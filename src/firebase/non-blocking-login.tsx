@@ -1,3 +1,4 @@
+
 'use client';
 import {
   Auth,
@@ -7,6 +8,7 @@ import {
   sendPasswordResetEmail,
   updateProfile,
 } from 'firebase/auth';
+import { doc, setDoc, Firestore } from 'firebase/firestore';
 import { toast } from '@/hooks/use-toast';
 
 /** Initiate anonymous sign-in (non-blocking). */
@@ -22,13 +24,33 @@ export function initiateAnonymousSignIn(authInstance: Auth): void {
 }
 
 /** Initiate email/password sign-up (non-blocking). */
-export function initiateEmailSignUp(authInstance: Auth, email: string, password: string, firstName: string, lastName: string): void {
+export function initiateEmailSignUp(
+  authInstance: Auth, 
+  db: Firestore,
+  email: string, 
+  password: string, 
+  firstName: string, 
+  lastName: string,
+  role: string = 'Sales'
+): void {
   createUserWithEmailAndPassword(authInstance, email, password)
-    .then((userCredential) => {
-      // After creating the user, update their profile with the display name.
-      // This will be picked up by the onAuthStateChanged listener in FirebaseProvider.
-      return updateProfile(userCredential.user, {
+    .then(async (userCredential) => {
+      const user = userCredential.user;
+      
+      // 1. Update auth profile
+      await updateProfile(user, {
         displayName: `${firstName} ${lastName}`
+      });
+
+      // 2. Create Firestore user profile immediately
+      // This ensures the user list is populated and roles are assigned without waiting for the background trigger
+      const userDocRef = doc(db, 'users', user.uid);
+      return setDoc(userDocRef, {
+        id: user.uid,
+        firstName,
+        lastName,
+        email: user.email,
+        roles: [role],
       });
     })
     .catch((error) => {

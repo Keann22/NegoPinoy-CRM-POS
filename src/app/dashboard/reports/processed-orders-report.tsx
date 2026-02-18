@@ -144,9 +144,9 @@ export function ProcessedOrdersReport() {
             <table className="w-full border-collapse border border-black">
                 <thead>
                     <tr className="bg-gray-100">
-                        <th className="border border-black px-2 py-1 text-left text-xs uppercase">Order ID</th>
-                        <th className="border border-black px-2 py-1 text-left text-xs uppercase">Customer Name</th>
-                        <th className="border border-black px-2 py-1 text-left text-xs uppercase">Notes / Shipping Details</th>
+                        <th className="border border-black px-2 py-1 text-left text-xs uppercase w-[15%]">Order ID</th>
+                        <th className="border border-black px-2 py-1 text-left text-xs uppercase w-[35%]">Customer Name</th>
+                        <th className="border border-black px-2 py-1 text-left text-xs uppercase w-[50%]">Notes / Shipping Details</th>
                     </tr>
                 </thead>
                 <tbody>

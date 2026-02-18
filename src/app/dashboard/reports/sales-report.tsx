@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -8,37 +9,25 @@ import {
   startOfYesterday,
   endOfYesterday,
   format,
-  endOfDay,
   subMonths,
 } from 'date-fns';
 import { Calendar as CalendarIcon, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
+  Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from '@/components/ui/card';
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
+  Popover, PopoverContent, PopoverTrigger,
 } from '@/components/ui/popover';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  TableFooter as ReportTableFooter,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter as ReportTableFooter,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
+import { useUserProfile } from '@/hooks/useUserProfile';
 
 
 // Matches a subset of the Firestore document structure for an order
@@ -72,6 +61,9 @@ export function SalesReport() {
 
   const firestore = useFirestore();
   const { user } = useUser();
+  const { userProfile } = useUserProfile();
+
+  const isManagement = useMemo(() => userProfile?.roles.some(r => ['Admin', 'Owner'].includes(r)), [userProfile]);
 
   const allOrdersQuery = useMemoFirebase(() => {
       if (!firestore || !user) return null;
@@ -80,12 +72,13 @@ export function SalesReport() {
   const { data: allOrders, isLoading: isLoadingOrders } = useCollection<Order>(allOrdersQuery);
 
   const usersQuery = useMemoFirebase(() => {
-      if (!firestore || !user) return null;
+      // Permission Guard: Only management roles can list the entire user directory
+      if (!firestore || !user || !isManagement) return null;
       return collection(firestore, 'users');
-  }, [firestore, user]);
+  }, [firestore, user, isManagement]);
   const { data: users, isLoading: isLoadingUsers } = useCollection<UserProfile>(usersQuery);
 
-  const isLoading = isLoadingOrders || isLoadingUsers;
+  const isLoading = isLoadingOrders || (isManagement && isLoadingUsers);
 
   const orders = useMemo(() => {
     if (!allOrders || !date?.from || !date?.to) return [];
@@ -104,12 +97,12 @@ export function SalesReport() {
   }, [users]);
 
   const salesByPerson = useMemo(() => {
-    if (!orders || !userMap) return [];
+    if (!orders) return [];
     
     const salesData = orders
       .reduce((acc, order) => {
         const { salesPersonId, totalAmount } = order;
-        if (!salesPersonId) return acc; // Skip if no salesperson assigned
+        if (!salesPersonId) return acc;
 
         if (!acc[salesPersonId]) {
           acc[salesPersonId] = {
@@ -163,10 +156,7 @@ export function SalesReport() {
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {date?.from ? (
                     date.to ? (
-                        <>
-                        {format(date.from, "LLL dd, y")} -{" "}
-                        {format(date.to, "LLL dd, y")}
-                        </>
+                        <>{format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}</>
                     ) : (
                         format(date.from, "LLL dd, y")
                     )

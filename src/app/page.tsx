@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useRouter } from 'next/navigation';
@@ -6,13 +7,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/logo';
-import { useAuth, useUser } from '@/firebase';
+import { useAuth, useUser, useFirestore } from '@/firebase';
 import { initiateEmailSignIn, initiatePasswordReset, initiateEmailSignUp } from '@/firebase/non-blocking-login';
 import { FormEvent, useEffect, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function LoginPage() {
   const auth = useAuth();
+  const firestore = useFirestore();
   const { user, isUserLoading, userError } = useUser();
   const router = useRouter();
   const { toast } = useToast();
@@ -25,6 +34,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [role, setRole] = useState('Sales');
 
 
   useEffect(() => {
@@ -45,7 +55,7 @@ export default function LoginPage() {
 
     if (isSignUp) {
         // Handle Sign Up
-        if (!email || !password || !firstName || !lastName) {
+        if (!email || !password || !firstName || !lastName || !role) {
             toast({
                 variant: "destructive",
                 title: "All fields are required.",
@@ -53,7 +63,7 @@ export default function LoginPage() {
             });
             return;
         }
-        initiateEmailSignUp(auth, email, password, firstName, lastName);
+        initiateEmailSignUp(auth, firestore, email, password, firstName, lastName, role);
 
     } else {
         // Handle Login
@@ -113,6 +123,20 @@ export default function LoginPage() {
                       <Label htmlFor="lastName">Last Name</Label>
                       <Input id="lastName" placeholder="Owner" required value={lastName} onChange={(e) => setLastName(e.target.value)} />
                     </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="role">Assign Your Role</Label>
+                    <Select value={role} onValueChange={setRole}>
+                      <SelectTrigger id="role">
+                        <SelectValue placeholder="Select a role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Owner">Owner (Full Access)</SelectItem>
+                        <SelectItem value="Admin">Admin</SelectItem>
+                        <SelectItem value="Inventory">Inventory (Fulfillment)</SelectItem>
+                        <SelectItem value="Sales">Sales</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </>
               )}
