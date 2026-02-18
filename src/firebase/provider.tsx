@@ -64,30 +64,39 @@ async function ensureUserProfileExists(firestore: Firestore, firebaseUser: User)
     const userDocRef = doc(firestore, 'users', firebaseUser.uid);
     try {
         const userDoc = await getDoc(userDocRef);
-        if (!userDoc.exists()) {
+        if (userDoc.exists()) return;
+
+        // Determine roles. Default to Sales.
+        let roles = ['Sales'];
+        
+        // Try to check if this is the first user.
+        // If this fails (due to permissions), we assume there are already users.
+        try {
             const usersCollectionRef = collection(firestore, 'users');
             const firstUserQuery = query(usersCollectionRef, limit(1));
             const firstUserSnapshot = await getDocs(firstUserQuery);
-
-            let roles = ['Sales']; // Default role
-            if (firstUserSnapshot.empty || (firstUserSnapshot.docs.length === 1 && firstUserSnapshot.docs[0].id === firebaseUser.uid)) {
+            
+            if (firstUserSnapshot.empty) {
                 // This is the very first user in the system.
                 roles = ['Owner', 'Admin', 'Inventory', 'Sales'];
             }
-
-            const [firstName, ...lastNameParts] = firebaseUser.displayName?.split(' ') || ['New', 'User'];
-            const lastName = lastNameParts.join(' ');
-
-            await setDoc(userDocRef, {
-                id: firebaseUser.uid,
-                firstName,
-                lastName,
-                email: firebaseUser.email,
-                roles: roles,
-            });
+        } catch (e) {
+            // Permission denied usually means there are already users and rules are active.
+            // Or just a network error. In any case, stick with default roles.
         }
+
+        const [firstName, ...lastNameParts] = firebaseUser.displayName?.split(' ') || ['New', 'User'];
+        const lastName = lastNameParts.join(' ') || 'User';
+
+        await setDoc(userDocRef, {
+            id: firebaseUser.uid,
+            firstName,
+            lastName,
+            email: firebaseUser.email,
+            roles: roles,
+        });
     } catch (dbError) {
-        console.error("Error during background user profile check/creation:", dbError);
+        console.error("Error during background user profile creation:", dbError);
     }
 }
 
