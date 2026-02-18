@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useRouter } from 'next/navigation';
@@ -131,7 +130,6 @@ export default function LoginPage() {
                         <SelectValue placeholder="Select a role" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Owner">Owner (Full Access)</SelectItem>
                         <SelectItem value="Admin">Admin</SelectItem>
                         <SelectItem value="Inventory">Inventory (Fulfillment)</SelectItem>
                         <SelectItem value="Sales">Sales</SelectItem>

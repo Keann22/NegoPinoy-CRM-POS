@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { UserProfile } from "@/app/dashboard/users/page";
 import { Checkbox } from "@/components/ui/checkbox";
 
-const roles: UserProfile['roles'] = ['Owner', 'Admin', 'Warehouse Manager', 'Sales'];
+const roles: UserProfile['roles'] = ['Owner', 'Admin', 'Inventory', 'Sales'];
 
 const rolesSchema = z.object({
   roles: z.array(z.string()).refine((value) => value.some((item) => item), {
