@@ -12,7 +12,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Overview } from '@/components/dashboard/overview';
 import { RecentSales } from '@/components/dashboard/recent-sales';
 import { AiRecommendations } from '@/components/dashboard/ai-recommendations';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -201,15 +200,7 @@ export default function DashboardPage() {
         </Card>
       </div>
       <div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3">
-        <Card className="xl:col-span-2">
-          <CardHeader>
-            <CardTitle className="font-headline">Overview</CardTitle>
-          </CardHeader>
-          <CardContent className="pl-2">
-            <Overview />
-          </CardContent>
-        </Card>
-        <Card>
+        <Card className="xl:col-span-3">
           <CardHeader>
             <CardTitle className="font-headline">Recent Sales</CardTitle>
           </CardHeader>
