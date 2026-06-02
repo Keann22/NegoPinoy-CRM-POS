@@ -59,6 +59,7 @@ function Footer() {
             <h3>NegoPinoy</h3>
             <p className="mb-4">Empowering businesses and consumers with quality products.</p>
             <p style={{fontSize: '0.85rem', marginBottom: '1rem', color: '#64748b'}}>Official Website of <strong>Colev Elijah Enterprises</strong></p>
+            <p><strong>Address:</strong> Poblacion 1, Victoria Oriental Mindoro</p>
             <p><strong>Phone:</strong> 09171869554</p>
             <p><strong>Email:</strong> ornoskeneth@gmail.com</p>
           </div>

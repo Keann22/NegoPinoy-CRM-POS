@@ -31,7 +31,7 @@ import { useCollection, useUser, useSupabase } from '@/firebase';
 import { AddProductDialog } from '@/components/dashboard/add-product-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BulkUploadProductsDialog } from '@/components/dashboard/bulk-upload-products-dialog';
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
