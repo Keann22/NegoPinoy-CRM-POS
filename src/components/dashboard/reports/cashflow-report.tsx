@@ -2,8 +2,7 @@
 import { useState, useMemo } from 'react';
 import { DateRange } from 'react-day-picker';
 import { startOfMonth, endOfMonth } from 'date-fns';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { useCollection, useSupabase, useUser, collection, query, where } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReportDateFilter } from './report-date-filter';
@@ -30,36 +29,36 @@ export function CashFlowReport() {
         to: endOfMonth(new Date()),
     });
 
-    const firestore = useFirestore();
+    const supabase = useSupabase();
     const { user } = useUser();
 
     // Queries
-    const paymentsQuery = useMemoFirebase(() => {
-        if (!firestore || !user || !date?.from || !date?.to) return null;
+    const paymentsQuery = useMemo(() => {
+        if (!supabase || !user || !date?.from || !date?.to) return null;
         return query(
-            collection(firestore, 'payments'),
+            collection(supabase, 'payments'),
             where('paymentDate', '>=', date.from.toISOString()),
             where('paymentDate', '<=', date.to.toISOString())
         );
-    }, [firestore, user, date]);
+    }, [supabase, user, date]);
     
-    const expensesQuery = useMemoFirebase(() => {
-        if (!firestore || !user || !date?.from || !date?.to) return null;
+    const expensesQuery = useMemo(() => {
+        if (!supabase || !user || !date?.from || !date?.to) return null;
         return query(
-            collection(firestore, 'expenses'),
+            collection(supabase, 'expenses'),
             where('expenseDate', '>=', date.from.toISOString()),
             where('expenseDate', '<=', date.to.toISOString())
         );
-    }, [firestore, user, date]);
+    }, [supabase, user, date]);
     
-    const refundsQuery = useMemoFirebase(() => {
-        if (!firestore || !user || !date?.from || !date?.to) return null;
+    const refundsQuery = useMemo(() => {
+        if (!supabase || !user || !date?.from || !date?.to) return null;
         return query(
-            collection(firestore, 'refunds'),
+            collection(supabase, 'refunds'),
             where('refundDate', '>=', date.from.toISOString()),
             where('refundDate', '<=', date.to.toISOString())
         );
-    }, [firestore, user, date]);
+    }, [supabase, user, date]);
 
 
     // Fetch data

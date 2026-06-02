@@ -6,10 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/logo';
-import { useAuth, useUser, useFirestore } from '@/firebase';
-import { initiateEmailSignIn, initiatePasswordReset, initiateEmailSignUp } from '@/firebase/non-blocking-login';
 import { FormEvent, useEffect, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { createClient } from '@/lib/supabase/client';
 import {
   Select,
   SelectContent,
@@ -19,79 +18,108 @@ import {
 } from "@/components/ui/select";
 
 export default function LoginPage() {
-  const auth = useAuth();
-  const firestore = useFirestore();
-  const { user, isUserLoading, userError } = useUser();
+  const supabase = createClient();
   const router = useRouter();
   const { toast } = useToast();
 
-  // State to toggle between Login and Sign Up
   const [isSignUp, setIsSignUp] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
 
-  // Form state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [role, setRole] = useState('Sales');
 
-
+  // Check if user is already logged in
   useEffect(() => {
-    if (!isUserLoading && user) {
-      router.push('/dashboard');
-    }
-    if(userError) {
-        toast({
-            variant: "destructive",
-            title: "Uh oh! Something went wrong.",
-            description: userError.message,
-        });
-    }
-  }, [user, isUserLoading, router, userError, toast]);
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        router.push('/dashboard');
+      } else {
+        setIsCheckingSession(false);
+      }
+    };
+    checkSession();
+  }, []);
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
 
-    if (isSignUp) {
-        // Handle Sign Up
+    try {
+      if (isSignUp) {
         if (!email || !password || !firstName || !lastName || !role) {
-            toast({
-                variant: "destructive",
-                title: "All fields are required.",
-                description: "Please fill out all fields to create an account.",
-            });
-            return;
+          toast({ variant: 'destructive', title: 'All fields are required.' });
+          return;
         }
-        initiateEmailSignUp(auth, firestore, email, password, firstName, lastName, role);
 
-    } else {
-        // Handle Login
-        if (!email || !password) {
-            toast({
-                variant: "destructive",
-                title: "Uh oh! Something went wrong.",
-                description: "Email and password are required.",
-            });
-            return;
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { first_name: firstName, last_name: lastName, role }
+          }
+        });
+
+        if (error) throw error;
+
+        if (data.user && !data.session) {
+          // Email confirmation required
+          toast({
+            title: 'Check your email!',
+            description: 'We sent a confirmation link. Please verify your email before logging in.',
+          });
+        } else if (data.session) {
+          // Auto-confirmed (email confirmation disabled in Supabase)
+          toast({ title: 'Account created!', description: 'Welcome aboard.' });
+          router.push('/dashboard');
         }
-        initiateEmailSignIn(auth, email, password);
-    }
-  };
-  
-  const handlePasswordReset = () => {
-    if (!email) {
+
+      } else {
+        if (!email || !password) {
+          toast({ variant: 'destructive', title: 'Email and password are required.' });
+          return;
+        }
+
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+        if (error) throw error;
+
+        router.push('/dashboard');
+      }
+    } catch (err: any) {
       toast({
         variant: 'destructive',
-        title: 'Email Required',
-        description: 'Please enter your email address to reset your password.',
+        title: 'Authentication Error',
+        description: err?.message || 'Something went wrong. Please try again.',
       });
-      return;
+    } finally {
+      setIsLoading(false);
     }
-    initiatePasswordReset(auth, email);
   };
 
-  if (isUserLoading || (!isUserLoading && user)) {
-    return <div className="flex items-center justify-center min-h-screen bg-background">Loading...</div>
+  const handlePasswordReset = async () => {
+    if (!email) {
+      toast({ variant: 'destructive', title: 'Email Required', description: 'Please enter your email address.' });
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      if (error) throw error;
+      toast({ title: 'Password Reset Sent', description: 'Check your inbox for the reset link.' });
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Error', description: err?.message });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isCheckingSession) {
+    return <div className="flex items-center justify-center min-h-screen bg-background">Loading...</div>;
   }
 
   return (
@@ -143,22 +171,22 @@ export default function LoginPage() {
                 <Input id="email" type="email" placeholder="m@example.com" required value={email} onChange={(e) => setEmail(e.target.value)} />
               </div>
               <div className="space-y-2">
-                 <div className="flex items-center justify-between">
-                    <Label htmlFor="password">Password</Label>
-                    {!isSignUp && (
-                        <button
-                            type="button"
-                            onClick={handlePasswordReset}
-                            className="text-sm font-medium text-primary hover:underline"
-                        >
-                            Forgot password?
-                        </button>
-                    )}
-                 </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Password</Label>
+                  {!isSignUp && (
+                    <button
+                      type="button"
+                      onClick={handlePasswordReset}
+                      className="text-sm font-medium text-primary hover:underline"
+                    >
+                      Forgot password?
+                    </button>
+                  )}
+                </div>
                 <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
               </div>
-              <Button type="submit" className="w-full">
-                {isSignUp ? 'Sign Up' : 'Login'}
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? 'Please wait...' : isSignUp ? 'Sign Up' : 'Login'}
               </Button>
             </div>
           </form>

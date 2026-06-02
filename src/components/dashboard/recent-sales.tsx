@@ -1,71 +1,137 @@
 'use client';
 
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, orderBy, limit } from 'firebase/firestore';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { Skeleton } from '../ui/skeleton';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { createClient } from '@/lib/supabase/client';
+import { useUser } from '@/firebase';
 
-type Order = {
-    id: string;
-    customerId: string;
-    totalAmount: number;
-};
+import { DateRange } from 'react-day-picker';
 
-type Customer = {
-    id: string;
-    firstName: string;
-    lastName: string;
+type RecentSaleItem = {
+    name: string;
     email: string;
+    amount: string;
+    avatarFallback: string;
 };
 
-export function RecentSales() {
-    const firestore = useFirestore();
+type RecentSalesProps = {
+    dateRange?: DateRange;
+    salespersonId?: string;
+};
+
+export function RecentSales({ dateRange, salespersonId = 'all' }: RecentSalesProps) {
     const { user } = useUser();
     const { userProfile } = useUserProfile();
+    const [recentSales, setRecentSales] = useState<RecentSaleItem[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
-    // Check permissions: Inventory ONLY users cannot see customer list
     const canSeeCustomers = useMemo(() => {
         if (!userProfile) return false;
         return userProfile.roles.some(r => ['Owner', 'Admin', 'Sales'].includes(r));
     }, [userProfile]);
 
-    const recentOrdersQuery = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return query(collection(firestore, 'orders'), orderBy('orderDate', 'desc'), limit(5));
-    }, [firestore, user]);
+    useEffect(() => {
+        if (!user) return;
 
-    // ONLY fetch customers if authorized
-    const customersQuery = useMemoFirebase(() => {
-        if (!firestore || !user || !canSeeCustomers) return null;
-        return collection(firestore, 'customers');
-    }, [firestore, user, canSeeCustomers]);
+        let isMounted = true;
+        const supabase = createClient();
 
-    const { data: orders, isLoading: isLoadingOrders } = useCollection<Order>(recentOrdersQuery);
-    const { data: customers, isLoading: isLoadingCustomers } = useCollection<Customer>(customersQuery);
+        const fetchRecentSales = async () => {
+            setIsLoading(true);
+            try {
+                let builder = supabase
+                    .from('orders')
+                    .select('id, customer_id, total_amount')
+                    .order('created_at', { ascending: false })
+                    .limit(5);
 
-    const isLoading = isLoadingOrders || (canSeeCustomers && isLoadingCustomers);
+                if (salespersonId !== 'all') {
+                    builder = builder.eq('sales_person_id', salespersonId);
+                }
+                
+                if (dateRange?.from) {
+                    builder = builder.gte('created_at', dateRange.from.toISOString());
+                }
+                if (dateRange?.to) {
+                    const toDate = new Date(dateRange.to);
+                    toDate.setHours(23, 59, 59, 999);
+                    builder = builder.lte('created_at', toDate.toISOString());
+                }
 
-    const customerMap = useMemo(() => {
-        if (!customers) return new Map<string, Omit<Customer, 'id'>>();
-        return new Map(customers.map(c => [c.id, { firstName: c.firstName, lastName: c.lastName, email: c.email }]));
-    }, [customers]);
+                const { data: orders, error: ordersError } = await builder;
 
-    const recentSales = useMemo(() => {
-        if (!orders) return [];
-        return orders.map(order => {
-            const customer = canSeeCustomers ? customerMap.get(order.customerId) : null;
-            const name = customer ? `${customer.firstName} ${customer.lastName}` : 'Restricted Customer';
-            const fallback = name.split(' ').map(n => n[0]).join('');
-            return {
-                name,
-                email: customer?.email || (canSeeCustomers ? '' : 'Access restricted'),
-                amount: `+₱${order.totalAmount.toFixed(2)}`,
-                avatarFallback: fallback.length > 0 ? fallback : 'UC'
+                if (ordersError) throw ordersError;
+                if (!orders || orders.length === 0) {
+                    if (isMounted) {
+                        setRecentSales([]);
+                        setIsLoading(false);
+                    }
+                    return;
+                }
+
+                // Build customer map if user can see customers
+                let customerMap = new Map<string, { name: string; email: string }>();
+
+                if (canSeeCustomers) {
+                    const customerIds = [...new Set(orders.map(o => o.customer_id).filter(Boolean))];
+                    if (customerIds.length > 0) {
+                        const { data: customers, error: customersError } = await supabase
+                            .from('customers')
+                            .select('id, full_name, email')
+                            .in('id', customerIds);
+
+                        if (!customersError && customers) {
+                            customers.forEach(c => {
+                                customerMap.set(c.id, {
+                                    name: c.full_name || 'Unknown Customer',
+                                    email: c.email || '',
+                                });
+                            });
+                        }
+                    }
+                }
+
+                const sales: RecentSaleItem[] = orders.map(order => {
+                    let name = 'Unknown Customer';
+                    let email = '';
+
+                    if (canSeeCustomers) {
+                        const customer = customerMap.get(order.customer_id);
+                        if (customer) {
+                            name = customer.name;
+                            email = customer.email;
+                        }
+                        // If customer not found in map but we have access, it may be a deleted/missing customer
+                    } else {
+                        name = 'Restricted (No Access)';
+                        email = 'Access restricted by role';
+                    }
+
+                    const fallback = name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                    return {
+                        name,
+                        email,
+                        amount: `+₱${Number(order.total_amount || 0).toFixed(2)}`,
+                        avatarFallback: fallback || 'UC',
+                    };
+                });
+
+                if (isMounted) {
+                    setRecentSales(sales);
+                }
+            } catch (err) {
+                console.warn('Error fetching recent sales:', err);
+                if (isMounted) setRecentSales([]);
+            } finally {
+                if (isMounted) setIsLoading(false);
             }
-        });
-    }, [orders, customerMap, canSeeCustomers]);
+        };
+
+        fetchRecentSales();
+        return () => { isMounted = false; };
+    }, [user, canSeeCustomers, dateRange, salespersonId]);
 
     if (isLoading) {
         return (
@@ -81,7 +147,7 @@ export function RecentSales() {
                     </div>
                 ))}
             </div>
-        )
+        );
     }
 
     return (
@@ -102,5 +168,5 @@ export function RecentSales() {
                 <p className='text-sm text-muted-foreground text-center py-10'>No recent sales to display.</p>
             )}
         </div>
-    )
+    );
 }

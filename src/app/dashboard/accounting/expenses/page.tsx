@@ -1,8 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { useCollection, useSupabase, useUser, collection, query, orderBy } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import {
@@ -35,16 +34,16 @@ type Expense = {
 };
 
 export default function ExpensesPage() {
-  const firestore = useFirestore();
+  const supabase = useSupabase();
   const { user } = useUser();
   const { userProfile } = useUserProfile();
 
   const isManagement = useMemo(() => userProfile?.roles.some(r => ['Admin', 'Owner'].includes(r)), [userProfile]);
 
   // CRITICAL: Strict role check before query
-  const expensesQuery = useMemoFirebase(
-    () => (firestore && user && isManagement ? query(collection(firestore, 'expenses'), orderBy('expenseDate', 'desc')) : null),
-    [firestore, user, isManagement]
+  const expensesQuery = useMemo(
+    () => (supabase && user && isManagement ? query(collection(supabase, 'expenses'), orderBy('expenseDate', 'desc')) : null),
+    [supabase, user, isManagement]
   );
   const { data: expenses, isLoading } = useCollection<Omit<Expense, 'id'>>(expensesQuery);
 

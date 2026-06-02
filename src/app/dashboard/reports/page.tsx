@@ -10,6 +10,8 @@ import { AccountsReceivableReport } from '@/app/dashboard/reports/ar-report';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { SalesByProductReport } from '@/components/dashboard/reports/sales-by-product-report';
 import { ToOrderReport } from '@/components/dashboard/reports/to-order-report';
+import { SalesSummaryReport } from '@/components/dashboard/reports/sales-summary-report';
+import { CommissionReport } from '@/components/dashboard/reports/commission-report';
 import { useMemo } from 'react';
 
 export default function ReportsPage() {
@@ -28,18 +30,24 @@ export default function ReportsPage() {
   if (!userProfile) return <div className="p-8 text-center">Loading permissions...</div>;
 
   return (
-    <Tabs defaultValue={defaultValue} className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="space-y-8">
+      {isManagement && <SalesSummaryReport />}
+      
+      <Tabs defaultValue={defaultValue} className="space-y-4">
+        <div className="flex items-center justify-between">
         <TabsList className="flex-wrap h-auto">
           {isManagement && <TabsTrigger value="pnl-statement">P&L Statement</TabsTrigger>}
           {isManagement && <TabsTrigger value="sales">Sales by Person</TabsTrigger>}
+          {(isManagement || isSales) && <TabsTrigger value="commissions">Commissions</TabsTrigger>}
           
           {(isManagement || isSales || isInventory) && (
             <TabsTrigger value="processed-orders">Processed Orders (Printing)</TabsTrigger>
           )}
           
           <TabsTrigger value="sales-product">Sales by Product</TabsTrigger>
-          <TabsTrigger value="to-order">To Order (Procurement)</TabsTrigger>
+          {(isManagement || isInventory) && (
+            <TabsTrigger value="to-order">To Order (Procurement)</TabsTrigger>
+          )}
           
           {isManagement && (
             <>
@@ -63,6 +71,12 @@ export default function ReportsPage() {
         </TabsContent>
       )}
 
+      {(isManagement || isSales) && (
+        <TabsContent value="commissions">
+            <CommissionReport />
+        </TabsContent>
+      )}
+
       {(isManagement || isSales || isInventory) && (
         <TabsContent value="processed-orders">
             <ProcessedOrdersReport />
@@ -73,9 +87,11 @@ export default function ReportsPage() {
         <SalesByProductReport />
       </TabsContent>
 
-      <TabsContent value="to-order">
-        <ToOrderReport />
-      </TabsContent>
+      {(isManagement || isInventory) && (
+        <TabsContent value="to-order">
+          <ToOrderReport />
+        </TabsContent>
+      )}
 
       {isManagement && (
         <>
@@ -93,5 +109,6 @@ export default function ReportsPage() {
         </>
       )}
     </Tabs>
+    </div>
   );
 }

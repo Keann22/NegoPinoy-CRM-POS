@@ -1,7 +1,8 @@
 'use client';
 
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, Star, Flame, Users, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Card,
   CardContent,
@@ -25,131 +26,150 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AddCustomerDialog } from '@/components/dashboard/add-customer-dialog';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useRouter } from 'next/navigation';
-import { useMemo } from 'react';
-import { Badge } from '@/components/ui/badge';
-
-
-// Matches the Firestore document structure for a customer
-type Customer = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phoneNumber?: string;
-  facebookProfileLink?: string;
-  shippingAddresses: string[];
-};
-
-// Matches a subset of the Order type
-type Order = {
-    id: string;
-    customerId: string;
-    balanceDue: number;
-    orderStatus: 'Pending Payment' | 'Processing' | 'Shipped' | 'Completed' | 'Cancelled' | 'Returned';
-};
-
+import { useState, useEffect } from 'react';
+import { createClient } from '@/lib/supabase/client';
 
 export default function CustomersPage() {
   const router = useRouter();
-  const firestore = useFirestore();
-  const { user } = useUser();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [customers, setCustomers] = useState<any[] | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const supabase = createClient();
 
-  const customersQuery = useMemoFirebase(
-    () => (firestore && user ? collection(firestore, 'customers') : null),
-    [firestore, user]
-  );
-  const { data: customers, isLoading: isLoadingCustomers } = useCollection<Customer>(customersQuery);
+  useEffect(() => {
+    const handler = setTimeout(() => {
+        setDebouncedQuery(searchQuery);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
-  const ordersQuery = useMemoFirebase(
-    () => (firestore && user ? collection(firestore, 'orders') : null),
-    [firestore, user]
-  );
-  const { data: orders, isLoading: isLoadingOrders } = useCollection<Order>(ordersQuery);
-
-  const isLoading = isLoadingCustomers || isLoadingOrders;
-
-  const customerBalances = useMemo(() => {
-    if (!orders) return new Map<string, number>();
-    const balances = new Map<string, number>();
-    for (const order of orders) {
-        if (order.balanceDue > 0 && order.orderStatus !== 'Cancelled' && order.orderStatus !== 'Returned') {
-            const currentBalance = balances.get(order.customerId) || 0;
-            balances.set(order.customerId, currentBalance + order.balanceDue);
+  useEffect(() => {
+    let isMounted = true;
+    const fetchCustomers = async () => {
+        setIsLoading(true);
+        try {
+            let query = supabase.from('customers').select('*')
+                .not('full_name', 'is', null).neq('full_name', '')
+                .not('mobile_number', 'is', null).neq('mobile_number', '')
+                .not('address_line', 'is', null).neq('address_line', '');
+            
+            if (debouncedQuery.trim()) {
+                query = query.ilike('full_name', `%${debouncedQuery.trim()}%`).limit(20);
+            } else {
+                query = query.order('created_at', { ascending: false }).limit(20);
+            }
+            
+            const { data, error } = await query;
+                
+            if (isMounted) {
+                if (error) {
+                    console.error('Error searching customers:', error);
+                    setCustomers([]);
+                } else {
+                    // Quick map for camelCase where necessary, or just use snake_case directly 
+                    // since the component below mostly uses snake_case keys anyway.
+                    setCustomers(data || []);
+                }
+            }
+        } catch (err) {
+            console.error('Error:', err);
+            if (isMounted) setCustomers([]);
+        } finally {
+            if (isMounted) setIsLoading(false);
         }
-    }
-    return balances;
-  }, [orders]);
+    };
 
+    fetchCustomers();
+    return () => { isMounted = false; };
+  }, [debouncedQuery, supabase]);
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
         <div>
-          <CardTitle className="font-headline">Customers</CardTitle>
+          <CardTitle className="font-headline">Customer CRM</CardTitle>
           <CardDescription>
-            View and manage your customer database.
+            Search and manage customer profiles.
           </CardDescription>
         </div>
-        <AddCustomerDialog />
+        <div className="flex items-center space-x-2">
+            <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                    type="search"
+                    placeholder="Search by name..."
+                    className="pl-8 w-[250px]"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                />
+            </div>
+            <AddCustomerDialog onSuccess={() => setDebouncedQuery(debouncedQuery + ' ')} />
+        </div>
       </CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Phone</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Balance Owed</TableHead>
+              <TableHead>Customer</TableHead>
+              <TableHead>Tier</TableHead>
+              <TableHead>Kitchen Profile</TableHead>
+              <TableHead>Spend & Engagement</TableHead>
               <TableHead>
                 <span className="sr-only">Actions</span>
               </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading && Array.from({ length: 5 }).map((_, i) => (
+            {isLoading && Array.from({ length: 3 }).map((_, i) => (
                  <TableRow key={i}>
-                    <TableCell>
-                      <div className="flex items-center gap-4">
-                        <Skeleton className="h-10 w-10 rounded-full" />
-                        <div className='space-y-2'>
-                          <Skeleton className="h-4 w-32" />
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
-                    <TableCell>
-                        <Skeleton className="h-8 w-8 ml-auto" />
-                    </TableCell>
+                    <TableCell><Skeleton className="h-10 w-32" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                    <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                  </TableRow>
             ))}
-            {customers && customers.map((customer) => {
-              const balance = customerBalances.get(customer.id) || 0;
-              const status: {text: string, variant: 'outline' | 'destructive'} = balance > 0 ? { text: 'Has Balance', variant: 'destructive' } : { text: 'Paid Up', variant: 'outline' };
-
+            {!isLoading && customers && customers.map((cust) => {
               return (
-              <TableRow key={customer.id}>
+              <TableRow key={cust.id}>
                 <TableCell>
-                  <div className="flex items-center gap-4">
-                    <Avatar>
-                        <AvatarFallback>{customer.firstName.charAt(0)}{customer.lastName.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div className="font-medium">{customer.firstName} {customer.lastName}</div>
+                  <div className="font-medium">{cust.full_name || 'Unknown'}</div>
+                  <div className="text-xs text-muted-foreground font-mono mt-1">{cust.psid}</div>
+                </TableCell>
+                <TableCell>
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
+                    cust.suki_tier?.toLowerCase() === 'vip' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' : 
+                    cust.suki_tier?.toLowerCase() === 'regular' ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20' :
+                    'bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
+                  }`}>
+                    {cust.suki_tier?.toLowerCase() === 'vip' && <Star className="w-3 h-3 mr-1" />}
+                    {cust.suki_tier?.toUpperCase() || 'NEWBIE'}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center text-sm">
+                      <Flame className="w-4 h-4 text-orange-500 mr-2 opacity-70" />
+                      <span className="text-muted-foreground">{cust.stove_type || 'Unknown Stove'}</span>
+                    </div>
+                    <div className="flex items-center text-sm">
+                      <Users className="w-4 h-4 text-blue-500 mr-2 opacity-70" />
+                      <span className="text-muted-foreground text-xs">Family Size: {cust.family_size || '?'}</span>
+                    </div>
                   </div>
                 </TableCell>
-                <TableCell>{customer.phoneNumber || 'N/A'}</TableCell>
-                <TableCell>
-                    <Badge variant={status.variant}>{status.text}</Badge>
-                </TableCell>
-                <TableCell className="text-right font-medium">
-                    {balance > 0 ? `₱${balance.toFixed(2)}` : '—'}
+                <TableCell className="font-medium">
+                  <div className="text-emerald-500 font-medium mb-1">₱{Number(cust.total_lifetime_spend || 0).toLocaleString()}</div>
+                  {cust.pain_points && Object.keys(cust.pain_points).length > 0 && (
+                    <div className="text-xs text-muted-foreground flex items-center">
+                      <span className="w-1.5 h-1.5 bg-rose-500 rounded-full mr-1.5"></span>
+                      {Object.keys(cust.pain_points).length} Pain point(s) recorded
+                    </div>
+                  )}
                 </TableCell>
                 <TableCell>
                   <DropdownMenu>
@@ -161,7 +181,7 @@ export default function CustomersPage() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuItem onClick={() => router.push(`/dashboard/customers/${customer.id}`)}>
+                      <DropdownMenuItem onClick={() => router.push(`/dashboard/customers/${cust.id}`)}>
                         View Account
                       </DropdownMenuItem>
                       <DropdownMenuItem>Edit</DropdownMenuItem>
@@ -177,20 +197,33 @@ export default function CustomersPage() {
         </Table>
         {!isLoading && (!customers || customers.length === 0) && (
             <div className="flex flex-col items-center justify-center text-center border-2 border-dashed rounded-lg p-12 mt-4">
-                <p className="text-lg font-semibold">No customers found</p>
-                <p className="text-muted-foreground mt-2">
-                    Click "Add Customer" to get started.
-                </p>
+                {debouncedQuery.trim() ? (
+                    <>
+                        <p className="text-lg font-semibold">No customers found</p>
+                        <p className="text-muted-foreground mt-2">
+                            Try adjusting your search criteria.
+                        </p>
+                    </>
+                ) : (
+                    <>
+                        <Users className="h-10 w-10 text-muted-foreground mb-4 opacity-50" />
+                        <p className="text-lg font-semibold">No customers yet</p>
+                        <p className="text-muted-foreground mt-2">
+                            You haven't added any customers. Click "Add Customer" to get started.
+                        </p>
+                    </>
+                )}
             </div>
         )}
       </CardContent>
       {customers && customers.length > 0 && (
         <CardFooter>
             <div className="text-xs text-muted-foreground">
-            Showing <strong>1-{customers.length}</strong> of <strong>{customers.length}</strong> customers
+            Showing up to <strong>{customers.length}</strong> results
             </div>
         </CardFooter>
       )}
     </Card>
   );
 }
+

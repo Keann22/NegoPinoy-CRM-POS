@@ -1,13 +1,12 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { DateRange } from 'react-day-picker';
 import { startOfMonth, endOfMonth } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReportDateFilter } from '@/components/dashboard/reports/report-date-filter';
 import { Separator } from '@/components/ui/separator';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query } from 'firebase/firestore';
+import { useUser, useSupabase } from '@/firebase';
 import {
     Accordion,
     AccordionContent,
@@ -16,14 +15,13 @@ import {
 } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
 
-// --- Data Types ---
 type Order = {
     id: string;
     subtotal: number;
     totalDiscount: number;
     totalAmount: number;
     orderDate: string;
-    orderStatus: 'Pending Payment' | 'Processing' | 'Shipped' | 'Completed' | 'Cancelled' | 'Returned';
+    orderStatus: string;
 };
 
 type OrderItem = {
@@ -38,140 +36,110 @@ type Expense = {
     category: string;
 };
 
-type BadDebt = {
-    amount: number;
-    writeOffDate: string;
-}
-
-type Refund = {
-    amount: number;
-    refundDate: string;
-}
-
-// --- Report Component ---
 export function PnlReport() {
     const [date, setDate] = useState<DateRange | undefined>({
         from: startOfMonth(new Date()),
         to: endOfMonth(new Date()),
     });
 
-    const firestore = useFirestore();
+    const supabase = useSupabase();
     const { user } = useUser();
 
-    // --- Data Fetching ---
-    // Fetch all documents and filter on the client-side for consistency and to avoid complex queries.
-    const allOrdersQuery = useMemoFirebase(() => (firestore && user ? query(collection(firestore, 'orders')) : null), [firestore, user]);
-    const allExpensesQuery = useMemoFirebase(() => (firestore && user ? query(collection(firestore, 'expenses')) : null), [firestore, user]);
-    const allBadDebtsQuery = useMemoFirebase(() => (firestore && user ? query(collection(firestore, 'badDebts')) : null), [firestore, user]);
-    const allOrderItemsQuery = useMemoFirebase(() => (firestore && user ? query(collection(firestore, 'orderItems')) : null), [firestore, user]);
-    const allRefundsQuery = useMemoFirebase(() => (firestore && user ? query(collection(firestore, 'refunds')) : null), [firestore, user]);
+    const [allOrders, setAllOrders] = useState<Order[]>([]);
+    const [allOrderItems, setAllOrderItems] = useState<OrderItem[]>([]);
+    const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
-    const { data: allOrders, isLoading: isLoadingOrders } = useCollection<Order>(allOrdersQuery);
-    const { data: allExpenses, isLoading: isLoadingExpenses } = useCollection<Expense>(allExpensesQuery);
-    const { data: allBadDebts, isLoading: isLoadingBadDebts } = useCollection<BadDebt>(allBadDebtsQuery);
-    const { data: allOrderItems, isLoading: isLoadingOrderItems } = useCollection<OrderItem>(allOrderItemsQuery);
-    const { data: allRefunds, isLoading: isLoadingRefunds } = useCollection<Refund>(allRefundsQuery);
-    
-    const isLoading = isLoadingOrders || isLoadingExpenses || isLoadingBadDebts || isLoadingOrderItems || isLoadingRefunds;
+    useEffect(() => {
+        if (!supabase || !user) return;
+        const fetchAll = async () => {
+            setIsLoading(true);
+            try {
+                const [ordersRes, itemsRes, expensesRes] = await Promise.all([
+                    supabase.from('orders').select('id, subtotal, total_discount, total_amount, status, order_date, created_at'),
+                    supabase.from('order_items').select('order_id, quantity, cost_price_at_sale'),
+                    supabase.from('expenses').select('amount, created_at, category'),
+                ]);
 
-    // --- Data Processing & Calculation ---
+                setAllOrders((ordersRes.data || []).map((o: any) => ({
+                    id: o.id,
+                    subtotal: Number(o.subtotal) || 0,
+                    totalDiscount: Number(o.total_discount) || 0,
+                    totalAmount: Number(o.total_amount) || 0,
+                    orderStatus: o.status,
+                    orderDate: o.order_date || o.created_at,
+                })));
+
+                setAllOrderItems((itemsRes.data || []).map((i: any) => ({
+                    orderId: i.order_id,
+                    quantity: Number(i.quantity) || 0,
+                    costPriceAtSale: Number(i.cost_price_at_sale) || 0,
+                })));
+
+                setAllExpenses((expensesRes.data || []).map((e: any) => ({
+                    amount: Number(e.amount) || 0,
+                    expenseDate: e.created_at,
+                    category: e.category || 'Uncategorized',
+                })));
+            } catch (err) {
+                console.error('P&L fetch error:', err);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchAll();
+    }, [supabase, user]);
+
     const reportData = useMemo(() => {
         const defaults = {
-            grossSales: 0,
-            salesReturns: 0,
-            salesDiscounts: 0,
-            netSales: 0,
-            cogs: 0,
-            grossProfit: 0,
-            operatingExpenses: 0,
+            grossSales: 0, salesReturns: 0, salesDiscounts: 0, netSales: 0,
+            cogs: 0, grossProfit: 0, operatingExpenses: 0,
             operatingExpensesBreakdown: {} as Record<string, number>,
-            badDebtExpense: 0,
-            refundsExpense: 0,
-            totalOtherLosses: 0,
-            netProfit: 0,
+            badDebtExpense: 0, refundsExpense: 0, totalOtherLosses: 0, netProfit: 0,
         };
 
-        if (!allOrders || !allOrderItems || !allExpenses || !allBadDebts || !allRefunds || !date?.from || !date?.to) {
-             return defaults;
-        }
-        
+        if (!date?.from || !date?.to) return defaults;
+
         const fromTime = date.from.getTime();
-        const toTime = date.to.getTime();
-        
-        // Filter all data sources by the selected date range
+        const toDate = new Date(date.to); toDate.setHours(23, 59, 59, 999);
+        const toTime = toDate.getTime();
+
         const periodOrders = allOrders.filter(o => {
-            const orderTime = new Date(o.orderDate).getTime();
-            return orderTime >= fromTime && orderTime <= toTime;
+            const t = new Date(o.orderDate).getTime();
+            return t >= fromTime && t <= toTime;
         });
-        
+
         const periodExpenses = allExpenses.filter(e => {
-            const expenseTime = new Date(e.expenseDate).getTime();
-            return expenseTime >= fromTime && expenseTime <= toTime;
+            const t = new Date(e.expenseDate).getTime();
+            return t >= fromTime && t <= toTime;
         });
 
-        const periodBadDebts = allBadDebts.filter(d => {
-            const debtTime = new Date(d.writeOffDate).getTime();
-            return debtTime >= fromTime && debtTime <= toTime;
-        });
-
-        const periodRefunds = allRefunds.filter(r => {
-            const refundTime = new Date(r.refundDate).getTime();
-            return refundTime >= fromTime && refundTime <= toTime;
-        });
-
-
-        // 1. Revenue Calculation
         const validOrders = periodOrders.filter(o => o.orderStatus !== 'Cancelled' && o.orderStatus !== 'Returned');
         const returnedOrders = periodOrders.filter(o => o.orderStatus === 'Cancelled' || o.orderStatus === 'Returned');
-        
-        const grossSales = validOrders.reduce((sum, order) => sum + (order.subtotal || order.totalAmount + (order.totalDiscount || 0)), 0);
-        const salesDiscounts = validOrders.reduce((sum, order) => sum + (order.totalDiscount || 0), 0);
-        const salesReturns = returnedOrders.reduce((sum, order) => sum + order.totalAmount, 0);
-        const netSales = grossSales - salesDiscounts; // Net Sales before returns for the Gross Profit calculation
 
-        // 2. COGS Calculation
+        const grossSales = validOrders.reduce((sum, o) => sum + (o.subtotal || (o.totalAmount + (o.totalDiscount || 0))), 0);
+        const salesDiscounts = validOrders.reduce((sum, o) => sum + (o.totalDiscount || 0), 0);
+        const salesReturns = returnedOrders.reduce((sum, o) => sum + o.totalAmount, 0);
+        const netSales = grossSales - salesDiscounts;
+
         const validOrderIds = new Set(validOrders.map(o => o.id));
-        const relevantOrderItems = allOrderItems.filter(item => validOrderIds.has(item.orderId));
-        const cogs = relevantOrderItems.reduce((sum, item) => sum + ((item.costPriceAtSale || 0) * (item.quantity || 0)), 0);
-
-        // 3. Gross Profit
+        const relevantItems = allOrderItems.filter(i => validOrderIds.has(i.orderId));
+        const cogs = relevantItems.reduce((sum, i) => sum + (i.costPriceAtSale * i.quantity), 0);
         const grossProfit = netSales - cogs;
 
-        // 4. Operating Expenses
-        const operatingExpensesBreakdown = periodExpenses.reduce((acc, expense) => {
-            if (expense.category.toLowerCase() !== 'cost of goods sold') {
-                if (!acc[expense.category]) {
-                    acc[expense.category] = 0;
-                }
-                acc[expense.category] += expense.amount;
+        const opBreakdown = periodExpenses.reduce((acc, e) => {
+            if (e.category.toLowerCase() !== 'cost of goods sold') {
+                acc[e.category] = (acc[e.category] || 0) + e.amount;
             }
             return acc;
         }, {} as Record<string, number>);
-        const operatingExpenses = Object.values(operatingExpensesBreakdown).reduce((sum, amount) => sum + amount, 0);
+        const operatingExpenses = Object.values(opBreakdown).reduce((s, a) => s + a, 0);
 
-        // 5. Other Losses
-        const badDebtExpense = periodBadDebts.reduce((sum, debt) => sum + debt.amount, 0);
-        const refundsExpense = periodRefunds.reduce((sum, refund) => sum + refund.amount, 0);
-        const totalOtherLosses = badDebtExpense + refundsExpense + salesReturns; // Returns are treated as a loss against gross profit
-
-        // 6. Net Profit
+        const totalOtherLosses = salesReturns;
         const netProfit = grossProfit - operatingExpenses - totalOtherLosses;
 
-        return {
-            grossSales,
-            salesReturns,
-            salesDiscounts,
-            netSales,
-            cogs,
-            grossProfit,
-            operatingExpenses,
-            operatingExpensesBreakdown,
-            badDebtExpense,
-            refundsExpense,
-            totalOtherLosses,
-            netProfit,
-        };
-    }, [allOrders, allOrderItems, allExpenses, allBadDebts, allRefunds, date]);
+        return { grossSales, salesReturns, salesDiscounts, netSales, cogs, grossProfit, operatingExpenses, operatingExpensesBreakdown: opBreakdown, badDebtExpense: 0, refundsExpense: 0, totalOtherLosses, netProfit };
+    }, [allOrders, allOrderItems, allExpenses, date]);
 
     const ReportItem = ({ label, value, isBold = false, isNegative = false, isSubItem = false, isFinal = false }: { label: string; value: number; isBold?: boolean; isNegative?: boolean; isSubItem?: boolean; isFinal?: boolean }) => (
         <div className={cn("flex justify-between py-2", isBold && "font-bold", isSubItem && "pl-4 text-sm")}>
@@ -179,7 +147,7 @@ export function PnlReport() {
             <span className={cn(isNegative && 'text-destructive', isFinal && 'border-t-2 border-b-4 double border-foreground py-1 my-1')}>{`₱${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</span>
         </div>
     );
-    
+
     return (
         <Card>
             <CardHeader>
@@ -205,12 +173,12 @@ export function PnlReport() {
                         <ReportItem label="Gross Sales" value={reportData.grossSales} isSubItem />
                         <ReportItem label="Less: Sales Discounts" value={-reportData.salesDiscounts} isSubItem />
                         <ReportItem label="Net Sales" value={reportData.netSales} isBold />
-                        
+
                         <Separator className='my-4'/>
 
                         <h3 className='font-bold text-lg mb-2'>Cost of Goods Sold</h3>
                         <ReportItem label="Total FIFO COGS" value={-reportData.cogs} />
-                        
+
                         <Separator className='my-4' />
 
                         <ReportItem label="Gross Profit" value={reportData.grossProfit} isBold />
@@ -228,7 +196,7 @@ export function PnlReport() {
                                 </AccordionTrigger>
                                 <AccordionContent className="pl-8 pt-2">
                                 {Object.entries(reportData.operatingExpensesBreakdown)
-                                    .sort(([catA], [catB]) => catA.localeCompare(catB))
+                                    .sort(([a], [b]) => a.localeCompare(b))
                                     .map(([category, amount]) => (
                                     <div key={category} className="flex justify-between py-1 text-sm text-muted-foreground">
                                         <span>{category}</span>
@@ -238,16 +206,14 @@ export function PnlReport() {
                                 </AccordionContent>
                             </AccordionItem>
                         </Accordion>
-                        
+
                         <Separator className='my-4' />
 
-                        <h3 className='font-bold text-lg mb-2'>Other Losses & Adjustments</h3>
-                        <ReportItem label="Sales Returns & Allowances" value={-reportData.salesReturns} isSubItem />
-                        <ReportItem label="Bad Debt Expense" value={-reportData.badDebtExpense} isSubItem />
-                        <ReportItem label="Refunds" value={-reportData.refundsExpense} isSubItem />
-                        
+                        <h3 className='font-bold text-lg mb-2'>Other Losses &amp; Adjustments</h3>
+                        <ReportItem label="Sales Returns &amp; Allowances" value={-reportData.salesReturns} isSubItem />
+
                         <Separator className='my-4' />
-                        
+
                         <ReportItem label="Net Profit" value={reportData.netProfit} isBold isNegative={reportData.netProfit < 0} isFinal/>
                     </div>
                 )}

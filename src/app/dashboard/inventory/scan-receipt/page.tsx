@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useFirestore } from '@/firebase';
-import { collection, doc, runTransaction, query, orderBy, where, limit, getDocs } from 'firebase/firestore';
+import { useSupabase } from '@/firebase';
+import { createClient } from '@/lib/supabase/client';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -24,6 +25,7 @@ import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AddProductDialog } from '@/components/dashboard/add-product-dialog';
+import { useRoleCheck } from '@/hooks/useRoleCheck';
 
 // Zod schemas
 const parsedItemSchema = z.object({
@@ -55,7 +57,7 @@ const fileToDataUri = (file: File): Promise<string> => {
 function ProductSearch({ rowIndex, form, onAddNewProduct }: { rowIndex: number; form: any; onAddNewProduct: (searchTerm: string, rowIndex: number) => void; }) {
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState(form.getValues(`items.${rowIndex}.productName`) || '');
-    const firestore = useFirestore();
+
     const [productResults, setProductResults] = useState<Product[]>([]);
     const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   
@@ -65,23 +67,21 @@ function ProductSearch({ rowIndex, form, onAddNewProduct }: { rowIndex: number; 
               setProductResults([]);
               return;
             }
-            if (!firestore) return;
             
             setIsLoadingProducts(true);
-            const searchTermCapitalized = search.charAt(0).toUpperCase() + search.slice(1);
-            
-            const nameQuery = query(
-              collection(firestore, 'products'),
-              orderBy('name'),
-              where('name', '>=', searchTermCapitalized),
-              where('name', '<=', searchTermCapitalized + '\uf8ff'),
-              limit(10)
-            );
-      
             try {
-              const querySnapshot = await getDocs(nameQuery);
-              const results = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
-              setProductResults(results);
+              const supabase = createClient();
+              const { data, error } = await supabase
+                .from('products')
+                .select('id, name, sku')
+                .ilike('name', `${search}%`)
+                .limit(10);
+              
+              if (!error && data) {
+                setProductResults(data as Product[]);
+              } else {
+                setProductResults([]);
+              }
             } catch (error) {
               console.error("Error searching products:", error);
             } finally {
@@ -90,7 +90,8 @@ function ProductSearch({ rowIndex, form, onAddNewProduct }: { rowIndex: number; 
           }, 300);
       
           return () => clearTimeout(handler);
-    }, [search, firestore]);
+    }, [search]);
+
 
     useEffect(() => {
         if (!open) return;
@@ -167,13 +168,15 @@ export default function ScanReceiptPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [receiptImage, setReceiptImage] = useState<File | null>(null);
     const [receiptImageUrl, setReceiptImageUrl] = useState<string | null>(null);
-    const firestore = useFirestore();
+
+    const supabase = useSupabase();
     const { toast } = useToast();
 
     // State for the AddProductDialog
     const [isAddProductDialogOpen, setIsAddProductDialogOpen] = useState(false);
     const [addProductInitialValues, setAddProductInitialValues] = useState<any>();
     const [productCreationRowIndex, setProductCreationRowIndex] = useState<number | null>(null);
+    const { isManagement } = useRoleCheck();
 
     const form = useForm<ScanFormValues>({
         resolver: zodResolver(scanSchema),
@@ -244,58 +247,73 @@ export default function ScanReceiptPage() {
     const totalCost = items.reduce((total, item) => total + ((item.quantity || 0) * (item.unitCost || 0)), 0);
 
     const onSubmit = async (values: ScanFormValues) => {
-        if (!firestore) return;
         setIsSaving(true);
         toast({ title: 'Saving to Inventory...', description: 'Please wait.' });
 
         try {
-            await runTransaction(firestore, async (transaction) => {
-                const totalExpense = values.items.reduce((sum, item) => sum + (item.quantity * item.unitCost), 0);
-                if (totalExpense > 0) {
-                    const expenseRef = doc(collection(firestore, 'expenses'));
-                    transaction.set(expenseRef, {
-                        expenseDate: values.purchaseDate.toISOString(),
+            // 1. Fetch current product data
+            const productIds = values.items.map(item => item.productId);
+            const { data: products, error: productsError } = await supabase
+                .from('products')
+                .select('id, stock_level, name')
+                .in('id', productIds);
+            
+            if (productsError) throw productsError;
+            
+            const productDataMap = new Map(products.map(p => [p.id, p]));
+
+            // Check if all products exist
+            for (const item of values.items) {
+                if (!productDataMap.has(item.productId)) {
+                    throw new Error(`Product "${item.productName}" not found in database.`);
+                }
+            }
+
+            // 2. Record Expense
+            const totalExpense = values.items.reduce((sum, item) => sum + (item.quantity * item.unitCost), 0);
+            if (totalExpense > 0) {
+                const { error: expenseError } = await supabase
+                    .from('expenses')
+                    .insert({
+                        expense_date: values.purchaseDate.toISOString(),
                         amount: totalExpense,
                         category: 'Cost of Goods Sold',
                         description: `Scanned receipt from ${values.supplierName}`,
-                        id: expenseRef.id,
                     });
-                }
+                if (expenseError) throw expenseError;
+            }
+            
+            // 3. Update products and create inventory movements
+            for (const item of values.items) {
+                const currentProduct = productDataMap.get(item.productId)!;
+                const newStockLevel = (currentProduct.stock_level || 0) + item.quantity;
+
+                // Update product stock level
+                const { error: updateError } = await supabase
+                    .from('products')
+                    .update({
+                        stock_level: newStockLevel,
+                        initial_unit_cost: item.unitCost
+                    })
+                    .eq('id', item.productId);
                 
-                for (const item of values.items) {
-                    const productRef = doc(firestore, 'products', item.productId);
-                    const productDoc = await transaction.get(productRef);
-                    if (!productDoc.exists()) throw new Error(`Product "${item.productName}" not found.`);
+                if (updateError) throw updateError;
 
-                    const productData = productDoc.data();
-                    const newQuantityOnHand = (productData.quantityOnHand || 0) + item.quantity;
-
-                    const newBatch = {
-                        batchId: doc(collection(firestore, '_')).id,
-                        purchaseDate: values.purchaseDate.toISOString(),
-                        originalQty: item.quantity,
-                        remainingQty: item.quantity,
-                        unitCost: item.unitCost,
-                        supplierName: values.supplierName,
-                    };
-
-                    const newStockBatches = [...(productData.stockBatches || []), newBatch];
-
-                    transaction.update(productRef, {
-                        quantityOnHand: newQuantityOnHand,
-                        stockBatches: newStockBatches,
-                    });
-
-                    const inventoryMovementRef = doc(collection(firestore, 'inventoryMovements'));
-                    transaction.set(inventoryMovementRef, {
-                        productId: item.productId,
-                        quantityChange: item.quantity,
-                        movementType: 'RESTOCK',
+                // Create inventory movement
+                const { error: movementError } = await supabase
+                    .from('inventory_movements')
+                    .insert({
+                        product_id: item.productId,
+                        quantity_change: item.quantity,
+                        movement_type: 'RESTOCK',
                         timestamp: new Date().toISOString(),
                         reason: `Scanned receipt from ${values.supplierName}`,
+                        supplier_name: values.supplierName,
+                        unit_cost: item.unitCost
                     });
-                }
-            });
+                    
+                if (movementError) throw movementError;
+            }
 
             toast({ title: 'Inventory Updated!', description: 'The items have been added to your inventory.' });
             form.reset();
@@ -354,7 +372,7 @@ export default function ScanReceiptPage() {
                                         <TableRow>
                                             <TableHead className='w-[45%]'>Product (Match)</TableHead>
                                             <TableHead>Qty</TableHead>
-                                            <TableHead>Unit Cost</TableHead>
+                                            {isManagement && <TableHead>Unit Cost</TableHead>}
                                             <TableHead className='w-[50px]'></TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -369,9 +387,11 @@ export default function ScanReceiptPage() {
                                                 <TableCell>
                                                     <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (<FormItem><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>)} />
                                                 </TableCell>
-                                                <TableCell>
-                                                    <FormField control={form.control} name={`items.${index}.unitCost`} render={({ field }) => (<FormItem><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                                                </TableCell>
+                                                {isManagement && (
+                                                    <TableCell>
+                                                        <FormField control={form.control} name={`items.${index}.unitCost`} render={({ field }) => (<FormItem><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                                                    </TableCell>
+                                                )}
                                                 <TableCell><Button type="button" variant='ghost' size='icon' onClick={() => remove(index)}><Trash2 className='h-4 w-4 text-destructive'/></Button></TableCell>
                                             </TableRow>
                                         ))}
@@ -382,7 +402,7 @@ export default function ScanReceiptPage() {
                                 </Table>
                                 </div>
                                 <FormMessage>{form.formState.errors.items?.message || form.formState.errors.items?.root?.message}</FormMessage>
-                                {fields.length > 0 && (
+                                {isManagement && fields.length > 0 && (
                                     <div className="pt-4 space-y-2 text-right">
                                         <p className="text-lg">Total Purchase Cost: <span className="font-bold">₱{totalCost.toFixed(2)}</span></p>
                                     </div>

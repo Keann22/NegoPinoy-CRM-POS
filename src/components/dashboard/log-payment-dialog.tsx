@@ -3,12 +3,12 @@
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useFirestore, useStorage } from "@/firebase";
-import { collection, doc, runTransaction } from "firebase/firestore";
+import { useSupabase } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -18,24 +18,25 @@ import { format } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Order } from "@/app/dashboard/orders/page";
 import { useEffect, useState } from "react";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { FileUpload } from "../ui/file-upload";
 
 const paymentSchema = z.object({
   paymentDate: z.date({ required_error: "A payment date is required." }),
   amount: z.coerce.number().positive("Amount must be positive"),
-  paymentMethod: z.string({ required_error: "Please select a payment method." }),
-  proofOfPayment: z.custom<File[]>().optional(),
-}).refine(data => {
-    if (data.paymentMethod === 'GCash') {
-        return data.proofOfPayment && data.proofOfPayment.length > 0;
+  paymentMethod: z.enum(["Cash", "GCash", "Bank Transfer", "Credit Card", "Other", "Shopee Platform Payouts", "COD Payed"], {
+    required_error: "Please select a payment method.",
+  }),
+  notes: z.string().optional(),
+  proofOfPayment: z.any().optional(),
+}).superRefine((data, ctx) => {
+    if (!data.proofOfPayment || data.proofOfPayment.length === 0) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Proof of payment is required.",
+            path: ["proofOfPayment"]
+        });
     }
-    return true;
-}, {
-    message: "A proof of payment photo is required for GCash.",
-    path: ["proofOfPayment"],
 });
-
 
 type PaymentFormValues = z.infer<typeof paymentSchema>;
 
@@ -45,11 +46,10 @@ interface LogPaymentDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const paymentMethods = ["GCash", "Shopee Platform Payouts", "Cash", "Bank Transfer", "COD Payed"];
+const paymentMethods = ["GCash", "Shopee Platform Payouts", "Cash", "Bank Transfer", "COD Payed", "Credit Card", "Other"];
 
 export function LogPaymentDialog({ order, open, onOpenChange }: LogPaymentDialogProps) {
-  const firestore = useFirestore();
-  const storage = useStorage();
+  const supabase = useSupabase();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -58,7 +58,9 @@ export function LogPaymentDialog({ order, open, onOpenChange }: LogPaymentDialog
     defaultValues: {
       paymentDate: new Date(),
       amount: order.balanceDue > 0 ? order.balanceDue : 0,
-      paymentMethod: undefined,
+      paymentMethod: "Cash",
+      notes: "",
+      proofOfPayment: [],
     },
   });
 
@@ -67,17 +69,15 @@ export function LogPaymentDialog({ order, open, onOpenChange }: LogPaymentDialog
       form.reset({
         paymentDate: new Date(),
         amount: order.balanceDue > 0 ? order.balanceDue : 0,
-        paymentMethod: undefined,
+        paymentMethod: "Cash",
+        notes: "",
         proofOfPayment: [],
       });
     }
   }, [order, open, form]);
 
   function onSubmit(values: PaymentFormValues) {
-    if (!firestore || !storage) return;
-
     setIsSubmitting(true);
-    // Close the dialog immediately and start processing in the background
     onOpenChange(false);
     
     toast({
@@ -87,50 +87,107 @@ export function LogPaymentDialog({ order, open, onOpenChange }: LogPaymentDialog
 
     const processPayment = async () => {
       try {
-        let proofOfPaymentUrl = '';
-        if (values.paymentMethod === 'GCash' && values.proofOfPayment && values.proofOfPayment.length > 0) {
+        if (!supabase) return;
+
+        // 1. Upload proof of payment
+        let proofUrl = null;
+        if (values.proofOfPayment && values.proofOfPayment.length > 0) {
             const file = values.proofOfPayment[0];
-            const storageRef = ref(storage, `payment-proofs/${order.id}/${Date.now()}-${file.name}`);
-            await uploadBytes(storageRef, file);
-            proofOfPaymentUrl = await getDownloadURL(storageRef);
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+            
+            const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('proof_of_payment')
+                .upload(fileName, file, { upsert: false });
+                
+            if (uploadError) throw uploadError;
+            
+            const { data: { publicUrl } } = supabase.storage.from('proof_of_payment').getPublicUrl(uploadData.path);
+            proofUrl = publicUrl;
         }
 
-        const paymentsCollection = collection(firestore, 'payments');
-        const orderRef = doc(firestore, 'orders', order.id);
+        // 2. Get current order data
+        const { data: currentOrderData, error: fetchError } = await supabase
+            .from('orders')
+            .select('*')
+            .eq('id', order.id)
+            .single();
+            
+        if (fetchError || !currentOrderData) {
+            throw new Error("Order does not exist!");
+        }
 
-        await runTransaction(firestore, async (transaction) => {
-            const orderDoc = await transaction.get(orderRef);
-            if (!orderDoc.exists()) {
-                throw new Error("Order does not exist!");
-            }
-            const currentOrderData = orderDoc.data() as Order;
-            const newAmountPaid = currentOrderData.amountPaid + values.amount;
-            const newBalanceDue = currentOrderData.totalAmount - newAmountPaid;
-            const newStatus = newBalanceDue <= 0 ? 'Completed' : currentOrderData.orderStatus;
-
-            const newPaymentRef = doc(paymentsCollection);
-            transaction.set(newPaymentRef, {
-                id: newPaymentRef.id,
-                orderId: order.id,
-                paymentDate: values.paymentDate.toISOString(),
-                amount: values.amount,
-                paymentMethod: values.paymentMethod,
-                ...(proofOfPaymentUrl && { proofOfPaymentUrl }),
-            });
-
-            transaction.update(orderRef, {
-                amountPaid: newAmountPaid,
-                balanceDue: newBalanceDue,
-                orderStatus: newStatus,
-            });
-        });
+        const newAmountPaid = (currentOrderData.amount_paid || 0) + values.amount;
+        let newBalanceDue = currentOrderData.total_amount - newAmountPaid;
+        const isCOD = currentOrderData.payment_method === 'COD' || values.paymentMethod === 'COD Payed';
         
-        toast({
-            title: "Payment Logged Successfully",
-            description: `₱${values.amount.toFixed(2)} has been logged.`,
-        });
+        let overpaymentAmount = 0;
+        if (newBalanceDue < 0) {
+            overpaymentAmount = Math.abs(newBalanceDue);
+            newBalanceDue = 0; // Cap at 0
+        }
+
+        let newStatus = currentOrderData.status;
+        if (newBalanceDue <= 0) {
+            newStatus = isCOD ? 'Payment Received (COD)' : 'Completed';
+        }
+
+        // 3. Log Payment
+        const { error: paymentError } = await supabase
+            .from('payments')
+            .insert({
+                order_id: order.id,
+                payment_date: values.paymentDate.toISOString(),
+                amount: values.amount,
+                payment_method: values.paymentMethod,
+                notes: values.notes,
+                proof_url: proofUrl,
+            });
+
+        if (paymentError) throw paymentError;
+
+        // 4. Update Order
+        const { error: updateError } = await supabase
+            .from('orders')
+            .update({
+                amount_paid: newAmountPaid,
+                balance_due: newBalanceDue,
+                status: newStatus,
+            })
+            .eq('id', order.id);
+
+        if (updateError) throw updateError;
+        
+        // 5. Handle Overpayment (Store Credit)
+        if (overpaymentAmount > 0 && currentOrderData.customer_id) {
+            const { data: customerData } = await supabase
+                .from('customers')
+                .select('store_credit')
+                .eq('id', currentOrderData.customer_id)
+                .single();
+                
+            const currentCredit = customerData?.store_credit || 0;
+            const { error: creditError } = await supabase
+                .from('customers')
+                .update({ store_credit: currentCredit + overpaymentAmount })
+                .eq('id', currentOrderData.customer_id);
+                
+            if (creditError) throw creditError;
+            
+            toast({
+                title: "Overpayment Detected",
+                description: `₱${overpaymentAmount.toFixed(2)} has been added to the customer's store credit balance.`,
+            });
+        }
+        
+        if (overpaymentAmount === 0) {
+            toast({
+                title: "Payment Logged Successfully",
+                description: `₱${values.amount.toFixed(2)} has been logged.`,
+            });
+        }
       } catch (error: any) {
-          console.error("Payment logging failed in background:", error);
+          console.error("Payment logging failed:", error);
           toast({
               variant: 'destructive',
               title: 'Payment Save Failed',
@@ -141,7 +198,6 @@ export function LogPaymentDialog({ order, open, onOpenChange }: LogPaymentDialog
       }
     };
     
-    // Execute the payment processing in the background
     processPayment();
   }
 
@@ -217,25 +273,36 @@ export function LogPaymentDialog({ order, open, onOpenChange }: LogPaymentDialog
                 </FormItem>
               )}
             />
-             {form.watch('paymentMethod') === 'GCash' && (
-              <FormField
+            <FormField
                 control={form.control}
                 name="proofOfPayment"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Proof of Payment</FormLabel>
-                    <FormControl>
-                        <FileUpload
-                            value={field.value ?? []}
-                            onChange={(files: File[]) => field.onChange(files)}
-                            multiple={false}
-                        />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+                    <FormItem>
+                        <FormLabel>Proof of Payment <span className="text-destructive">*</span></FormLabel>
+                        <FormControl>
+                            <FileUpload 
+                                value={field.value} 
+                                onChange={field.onChange} 
+                                multiple={false}
+                            />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
                 )}
-              />
-            )}
+            />
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Notes</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Add any notes here..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <DialogFooter className="pt-4">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancel</Button>
               <Button type="submit" disabled={isSubmitting}>

@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { DateRange } from 'react-day-picker';
 import {
-  startOfToday,
-  endOfToday,
+  startOfMonth,
+  endOfMonth,
   format,
+  isValid,
 } from 'date-fns';
-import { Calendar as CalendarIcon, Printer } from 'lucide-react';
+import { Calendar as CalendarIcon, Printer, CheckCircle, Check, Undo2 } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import {
@@ -32,8 +34,7 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query } from 'firebase/firestore';
+import { useUser, useSupabase } from '@/firebase';
 
 type Order = {
   id: string;
@@ -43,12 +44,12 @@ type Order = {
   orderStatus: string;
   paymentType: string;
   shippingDetails?: string;
-};
-
-type Customer = {
-  id: string;
-  firstName: string;
-  lastName: string;
+  customerName?: string;
+  customerAddress?: string;
+  customerMobile?: string;
+  salesPersonName?: string;
+  isPrinted?: boolean;
+  items?: OrderItem[];
 };
 
 type OrderItem = {
@@ -56,49 +57,184 @@ type OrderItem = {
     orderId: string;
     productName: string;
     quantity: number;
+    sellingPriceAtSale?: number;
 }
 
 export function ProcessedOrdersReport() {
   const [date, setDate] = useState<DateRange | undefined>({
-    from: startOfToday(),
-    to: endOfToday(),
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date()),
   });
+  const [activeTab, setActiveTab] = useState<'to-print' | 'printed'>('to-print');
 
-  const firestore = useFirestore();
+  const supabase = useSupabase();
   const { user } = useUser();
 
-  const allOrdersQuery = useMemoFirebase(() => (firestore && user ? query(collection(firestore, 'orders')) : null), [firestore, user]);
-  const { data: allOrders, isLoading: isLoadingOrders } = useCollection<Order>(allOrdersQuery);
+  const [allOrders, setAllOrders] = useState<Order[]>([]);
+  const [isLoadingOrders, setIsLoadingOrders] = useState(true);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [enrichedOrders, setEnrichedOrders] = useState<Order[]>([]);
 
-  const customersQuery = useMemoFirebase(() => (firestore && user ? collection(firestore, 'customers') : null), [firestore, user]);
-  const { data: customers, isLoading: isLoadingCustomers } = useCollection<Customer>(customersQuery);
+  // Step 1: Load all orders
+  useEffect(() => {
+    if (!supabase || !user) return;
+    const fetchOrders = async () => {
+      setIsLoadingOrders(true);
+      try {
+        const { data, error } = await supabase
+          .from('orders')
+          .select('id, customer_id, created_at, status, payment_method, total_amount, notes, sales_person_name, is_printed')
+          .order('created_at', { ascending: false });
 
-  const itemsQuery = useMemoFirebase(() => (firestore && user ? collection(firestore, 'orderItems') : null), [firestore, user]);
-  const { data: allOrderItems, isLoading: isLoadingItems } = useCollection<OrderItem>(itemsQuery);
+        if (error) throw error;
 
-  const isLoading = isLoadingOrders || isLoadingCustomers || isLoadingItems;
+        const mapped = (data || []).map((o: any) => ({
+          id: o.id,
+          customerId: o.customer_id,
+          orderDate: o.created_at,
+          orderStatus: o.status,
+          paymentType: o.payment_method,
+          totalAmount: Number(o.total_amount),
+          shippingDetails: o.notes,
+          salesPersonName: o.sales_person_name || null,
+          isPrinted: o.is_printed || false,
+        }));
+        setAllOrders(mapped);
+      } catch (err) {
+        console.error('Error fetching orders:', err);
+      } finally {
+        setIsLoadingOrders(false);
+      }
+    };
+    fetchOrders();
+  }, [supabase, user]);
 
-  const customerMap = useMemo(() => {
-    if (!customers) return new Map();
-    return new Map(customers.map((c) => [c.id, `${c.firstName} ${c.lastName}`]));
-  }, [customers]);
-
-  const orders = useMemo(() => {
+  // Step 2: Filter orders by date range and status
+  const filteredOrders = useMemo(() => {
     if (!allOrders || !date?.from || !date?.to) return [];
     const fromTime = date.from.getTime();
-    const toTime = date.to.getTime();
-    return allOrders.filter(order => {
-        const orderTime = new Date(order.orderDate).getTime();
-        return orderTime >= fromTime && orderTime <= toTime && order.orderStatus === 'Processing';
-    }).map(o => ({
-        ...o,
-        customerName: customerMap.get(o.customerId) || 'Unknown Customer',
-        items: allOrderItems?.filter(i => i.orderId === o.id) || []
-    }));
-  }, [allOrders, date, customerMap, allOrderItems]);
+    const toDate = new Date(date.to);
+    toDate.setHours(23, 59, 59, 999);
+    const toTime = toDate.getTime();
+
+    const filtered = allOrders.filter(order => {
+      const orderTime = new Date(order.orderDate).getTime();
+      const withinDate = orderTime >= fromTime && orderTime <= toTime;
+      const validStatus = order.orderStatus !== 'Cancelled' && order.orderStatus !== 'Returned';
+      const matchesTab = activeTab === 'to-print' ? !order.isPrinted : !!order.isPrinted;
+      
+      return withinDate && validStatus && matchesTab;
+    });
+
+    // Sort: 1. Unshipped first, 2. Older first
+    return filtered.sort((a, b) => {
+        const aPending = ['Pending Payment', 'Processing'].includes(a.orderStatus) ? 0 : 1;
+        const bPending = ['Pending Payment', 'Processing'].includes(b.orderStatus) ? 0 : 1;
+        
+        if (aPending !== bPending) return aPending - bPending;
+        
+        return new Date(a.orderDate).getTime() - new Date(b.orderDate).getTime();
+    });
+  }, [allOrders, date, activeTab]);
+
+  // Step 3: Enrich filtered orders with customer names and order items
+  useEffect(() => {
+    if (!supabase || filteredOrders.length === 0) {
+      setEnrichedOrders(filteredOrders.map(o => ({ ...o, customerName: 'Unknown Customer', items: [] })));
+      return;
+    }
+
+    const enrich = async () => {
+      setIsLoadingDetails(true);
+      try {
+        const orderIds = filteredOrders.map(o => o.id);
+        const customerIds = Array.from(new Set(filteredOrders.map(o => o.customerId)));
+
+        // Fetch customers for these orders only
+        const { data: customersData } = await supabase
+          .from('customers')
+          .select('id, full_name, address_line, mobile_number')
+          .in('id', customerIds);
+
+        const customerMap = new Map<string, any>();
+        (customersData || []).forEach((c: any) => {
+          customerMap.set(c.id, {
+              name: c.full_name || 'Unknown Customer',
+              address: c.address_line || '',
+              mobile: c.mobile_number || ''
+          });
+        });
+
+        // Fetch order items for these orders only
+        const { data: itemsData } = await supabase
+          .from('order_items')
+          .select('id, order_id, quantity, selling_price_at_sale, product_id, products(name)')
+          .in('order_id', orderIds);
+
+        // Group items by order_id
+        const itemsMap = new Map<string, OrderItem[]>();
+        (itemsData || []).forEach((item: any) => {
+          const existing = itemsMap.get(item.order_id) || [];
+          existing.push({
+            id: item.id,
+            orderId: item.order_id,
+            productName: item.products?.name || 'Unknown Product',
+            quantity: item.quantity,
+            sellingPriceAtSale: item.selling_price_at_sale,
+          });
+          itemsMap.set(item.order_id, existing);
+        });
+
+        const enriched = filteredOrders.map(order => {
+          const cust = customerMap.get(order.customerId) || { name: 'Unknown Customer', address: '', mobile: '' };
+          return {
+            ...order,
+            customerName: cust.name,
+            customerAddress: cust.address,
+            customerMobile: cust.mobile,
+            items: itemsMap.get(order.id) || [],
+          };
+        });
+
+        setEnrichedOrders(enriched);
+      } catch (err) {
+        console.error('Error enriching orders:', err);
+      } finally {
+        setIsLoadingDetails(false);
+      }
+    };
+
+    enrich();
+  }, [filteredOrders, supabase]);
+
+  const isLoading = isLoadingOrders || isLoadingDetails;
+  const orders = enrichedOrders;
+
+
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleMarkBatchPrinted = async () => {
+    if (!supabase || orders.length === 0) return;
+    try {
+        const orderIds = orders.map(o => o.id);
+        await supabase.from('orders').update({ is_printed: true }).in('id', orderIds);
+        setAllOrders(prev => prev.map(o => orderIds.includes(o.id) ? { ...o, isPrinted: true } : o));
+    } catch (err) {
+        console.error('Error marking batch as printed:', err);
+    }
+  };
+
+  const togglePrintStatus = async (orderId: string, currentStatus: boolean) => {
+    if (!supabase) return;
+    try {
+        await supabase.from('orders').update({ is_printed: !currentStatus }).eq('id', orderId);
+        setAllOrders(prev => prev.map(o => o.id === orderId ? { ...o, isPrinted: !currentStatus } : o));
+    } catch (err) {
+        console.error('Error toggling print status:', err);
+    }
   };
 
   return (
@@ -113,11 +249,22 @@ export function ProcessedOrdersReport() {
             <Button variant="outline" size="sm" onClick={handlePrint} disabled={orders.length === 0}>
                 <Printer className="mr-2 h-4 w-4" /> Print Batch
             </Button>
+            {activeTab === 'to-print' && orders.length > 0 && (
+                <Button variant="default" size="sm" onClick={handleMarkBatchPrinted}>
+                    <CheckCircle className="mr-2 h-4 w-4" /> Mark Batch as Printed
+                </Button>
+            )}
           </div>
         </div>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-wrap items-center gap-2 mb-4 print:hidden">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-4 print:hidden">
+            <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
+                <TabsList>
+                    <TabsTrigger value="to-print">To Print</TabsTrigger>
+                    <TabsTrigger value="printed">Already Printed</TabsTrigger>
+                </TabsList>
+            </Tabs>
             <Popover>
                 <PopoverTrigger asChild>
                 <Button variant={"outline"} size="sm" className={cn("w-[240px] justify-start text-left font-normal", !date && "text-muted-foreground")}>
@@ -131,36 +278,6 @@ export function ProcessedOrdersReport() {
             </Popover>
         </div>
 
-        {/* --- PRINT ONLY CONTENT: SUMMARY SHEET --- */}
-        <div className="hidden print:block mb-8">
-            <div className="flex justify-between items-center mb-4 border-b-2 border-black pb-2">
-                <h1 className="text-2xl font-bold uppercase">Order Batch Summary</h1>
-                <div className="text-right text-sm">
-                    <p>Date Printed: {format(new Date(), 'PPPP p')}</p>
-                    <p>Total Orders: {orders.length}</p>
-                </div>
-            </div>
-            <table className="w-full border-collapse border border-black">
-                <thead>
-                    <tr className="bg-gray-100">
-                        <th className="border border-black px-2 py-1 text-left text-xs uppercase w-[15%]">Order ID</th>
-                        <th className="border border-black px-2 py-1 text-left text-xs uppercase w-[35%]">Customer Name</th>
-                        <th className="border border-black px-2 py-1 text-left text-xs uppercase w-[50%]">Notes / Shipping Details</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {orders.map(order => (
-                        <tr key={order.id}>
-                            <td className="border border-black px-2 py-1 text-sm font-mono">{order.id.substring(0, 7).toUpperCase()}</td>
-                            <td className="border border-black px-2 py-1 text-sm font-bold">{order.customerName}</td>
-                            <td className="border border-black px-2 py-1 text-xs">{order.shippingDetails || '—'}</td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-            <div className="page-break-after" />
-        </div>
-
         {/* --- MAIN LIST VIEW --- */}
         <div className="print:hidden">
             <Table>
@@ -169,7 +286,9 @@ export function ProcessedOrdersReport() {
                 <TableHead>Order ID</TableHead>
                 <TableHead>Customer</TableHead>
                 <TableHead>Date</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead className="text-right">Items</TableHead>
+                <TableHead className="text-center w-16">Action</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -178,75 +297,180 @@ export function ProcessedOrdersReport() {
                     <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="h-4 w-8 ml-auto" /></TableCell>
+                    <TableCell><Skeleton className="h-6 w-6 mx-auto" /></TableCell>
                 </TableRow>
                 ))}
                 {orders.map((order) => (
-                <TableRow key={order.id}>
-                    <TableCell className="font-mono text-xs">{order.id.substring(0, 7).toUpperCase()}</TableCell>
+                <TableRow key={order.id || Math.random().toString()}>
+                    <TableCell className="font-mono text-xs">{order.id ? order.id.substring(0, 7).toUpperCase() : 'N/A'}</TableCell>
                     <TableCell className="font-medium">{order.customerName}</TableCell>
-                    <TableCell>{format(new Date(order.orderDate), 'PPP p')}</TableCell>
-                    <TableCell className="text-right">{order.items.length}</TableCell>
+                    <TableCell>{order.orderDate && isValid(new Date(order.orderDate)) ? format(new Date(order.orderDate), 'PPP p') : '—'}</TableCell>
+                    <TableCell>
+                        <span className={cn(
+                            "px-2 py-1 rounded-full text-xs font-semibold",
+                            ['Pending Payment', 'Processing'].includes(order.orderStatus) 
+                                ? "bg-amber-100 text-amber-800" 
+                                : "bg-green-100 text-green-800"
+                        )}>
+                            {order.orderStatus}
+                        </span>
+                    </TableCell>
+                    <TableCell className="text-right">{order.items?.length || 0}</TableCell>
+                    <TableCell className="text-center">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            title={order.isPrinted ? "Mark as To Print" : "Mark as Printed"}
+                            onClick={() => togglePrintStatus(order.id, !!order.isPrinted)}
+                        >
+                            {order.isPrinted ? (
+                                <Undo2 className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                                <Check className="h-4 w-4 text-muted-foreground" />
+                            )}
+                        </Button>
+                    </TableCell>
                 </TableRow>
                 ))}
             </TableBody>
             </Table>
             {!isLoading && orders.length === 0 && (
             <div className="flex flex-col items-center justify-center text-center border-2 border-dashed rounded-lg p-12 mt-4">
-                <p className="text-lg font-semibold">No Processing Orders Found</p>
-                <p className="text-muted-foreground mt-2">Filter a different date or process more orders.</p>
+                <p className="text-lg font-semibold">No Orders Found</p>
+                <p className="text-muted-foreground mt-2">There are no orders in the {activeTab === 'to-print' ? '"To Print"' : '"Already Printed"'} list.</p>
             </div>
             )}
         </div>
 
-        {/* --- PRINT ONLY CONTENT: INDIVIDUAL ORDER SHEETS --- */}
-        <div className="hidden print:block">
-            {orders.map((order, idx) => (
-                <div key={order.id} className={cn("border border-black p-6 mb-8", idx < orders.length - 1 && "page-break-after")}>
-                    <div className="flex justify-between items-start border-b border-black pb-4 mb-4">
-                        <div>
-                            <h2 className="text-xl font-bold">Order #{order.id.substring(0, 7).toUpperCase()}</h2>
-                            <p className="text-sm">{format(new Date(order.orderDate), 'PPPP p')}</p>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-lg font-bold">{order.customerName}</p>
-                            <p className="text-xs text-gray-600">Status: {order.orderStatus}</p>
-                        </div>
+        {/* --- PRINT ONLY CONTENT --- */}
+        <div id="print-area" className="hidden print:block w-full bg-white">
+            <div className="mb-8">
+                <div className="flex justify-between items-center mb-4 border-b-2 border-black pb-2">
+                    <h1 className="text-2xl font-bold uppercase">Order Batch Summary</h1>
+                    <div className="text-right text-sm">
+                        <p>Date Printed: {format(new Date(), 'PPPP p')}</p>
+                        <p>Total Orders: {orders.length}</p>
                     </div>
-                    <div className="mb-6">
-                        <h3 className="font-bold mb-2 uppercase text-xs">Fulfillment List:</h3>
-                        <table className="w-full">
-                            <thead>
-                                <tr className="border-b border-black">
-                                    <th className="text-left py-1 text-sm">Product Name</th>
-                                    <th className="text-right py-1 text-sm">Qty</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {order.items.map(item => (
-                                    <tr key={item.id} className="border-b border-gray-200">
-                                        <td className="py-2 text-sm">{item.productName}</td>
-                                        <td className="py-2 text-right font-bold">{item.quantity}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                    {order.shippingDetails && (
-                        <div className="bg-gray-50 p-4 border border-gray-300">
-                            <h3 className="font-bold mb-1 uppercase text-xs">Shipping Notes:</h3>
-                            <p className="text-sm italic">{order.shippingDetails}</p>
-                        </div>
-                    )}
                 </div>
-            ))}
+                <table className="w-full border-collapse border border-black">
+                    <thead>
+                        <tr className="bg-gray-100">
+                            <th className="border border-black px-2 py-1 text-left text-xs uppercase w-[15%]">Order ID</th>
+                            <th className="border border-black px-2 py-1 text-left text-xs uppercase w-[25%]">Customer Name</th>
+                            <th className="border border-black px-2 py-1 text-left text-xs uppercase w-[15%]">Status</th>
+                            <th className="border border-black px-2 py-1 text-left text-xs uppercase w-[45%]">Notes / Shipping Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {orders.map(order => (
+                            <tr key={order.id}>
+                                <td className="border border-black px-2 py-1 text-sm font-mono">{order.id.substring(0, 7).toUpperCase()}</td>
+                                <td className="border border-black px-2 py-1 text-sm font-bold">{order.customerName}</td>
+                                <td className="border border-black px-2 py-1 text-xs font-semibold">{order.orderStatus}</td>
+                                <td className="border border-black px-2 py-1 text-xs">{order.shippingDetails || '—'}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+                <div className="page-break-after" />
+            </div>
+
+            <div className="font-sans text-sm pb-10">
+                {orders.map((order, idx) => (
+                    <div key={order.id} className="mb-4 break-inside-avoid">
+                        <div className="border-2 border-black flex flex-col">
+                            {/* Header Section */}
+                            <div className="flex border-b-2 border-black">
+                                <div className="w-1/2 p-2 border-r-2 border-black">
+                                    <div className="font-bold">Negosyanteng Pinoy PH</div>
+                                    <div className="text-xs">http://facebook.com/NegoPinoyPH</div>
+                                </div>
+                                <div className="w-1/2 p-2 text-xs">
+                                    <div className="font-bold">Order #{order.id.substring(0, 7).toUpperCase()}</div>
+                                    <div>Created At: {order.orderDate && isValid(new Date(order.orderDate)) ? format(new Date(order.orderDate), 'MM/dd/yyyy') : '—'}</div>
+                                </div>
+                            </div>
+                            
+                            {/* Recipient Section */}
+                            <div className="flex flex-col p-2 border-b-2 border-black">
+                                <div className="flex">
+                                    <span className="mr-1">Recipient:</span>
+                                    <div className="flex-1">
+                                        <div className="font-bold">{order.customerName}</div>
+                                    </div>
+                                </div>
+                                {order.customerMobile && (
+                                    <div className="text-xs mt-1">
+                                        <span className="font-semibold">Contact: </span>{order.customerMobile}
+                                    </div>
+                                )}
+                                {order.customerAddress && (
+                                    <div className="text-xs">
+                                        <span className="font-semibold">Address: </span>{order.customerAddress}
+                                    </div>
+                                )}
+                            </div>
+                            
+                            {/* Items Table */}
+                            <div className="min-h-[120px] pb-2">
+                                <table className="w-full text-xs">
+                                    <thead>
+                                        <tr className="border-b-2 border-black text-left">
+                                            <th className="py-1 px-2 font-normal w-8">#</th>
+                                            <th className="py-1 px-2 font-normal">Product</th>
+                                            <th className="py-1 px-2 font-normal text-right w-12">Qty</th>
+                                            <th className="py-1 px-2 font-normal text-right w-24">Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {order.items.map((item, i) => (
+                                            <tr key={item.id}>
+                                                <td className="py-1 px-2 align-top">{i + 1}</td>
+                                                <td className="py-1 px-2 align-top">{item.productName}</td>
+                                                <td className="py-1 px-2 align-top text-right">{item.quantity}</td>
+                                                <td className="py-1 px-2 align-top text-right whitespace-nowrap font-semibold">
+                                                    ₱ {(item.sellingPriceAtSale ?? 0) * item.quantity}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            {/* Footer Section */}
+                            <div className="flex border-t-2 border-black">
+                                <div className="w-2/3 p-2 border-r-2 border-black text-xs whitespace-pre-wrap min-h-[70px]">
+                                    <div className="font-bold uppercase mb-1">{order.paymentType}</div>
+                                    {order.shippingDetails && (
+                                        <div>
+                                            <span className="font-semibold">Notes: </span>
+                                            <span>{order.shippingDetails}</span>
+                                        </div>
+                                    )}
+                                    {order.salesPersonName && (
+                                        <div className="mt-1 text-gray-500">Processed by: <span className="font-semibold text-black">{order.salesPersonName}</span></div>
+                                    )}
+                                </div>
+                                <div className="w-1/3 p-2 text-sm flex items-center">
+                                    <div>Collection (COD): <span className="font-bold whitespace-nowrap">₱ {order.totalAmount}</span></div>
+                                </div>
+                            </div>
+                        </div>
+                        {/* Dashed separator between orders, except after the last one */}
+                        {idx < orders.length - 1 && (
+                            <div className="mt-4 border-b-[3px] border-dashed border-gray-600 w-full" />
+                        )}
+                    </div>
+                ))}
+            </div>
         </div>
       </CardContent>
-      <style jsx global>{`
+      <style>{`
         @media print {
-            body * { visibility: hidden; }
-            .print\:block, .print\:block * { visibility: visible; }
-            .print\:block { position: absolute; left: 0; top: 0; width: 100%; }
+            .print\\:hidden { display: none !important; }
+            #print-area { display: block !important; }
             .page-break-after { page-break-after: always; }
             @page { margin: 1cm; }
         }

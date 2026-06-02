@@ -7,8 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { addDocumentNonBlocking, useFirestore } from "@/firebase";
-import { collection } from "firebase/firestore";
+import { useSupabase } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 
@@ -23,7 +22,8 @@ const supplierSchema = z.object({
 
 export function AddSupplierDialog() {
   const [open, setOpen] = useState(false);
-  const firestore = useFirestore();
+  const supabase = useSupabase();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof supplierSchema>>({
@@ -39,23 +39,44 @@ export function AddSupplierDialog() {
   });
 
   async function onSubmit(values: z.infer<typeof supplierSchema>) {
-    if (!firestore) return;
-    setOpen(false);
+    if (!supabase) return;
+    setIsSubmitting(true);
 
     toast({
       title: "Adding Supplier...",
       description: `Adding ${values.name} to your database.`,
     });
 
-    const suppliersCollection = collection(firestore, 'suppliers');
-    
-    addDocumentNonBlocking(suppliersCollection, values).then(() => {
+    try {
+        const { error } = await supabase
+            .from('suppliers')
+            .insert({
+                name: values.name,
+                contact_person: values.contactPerson || null,
+                email: values.email || null,
+                phone_number: values.phoneNumber || null,
+                facebook_profile_link: values.facebookProfileLink || null,
+                website: values.website || null,
+            });
+
+        if (error) throw error;
+
         toast({
             title: "Supplier Added",
             description: `${values.name} has been successfully added.`,
         });
         form.reset();
-    });
+        setOpen(false);
+    } catch (error: any) {
+        console.error("Failed to add supplier:", error);
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: error.message || "Failed to save the supplier.",
+        });
+    } finally {
+        setIsSubmitting(false);
+    }
   }
 
   return (
@@ -72,7 +93,7 @@ export function AddSupplierDialog() {
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid gap-2 py-4 max-h-[70vh] overflow-y-auto px-1">
+            <div className="grid gap-2 py-4 px-1">
               <FormField
                 control={form.control}
                 name="name"
@@ -153,8 +174,8 @@ export function AddSupplierDialog() {
               />
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-              <Button type="submit">Save Supplier</Button>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isSubmitting}>Cancel</Button>
+              <Button type="submit" disabled={isSubmitting}>Save Supplier</Button>
             </DialogFooter>
           </form>
         </Form>

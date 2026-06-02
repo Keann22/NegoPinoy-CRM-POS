@@ -1,10 +1,16 @@
 'use client';
 
-import { Activity, CreditCard, DollarSign, TrendingUp } from 'lucide-react';
-import { useMemo, useEffect } from 'react';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { Activity, CreditCard, DollarSign, TrendingUp, CalendarIcon, Filter } from 'lucide-react';
+import { useMemo, useEffect, useState } from 'react';
+import { useUser, useSupabase } from '@/firebase';
 import { useRouter } from 'next/navigation';
+import { DateRange } from 'react-day-picker';
+import { startOfMonth, endOfMonth, format } from 'date-fns';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 
 import {
   Card,
@@ -13,7 +19,9 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { RecentSales } from '@/components/dashboard/recent-sales';
-import { AiRecommendations } from '@/components/dashboard/ai-recommendations';
+import { TopCustomers } from '@/components/dashboard/top-customers';
+import { TopProducts } from '@/components/dashboard/top-products';
+import { CollectionsDueSoon } from '@/components/dashboard/collections-due-soon';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUserProfile } from '@/hooks/useUserProfile';
 
@@ -38,7 +46,6 @@ type Expense = {
 
 
 export default function DashboardPage() {
-    const firestore = useFirestore();
     const { user } = useUser();
     const { userProfile } = useUserProfile();
     const router = useRouter();
@@ -47,6 +54,35 @@ export default function DashboardPage() {
     const isSales = useMemo(() => userProfile?.roles.includes('Sales'), [userProfile]);
     const isInventoryOnly = useMemo(() => userProfile?.roles.includes('Inventory') && !userProfile?.roles.includes('Sales') && !userProfile?.roles.includes('Admin') && !userProfile?.roles.includes('Owner'), [userProfile]);
 
+    const supabase = useSupabase();
+    const [dateRange, setDateRange] = useState<DateRange | undefined>({
+        from: startOfMonth(new Date()),
+        to: endOfMonth(new Date()),
+    });
+    const [selectedSalesperson, setSelectedSalesperson] = useState<string>('all');
+    const [salespeople, setSalespeople] = useState<{id: string, name: string}[]>([]);
+
+    useEffect(() => {
+        if (!supabase) return;
+        const fetchUsers = async () => {
+            const { data } = await supabase.rpc('get_all_users');
+            if (data) {
+                const reps = data.map((u: any) => ({
+                    id: u.id,
+                    name: `${u.raw_user_meta_data?.first_name || ''} ${u.raw_user_meta_data?.last_name || ''}`.trim() || u.email
+                }));
+                setSalespeople(reps);
+            }
+        };
+        fetchUsers();
+    }, [supabase]);
+
+    useEffect(() => {
+        if (userProfile && selectedSalesperson === 'all' && !isManagement) {
+            setSelectedSalesperson(userProfile.id);
+        }
+    }, [userProfile, isManagement, selectedSalesperson]);
+
     // Redirect Inventory users away from the dashboard immediately
     useEffect(() => {
         if (isInventoryOnly) {
@@ -54,73 +90,104 @@ export default function DashboardPage() {
         }
     }, [isInventoryOnly, router]);
 
-    // Queries - STRICT conditional checks based on role to prevent permission errors
-    const ordersQuery = useMemoFirebase(
-        () => (firestore && user && (isManagement || isSales) ? collection(firestore, 'orders') : null),
-        [firestore, user, isManagement, isSales]
-    );
+    const [dashboardMetrics, setDashboardMetrics] = useState({
+        totalRevenue: 0,
+        netProfit: 0,
+        salesCount: 0,
+        accountsReceivable: 0,
+        arCount: 0,
+    });
+    const [isLoading, setIsLoading] = useState(true);
 
-    const orderItemsQuery = useMemoFirebase(
-        () => (firestore && user && (isManagement || isSales) ? collection(firestore, 'orderItems') : null),
-        [firestore, user, isManagement, isSales]
-    );
+    useEffect(() => {
+        if (!supabase || !user || (!isManagement && !isSales)) return;
 
-    const expensesQuery = useMemoFirebase(
-        () => (firestore && user && isManagement ? collection(firestore, 'expenses') : null),
-        [firestore, user, isManagement]
-    );
-    
-    // Data fetching
-    const { data: orders, isLoading: isLoadingOrders } = useCollection<Order>(ordersQuery);
-    const { data: orderItems, isLoading: isLoadingOrderItems } = useCollection<OrderItem>(orderItemsQuery);
-    const { data: expenses, isLoading: isLoadingExpenses } = useCollection<Expense>(expensesQuery);
-
-    const isLoading = isLoadingOrders || isLoadingOrderItems || (isManagement && isLoadingExpenses);
-
-    const dashboardMetrics = useMemo(() => {
-        if (!orders || !orderItems || (isManagement && !expenses)) {
-            return {
-                totalRevenue: 0,
-                netProfit: 0,
-                salesCount: 0,
-                accountsReceivable: 0,
-                arCount: 0,
-            };
-        }
-
-        const validOrders = orders.filter(o => o.orderStatus !== 'Cancelled' && o.orderStatus !== 'Returned');
-        const totalRevenue = validOrders.reduce((sum, order) => sum + order.totalAmount, 0);
-        const salesCount = validOrders.length;
-        
-        const accountsReceivableData = orders.filter(o => o.balanceDue > 0);
-        const accountsReceivable = accountsReceivableData.reduce((sum, order) => sum + order.balanceDue, 0);
-        const arCount = accountsReceivableData.length;
-
-        // Net Profit Calculation (Only if management can see expenses)
-        let netProfit = 0;
-        if (isManagement && expenses) {
-            const validOrderIds = new Set(validOrders.map(o => o.id));
-            const relevantOrderItems = orderItems.filter(item => validOrderIds.has(item.orderId));
-            const totalCogs = relevantOrderItems.reduce((sum, item) => sum + ((item.costPriceAtSale || 0) * (item.quantity || 0)), 0);
-            const operatingExpenses = expenses.reduce((sum, expense) => {
-                if (expense.category.toLowerCase() !== 'cost of goods sold') {
-                    return sum + expense.amount;
+        const fetchMetrics = async () => {
+            setIsLoading(true);
+            try {
+                let query = supabase.from('orders').select('id, total_amount, balance_due, status');
+                
+                if (dateRange?.from) {
+                    query = query.gte('order_date', dateRange.from.toISOString());
                 }
-                return sum;
-            }, 0);
-            const grossProfit = totalRevenue - totalCogs;
-            netProfit = grossProfit - operatingExpenses;
-        }
+                if (dateRange?.to) {
+                    const toDate = new Date(dateRange.to);
+                    toDate.setHours(23, 59, 59, 999);
+                    query = query.lte('order_date', toDate.toISOString());
+                }
+                if (selectedSalesperson !== 'all') {
+                    query = query.eq('sales_person_id', selectedSalesperson);
+                }
 
-        return {
-            totalRevenue,
-            netProfit,
-            salesCount,
-            accountsReceivable,
-            arCount,
-        }
+                const { data: ordersData, error: ordersError } = await query;
+                if (ordersError) throw ordersError;
 
-    }, [orders, orderItems, expenses, isManagement]);
+                const validOrders = (ordersData || []).filter((o: any) => o.status !== 'Cancelled' && o.status !== 'Returned');
+                const totalRevenue = validOrders.reduce((sum: number, order: any) => sum + Number(order.total_amount || 0), 0);
+                const salesCount = validOrders.length;
+                
+                const accountsReceivableData = validOrders.filter((o: any) => Number(o.balance_due || 0) > 0);
+                const accountsReceivable = accountsReceivableData.reduce((sum: number, order: any) => sum + Number(order.balance_due || 0), 0);
+                const arCount = accountsReceivableData.length;
+
+                let netProfit = 0;
+                if (isManagement) {
+                    const validOrderIds = validOrders.map((o: any) => o.id);
+                    let totalCogs = 0;
+                    
+                    if (validOrderIds.length > 0) {
+                        const chunkSize = 500;
+                        for (let i = 0; i < validOrderIds.length; i += chunkSize) {
+                            const chunk = validOrderIds.slice(i, i + chunkSize);
+                            const { data: itemsData } = await supabase
+                                .from('order_items')
+                                .select('quantity, cost_price_at_sale')
+                                .in('order_id', chunk);
+                                
+                            if (itemsData) {
+                                totalCogs += itemsData.reduce((sum: number, item: any) => sum + (Number(item.cost_price_at_sale || 0) * Number(item.quantity || 0)), 0);
+                            }
+                        }
+                    }
+
+                    let expenseQuery = supabase.from('expenses').select('amount, category');
+                    if (dateRange?.from) {
+                        expenseQuery = expenseQuery.gte('date', dateRange.from.toISOString());
+                    }
+                    if (dateRange?.to) {
+                        const toDate = new Date(dateRange.to);
+                        toDate.setHours(23, 59, 59, 999);
+                        expenseQuery = expenseQuery.lte('date', toDate.toISOString());
+                    }
+
+                    const { data: expensesData } = await expenseQuery;
+                    const operatingExpenses = (expensesData || []).reduce((sum: number, expense: any) => {
+                        if (expense.category?.toLowerCase() !== 'cost of goods sold') {
+                            return sum + Number(expense.amount || 0);
+                        }
+                        return sum;
+                    }, 0);
+
+                    const grossProfit = totalRevenue - totalCogs;
+                    netProfit = grossProfit - operatingExpenses;
+                }
+
+                setDashboardMetrics({
+                    totalRevenue,
+                    netProfit,
+                    salesCount,
+                    accountsReceivable,
+                    arCount,
+                });
+            } catch (err) {
+                console.error("Error fetching metrics:", err);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchMetrics();
+    }, [supabase, user, isManagement, isSales, dateRange, selectedSalesperson]);
 
   if (isInventoryOnly) {
     return (
@@ -133,6 +200,36 @@ export default function DashboardPage() {
 
   return (
     <>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
+        <h1 className="text-2xl font-bold font-headline tracking-tight">Dashboard Overview</h1>
+        <div className="flex items-center gap-2">
+            <Select value={selectedSalesperson} onValueChange={setSelectedSalesperson}>
+                <SelectTrigger className="w-[200px] bg-background">
+                    <Filter className="w-4 h-4 mr-2" />
+                    <SelectValue placeholder="Filter by User" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">Company Overall</SelectItem>
+                    {salespeople.map(rep => (
+                        <SelectItem key={rep.id} value={rep.id}>{rep.id === userProfile?.id ? 'My Sales' : rep.name}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+
+            <Popover>
+                <PopoverTrigger asChild>
+                    <Button variant={"outline"} size="sm" className={cn("w-[240px] justify-start text-left font-normal bg-background h-10", !dateRange && "text-muted-foreground")}>
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {dateRange?.from ? (dateRange.to ? <>{format(dateRange.from, "LLL dd, y")} - {format(dateRange.to, "LLL dd, y")}</> : format(dateRange.from, "LLL dd, y")) : <span>Pick a date range</span>}
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar initialFocus mode="range" defaultMonth={dateRange?.from} selected={dateRange} onSelect={setDateRange} numberOfMonths={2} />
+                </PopoverContent>
+            </Popover>
+        </div>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -150,24 +247,26 @@ export default function DashboardPage() {
             </p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Net Profit
-            </CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-             {isLoading ? <Skeleton className="h-8 w-3/4 mt-1" /> : (
-                <div className="text-2xl font-bold">
-                    {isManagement ? `₱${dashboardMetrics.netProfit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Restricted'}
-                </div>
-            )}
-            <p className="text-xs text-muted-foreground">
-              Revenue minus COGS and operating expenses.
-            </p>
-          </CardContent>
-        </Card>
+        {isManagement && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Net Profit
+              </CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+               {isLoading ? <Skeleton className="h-8 w-3/4 mt-1" /> : (
+                  <div className="text-2xl font-bold">
+                      ₱{dashboardMetrics.netProfit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Revenue minus COGS and operating expenses.
+              </p>
+            </CardContent>
+          </Card>
+        )}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Sales</CardTitle>
@@ -200,18 +299,42 @@ export default function DashboardPage() {
         </Card>
       </div>
       <div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3">
-        <Card className="xl:col-span-3">
+        <Card className="xl:col-span-2">
           <CardHeader>
             <CardTitle className="font-headline">Recent Sales</CardTitle>
           </CardHeader>
           <CardContent>
-            <RecentSales />
+            <RecentSales dateRange={dateRange} salespersonId={selectedSalesperson} />
+          </CardContent>
+        </Card>
+        <Card className="xl:col-span-1">
+          <CardHeader>
+            <CardTitle className="font-headline text-destructive">Collections Due Soon</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CollectionsDueSoon />
           </CardContent>
         </Card>
       </div>
       {(isManagement || isSales) && (
-        <div className="grid gap-4 md:gap-8">
-            <AiRecommendations />
+        <div className="grid gap-4 md:gap-8 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-headline">Top Customers</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <TopCustomers dateRange={dateRange} salespersonId={selectedSalesperson} />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-headline">Top Products</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <TopProducts dateRange={dateRange} salespersonId={selectedSalesperson} />
+              </CardContent>
+            </Card>
         </div>
       )}
     </>

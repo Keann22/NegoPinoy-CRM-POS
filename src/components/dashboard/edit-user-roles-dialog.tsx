@@ -6,11 +6,10 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { updateDocumentNonBlocking, useFirestore } from "@/firebase";
-import { doc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import type { UserProfile } from "@/app/dashboard/users/page";
 import { Checkbox } from "@/components/ui/checkbox";
+import { createClient } from "@/lib/supabase/client";
 
 const roles: UserProfile['roles'] = ['Owner', 'Admin', 'Inventory', 'Sales'];
 
@@ -26,11 +25,12 @@ interface EditUserRolesDialogProps {
   user: UserProfile | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void;
 }
 
-export function EditUserRolesDialog({ user, open, onOpenChange }: EditUserRolesDialogProps) {
-  const firestore = useFirestore();
+export function EditUserRolesDialog({ user, open, onOpenChange, onSuccess }: EditUserRolesDialogProps) {
   const { toast } = useToast();
+  const supabase = createClient();
 
   const form = useForm<RolesFormValues>({
     resolver: zodResolver(rolesSchema),
@@ -44,7 +44,7 @@ export function EditUserRolesDialog({ user, open, onOpenChange }: EditUserRolesD
   }
 
   async function onSubmit(data: RolesFormValues) {
-    if (!firestore || !user) return;
+    if (!user) return;
     onOpenChange(false);
 
     toast({
@@ -52,13 +52,28 @@ export function EditUserRolesDialog({ user, open, onOpenChange }: EditUserRolesD
       description: `Updating roles for ${user.firstName} ${user.lastName}.`,
     });
     
-    const userDocRef = doc(firestore, 'users', user.id);
-    updateDocumentNonBlocking(userDocRef, { roles: data.roles });
+    const { error } = await supabase.rpc('set_user_roles', {
+      target_user_id: user.id,
+      new_roles: data.roles
+    });
+
+    if (error) {
+      toast({
+        variant: 'destructive',
+        title: "Error Updating Roles",
+        description: error.message,
+      });
+      return;
+    }
 
     toast({
         title: "Roles Updated",
         description: `Successfully updated roles.`,
     });
+    
+    if (onSuccess) {
+      onSuccess();
+    }
   }
 
   return (

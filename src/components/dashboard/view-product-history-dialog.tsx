@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -17,8 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { useCollection, useSupabase, useUser, collection, query, where } from '@/firebase';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -52,18 +51,26 @@ const getMovementVariant = (type: string) => {
 }
 
 export function ViewProductHistoryDialog({ product, open, onOpenChange }: ViewProductHistoryDialogProps) {
-  const firestore = useFirestore();
+  const supabase = useSupabase();
   const { user } = useUser();
+
+  const [localProduct, setLocalProduct] = useState<Product | null>(null);
+
+  useEffect(() => {
+    if (product) setLocalProduct(product);
+  }, [product]);
+
+  const displayProduct = product || localProduct;
 
   // Optimized query: No orderBy to avoid missing index errors. 
   // We sort the results in memory instead.
-  const movementsQuery = useMemoFirebase(() => {
-    if (!firestore || !user || !product) return null;
+  const movementsQuery = useMemo(() => {
+    if (!supabase || !user || !displayProduct) return null;
     return query(
-      collection(firestore, 'inventoryMovements'),
-      where('productId', '==', product.id)
+      collection(supabase, 'inventoryMovements'),
+      where('productId', '==', displayProduct.id)
     );
-  }, [firestore, user, product]);
+  }, [supabase, user, displayProduct]);
 
   const { data: rawMovements, isLoading } = useCollection<InventoryMovement>(movementsQuery);
 
@@ -74,7 +81,7 @@ export function ViewProductHistoryDialog({ product, open, onOpenChange }: ViewPr
     );
   }, [rawMovements]);
 
-  if (!product) {
+  if (!displayProduct) {
     return null;
   }
 
@@ -82,7 +89,7 @@ export function ViewProductHistoryDialog({ product, open, onOpenChange }: ViewPr
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Inventory History: {product.name}</DialogTitle>
+          <DialogTitle>Inventory History: {displayProduct.name}</DialogTitle>
           <DialogDescription>
             Audit log of all stock changes for this product.
           </DialogDescription>

@@ -28,8 +28,17 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'sgkjdtwqqbrpmrfukhja.supabase.co',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
+  // Exclude Genkit AI packages from the server bundle — they use Node.js internals
+  // incompatible with the Next.js Edge/Turbopack server runtime.
+  serverExternalPackages: ['genkit', '@genkit-ai/google-genai', '@genkit-ai/googleai'],
 };
 
 export default nextConfig;

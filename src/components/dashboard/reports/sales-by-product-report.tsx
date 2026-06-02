@@ -1,39 +1,59 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { useMemo, useEffect, useState } from 'react';
+import { useUser, useSupabase } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 
-type OrderItem = {
-    productId: string;
-    productName: string;
-    quantity: number;
-    sellingPriceAtSale: number;
+type ProductStat = {
+    name: string;
+    qty: number;
+    revenue: number;
 };
 
 export function SalesByProductReport() {
-    const firestore = useFirestore();
+    const supabase = useSupabase();
     const { user } = useUser();
 
-    const itemsQuery = useMemoFirebase(() => (firestore && user ? collection(firestore, 'orderItems') : null), [firestore, user]);
-    const { data: items, isLoading } = useCollection<OrderItem>(itemsQuery);
+    const [aggregated, setAggregated] = useState<ProductStat[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
-    const aggregated = useMemo(() => {
-        if (!items) return [];
-        const map = new Map<string, { name: string, qty: number, revenue: number }>();
-        items.forEach(item => {
-            const existing = map.get(item.productId) || { name: item.productName, qty: 0, revenue: 0 };
-            map.set(item.productId, {
-                name: item.productName,
-                qty: existing.qty + item.quantity,
-                revenue: existing.revenue + (item.quantity * item.sellingPriceAtSale)
-            });
-        });
-        return Array.from(map.values()).sort((a, b) => b.qty - a.qty);
-    }, [items]);
+    useEffect(() => {
+        if (!supabase || !user) return;
+        const fetchData = async () => {
+            setIsLoading(true);
+            try {
+                const { data, error } = await supabase
+                    .from('order_items')
+                    .select('product_id, product_name, quantity, selling_price_at_sale, products(name)');
+
+                if (error) throw error;
+
+                const map = new Map<string, ProductStat>();
+                (data || []).forEach((item: any) => {
+                    const productId = item.product_id || item.product_name;
+                    const name = item.products?.name || item.product_name || 'Unknown Product';
+                    const qty = Number(item.quantity) || 0;
+                    const revenue = qty * (Number(item.selling_price_at_sale) || 0);
+
+                    const existing = map.get(productId) || { name, qty: 0, revenue: 0 };
+                    map.set(productId, {
+                        name,
+                        qty: existing.qty + qty,
+                        revenue: existing.revenue + revenue,
+                    });
+                });
+
+                setAggregated(Array.from(map.values()).sort((a, b) => b.qty - a.qty));
+            } catch (err) {
+                console.error('Sales by product error:', err);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchData();
+    }, [supabase, user]);
 
     return (
         <Card>
@@ -57,7 +77,11 @@ export function SalesByProductReport() {
                                 <TableCell><Skeleton className="h-4 w-12 ml-auto" /></TableCell>
                                 <TableCell><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
                             </TableRow>
-                        )) : aggregated.map((p, i) => (
+                        )) : aggregated.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">No sales data found.</TableCell>
+                            </TableRow>
+                        ) : aggregated.map((p, i) => (
                             <TableRow key={i}>
                                 <TableCell className="font-medium">{p.name}</TableCell>
                                 <TableCell className="text-right">{p.qty}</TableCell>

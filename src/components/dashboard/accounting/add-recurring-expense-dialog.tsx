@@ -8,8 +8,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { addDocumentNonBlocking, useFirestore } from "@/firebase";
-import { collection } from "firebase/firestore";
+import { useSupabase } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -37,7 +36,8 @@ const expenseCategories = [
 
 export function AddRecurringExpenseDialog() {
   const [open, setOpen] = useState(false);
-  const firestore = useFirestore();
+  const supabase = useSupabase();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<RecurringExpenseFormValues>({
@@ -45,23 +45,42 @@ export function AddRecurringExpenseDialog() {
   });
 
   async function onSubmit(values: RecurringExpenseFormValues) {
-    if (!firestore) return;
-    setOpen(false);
+    if (!supabase) return;
+    setIsSubmitting(true);
 
     toast({
       title: "Adding Recurring Expense...",
       description: `Saving "${values.name}".`,
     });
 
-    const recurringExpensesCollection = collection(firestore, 'recurringExpenses');
-    
-    addDocumentNonBlocking(recurringExpensesCollection, values).then(() => {
+    try {
+        const { error } = await supabase
+            .from('recurring_expenses')
+            .insert({
+                name: values.name,
+                amount: values.amount,
+                category: values.category,
+                day_of_month: values.dayOfMonth,
+            });
+
+        if (error) throw error;
+
         toast({
             title: "Recurring Expense Added",
             description: `"${values.name}" has been successfully saved.`,
         });
         form.reset();
-    });
+        setOpen(false);
+    } catch (error: any) {
+        console.error("Failed to add recurring expense:", error);
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: error.message || "Failed to save the recurring expense.",
+        });
+    } finally {
+        setIsSubmitting(false);
+    }
   }
 
   return (
@@ -142,8 +161,8 @@ export function AddRecurringExpenseDialog() {
                 />
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-              <Button type="submit">Save Expense</Button>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isSubmitting}>Cancel</Button>
+              <Button type="submit" disabled={isSubmitting}>Save Expense</Button>
             </DialogFooter>
           </form>
         </Form>

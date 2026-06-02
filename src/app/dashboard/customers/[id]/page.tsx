@@ -2,8 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useDoc, useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, doc, query, orderBy } from 'firebase/firestore';
+import { useDoc, useCollection, useSupabase, useUser, collection, doc, query, orderBy } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -18,6 +17,9 @@ type Customer = {
   firstName: string;
   lastName: string;
   email: string;
+  mobileNumber?: string;
+  addressLine?: string;
+  sukiTier?: string;
 };
 
 type Payment = {
@@ -47,20 +49,20 @@ const getStatusVariant = (status: Order['orderStatus']) => {
 export default function CustomerDetailPage() {
   const params = useParams();
   const customerId = params.id as string;
-  const firestore = useFirestore();
+  const supabase = useSupabase();
   const router = useRouter();
 
   const [logPaymentOrder, setLogPaymentOrder] = useState<Order | null>(null);
   
   // Fetch customer
-  const customerRef = useMemoFirebase(() => (firestore && customerId ? doc(firestore, 'customers', customerId) : null), [firestore, customerId]);
+  const customerRef = useMemo(() => (supabase && customerId ? doc(supabase, 'customers', customerId) : null), [supabase, customerId]);
   const { data: customer, isLoading: isLoadingCustomer } = useDoc<Customer>(customerRef);
   
   // Fetch ALL orders and payments, then filter on the client
-  const allOrdersQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'orders'), orderBy('orderDate', 'desc')) : null), [firestore]);
+  const allOrdersQuery = useMemo(() => (supabase ? query(collection(supabase, 'orders'), orderBy('orderDate', 'desc')) : null), [supabase]);
   const { data: allOrders, isLoading: isLoadingOrders } = useCollection<Order>(allOrdersQuery);
 
-  const allPaymentsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'payments'), orderBy('paymentDate', 'desc')) : null), [firestore]);
+  const allPaymentsQuery = useMemo(() => (supabase ? query(collection(supabase, 'payments'), orderBy('paymentDate', 'desc')) : null), [supabase]);
   const { data: allPayments, isLoading: isLoadingPayments } = useCollection<Payment>(allPaymentsQuery);
 
   const isLoading = isLoadingCustomer || isLoadingOrders || isLoadingPayments;
@@ -111,8 +113,13 @@ export default function CustomerDetailPage() {
             <Avatar className="h-16 w-16">
               <AvatarFallback className="text-2xl">{customer.firstName[0]}{customer.lastName[0]}</AvatarFallback>
             </Avatar>
-            <div>
+            <div className="flex-1">
               <CardTitle className="text-3xl font-headline">{customer.firstName} {customer.lastName}</CardTitle>
+              <div className="flex flex-col gap-1 mt-2 mb-4 text-sm text-muted-foreground">
+                {customer.email && <div className="flex items-center gap-2"><span>✉️</span> {customer.email}</div>}
+                {customer.mobileNumber && <div className="flex items-center gap-2"><span>📱</span> {customer.mobileNumber}</div>}
+                {customer.addressLine && <div className="flex items-center gap-2"><span>📍</span> {customer.addressLine}</div>}
+              </div>
               <CardDescription className="text-base">
                 Total Outstanding Balance: <span className="font-bold text-destructive">₱{totalBalanceOwed.toFixed(2)}</span>
               </CardDescription>

@@ -2,8 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { useFirestore } from '@/firebase';
-import { collection, doc, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { startOfMonth, endOfMonth } from 'date-fns';
@@ -13,22 +12,21 @@ type RecurringExpense = {
     name: string;
     amount: number;
     category: string;
-    dayOfMonth: number;
+    day_of_month: number;
 };
 
 export function PostRecurringExpensesButton() {
     const [isLoading, setIsLoading] = useState(false);
-    const firestore = useFirestore();
     const { toast } = useToast();
 
     const handlePostExpenses = async () => {
-        if (!firestore) return;
-
         setIsLoading(true);
         toast({
             title: "Posting Expenses...",
             description: "Checking for recurring expenses to post for this month.",
         });
+
+        const supabase = createClient();
 
         try {
             const now = new Date();
@@ -37,60 +35,68 @@ export function PostRecurringExpensesButton() {
             const monthStart = startOfMonth(now);
             const monthEnd = endOfMonth(now);
 
-            // --- READ PHASE ---
             // 1. Get all recurring expense definitions
-            const recurringExpensesRef = collection(firestore, 'recurringExpenses');
-            const recurringSnapshot = await getDocs(recurringExpensesRef);
-            const recurringExpenses = recurringSnapshot.docs.map(d => ({ id: d.id, ...d.data() } as RecurringExpense));
+            const { data: recurringExpenses, error: recurringError } = await supabase
+                .from('recurring_expenses')
+                .select('*');
+
+            if (recurringError) throw recurringError;
+            if (!recurringExpenses || recurringExpenses.length === 0) {
+                toast({
+                    title: "No Recurring Expenses",
+                    description: "There are no recurring expenses configured.",
+                });
+                return;
+            }
 
             // 2. Get all expenses already posted this month to avoid duplicates
-            const expensesRef = collection(firestore, 'expenses');
-            const monthlyExpensesQuery = query(
-                expensesRef,
-                where('expenseDate', '>=', monthStart.toISOString()),
-                where('expenseDate', '<=', monthEnd.toISOString())
-            );
-            const monthlySnapshot = await getDocs(monthlyExpensesQuery);
-            const postedDescriptions = new Set(monthlySnapshot.docs.map(d => d.data().description));
-            
-            // --- WRITE PHASE ---
-            // Use a write batch for all writes for atomicity
-            const batch = writeBatch(firestore);
-            let postedCount = 0;
+            const { data: monthlyExpenses, error: monthlyError } = await supabase
+                .from('expenses')
+                .select('description')
+                .gte('expense_date', monthStart.toISOString())
+                .lte('expense_date', monthEnd.toISOString());
+
+            if (monthlyError) throw monthlyError;
+
+            const postedDescriptions = new Set((monthlyExpenses || []).map(e => e.description));
+
+            // 3. Build list of expenses to insert
+            const toInsert = [];
             let skippedCount = 0;
 
-            for (const recurring of recurringExpenses) {
+            for (const recurring of recurringExpenses as RecurringExpense[]) {
                 const description = `Recurring: ${recurring.name}`;
                 if (postedDescriptions.has(description)) {
                     skippedCount++;
                     continue;
                 }
-                
-                let dayToUse = recurring.dayOfMonth;
+
+                let dayToUse = recurring.day_of_month;
                 const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
                 if (dayToUse > daysInMonth) {
-                    dayToUse = daysInMonth; // Clamp to the last day of the month
+                    dayToUse = daysInMonth;
                 }
                 const expenseDate = new Date(currentYear, currentMonth, dayToUse);
 
-                const newExpenseRef = doc(expensesRef);
-                batch.set(newExpenseRef, {
-                    id: newExpenseRef.id,
-                    expenseDate: expenseDate.toISOString(),
+                toInsert.push({
+                    expense_date: expenseDate.toISOString(),
                     amount: recurring.amount,
                     category: recurring.category,
                     description: description,
                 });
-                postedCount++;
             }
-            
-            if (postedCount > 0) {
-                await batch.commit();
+
+            if (toInsert.length > 0) {
+                const { error: insertError } = await supabase
+                    .from('expenses')
+                    .insert(toInsert);
+
+                if (insertError) throw insertError;
             }
-            
+
             toast({
                 title: "Processing Complete",
-                description: `${postedCount} expenses posted. ${skippedCount} were already posted and skipped.`,
+                description: `${toInsert.length} expenses posted. ${skippedCount} were already posted and skipped.`,
             });
 
         } catch (error: any) {

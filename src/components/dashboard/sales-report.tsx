@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { DateRange } from 'react-day-picker';
 import {
   startOfToday,
@@ -37,8 +38,7 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { useCollection, useSupabase, useUser, collection, query, where } from '@/firebase';
 
 
 // Matches a subset of the Firestore document structure for an order
@@ -70,22 +70,23 @@ export function SalesReport() {
     to: endOfToday(),
   });
 
-  const firestore = useFirestore();
+  const supabase = useSupabase();
   const { user } = useUser();
+  const router = useRouter();
 
-  const allOrdersQuery = useMemoFirebase(() => {
-      if (!firestore || !user) return null;
+  const allOrdersQuery = useMemo(() => {
+      if (!supabase || !user) return null;
       return query(
-          collection(firestore, 'orders'),
+          collection(supabase, 'orders'),
           where('orderStatus', '==', 'Completed')
       );
-  }, [firestore, user]);
+  }, [supabase, user]);
   const { data: allOrders, isLoading: isLoadingOrders } = useCollection<Order>(allOrdersQuery);
 
-  const usersQuery = useMemoFirebase(() => {
-      if (!firestore || !user) return null;
-      return collection(firestore, 'users');
-  }, [firestore, user]);
+  const usersQuery = useMemo(() => {
+      if (!supabase || !user) return null;
+      return collection(supabase, 'users');
+  }, [supabase, user]);
   const { data: users, isLoading: isLoadingUsers } = useCollection<UserProfile>(usersQuery);
 
   const isLoading = isLoadingOrders || isLoadingUsers;
@@ -210,8 +211,17 @@ export function SalesReport() {
               </TableRow>
             ))}
             {salesByPerson.map((sale) => (
-              <TableRow key={sale.userId}>
-                <TableCell className="font-medium">{sale.name}</TableCell>
+              <TableRow 
+                key={sale.userId}
+                className="cursor-pointer hover:bg-muted/50 transition-colors"
+                onClick={() => {
+                  const fromParam = date?.from ? date.from.toISOString() : '';
+                  const toParam = date?.to ? date.to.toISOString() : '';
+                  const nameParam = encodeURIComponent(sale.name);
+                  router.push(`/dashboard/reports/sales-by-person/${sale.userId}?from=${fromParam}&to=${toParam}&name=${nameParam}`);
+                }}
+              >
+                <TableCell className="font-medium text-primary hover:underline">{sale.name}</TableCell>
                 <TableCell className="text-center">{sale.salesCount}</TableCell>
                 <TableCell className="text-right">₱{sale.totalAmount.toFixed(2)}</TableCell>
               </TableRow>

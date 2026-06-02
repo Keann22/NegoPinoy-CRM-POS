@@ -1,91 +1,79 @@
 'use client';
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-  } from '@/components/ui/table';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query } from 'firebase/firestore';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useUser, useSupabase } from '@/firebase';
 
-// Types based on backend.json
-type Order = {
+type ReceivableOrder = {
     id: string;
     totalAmount: number;
     balanceDue: number;
     orderDate: string;
     customerId: string;
-    paymentType: 'Full Payment' | 'Lay-away' | 'Installment';
-    orderStatus: 'Pending Payment' | 'Processing' | 'Shipped' | 'Completed' | 'Cancelled' | 'Returned';
+    customerName: string;
+    paymentType: string;
+    orderStatus: string;
     installmentMonths?: number;
 };
 
-type Customer = {
-    id: string;
-    firstName: string;
-    lastName: string;
-};
-
-// The type for the filtered, display-ready data
-type ReceivableOrder = Order & {
-    customerName: string;
-};
-
 export function AccountsReceivableReport() {
-    const firestore = useFirestore();
+    const supabase = useSupabase();
     const { user } = useUser();
 
-    // 1. Fetch ALL orders, no server-side filtering
-    const allOrdersQuery = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return query(collection(firestore, 'orders'));
-    }, [firestore, user]);
-    const { data: allOrders, isLoading: isLoadingOrders } = useCollection<Order>(allOrdersQuery);
-    
-    // 2. Fetch ALL customers to create a name map
-    const customersQuery = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return collection(firestore, 'customers');
-    }, [firestore, user]);
-    const { data: customers, isLoading: isLoadingCustomers } = useCollection<Customer>(customersQuery);
+    const [orders, setOrders] = useState<ReceivableOrder[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
-    const isLoading = isLoadingOrders || isLoadingCustomers;
+    useEffect(() => {
+        if (!supabase || !user) return;
+        const fetchData = async () => {
+            setIsLoading(true);
+            try {
+                // Fetch orders with balance due for installment/lay-away
+                const { data: ordersData, error } = await supabase
+                    .from('orders')
+                    .select('id, total_amount, balance_due, order_date, created_at, customer_id, payment_method, status, installment_months')
+                    .gt('balance_due', 0)
+                    .in('payment_method', ['Installment', 'Lay-away'])
+                    .not('status', 'in', '("Cancelled","Returned")')
+                    .order('order_date', { ascending: false });
 
-    // Create a map for quick customer lookup
-    const customerMap = useMemo(() => {
-        if (!customers) return new Map();
-        return new Map(customers.map(c => [c.id, `${c.firstName} ${c.lastName}`]));
-    }, [customers]);
+                if (error) throw error;
 
-    // 3. Perform filtering on the CLIENT-SIDE
-    const { totalOutstanding, customerBreakdown } = useMemo(() => {
-        if (!allOrders) {
-            return { totalOutstanding: 0, customerBreakdown: [] };
-        }
+                const mapped = ordersData || [];
+                if (mapped.length === 0) { setOrders([]); return; }
 
-        // Filter for orders that constitute accounts receivable
-        const arOrders = allOrders.filter(order => 
-            order.balanceDue > 0 && 
-            (order.paymentType === 'Installment' || order.paymentType === 'Lay-away') &&
-            order.orderStatus !== 'Cancelled' &&
-            order.orderStatus !== 'Returned'
-        );
+                const customerIds = Array.from(new Set(mapped.map((o: any) => o.customer_id)));
+                const { data: customersData } = await supabase
+                    .from('customers')
+                    .select('id, full_name')
+                    .in('id', customerIds);
 
-        const total = arOrders.reduce((sum, order) => sum + order.balanceDue, 0);
+                const customerMap = new Map<string, string>();
+                (customersData || []).forEach((c: any) => customerMap.set(c.id, c.full_name || 'Unknown Customer'));
 
-        const breakdown: ReceivableOrder[] = arOrders.map(order => ({
-            ...order,
-            customerName: customerMap.get(order.customerId) || 'Unknown Customer'
-        })).sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime()); // Sort by most recent
+                setOrders(mapped.map((o: any) => ({
+                    id: o.id,
+                    totalAmount: Number(o.total_amount) || 0,
+                    balanceDue: Number(o.balance_due) || 0,
+                    orderDate: o.order_date || o.created_at,
+                    customerId: o.customer_id,
+                    customerName: customerMap.get(o.customer_id) || 'Unknown Customer',
+                    paymentType: o.payment_method,
+                    orderStatus: o.status,
+                    installmentMonths: o.installment_months,
+                })));
+            } catch (err) {
+                console.error('AR report error:', err);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchData();
+    }, [supabase, user]);
 
-        return { totalOutstanding: total, customerBreakdown: breakdown };
-    }, [allOrders, customerMap]);
+    const totalOutstanding = useMemo(() => orders.reduce((sum, o) => sum + o.balanceDue, 0), [orders]);
 
     return (
         <Card>
@@ -106,9 +94,7 @@ export function AccountsReceivableReport() {
                 </div>
             </CardHeader>
             <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                    This report lists all customers with a remaining balance.
-                </p>
+                <p className="text-sm text-muted-foreground mb-4">This report lists all customers with a remaining balance.</p>
                 <Table>
                     <TableHeader>
                         <TableRow>
@@ -129,7 +115,7 @@ export function AccountsReceivableReport() {
                             <TableCell className="text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
                         </TableRow>
                     ))}
-                    {customerBreakdown.map((order) => (
+                    {orders.map((order) => (
                         <TableRow key={order.id}>
                             <TableCell className="font-medium">{order.customerName}</TableCell>
                             <TableCell>{format(new Date(order.orderDate), 'PPP')}</TableCell>
@@ -145,12 +131,10 @@ export function AccountsReceivableReport() {
                     ))}
                     </TableBody>
                 </Table>
-                {!isLoading && customerBreakdown.length === 0 && (
+                {!isLoading && orders.length === 0 && (
                 <div className="flex flex-col items-center justify-center text-center border-2 border-dashed rounded-lg p-12 mt-4">
                     <p className="text-lg font-semibold">No Outstanding Balances</p>
-                    <p className="text-muted-foreground mt-2">
-                        All installment and lay-away plans are fully paid.
-                    </p>
+                    <p className="text-muted-foreground mt-2">All installment and lay-away plans are fully paid.</p>
                 </div>
                 )}
             </CardContent>

@@ -6,8 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReportDateFilter } from './report-date-filter';
 import { Separator } from '@/components/ui/separator';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { useCollection, useSupabase, useUser, collection, query, where } from '@/firebase';
 
 type Order = {
     id: string;
@@ -39,32 +38,32 @@ export function PnlReport() {
         to: endOfMonth(new Date()),
     });
 
-    const firestore = useFirestore();
+    const supabase = useSupabase();
     const { user } = useUser();
 
     // Queries - Fetch all data and filter on the client
-    const allOrdersQuery = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return query(collection(firestore, 'orders'), where('orderStatus', '!=', 'Cancelled'));
-    }, [firestore, user]);
+    const allOrdersQuery = useMemo(() => {
+        if (!supabase || !user) return null;
+        return query(collection(supabase, 'orders'), where('orderStatus', '!=', 'Cancelled'));
+    }, [supabase, user]);
     const { data: allOrders, isLoading: isLoadingOrders } = useCollection<Order>(allOrdersQuery);
 
-    const allExpensesQuery = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return collection(firestore, 'expenses');
-    }, [firestore, user]);
+    const allExpensesQuery = useMemo(() => {
+        if (!supabase || !user) return null;
+        return collection(supabase, 'expenses');
+    }, [supabase, user]);
     const { data: allExpenses, isLoading: isLoadingExpenses } = useCollection<Expense>(allExpensesQuery);
 
-    const allBadDebtsQuery = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return collection(firestore, 'badDebts');
-    }, [firestore, user]);
+    const allBadDebtsQuery = useMemo(() => {
+        if (!supabase || !user) return null;
+        return collection(supabase, 'badDebts');
+    }, [supabase, user]);
     const { data: allBadDebts, isLoading: isLoadingBadDebts } = useCollection<BadDebt>(allBadDebtsQuery);
 
-    const allOrderItemsQuery = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return collection(firestore, 'orderItems');
-    }, [firestore, user]);
+    const allOrderItemsQuery = useMemo(() => {
+        if (!supabase || !user) return null;
+        return collection(supabase, 'orderItems');
+    }, [supabase, user]);
     const { data: allOrderItems, isLoading: isLoadingOrderItems } = useCollection<OrderItem>(allOrderItemsQuery);
 
     const isLoading = isLoadingOrders || isLoadingExpenses || isLoadingBadDebts || isLoadingOrderItems;

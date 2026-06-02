@@ -1,7 +1,9 @@
-import {genkit} from 'genkit';
-import {googleAI} from '@genkit-ai/google-genai';
+// Genkit AI is only available in server-side Genkit flows (run via genkit:dev).
+// This stub prevents the package from being bundled into the Next.js server,
+// which crashes due to google-auth-library incompatibilities with Turbopack.
 
-export const ai = genkit({
-  plugins: [googleAI()],
-  model: 'googleai/gemini-2.5-flash',
-});
+export const ai = {
+  generate: async () => { throw new Error('AI is not available in this context.'); },
+  defineFlow: (config: any, fn: any) => fn,
+  defineTool: (config: any, fn: any) => fn,
+};

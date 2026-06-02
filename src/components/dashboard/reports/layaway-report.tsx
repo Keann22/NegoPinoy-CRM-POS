@@ -11,8 +11,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { format } from 'date-fns';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { useCollection, useSupabase, useUser, collection, query, where } from '@/firebase';
 
 type Order = {
     id: string;
@@ -31,23 +30,23 @@ type Customer = {
 };
 
 export function LayawayReport() {
-    const firestore = useFirestore();
+    const supabase = useSupabase();
     const { user } = useUser();
 
-    const layawayOrdersQuery = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
+    const layawayOrdersQuery = useMemo(() => {
+        if (!supabase || !user) return null;
         return query(
-            collection(firestore, 'orders'),
+            collection(supabase, 'orders'),
             where('paymentType', '==', 'Lay-away'),
             where('orderStatus', 'in', ['Pending Payment', 'Processing'])
         );
-    }, [firestore, user]);
+    }, [supabase, user]);
     const { data: layawayOrders, isLoading: isLoadingOrders } = useCollection<Order>(layawayOrdersQuery);
 
-    const customersQuery = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return collection(firestore, 'customers');
-    }, [firestore, user]);
+    const customersQuery = useMemo(() => {
+        if (!supabase || !user) return null;
+        return collection(supabase, 'customers');
+    }, [supabase, user]);
     const { data: customers, isLoading: isLoadingCustomers } = useCollection<Customer>(customersQuery);
 
     const isLoading = isLoadingOrders || isLoadingCustomers;

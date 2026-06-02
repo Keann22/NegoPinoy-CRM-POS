@@ -6,8 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { updateDocumentNonBlocking, useFirestore } from "@/firebase";
-import { doc } from "firebase/firestore";
+import { useSupabase } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
 import type { UserProfile } from "@/app/dashboard/users/page";
 import { Input } from "../ui/input";
@@ -27,8 +26,9 @@ interface EditUserDialogProps {
 }
 
 export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps) {
-  const firestore = useFirestore();
+  const supabase = useSupabase();
   const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userSchema),
@@ -49,24 +49,40 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
   }
 
   async function onSubmit(data: UserFormValues) {
-    if (!firestore || !user) return;
-    onOpenChange(false);
+    if (!supabase || !user) return;
+    setIsSubmitting(true);
 
     toast({
       title: "Updating User...",
       description: `Updating profile for ${user.email}.`,
     });
     
-    const userDocRef = doc(firestore, 'users', user.id);
-    updateDocumentNonBlocking(userDocRef, { 
-      firstName: data.firstName,
-      lastName: data.lastName,
-    });
+    try {
+        const { error } = await supabase
+            .from('users')
+            .update({ 
+              first_name: data.firstName,
+              last_name: data.lastName,
+            })
+            .eq('id', user.id);
 
-    toast({
-        title: "User Updated",
-        description: `Successfully updated profile for ${user.email}.`,
-    });
+        if (error) throw error;
+
+        toast({
+            title: "User Updated",
+            description: `Successfully updated profile for ${user.email}.`,
+        });
+        onOpenChange(false);
+    } catch (error: any) {
+        console.error("Failed to update user:", error);
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: error.message || "Failed to update the user profile.",
+        });
+    } finally {
+        setIsSubmitting(false);
+    }
   }
 
   return (
@@ -107,8 +123,8 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
               )}
             />
             <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-                <Button type="submit">Save Changes</Button>
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancel</Button>
+                <Button type="submit" disabled={isSubmitting}>Save Changes</Button>
             </DialogFooter>
           </form>
         </Form>

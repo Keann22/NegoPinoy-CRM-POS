@@ -27,9 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useCollection, useFirestore, useMemoFirebase, useStorage, useUser } from '@/firebase';
-import { collection, doc, getDoc, deleteDoc } from 'firebase/firestore';
-import { deleteObject, ref as storageRef } from 'firebase/storage';
+import { useCollection, useUser, useSupabase } from '@/firebase';
 import { AddProductDialog } from '@/components/dashboard/add-product-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BulkUploadProductsDialog } from '@/components/dashboard/bulk-upload-products-dialog';
@@ -50,6 +48,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { EditProductDialog } from '@/components/dashboard/edit-product-dialog';
 import { ViewProductHistoryDialog } from '@/components/dashboard/view-product-history-dialog';
+import { ViewProductDetailsDialog } from '@/components/dashboard/view-product-details-dialog';
 import { useUserProfile } from '@/hooks/useUserProfile';
 
 // Matches the Firestore document structure for a product
@@ -63,12 +62,14 @@ export type Product = {
   images: string[];
   sellingPrice: number;
   quantityOnHand: number;
+  shelf_location?: string;
 };
 
 export type FormattedProduct = Product & {
     status: { text: 'In Stock' | 'Low Stock' | 'Out of Stock'; variant: 'outline' | 'default' | 'destructive'; };
     price: string;
     image: string;
+    shelfLocation?: string;
 }
 
 const getStatus = (stock: number | undefined | null): { text: 'In Stock' | 'Low Stock' | 'Out of Stock'; variant: 'outline' | 'default' | 'destructive' } => {
@@ -83,12 +84,12 @@ const getStatus = (stock: number | undefined | null): { text: 'In Stock' | 'Low 
 };
 
 export default function ProductsPage() {
-  const firestore = useFirestore();
-  const storage = useStorage();
+  const supabase = useSupabase();
   const { user } = useUser();
   const { userProfile } = useUserProfile();
   const [deletingProduct, setDeletingProduct] = useState<FormattedProduct | null>(null);
   const [editingProduct, setEditingProduct] = useState<FormattedProduct | null>(null);
+  const [viewingDetailsProduct, setViewingDetailsProduct] = useState<FormattedProduct | null>(null);
   const [viewingHistoryProduct, setViewingHistoryProduct] = useState<FormattedProduct | null>(null);
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
@@ -98,14 +99,14 @@ export default function ProductsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [stockFilter, setStockFilter] = useState('all');
 
-  const isManagement = useMemo(() => userProfile?.roles.some(r => ['Admin', 'Owner'].includes(r)), [userProfile]);
+  const isManagement = useMemo(() => userProfile?.roles?.some(r => ['Admin', 'Owner'].includes(r)), [userProfile]);
 
-  const productsQuery = useMemoFirebase(
-    () => (firestore && user ? collection(firestore, 'products') : null),
-    [firestore, user]
+  const productsQuery = useMemo(
+    () => (supabase && user ? 'products' : null),
+    [supabase, user]
   );
 
-  const { data: products, isLoading } = useCollection<Omit<Product, 'id'>>(productsQuery);
+  const { data: products, isLoading, refetch } = useCollection<Omit<Product, 'id'>>(productsQuery);
 
   const formattedProducts: FormattedProduct[] = useMemo(() => {
     if (!products) return [];
@@ -113,8 +114,9 @@ export default function ProductsPage() {
       ...p,
       quantityOnHand: p.quantityOnHand ?? 0,
       status: getStatus(p.quantityOnHand),
-      price: `₱${p.sellingPrice.toFixed(2)}`,
+      price: `₱${(Number(p.sellingPrice) || 0).toFixed(2)}`,
       image: p.images?.[0] || 'https://placehold.co/64x64',
+      shelfLocation: p.shelf_location || "",
     }));
   }, [products]);
 
@@ -150,7 +152,8 @@ export default function ProductsPage() {
 
 
   const handleDeleteConfirm = async () => {
-    if (!deletingProduct || !firestore || !storage) return;
+    if (!deletingProduct) return;
+
 
     const productToDelete = deletingProduct;
     setDeletingProduct(null);
@@ -163,18 +166,20 @@ export default function ProductsPage() {
     try {
         // Delete images from Storage
         if (productToDelete.images && productToDelete.images.length > 0) {
-            const deletePromises = productToDelete.images.map(imageUrl => {
-                if (imageUrl.includes('placehold.co')) {
-                    return Promise.resolve();
-                }
-                const imageFileRef = storageRef(storage, imageUrl);
-                return deleteObject(imageFileRef);
-            });
-            await Promise.all(deletePromises);
+            const imagePaths = productToDelete.images
+                .filter(url => !url.includes('placehold.co'))
+                .map(url => {
+                    const urlParts = url.split('/');
+                    return urlParts[urlParts.length - 1]; // get file name
+                });
+            
+            if (imagePaths.length > 0) {
+                await supabase.storage.from('products').remove(imagePaths);
+            }
         }
 
-        const productDocRef = doc(firestore, 'products', productToDelete.id);
-        await deleteDoc(productDocRef);
+        const { error } = await supabase.from('products').delete().eq('id', productToDelete.id);
+        if (error) throw error;
 
         toast({
           title: "Product Deleted",
@@ -185,13 +190,13 @@ export default function ProductsPage() {
         toast({
             variant: 'destructive',
             title: 'Deletion Failed',
-            description: `Could not delete "${productToDelete.name}".`
+            description: `Could not delete "${productToDelete.name}". ${error?.message || ''}`
         });
     }
   }
 
   const handleBulkDeleteConfirm = async () => {
-    if (!firestore || !storage || selectedProductIds.length === 0) return;
+    if (!supabase || selectedProductIds.length === 0) return;
 
     const idsToDelete = [...selectedProductIds];
     setShowBulkDeleteConfirm(false);
@@ -202,39 +207,41 @@ export default function ProductsPage() {
       description: `${idsToDelete.length} products are being queued for deletion.`,
     });
 
-    const results = await Promise.allSettled(idsToDelete.map(async (productId) => {
-        const productDocRef = doc(firestore, 'products', productId);
-        const docSnap = await getDoc(productDocRef);
-
-        if (docSnap.exists()) {
-            const productData = docSnap.data() as Product;
-            if (productData.images && productData.images.length > 0) {
-                await Promise.all(productData.images.map(imageUrl => {
-                    if (imageUrl.includes('placehold.co')) {
-                        return Promise.resolve();
-                    }
-                    const imageFileRef = storageRef(storage, imageUrl);
-                    return deleteObject(imageFileRef).catch(err => console.error(`Failed to delete image ${imageUrl}`, err));
-                }));
+    try {
+        // 1. Fetch images to delete
+        const { data: productsData } = await supabase
+            .from('products')
+            .select('images')
+            .in('id', idsToDelete);
+            
+        if (productsData) {
+            const allImagePaths = productsData
+                .flatMap(p => p.images || [])
+                .filter(url => !url.includes('placehold.co'))
+                .map(url => {
+                    const urlParts = url.split('/');
+                    return urlParts[urlParts.length - 1];
+                });
+                
+            if (allImagePaths.length > 0) {
+                await supabase.storage.from('products').remove(allImagePaths);
             }
         }
-        await deleteDoc(productDocRef);
-        return productId;
-    }));
 
-    const successfulDeletes = results.filter(r => r.status === 'fulfilled').length;
-    const failedDeletes = results.filter(r => r.status === 'rejected').length;
+        // 2. Delete rows
+        const { error } = await supabase.from('products').delete().in('id', idsToDelete);
+        if (error) throw error;
 
-    if (failedDeletes > 0) {
+        toast({
+          title: "Bulk Deletion Complete",
+          description: `${idsToDelete.length} products have been successfully deleted.`,
+        });
+    } catch (error) {
+        console.error("Bulk delete error", error);
         toast({
             variant: "destructive",
-            title: "Bulk Deletion Partially Failed",
-            description: `${successfulDeletes} products deleted. ${failedDeletes} failed.`,
-        });
-    } else {
-         toast({
-          title: "Bulk Deletion Complete",
-          description: `${successfulDeletes} products have been successfully deleted.`,
+            title: "Bulk Deletion Failed",
+            description: `There was an error deleting the products. ${error?.message || ''}`,
         });
     }
   };
@@ -253,7 +260,7 @@ export default function ProductsPage() {
           </div>
           <div className="flex gap-2">
             <BulkUploadProductsDialog />
-            <AddProductDialog />
+            <AddProductDialog onProductAdded={refetch} />
           </div>
         </CardHeader>
         <CardContent>
@@ -315,6 +322,7 @@ export default function ProductsPage() {
                 <TableHead>Name</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Price</TableHead>
+                <TableHead className="hidden md:table-cell">Location</TableHead>
                 <TableHead className="hidden md:table-cell">
                   Stock
                 </TableHead>
@@ -331,6 +339,7 @@ export default function ProductsPage() {
                       <TableCell><Skeleton className="h-4 w-48" /></TableCell>
                       <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-16" /></TableCell>
                       <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-12" /></TableCell>
                       <TableCell><Skeleton className="h-8 w-8" /></TableCell>
                   </TableRow>
@@ -367,6 +376,7 @@ export default function ProductsPage() {
                     </Badge>
                   </TableCell>
                   <TableCell>{product.price}</TableCell>
+                  <TableCell className="hidden md:table-cell">{product.shelfLocation || '-'}</TableCell>
                   <TableCell className="hidden md:table-cell">
                     {product.quantityOnHand ?? 0}
                   </TableCell>
@@ -380,6 +390,7 @@ export default function ProductsPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuItem onClick={() => setViewingDetailsProduct(product)}>View Details</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setEditingProduct(product)}>Edit</DropdownMenuItem>
                         {isManagement && <DropdownMenuItem>Duplicate</DropdownMenuItem>}
                         <DropdownMenuItem onClick={() => setViewingHistoryProduct(product)}>View History</DropdownMenuItem>
@@ -441,6 +452,12 @@ export default function ProductsPage() {
         product={editingProduct}
         open={!!editingProduct}
         onOpenChange={(isOpen) => !isOpen && setEditingProduct(null)}
+      />
+
+      <ViewProductDetailsDialog
+        product={viewingDetailsProduct}
+        open={!!viewingDetailsProduct}
+        onOpenChange={(isOpen) => !isOpen && setViewingDetailsProduct(null)}
       />
 
       <ViewProductHistoryDialog

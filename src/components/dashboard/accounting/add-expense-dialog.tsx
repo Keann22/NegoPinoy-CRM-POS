@@ -9,8 +9,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { addDocumentNonBlocking, useFirestore } from "@/firebase";
-import { collection } from "firebase/firestore";
+import { useSupabase } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarIcon } from "lucide-react";
@@ -43,7 +42,8 @@ const expenseCategories = [
 
 export function AddExpenseDialog() {
   const [open, setOpen] = useState(false);
-  const firestore = useFirestore();
+  const supabase = useSupabase();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<ExpenseFormValues>({
@@ -55,20 +55,26 @@ export function AddExpenseDialog() {
   });
 
   async function onSubmit(values: ExpenseFormValues) {
-    if (!firestore) return;
-    setOpen(false);
+    if (!supabase) return;
+    setIsSubmitting(true);
 
     toast({
       title: "Adding Expense...",
       description: `Recording your expense of ₱${values.amount}.`,
     });
 
-    const expensesCollection = collection(firestore, 'expenses');
-    
-    addDocumentNonBlocking(expensesCollection, {
-      ...values,
-      expenseDate: values.expenseDate.toISOString(),
-    }).then(() => {
+    try {
+        const { error } = await supabase
+            .from('expenses')
+            .insert({
+                expense_date: values.expenseDate.toISOString(),
+                amount: values.amount,
+                category: values.category,
+                description: values.description || null,
+            });
+
+        if (error) throw error;
+
         toast({
             title: "Expense Added",
             description: `The expense has been successfully recorded.`,
@@ -79,7 +85,17 @@ export function AddExpenseDialog() {
             category: undefined,
             description: ""
         });
-    });
+        setOpen(false);
+    } catch (error: any) {
+        console.error("Failed to add expense:", error);
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: error.message || "Failed to save the expense.",
+        });
+    } finally {
+        setIsSubmitting(false);
+    }
   }
 
   return (
@@ -173,8 +189,8 @@ export function AddExpenseDialog() {
                 />
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-              <Button type="submit">Save Expense</Button>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isSubmitting}>Cancel</Button>
+              <Button type="submit" disabled={isSubmitting}>Save Expense</Button>
             </DialogFooter>
           </form>
         </Form>

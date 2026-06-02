@@ -1,11 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, doc, getDocs, query, where, orderBy, limit, runTransaction } from 'firebase/firestore';
+import { useCollection, useUser, useSupabase, collection, query, where, orderBy, limit } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -17,13 +16,14 @@ import { useToast } from '@/hooks/use-toast';
 import { CalendarIcon, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { useRoleCheck } from '@/hooks/useRoleCheck';
 
 const restockSchema = z.object({
   productId: z.string({ required_error: 'Please select a product.' }),
   productName: z.string(),
   quantity: z.coerce.number().positive('Quantity must be a positive number.'),
   unitCost: z.coerce.number().min(0, 'Unit cost cannot be negative.'),
-  supplierName: z.string().min(1, 'Supplier name is required.'),
+  supplierName: z.string().optional(),
   purchaseDate: z.date({ required_error: 'A purchase date is required.' }),
 });
 
@@ -35,23 +35,25 @@ export default function RestockPage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productSearch, setProductSearch] = useState('');
   
-  const firestore = useFirestore();
+
+  const supabase = useSupabase();
   const { user } = useUser();
   const { toast } = useToast();
+  const { isManagement } = useRoleCheck();
 
-  const productsQuery = useMemoFirebase(
+  const productsQuery = useMemo(
     () => {
-      if (!firestore || !user || productSearch.length < 2) return null;
+      if (!supabase || !user || productSearch.length < 2) return null;
       const searchTermCapitalized = productSearch.charAt(0).toUpperCase() + productSearch.slice(1);
       return query(
-        collection(firestore, 'products'),
+        collection(supabase, 'products'),
         orderBy('name'),
         where('name', '>=', searchTermCapitalized),
         where('name', '<=', searchTermCapitalized + '\uf8ff'),
         limit(10)
       );
     },
-    [firestore, user, productSearch]
+    [supabase, user, productSearch]
   );
   const { data: productResults, isLoading: isLoadingProducts } = useCollection<Product>(productsQuery);
 
@@ -59,6 +61,7 @@ export default function RestockPage() {
     resolver: zodResolver(restockSchema),
     defaultValues: {
       purchaseDate: new Date(),
+      supplierName: '',
     },
   });
 
@@ -70,56 +73,62 @@ export default function RestockPage() {
   };
 
   const onSubmit = async (values: RestockFormValues) => {
-    if (!firestore) return;
     setIsSubmitting(true);
     toast({ title: 'Saving Purchase...', description: 'Please wait.' });
 
     try {
-      await runTransaction(firestore, async (transaction) => {
-        const productRef = doc(firestore, 'products', values.productId);
-        const productDoc = await transaction.get(productRef);
+      // 1. Fetch current product data
+      const { data: productData, error: productError } = await supabase
+        .from('products')
+        .select('id, stock_level')
+        .eq('id', values.productId)
+        .single();
 
-        if (!productDoc.exists()) {
-          throw new Error("Product not found. It may have been deleted.");
-        }
+      if (productError || !productData) {
+        throw new Error("Product not found. It may have been deleted.");
+      }
 
-        const productData = productDoc.data();
-        const newQuantityOnHand = (productData.quantityOnHand || 0) + values.quantity;
+      const newStockLevel = (productData.stock_level || 0) + values.quantity;
 
-        const newBatch = {
-          batchId: doc(collection(firestore, '_')).id,
-          purchaseDate: values.purchaseDate.toISOString(),
-          originalQty: values.quantity,
-          remainingQty: values.quantity,
-          unitCost: values.unitCost,
-          supplierName: values.supplierName,
-        };
+      // 2. Update product stock and unit cost
+      const { error: updateError } = await supabase
+        .from('products')
+        .update({
+          stock_level: newStockLevel,
+          initial_unit_cost: values.unitCost
+        })
+        .eq('id', values.productId);
 
-        const newStockBatches = [...(productData.stockBatches || []), newBatch];
+      if (updateError) throw updateError;
 
-        transaction.update(productRef, {
-          quantityOnHand: newQuantityOnHand,
-          stockBatches: newStockBatches,
-        });
-
-        const inventoryMovementRef = doc(collection(firestore, 'inventoryMovements'));
-        transaction.set(inventoryMovementRef, {
-          productId: values.productId,
-          quantityChange: values.quantity,
-          movementType: 'RESTOCK',
+      // 3. Create inventory movement
+      const { error: movementError } = await supabase
+        .from('inventory_movements')
+        .insert({
+          product_id: values.productId,
+          quantity_change: values.quantity,
+          movement_type: 'RESTOCK',
           timestamp: new Date().toISOString(),
-          reason: `Restock from ${values.supplierName}`,
+          reason: `Restock${values.supplierName ? ` from ${values.supplierName}` : ''}`,
+          supplier_name: values.supplierName || null,
+          unit_cost: values.unitCost
         });
 
-        const expenseRef = doc(collection(firestore, 'expenses'));
-        transaction.set(expenseRef, {
-          expenseDate: values.purchaseDate.toISOString(),
-          amount: values.quantity * values.unitCost,
-          category: 'Cost of Goods Sold',
-          description: `Purchased ${values.quantity} of ${values.productName} from ${values.supplierName}`,
-          id: expenseRef.id,
-        });
-      });
+      if (movementError) throw movementError;
+
+      // 4. Record expense if there is a cost
+      if (values.unitCost > 0) {
+        const { error: expenseError } = await supabase
+          .from('expenses')
+          .insert({
+            expense_date: values.purchaseDate.toISOString(),
+            amount: values.quantity * values.unitCost,
+            category: 'Cost of Goods Sold',
+            description: `Purchased ${values.quantity} of ${values.productName}${values.supplierName ? ` from ${values.supplierName}` : ''}`
+          });
+
+        if (expenseError) throw expenseError;
+      }
 
       toast({
         title: 'Purchase Saved!',
@@ -219,19 +228,21 @@ export default function RestockPage() {
                     </FormItem>
                 )}
                 />
-                <FormField
-                control={form.control}
-                name="unitCost"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Unit Cost (₱)</FormLabel>
-                    <FormControl>
-                        <Input type="number" step="0.01" placeholder="50.00" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
+                {isManagement && (
+                    <FormField
+                    control={form.control}
+                    name="unitCost"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Unit Cost (₱)</FormLabel>
+                        <FormControl>
+                            <Input type="number" step="0.01" placeholder="50.00" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
                 )}
-                />
             </div>
             
             <FormField
@@ -239,7 +250,7 @@ export default function RestockPage() {
               name="supplierName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Supplier Name</FormLabel>
+                  <FormLabel>Supplier Name (Optional)</FormLabel>
                   <FormControl>
                     <Input placeholder="e.g., Global Imports Inc." {...field} />
                   </FormControl>

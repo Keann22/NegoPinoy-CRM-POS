@@ -34,8 +34,7 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { useCollection, useSupabase, useUser, collection, query, where } from '@/firebase';
 
 
 // Matches the Firestore document structure for an order
@@ -61,22 +60,22 @@ export function ProcessedOrdersReport() {
     to: endOfToday(),
   });
 
-  const firestore = useFirestore();
+  const supabase = useSupabase();
   const { user } = useUser();
 
-  const allOrdersQuery = useMemoFirebase(() => {
-      if (!firestore || !user) return null;
+  const allOrdersQuery = useMemo(() => {
+      if (!supabase || !user) return null;
       return query(
-          collection(firestore, 'orders'),
+          collection(supabase, 'orders'),
           where('orderStatus', '==', 'Processing')
       );
-  }, [firestore, user]);
+  }, [supabase, user]);
   const { data: allOrders, isLoading: isLoadingOrders } = useCollection<Order>(allOrdersQuery);
 
-  const customersQuery = useMemoFirebase(() => {
-      if (!firestore || !user) return null;
-      return collection(firestore, 'customers');
-  }, [firestore, user]);
+  const customersQuery = useMemo(() => {
+      if (!supabase || !user) return null;
+      return collection(supabase, 'customers');
+  }, [supabase, user]);
   const { data: customers, isLoading: isLoadingCustomers } = useCollection<Customer>(customersQuery);
 
   const isLoading = isLoadingOrders || isLoadingCustomers;

@@ -1,0 +1,193 @@
+'use client';
+
+import { useState, useMemo } from 'react';
+import { useCollection, useSupabase, useUser } from '@/firebase';
+import { useUserProfile } from '@/hooks/useUserProfile';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { MoreHorizontal, Plus } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { useToast } from '@/hooks/use-toast';
+import { ManageCategoryDialog } from '@/components/dashboard/manage-category-dialog';
+
+export type Category = {
+    id: string;
+    name: string;
+    description: string;
+};
+
+export default function CategoriesPage() {
+    const supabase = useSupabase();
+    const { user } = useUser();
+    const { userProfile } = useUserProfile();
+    const { toast } = useToast();
+    
+    const [searchTerm, setSearchTerm] = useState('');
+    const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+    const [isAddingCategory, setIsAddingCategory] = useState(false);
+    const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
+
+    const isManagement = useMemo(() => userProfile?.roles?.some(r => ['Admin', 'Owner'].includes(r)), [userProfile]);
+    const isInventory = useMemo(() => userProfile?.roles?.some(r => String(r).toLowerCase() === 'inventory'), [userProfile]);
+    const canManageCategories = isManagement || isInventory;
+
+    const { data: categories, isLoading, refetch } = useCollection<Category>(
+        supabase && user ? { path: 'categories', constraints: [{ type: 'orderBy', field: 'name' }] } : null
+    );
+
+    const filteredCategories = useMemo(() => {
+        if (!categories) return [];
+        if (!searchTerm) return categories;
+        return categories.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    }, [categories, searchTerm]);
+
+    const handleDeleteConfirm = async () => {
+        if (!deletingCategory || !supabase) return;
+        
+        const categoryToDelete = deletingCategory;
+        setDeletingCategory(null);
+        
+        try {
+            const { error } = await supabase.from('categories').delete().eq('id', categoryToDelete.id);
+            if (error) throw error;
+            
+            toast({
+                title: "Category Deleted",
+                description: `"${categoryToDelete.name}" has been removed.`,
+            });
+            refetch();
+        } catch (error: any) {
+            console.error("Error deleting category:", error);
+            toast({
+                variant: 'destructive',
+                title: 'Deletion Failed',
+                description: error.message || `Could not delete "${categoryToDelete.name}".`
+            });
+        }
+    };
+
+    return (
+        <>
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                        <CardTitle className="font-headline">Categories</CardTitle>
+                        <CardDescription>
+                            Manage your product categories.
+                        </CardDescription>
+                    </div>
+                    {canManageCategories && (
+                        <Button onClick={() => setIsAddingCategory(true)}>
+                            <Plus className="mr-2 h-4 w-4" /> Add Category
+                        </Button>
+                    )}
+                </CardHeader>
+                <CardContent>
+                    <div className="flex items-center mb-4">
+                        <Input
+                            placeholder="Search categories by name..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="max-w-sm"
+                        />
+                    </div>
+                    
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Description</TableHead>
+                                {canManageCategories && (
+                                    <TableHead className="w-[100px]"><span className="sr-only">Actions</span></TableHead>
+                                )}
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {isLoading && Array.from({ length: 5 }).map((_, i) => (
+                                <TableRow key={i}>
+                                    <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                                    <TableCell><Skeleton className="h-4 w-full" /></TableCell>
+                                    {canManageCategories && <TableCell><Skeleton className="h-8 w-8" /></TableCell>}
+                                </TableRow>
+                            ))}
+                            
+                            {!isLoading && filteredCategories.map((category) => (
+                                <TableRow key={category.id}>
+                                    <TableCell className="font-medium">{category.name}</TableCell>
+                                    <TableCell className="text-muted-foreground">{category.description || '-'}</TableCell>
+                                    {canManageCategories && (
+                                        <TableCell>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button aria-haspopup="true" size="icon" variant="ghost">
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                        <span className="sr-only">Toggle menu</span>
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                                    <DropdownMenuItem onClick={() => setEditingCategory(category)}>Edit</DropdownMenuItem>
+                                                    <DropdownMenuItem 
+                                                        className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                                                        onClick={() => setDeletingCategory(category)}
+                                                    >
+                                                        Delete
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </TableCell>
+                                    )}
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                    
+                    {!isLoading && filteredCategories.length === 0 && (
+                        <div className="flex flex-col items-center justify-center text-center border-2 border-dashed rounded-lg p-12 mt-4">
+                            <p className="text-lg font-semibold">No categories found</p>
+                            <p className="text-muted-foreground mt-2">
+                                {searchTerm ? `No category matched "${searchTerm}".` : `Click "Add Category" to get started.`}
+                            </p>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            <ManageCategoryDialog 
+                open={isAddingCategory || !!editingCategory}
+                category={editingCategory}
+                onOpenChange={(isOpen) => {
+                    if (!isOpen) {
+                        setIsAddingCategory(false);
+                        setEditingCategory(null);
+                    }
+                }}
+                onSuccess={refetch}
+            />
+
+            <AlertDialog open={!!deletingCategory} onOpenChange={(isOpen) => !isOpen && setDeletingCategory(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will permanently delete the category "{deletingCategory?.name}". Products currently assigned to this category will not be deleted, but they may lose their category association.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={handleDeleteConfirm}
+                        >
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </>
+    );
+}

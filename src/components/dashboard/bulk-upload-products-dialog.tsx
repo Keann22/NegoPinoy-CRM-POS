@@ -6,8 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { addDocumentNonBlocking, useFirestore } from "@/firebase";
-import { collection, doc, getDocs } from "firebase/firestore";
+import { useSupabase } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -93,11 +92,11 @@ const parseCsvDataRobustly = (csvData: string): { headers: string[], rows: strin
 export function BulkUploadProductsDialog() {
   const [open, setOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const firestore = useFirestore();
+  const supabase = useSupabase();
   const { toast } = useToast();
   const { userProfile } = useUserProfile();
 
-  const canViewCostPrice = userProfile && (userProfile.roles.includes('Owner') || userProfile.roles.includes('Admin'));
+  const canViewCostPrice = userProfile && (userProfile.roles?.includes('Owner') || userProfile.roles?.includes('Admin'));
 
   const form = useForm<z.infer<typeof bulkUploadSchema>>({
     resolver: zodResolver(bulkUploadSchema),
@@ -138,11 +137,23 @@ export function BulkUploadProductsDialog() {
         return acc;
     }, {} as {[key: string]: number});
 
-    const productsCollection = collection(firestore, 'products');
-    const inventoryMovementsCollection = collection(firestore, 'inventoryMovements');
+    if (!supabase) return;
 
-    const existingProductsSnapshot = await getDocs(productsCollection);
-    const existingSkus = new Set(existingProductsSnapshot.docs.map(doc => doc.data().sku));
+    const { data: existingProductsData, error: fetchError } = await supabase
+        .from('products')
+        .select('sku');
+
+    if (fetchError) {
+        toast({
+            variant: "destructive",
+            title: "Error fetching existing SKUs",
+            description: "Failed to validate products against existing ones.",
+        });
+        setIsUploading(false);
+        return;
+    }
+
+    const existingSkus = new Set(existingProductsData?.map((p: any) => p.sku) || []);
 
     const uploadPromises: Promise<void>[] = [];
     let successfulUploads = 0;
@@ -178,43 +189,44 @@ export function BulkUploadProductsDialog() {
         const description = row[headerMap['description']]?.trim() || '';
         const categoryId = row[headerMap['categoryId']]?.trim() || 'Uncategorized';
 
-        const initialBatches = [];
-        if (quantityOnHand > 0) {
-            initialBatches.push({
-                batchId: doc(collection(firestore, '_')).id,
-                purchaseDate: new Date().toISOString(),
-                originalQty: quantityOnHand,
-                remainingQty: quantityOnHand,
-                unitCost: initialUnitCost,
-                supplierName: 'Bulk Upload',
-            });
-        }
-
         const productData = {
             name,
             sku,
             description,
-            categoryId,
-            images: [],
-            sellingPrice,
-            quantityOnHand,
-            stockBatches: initialBatches,
+            category_id: categoryId,
+            selling_price: sellingPrice,
+            stock_level: quantityOnHand,
         };
 
-        const uploadPromise = addDocumentNonBlocking(productsCollection, productData)
-            .then(async (newProductRef) => {
-                if (newProductRef && quantityOnHand > 0) {
-                    await addDocumentNonBlocking(inventoryMovementsCollection, {
-                        productId: newProductRef.id,
-                        quantityChange: quantityOnHand,
-                        movementType: 'initial_stock',
-                        timestamp: new Date().toISOString(),
-                        reason: 'Bulk upload',
-                    });
+        const uploadPromise = supabase
+            .from('products')
+            .insert(productData)
+            .select('id')
+            .single()
+            .then(async ({ data: newProductData, error: insertError }) => {
+                if (insertError) {
+                    console.error(`Failed to upload product with SKU ${sku}:`, insertError);
+                    return;
+                }
+                
+                if (newProductData && quantityOnHand > 0) {
+                    const movementError = await supabase
+                        .from('inventory_movements')
+                        .insert({
+                            product_id: newProductData.id,
+                            quantity_change: quantityOnHand,
+                            movement_type: 'initial_stock',
+                            reason: 'Bulk upload',
+                            cost_price_at_movement: initialUnitCost,
+                        });
+                    
+                    if (movementError.error) {
+                         console.error(`Failed to upload movement for SKU ${sku}:`, movementError.error);
+                    }
                 }
                 successfulUploads++;
             }).catch(err => {
-                console.error(`Failed to upload product with SKU ${sku}:`, err);
+                console.error(`Unexpected error for product SKU ${sku}:`, err);
             });
         
         uploadPromises.push(uploadPromise);

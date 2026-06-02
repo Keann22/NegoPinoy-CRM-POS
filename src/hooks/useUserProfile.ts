@@ -1,7 +1,5 @@
-
 'use client';
-import { useFirestore, useUser, useDoc, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useUser } from '@/firebase';
 import { useMemo } from 'react';
 
 export type UserProfile = {
@@ -12,20 +10,52 @@ export type UserProfile = {
     roles: ('Owner' | 'Admin' | 'Inventory' | 'Sales')[];
 }
 
+// Maps a single role string from Supabase user_metadata to the roles array
+// used by the dashboard layout.
+function buildRolesFromMetadata(metadata: any): ('Owner' | 'Admin' | 'Inventory' | 'Sales')[] {
+    if (!metadata) return [];
+
+    // If roles array already exists in metadata, use it directly, but normalize casing
+    if (Array.isArray(metadata.roles)) {
+        return metadata.roles.map((r: string) => {
+            const lower = String(r).toLowerCase();
+            if (lower === 'owner') return 'Owner';
+            if (lower === 'admin') return 'Admin';
+            if (lower === 'sales') return 'Sales';
+            if (lower === 'inventory') return 'Inventory';
+            return r as any;
+        });
+    }
+
+    // Map single role string to roles array
+    const role = metadata.role as string | undefined;
+    if (!role) return [];
+
+    switch (role.toLowerCase()) {
+        case 'owner':   return ['Owner', 'Admin', 'Sales', 'Inventory'];
+        case 'admin':   return ['Admin', 'Sales', 'Inventory'];
+        case 'sales':   return ['Sales'];
+        case 'inventory': return ['Inventory'];
+        default:        return [];
+    }
+}
+
 export function useUserProfile() {
     const { user } = useUser();
-    const firestore = useFirestore();
-    
-    const userProfileRef = useMemoFirebase(
-        () => (user && firestore ? doc(firestore, 'users', user.uid) : null),
-        [user, firestore]
-    );
 
-    const { data: userProfile, ...rest } = useDoc<Omit<UserProfile, 'id'>>(userProfileRef);
+    const userProfile = useMemo<UserProfile | null>(() => {
+        if (!user) return null;
 
-    const profileWithId = useMemo(() => 
-        userProfile ? { ...userProfile, id: user?.uid ?? '' } : null
-    , [userProfile, user]);
+        const meta = (user as any).userMetadata ?? {};
 
-    return { userProfile: profileWithId, ...rest };
+        return {
+            id: user.uid,
+            firstName: meta.first_name ?? '',
+            lastName: meta.last_name ?? '',
+            email: user.email ?? '',
+            roles: buildRolesFromMetadata(meta),
+        };
+    }, [user]);
+
+    return { userProfile, isLoading: false };
 }

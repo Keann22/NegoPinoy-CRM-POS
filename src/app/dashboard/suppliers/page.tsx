@@ -18,8 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { useCollection, useUser, useSupabase, collection } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AddSupplierDialog } from '@/components/dashboard/add-supplier-dialog';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -40,7 +39,7 @@ type Supplier = {
 };
 
 export default function SuppliersPage() {
-  const firestore = useFirestore();
+  const supabase = useSupabase();
   const { user } = useUser();
   const { userProfile } = useUserProfile();
   const [viewingHistorySupplier, setViewingHistorySupplier] = useState<Supplier | null>(null);
@@ -48,9 +47,9 @@ export default function SuppliersPage() {
   const isManagement = useMemo(() => userProfile?.roles.some(r => ['Admin', 'Owner'].includes(r)), [userProfile]);
 
   // CRITICAL: Strict role check before query
-  const suppliersQuery = useMemoFirebase(
-    () => (firestore && user && isManagement ? collection(firestore, 'suppliers') : null),
-    [firestore, user, isManagement]
+  const suppliersQuery = useMemo(
+    () => (supabase && user && isManagement ? collection(supabase, 'suppliers') : null),
+    [supabase, user, isManagement]
   );
   const { data: suppliers, isLoading } = useCollection<Supplier>(suppliersQuery);
 

@@ -8,24 +8,35 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { addDocumentNonBlocking, useFirestore } from "@/firebase";
-import { collection } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
+
 
 const customerSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
-  email: z.string().email("Invalid email address"),
+  email: z.preprocess(val => val === '' ? undefined : val, z.string().email("Invalid email address").optional()),
   phoneNumber: z.string().optional(),
-  facebookProfileLink: z.string().url().optional().or(z.literal('')),
+  facebookProfileLink: z.preprocess(val => val === '' ? undefined : val, z.string().url("Invalid URL").optional()),
   shippingAddresses: z.string().min(1, "At least one shipping address is required."),
 });
 
-export function AddCustomerDialog() {
-  const [open, setOpen] = useState(false);
-  const firestore = useFirestore();
+interface AddCustomerDialogProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  onSuccess?: (customer: {id: string, firstName: string, lastName: string}) => void;
+  triggerButton?: React.ReactNode;
+  initialName?: string;
+}
+
+export function AddCustomerDialog(props: AddCustomerDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
   const { toast } = useToast();
+
+  const isControlled = props.open !== undefined && props.onOpenChange !== undefined;
+  const open = isControlled ? props.open : internalOpen;
+  const setOpen = isControlled ? props.onOpenChange : setInternalOpen;
 
   const form = useForm<z.infer<typeof customerSchema>>({
     resolver: zodResolver(customerSchema),
@@ -39,6 +50,26 @@ export function AddCustomerDialog() {
     },
   });
 
+  useEffect(() => {
+      if (open) {
+          let firstName = "";
+          let lastName = "";
+          if (props.initialName) {
+              const parts = props.initialName.trim().split(' ');
+              firstName = parts[0] || '';
+              lastName = parts.slice(1).join(' ') || '';
+          }
+          form.reset({
+              firstName: firstName,
+              lastName: lastName,
+              email: "",
+              phoneNumber: "",
+              facebookProfileLink: "",
+              shippingAddresses: "",
+          });
+      }
+  }, [open, props.initialName, form]);
+
   async function onSubmit(values: z.infer<typeof customerSchema>) {
     setOpen(false);
 
@@ -47,28 +78,50 @@ export function AddCustomerDialog() {
       description: `Adding ${values.firstName} ${values.lastName} to your database.`,
     });
 
-    const customersCollection = collection(firestore, 'customers');
+    const supabase = createClient();
     
-    // Convert shippingAddresses string to an array, splitting by new lines
-    const shippingAddressesArray = values.shippingAddresses.split('\n').filter(addr => addr.trim() !== '');
+    // Combine shipping addresses into a single string for address_line
+    const addressLine = values.shippingAddresses.split('\n').filter(addr => addr.trim() !== '').join(', ');
 
-    addDocumentNonBlocking(customersCollection, {
-      ...values,
-      shippingAddresses: shippingAddressesArray
-    }).then(() => {
-        toast({
-            title: "Customer Added",
-            description: `${values.firstName} ${values.lastName} has been successfully added.`,
-        });
-        form.reset();
-    });
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .insert({
+          full_name: `${values.firstName} ${values.lastName}`.trim(),
+          email: values.email || null,
+          mobile_number: values.phoneNumber || null,
+          address_line: addressLine || null,
+          suki_tier: 'NEWBIE'
+        })
+        .select()
+        .single();
+        
+      if (error) throw error;
+      
+      toast({
+          title: "Customer Added",
+          description: `${values.firstName} ${values.lastName} has been successfully added.`,
+      });
+      form.reset();
+      if (props.onSuccess) props.onSuccess({ id: data.id, firstName: values.firstName, lastName: values.lastName });
+      
+    } catch (err) {
+      console.error("Error adding customer:", err);
+      toast({
+          variant: "destructive",
+          title: "Save Failed",
+          description: `There was an error creating the customer: ${err.message || 'Unknown error'}`,
+      });
+    }
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>Add Customer</Button>
-      </DialogTrigger>
+      {!isControlled && (
+          <DialogTrigger asChild>
+            {props.triggerButton || <Button>Add Customer</Button>}
+          </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Add New Customer</DialogTitle>
@@ -78,7 +131,7 @@ export function AddCustomerDialog() {
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid gap-2 py-4 max-h-[70vh] overflow-y-auto px-1">
+            <div className="grid gap-2 py-4 px-1">
               <FormField
                 control={form.control}
                 name="firstName"
@@ -110,7 +163,7 @@ export function AddCustomerDialog() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>Email (Optional)</FormLabel>
                     <FormControl>
                       <Input type="email" placeholder="john.doe@example.com" {...field} />
                     </FormControl>

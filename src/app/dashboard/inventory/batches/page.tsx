@@ -1,86 +1,108 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, where, orderBy } from 'firebase/firestore';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { useState, useEffect, useMemo } from 'react';
+import { useSupabase } from '@/firebase';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useUserProfile } from '@/hooks/useUserProfile';
 
-type Product = {
-  id: string;
-  name: string;
-  sku: string;
-  quantityOnHand: number;
-  stockBatches?: StockBatch[];
-};
-
-type StockBatch = {
+type FlattenedBatch = {
   batchId: string;
-  purchaseDate: string; // ISO string
+  productName: string;
+  productSku: string;
+  purchaseDate: string;
   originalQty: number;
   remainingQty: number;
   unitCost: number;
   supplierName: string;
 };
 
-type FlattenedBatch = StockBatch & {
-  productName: string;
-  productSku: string;
-};
-
 export default function BatchesPage() {
-  const firestore = useFirestore();
-  const { user } = useUser();
+  const supabase = useSupabase();
+  const [allBatches, setAllBatches] = useState<FlattenedBatch[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { userProfile } = useUserProfile();
 
-  const productsQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(
-      collection(firestore, 'products'),
-      where('quantityOnHand', '>', 0),
-      orderBy('quantityOnHand', 'desc')
-    );
-  }, [firestore, user]);
+  const canSeeUnitCost = useMemo(() => {
+      if (!userProfile) return false;
+      return userProfile.roles.some(r => ['Owner', 'Admin'].includes(r));
+  }, [userProfile]);
 
-  const { data: products, isLoading } = useCollection<Product>(productsQuery);
+  useEffect(() => {
+    if (!supabase) return;
 
-  const allBatches = useMemo((): FlattenedBatch[] => {
-    if (!products) {
-      return [];
-    }
+    const loadBatches = async () => {
+      setIsLoading(true);
+      try {
+        // 1. Fetch all products
+        const { data: productsData, error: productsError } = await supabase
+          .from('products')
+          .select('id, name, sku');
+        if (productsError) throw productsError;
 
-    const flattened = products.flatMap((product) => {
-      if (!product.stockBatches || product.stockBatches.length === 0) {
-        return [];
+        // 2. Fetch all movements, ordered by time ASC (FIFO basis)
+        const { data: movementsData, error: movementsError } = await supabase
+          .from('inventory_movements')
+          .select('id, product_id, quantity_change, unit_cost, supplier_name, timestamp')
+          .order('timestamp', { ascending: true });
+        if (movementsError) throw movementsError;
+
+        // 3. FIFO calculation per product
+        const calculatedBatches: FlattenedBatch[] = [];
+
+        for (const product of productsData) {
+           const productMovements = movementsData.filter(m => m.product_id === product.id);
+           const productBatches: FlattenedBatch[] = [];
+
+           for (const movement of productMovements) {
+              const qtyChange = movement.quantity_change;
+              
+              if (qtyChange > 0) {
+                 // It's a restock/receive, add as new batch
+                 productBatches.push({
+                    batchId: movement.id,
+                    productName: product.name,
+                    productSku: product.sku || '',
+                    purchaseDate: movement.timestamp,
+                    originalQty: qtyChange,
+                    remainingQty: qtyChange,
+                    unitCost: Number(movement.unit_cost) || 0,
+                    supplierName: movement.supplier_name || '-',
+                 });
+              } else if (qtyChange < 0) {
+                 // It's a sale/deduction, deduct from oldest batches
+                 let qtyToDeduct = Math.abs(qtyChange);
+                 
+                 for (let i = 0; i < productBatches.length; i++) {
+                    if (qtyToDeduct <= 0) break;
+                    if (productBatches[i].remainingQty > 0) {
+                       const deduct = Math.min(productBatches[i].remainingQty, qtyToDeduct);
+                       productBatches[i].remainingQty -= deduct;
+                       qtyToDeduct -= deduct;
+                    }
+                 }
+              }
+           }
+
+           // Only keep batches that still have items left
+           calculatedBatches.push(...productBatches.filter(b => b.remainingQty > 0));
+        }
+
+        // 4. Sort all active batches by purchase date (oldest first)
+        calculatedBatches.sort((a, b) => new Date(a.purchaseDate).getTime() - new Date(b.purchaseDate).getTime());
+        setAllBatches(calculatedBatches);
+
+      } catch (error) {
+        console.error("Error calculating batches:", error);
+      } finally {
+        setIsLoading(false);
       }
-      return product.stockBatches
-        .filter((batch) => batch.remainingQty > 0)
-        .map((batch) => ({
-          ...batch,
-          productName: product.name,
-          productSku: product.sku,
-        }));
-    });
+    };
 
-    // Sort by purchase date, oldest first
-    return flattened.sort(
-      (a, b) => new Date(a.purchaseDate).getTime() - new Date(b.purchaseDate).getTime()
-    );
-  }, [products]);
+    loadBatches();
+  }, [supabase]);
 
   const totalAssetValue = useMemo(() => {
     return allBatches.reduce((total, batch) => {
@@ -98,17 +120,20 @@ export default function BatchesPage() {
                 View all individual stock batches for your products, sorted with the oldest first (FIFO).
                 </CardDescription>
             </div>
-            <div className="text-right">
-                <p className="text-sm font-medium text-muted-foreground">Total Asset Value</p>
-                {isLoading ? (
-                    <Skeleton className="h-8 w-32 mt-1" />
-                ) : (
-                    <p className="text-2xl font-bold">₱{totalAssetValue.toFixed(2)}</p>
-                )}
-            </div>
+            {canSeeUnitCost && (
+                <div className="text-right">
+                    <p className="text-sm font-medium text-muted-foreground">Total Asset Value</p>
+                    {isLoading ? (
+                        <Skeleton className="h-8 w-32 mt-1" />
+                    ) : (
+                        <p className="text-2xl font-bold">₱{totalAssetValue.toFixed(2)}</p>
+                    )}
+                </div>
+            )}
         </div>
       </CardHeader>
       <CardContent>
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -116,13 +141,13 @@ export default function BatchesPage() {
               <TableHead className="hidden sm:table-cell">SKU</TableHead>
               <TableHead>Batch Date</TableHead>
               <TableHead>Supplier</TableHead>
-              <TableHead className="text-right">Unit Cost</TableHead>
+              {canSeeUnitCost && <TableHead className="text-right">Unit Cost</TableHead>}
               <TableHead className="text-right">Remaining Qty</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading &&
-              Array.from({ length: 10 }).map((_, i) => (
+              Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i}>
                   <TableCell>
                     <Skeleton className="h-4 w-40" />
@@ -136,26 +161,29 @@ export default function BatchesPage() {
                   <TableCell>
                     <Skeleton className="h-4 w-24" />
                   </TableCell>
-                  <TableCell className="text-right">
-                    <Skeleton className="h-4 w-16 ml-auto" />
-                  </TableCell>
+                  {canSeeUnitCost && (
+                      <TableCell className="text-right">
+                        <Skeleton className="h-4 w-16 ml-auto" />
+                      </TableCell>
+                  )}
                   <TableCell className="text-right">
                     <Skeleton className="h-4 w-12 ml-auto" />
                   </TableCell>
                 </TableRow>
               ))}
-            {allBatches.map((batch) => (
+            {!isLoading && allBatches.map((batch) => (
               <TableRow key={batch.batchId}>
                 <TableCell className="font-medium">{batch.productName}</TableCell>
-                <TableCell className="hidden sm:table-cell">{batch.productSku}</TableCell>
+                <TableCell className="hidden sm:table-cell text-muted-foreground">{batch.productSku}</TableCell>
                 <TableCell>{format(new Date(batch.purchaseDate), 'MMM d, yyyy')}</TableCell>
                 <TableCell>{batch.supplierName}</TableCell>
-                <TableCell className="text-right">₱{batch.unitCost.toFixed(2)}</TableCell>
-                <TableCell className="text-right">{batch.remainingQty}</TableCell>
+                {canSeeUnitCost && <TableCell className="text-right">₱{batch.unitCost.toFixed(2)}</TableCell>}
+                <TableCell className="text-right font-bold">{batch.remainingQty}</TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
+        </div>
         {!isLoading && allBatches.length === 0 && (
             <div className="flex flex-col items-center justify-center text-center border-2 border-dashed rounded-lg p-12 mt-4">
             <p className="text-lg font-semibold">No Stock Batches Found</p>

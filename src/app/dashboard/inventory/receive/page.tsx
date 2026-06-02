@@ -1,11 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, doc, runTransaction, query, orderBy, where, limit } from 'firebase/firestore';
+import { useCollection, useUser, useSupabase, collection, query, orderBy, where, limit } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -18,16 +17,16 @@ import { CalendarIcon, Loader2, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-
+import { useRoleCheck } from '@/hooks/useRoleCheck';
 const shipmentItemSchema = z.object({
   productId: z.string().min(1, "Product must be selected."),
   productName: z.string(),
   quantity: z.coerce.number().positive(),
   unitCost: z.coerce.number().min(0),
+  supplierName: z.string().optional(),
 });
 
 const shipmentSchema = z.object({
-  supplierName: z.string().min(1, 'Supplier name is required.'),
   purchaseDate: z.date({ required_error: 'A purchase date is required.' }),
   items: z.array(shipmentItemSchema).min(1, "Please add at least one item to the shipment."),
 });
@@ -39,23 +38,23 @@ type Product = { id: string; name: string; sku: string; [key: string]: any; };
 function ProductSearch({ onProductSelect }: { onProductSelect: (product: Product) => void }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
-  const firestore = useFirestore();
+  const supabase = useSupabase();
   const { user } = useUser();
 
-  const productsQuery = useMemoFirebase(
+  const productsQuery = useMemo(
     () => {
-      if (!firestore || !user || search.length < 2) return null;
+      if (!supabase || !user || search.length < 2) return null;
       // Simple capitalization for search term
       const searchTermCapitalized = search.charAt(0).toUpperCase() + search.slice(1);
       return query(
-        collection(firestore, 'products'),
+        collection(supabase, 'products'),
         orderBy('name'),
         where('name', '>=', searchTermCapitalized),
         where('name', '<=', searchTermCapitalized + '\uf8ff'),
         limit(10)
       );
     },
-    [firestore, user, search]
+    [supabase, user, search]
   );
   const { data: productResults, isLoading: isLoadingProducts } = useCollection<Product>(productsQuery);
   
@@ -102,13 +101,14 @@ function ProductSearch({ onProductSelect }: { onProductSelect: (product: Product
 
 export default function BulkReceivePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const firestore = useFirestore();
+
+  const supabase = useSupabase();
   const { toast } = useToast();
+  const { isManagement } = useRoleCheck();
 
   const form = useForm<ShipmentFormValues>({
     resolver: zodResolver(shipmentSchema),
     defaultValues: {
-      supplierName: '',
       purchaseDate: new Date(),
       items: [],
     },
@@ -120,7 +120,7 @@ export default function BulkReceivePage() {
   });
 
   const addNewItem = () => {
-    append({ productId: '', productName: '', quantity: 1, unitCost: 0 });
+    append({ productId: '', productName: '', quantity: 1, unitCost: 0, supplierName: '' });
   };
   
   const items = useWatch({ control: form.control, name: 'items' });
@@ -129,84 +129,83 @@ export default function BulkReceivePage() {
   }, 0);
 
   const onSubmit = async (values: ShipmentFormValues) => {
-    if (!firestore) return;
     setIsSubmitting(true);
     toast({ title: 'Saving Shipment...', description: 'Please wait.' });
 
     try {
-      await runTransaction(firestore, async (transaction) => {
-        // --- READ PHASE ---
-        const productPromises = values.items.map(item => {
-            const productRef = doc(firestore, 'products', item.productId);
-            return transaction.get(productRef);
-        });
+      // 1. Fetch current product data
+      const productIds = values.items.map(item => item.productId);
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('id, stock_level, name')
+        .in('id', productIds);
+      
+      if (productsError) throw productsError;
+      
+      const productDataMap = new Map(products.map(p => [p.id, p]));
 
-        const productDocs = await Promise.all(productPromises);
-        const productDataMap = new Map<string, { productDoc: any; productData: any }>();
+      // Check if all products exist
+      for (const item of values.items) {
+          if (!productDataMap.has(item.productId)) {
+              throw new Error(`Product "${item.productName}" not found in database.`);
+          }
+      }
+
+      // 2. Record Expense
+      const totalExpense = values.items.reduce((sum, item) => sum + (item.quantity * item.unitCost), 0);
+      if (totalExpense > 0) {
+        // Collect unique supplier names for the description if any
+        const suppliers = Array.from(new Set(values.items.map(i => i.supplierName).filter(Boolean)));
+        const supplierText = suppliers.length > 0 ? ` from ${suppliers.join(', ')}` : '';
         
-        for (let i = 0; i < values.items.length; i++) {
-            const productDoc = productDocs[i];
-            const item = values.items[i];
-            if (!productDoc.exists()) {
-                throw new Error(`Product "${item.productName}" not found.`);
-            }
-            productDataMap.set(item.productId, { productDoc, productData: productDoc.data() });
-        }
-        
-        // --- WRITE PHASE ---
-        const totalExpense = values.items.reduce((sum, item) => sum + (item.quantity * item.unitCost), 0);
-
-        if (totalExpense > 0) {
-            const expenseRef = doc(collection(firestore, 'expenses'));
-            transaction.set(expenseRef, {
-                expenseDate: values.purchaseDate.toISOString(),
-                amount: totalExpense,
-                category: 'Cost of Goods Sold',
-                description: `Shipment received from ${values.supplierName}`,
-                id: expenseRef.id,
-            });
-        }
-        
-        for (const item of values.items) {
-          const { productDoc, productData } = productDataMap.get(item.productId)!;
-          const productRef = productDoc.ref;
-          
-          const newQuantityOnHand = (productData.quantityOnHand || 0) + item.quantity;
-
-          const newBatch = {
-            batchId: doc(collection(firestore, '_')).id,
-            purchaseDate: values.purchaseDate.toISOString(),
-            originalQty: item.quantity,
-            remainingQty: item.quantity,
-            unitCost: item.unitCost,
-            supplierName: values.supplierName,
-          };
-
-          const newStockBatches = [...(productData.stockBatches || []), newBatch];
-
-          transaction.update(productRef, {
-            quantityOnHand: newQuantityOnHand,
-            stockBatches: newStockBatches,
+        const { error: expenseError } = await supabase
+          .from('expenses')
+          .insert({
+            expense_date: values.purchaseDate.toISOString(),
+            amount: totalExpense,
+            category: 'Cost of Goods Sold',
+            description: `Shipment received${supplierText}`,
           });
+        if (expenseError) throw expenseError;
+      }
+      
+      // 3. Update products and create inventory movements
+      for (const item of values.items) {
+        const currentProduct = productDataMap.get(item.productId)!;
+        const newStockLevel = (currentProduct.stock_level || 0) + item.quantity;
 
-          const inventoryMovementRef = doc(collection(firestore, 'inventoryMovements'));
-          transaction.set(inventoryMovementRef, {
-            id: inventoryMovementRef.id,
-            productId: item.productId,
-            quantityChange: item.quantity,
-            movementType: 'RESTOCK',
+        // Update product stock level
+        const { error: updateError } = await supabase
+          .from('products')
+          .update({
+            stock_level: newStockLevel,
+            initial_unit_cost: item.unitCost // Update unit cost to the latest
+          })
+          .eq('id', item.productId);
+        
+        if (updateError) throw updateError;
+
+        // Create inventory movement
+        const { error: movementError } = await supabase
+          .from('inventory_movements')
+          .insert({
+            product_id: item.productId,
+            quantity_change: item.quantity,
+            movement_type: 'RESTOCK',
             timestamp: new Date().toISOString(),
-            reason: `Bulk receive from ${values.supplierName}`,
+            reason: `Bulk receive${item.supplierName ? ` from ${item.supplierName}` : ''}`,
+            supplier_name: item.supplierName || null,
+            unit_cost: item.unitCost
           });
-        }
-      });
+          
+        if (movementError) throw movementError;
+      }
 
       toast({
         title: 'Shipment Saved!',
         description: `The received items have been added to inventory.`,
       });
       form.reset({
-        supplierName: '',
         purchaseDate: new Date(),
         items: [],
       });
@@ -234,19 +233,6 @@ export default function BulkReceivePage() {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="supplierName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Supplier Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Global Imports Inc." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
               <FormField
                 control={form.control}
                 name="purchaseDate"
@@ -281,9 +267,10 @@ export default function BulkReceivePage() {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className='w-[40%]'>Product</TableHead>
+                            <TableHead className='w-[30%]'>Product</TableHead>
+                            <TableHead>Supplier (Optional)</TableHead>
                             <TableHead>Quantity</TableHead>
-                            <TableHead>Unit Cost (₱)</TableHead>
+                            {isManagement && <TableHead>Unit Cost (₱)</TableHead>}
                             <TableHead className='w-[50px] text-right'></TableHead>
                         </TableRow>
                     </TableHeader>
@@ -309,6 +296,20 @@ export default function BulkReceivePage() {
                                 <TableCell>
                                      <FormField
                                         control={form.control}
+                                        name={`items.${index}.supplierName`}
+                                        render={({ field }) => (
+                                            <FormItem>
+                                            <FormControl>
+                                                <Input placeholder="Optional" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </TableCell>
+                                <TableCell>
+                                     <FormField
+                                        control={form.control}
                                         name={`items.${index}.quantity`}
                                         render={({ field }) => (
                                             <FormItem>
@@ -320,20 +321,22 @@ export default function BulkReceivePage() {
                                         )}
                                     />
                                 </TableCell>
-                                <TableCell>
-                                     <FormField
-                                        control={form.control}
-                                        name={`items.${index}.unitCost`}
-                                        render={({ field }) => (
-                                            <FormItem>
-                                            <FormControl>
-                                                <Input type="number" step="0.01" placeholder="50.00" {...field} />
-                                            </FormControl>
-                                            <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                </TableCell>
+                                {isManagement && (
+                                    <TableCell>
+                                         <FormField
+                                            control={form.control}
+                                            name={`items.${index}.unitCost`}
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                <FormControl>
+                                                    <Input type="number" step="0.01" placeholder="50.00" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </TableCell>
+                                )}
                                 <TableCell className="text-right">
                                     <Button type="button" variant='ghost' size='icon' onClick={() => remove(index)}>
                                         <Trash2 className='h-4 w-4 text-destructive'/>
@@ -343,7 +346,7 @@ export default function BulkReceivePage() {
                         ))}
                          {fields.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={4} className="h-24 text-center">
+                                <TableCell colSpan={5} className="h-24 text-center">
                                 No items added. Click "Add Item" to start.
                                 </TableCell>
                             </TableRow>
@@ -356,9 +359,11 @@ export default function BulkReceivePage() {
             
             <Button type='button' variant='outline' onClick={addNewItem}>Add Item</Button>
 
-            <div className="pt-4 space-y-2 text-right">
-                <p className="text-lg">Total Purchase Cost: <span className="font-bold">₱{totalCost.toFixed(2)}</span></p>
-            </div>
+            {isManagement && (
+                <div className="pt-4 space-y-2 text-right">
+                    <p className="text-lg">Total Purchase Cost: <span className="font-bold">₱{totalCost.toFixed(2)}</span></p>
+                </div>
+            )}
 
             <div className='flex justify-end'>
                 <Button type="submit" disabled={isSubmitting}>

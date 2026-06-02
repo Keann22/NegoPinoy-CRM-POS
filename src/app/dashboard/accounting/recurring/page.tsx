@@ -1,8 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { useCollection, useSupabase, useUser, collection, query, orderBy } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Card,
@@ -32,16 +31,16 @@ type RecurringExpense = {
 };
 
 export default function RecurringExpensesPage() {
-  const firestore = useFirestore();
+  const supabase = useSupabase();
   const { user } = useUser();
   const { userProfile } = useUserProfile();
 
   const isManagement = useMemo(() => userProfile?.roles.some(r => ['Admin', 'Owner'].includes(r)), [userProfile]);
 
   // CRITICAL: Strict role check before query
-  const recurringExpensesQuery = useMemoFirebase(
-    () => (firestore && user && isManagement ? query(collection(firestore, 'recurringExpenses'), orderBy('dayOfMonth', 'asc')) : null),
-    [firestore, user, isManagement]
+  const recurringExpensesQuery = useMemo(
+    () => (supabase && user && isManagement ? query(collection(supabase, 'recurringExpenses'), orderBy('dayOfMonth', 'asc')) : null),
+    [supabase, user, isManagement]
   );
   const { data: recurringExpenses, isLoading } = useCollection<RecurringExpense>(recurringExpensesQuery);
 

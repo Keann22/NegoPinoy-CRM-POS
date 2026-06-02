@@ -17,8 +17,7 @@ import {
   TableRow,
   TableFooter,
 } from '@/components/ui/table';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { useCollection, useSupabase, useUser, collection } from '@/firebase';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -59,12 +58,12 @@ interface ViewSupplierHistoryDialogProps {
 }
 
 export function ViewSupplierHistoryDialog({ supplier, open, onOpenChange }: ViewSupplierHistoryDialogProps) {
-  const firestore = useFirestore();
+  const supabase = useSupabase();
   const { user } = useUser();
 
-  const productsQuery = useMemoFirebase(
-    () => (firestore && user ? collection(firestore, 'products') : null),
-    [firestore, user]
+  const productsQuery = useMemo(
+    () => (supabase && user ? collection(supabase, 'products') : null),
+    [supabase, user]
   );
   const { data: products, isLoading } = useCollection<Product>(productsQuery);
 

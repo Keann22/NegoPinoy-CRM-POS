@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { cn } from '@/lib/utils';
-import { FirebaseClientProvider } from '@/firebase/client-provider';
+import { RouteChangeListener } from '@/components/route-change-listener';
 
 export const metadata: Metadata = {
   title: 'RetailFlow',
@@ -22,9 +22,8 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Code+Pro&display=swap" rel="stylesheet" />
       </head>
       <body className={cn("min-h-screen bg-background font-body antialiased")}>
-        <FirebaseClientProvider>
-          {children}
-        </FirebaseClientProvider>
+        <RouteChangeListener />
+        {children}
         <Toaster />
       </body>
     </html>

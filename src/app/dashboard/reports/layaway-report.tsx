@@ -1,20 +1,12 @@
 'use client';
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { useUser, useSupabase } from '@/firebase';
 
-type Order = {
+type LayawayOrder = {
     id: string;
     amountPaid: number;
     balanceDue: number;
@@ -22,56 +14,71 @@ type Order = {
     customerId: string;
     paymentType: string;
     orderStatus: string;
-};
-
-type Customer = {
-    id: string;
-    firstName: string;
-    lastName: string;
+    customerName: string;
 };
 
 export function LayawayReport() {
-    const firestore = useFirestore();
+    const supabase = useSupabase();
     const { user } = useUser();
 
-    // Fetch all layaway orders and filter on the client
-    const layawayOrdersQuery = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return query(
-            collection(firestore, 'orders'),
-            where('paymentType', '==', 'Lay-away'),
-            where('orderStatus', 'in', ['Pending Payment', 'Processing'])
-        );
-    }, [firestore, user]);
-    const { data: layawayOrders, isLoading: isLoadingOrders } = useCollection<Order>(layawayOrdersQuery);
+    const [orders, setOrders] = useState<LayawayOrder[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
-    const customersQuery = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return collection(firestore, 'customers');
-    }, [firestore, user]);
-    const { data: customers, isLoading: isLoadingCustomers } = useCollection<Customer>(customersQuery);
+    useEffect(() => {
+        if (!supabase || !user) return;
+        const fetchData = async () => {
+            setIsLoading(true);
+            try {
+                // Fetch lay-away orders with balance due
+                const { data: ordersData, error } = await supabase
+                    .from('orders')
+                    .select('id, amount_paid, balance_due, order_date, created_at, customer_id, payment_method, status')
+                    .eq('payment_method', 'Lay-away')
+                    .in('status', ['Pending Payment', 'Processing']);
 
-    const isLoading = isLoadingOrders || isLoadingCustomers;
+                if (error) throw error;
 
-    const customerMap = useMemo(() => {
-        if (!customers) return new Map();
-        return new Map(customers.map(c => [c.id, `${c.firstName} ${c.lastName}`]));
-    }, [customers]);
+                const mapped = ordersData || [];
+                if (mapped.length === 0) {
+                    setOrders([]);
+                    return;
+                }
 
-    const { totalPaid, totalPending, breakdown } = useMemo(() => {
-        if (!layawayOrders) {
-            return { totalPaid: 0, totalPending: 0, breakdown: [] };
-        }
+                // Fetch customer names for these orders
+                const customerIds = Array.from(new Set(mapped.map((o: any) => o.customer_id)));
+                const { data: customersData } = await supabase
+                    .from('customers')
+                    .select('id, full_name')
+                    .in('id', customerIds);
 
-        const paid = layawayOrders.reduce((sum, order) => sum + order.amountPaid, 0);
-        const pending = layawayOrders.reduce((sum, order) => sum + order.balanceDue, 0);
-        const orderBreakdown = layawayOrders.map(order => ({
-            ...order,
-            customerName: customerMap.get(order.customerId) || 'Unknown Customer'
-        }));
+                const customerMap = new Map<string, string>();
+                (customersData || []).forEach((c: any) => {
+                    customerMap.set(c.id, c.full_name || 'Unknown Customer');
+                });
 
-        return { totalPaid: paid, totalPending: pending, breakdown: orderBreakdown };
-    }, [layawayOrders, customerMap]);
+                setOrders(mapped.map((o: any) => ({
+                    id: o.id,
+                    amountPaid: Number(o.amount_paid) || 0,
+                    balanceDue: Number(o.balance_due) || 0,
+                    orderDate: o.order_date || o.created_at,
+                    customerId: o.customer_id,
+                    paymentType: o.payment_method,
+                    orderStatus: o.status,
+                    customerName: customerMap.get(o.customer_id) || 'Unknown Customer',
+                })));
+            } catch (err) {
+                console.error('Layaway report error:', err);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchData();
+    }, [supabase, user]);
+
+    const { totalPaid, totalPending } = useMemo(() => ({
+        totalPaid: orders.reduce((sum, o) => sum + o.amountPaid, 0),
+        totalPending: orders.reduce((sum, o) => sum + o.balanceDue, 0),
+    }), [orders]);
 
     return (
         <Card>
@@ -104,7 +111,7 @@ export function LayawayReport() {
                         </CardContent>
                     </Card>
                 </div>
-                 <Table>
+                <Table>
                     <TableHeader>
                         <TableRow>
                             <TableHead>Customer</TableHead>
@@ -122,7 +129,7 @@ export function LayawayReport() {
                             <TableCell className="text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
                         </TableRow>
                     ))}
-                    {breakdown.map((order) => (
+                    {orders.map((order) => (
                         <TableRow key={order.id}>
                             <TableCell className="font-medium">{order.customerName}</TableCell>
                             <TableCell>{format(new Date(order.orderDate), 'PPP')}</TableCell>
@@ -132,12 +139,10 @@ export function LayawayReport() {
                     ))}
                     </TableBody>
                 </Table>
-                {!isLoading && breakdown.length === 0 && (
+                {!isLoading && orders.length === 0 && (
                 <div className="flex flex-col items-center justify-center text-center border-2 border-dashed rounded-lg p-12 mt-4">
                     <p className="text-lg font-semibold">No Active Lay-away Plans</p>
-                    <p className="text-muted-foreground mt-2">
-                    There are no current orders marked as 'Lay-away' with a pending balance.
-                    </p>
+                    <p className="text-muted-foreground mt-2">There are no current orders marked as 'Lay-away' with a pending balance.</p>
                 </div>
                 )}
             </CardContent>

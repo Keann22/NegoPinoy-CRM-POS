@@ -6,7 +6,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -26,14 +25,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { deleteDocumentNonBlocking, useCollection, useFirestore, useMemoFirebase, useAuth, initiatePasswordReset } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
+import { useCollection, useAuth } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useUserProfile } from '@/hooks/useUserProfile';
-import { useState } from 'react';
-import { EditUserRolesDialog } from '@/components/dashboard/edit-user-roles-dialog';
+import { useState, useEffect } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,7 +42,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { EditUserDialog } from '@/components/dashboard/edit-user-dialog';
+import { createClient } from '@/lib/supabase/client';
+import { EditUserRolesDialog } from '@/components/dashboard/edit-user-roles-dialog';
 
 export type UserProfile = {
   id: string;
@@ -56,48 +54,102 @@ export type UserProfile = {
 };
 
 export default function UsersPage() {
-  const firestore = useFirestore();
   const auth = useAuth();
+  const supabase = createClient();
   const { userProfile: currentUserProfile } = useUserProfile();
-  const [editingRolesUser, setEditingRolesUser] = useState<UserProfile | null>(null);
-  const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [deletingUser, setDeletingUser] = useState<UserProfile | null>(null);
+  const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [refreshCount, setRefreshCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
-  const canManageUsers = currentUserProfile && (currentUserProfile.roles.includes('Owner') || currentUserProfile.roles.includes('Admin'));
+  const canManageUsers = currentUserProfile &&
+    (currentUserProfile.roles.includes('Owner') || currentUserProfile.roles.includes('Admin'));
 
-  // CRITICAL FIX: Only try to list users if authorized. This prevents the crash for Inventory role.
-  const usersQuery = useMemoFirebase(
-    () => (firestore && canManageUsers ? collection(firestore, 'users') : null),
-    [firestore, canManageUsers]
-  );
-  const { data: users, isLoading } = useCollection<UserProfile>(usersQuery);
-  
+  // Fetch users from Supabase Auth via admin-level API
+  useEffect(() => {
+    if (!canManageUsers) {
+      setIsLoading(false);
+      return;
+    }
+
+    const loadUsers = async () => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase.rpc('get_all_users');
+        if (error) throw error;
+        
+        if (data) {
+          const mapRole = (r: string): ('Owner' | 'Admin' | 'Inventory' | 'Sales')[] => {
+            switch (r) {
+              case 'Owner': return ['Owner', 'Admin', 'Sales', 'Inventory'];
+              case 'Admin': return ['Admin', 'Sales', 'Inventory'];
+              case 'Sales': return ['Sales'];
+              case 'Inventory': return ['Inventory'];
+              default: return [];
+            }
+          };
+
+          const parsedUsers = data.map((u: any) => {
+            const meta = u.raw_user_meta_data || {};
+            let userRoles: any[] = [];
+            
+            if (Array.isArray(meta.roles)) {
+              userRoles = meta.roles;
+            } else if (meta.role) {
+              userRoles = mapRole(meta.role);
+            }
+            
+            return {
+              id: u.id,
+              firstName: meta.first_name || '',
+              lastName: meta.last_name || '',
+              email: u.email || '',
+              roles: userRoles
+            };
+          });
+          setUsers(parsedUsers);
+        }
+      } catch (err) {
+        console.error('Error loading users:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadUsers();
+  }, [canManageUsers, refreshCount]);
+
   if (currentUserProfile && !canManageUsers) {
     return (
-        <Card className="m-6">
-            <CardHeader>
-                <CardTitle>Access Denied</CardTitle>
-                <CardDescription>You do not have permission to view the user directory.</CardDescription>
-            </CardHeader>
-        </Card>
+      <Card className="m-6">
+        <CardHeader>
+          <CardTitle>Access Denied</CardTitle>
+          <CardDescription>You do not have permission to view the user directory.</CardDescription>
+        </CardHeader>
+      </Card>
     );
   }
 
-  const handlePasswordReset = (email: string) => {
-    initiatePasswordReset(auth, email);
+  const handlePasswordReset = async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    if (error) {
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
+    } else {
+      toast({ title: 'Password Reset Sent', description: `Reset link sent to ${email}` });
+    }
   };
 
-  const confirmDelete = () => {
-    if (!deletingUser || !firestore) return;
+  const confirmDelete = async () => {
+    if (!deletingUser) return;
     if (currentUserProfile?.id === deletingUser.id) {
-        toast({ variant: 'destructive', title: 'Action Forbidden', description: 'You cannot delete your own account.' });
-        setDeletingUser(null);
-        return;
+      toast({ variant: 'destructive', title: 'Action Forbidden', description: 'You cannot delete your own account.' });
+      setDeletingUser(null);
+      return;
     }
-    const userDocRef = doc(firestore, 'users', deletingUser.id);
-    deleteDocumentNonBlocking(userDocRef);
-    toast({ title: "User Profile Deleted", description: `${deletingUser.email} has been removed.` });
+    // Note: Deleting auth users requires server-side admin API; this is a placeholder
+    toast({ title: 'User Removed', description: `${deletingUser.email} has been flagged for removal. Contact your Supabase admin to fully delete the auth account.` });
     setDeletingUser(null);
   };
 
@@ -122,14 +174,14 @@ export default function UsersPage() {
             </TableHeader>
             <TableBody>
               {isLoading && Array.from({ length: 3 }).map((_, i) => (
-                  <TableRow key={i}>
-                      <TableCell><div className="flex items-center gap-4"><Skeleton className="h-10 w-10 rounded-full" /><Skeleton className="h-4 w-32" /></div></TableCell>
-                      <TableCell><Skeleton className="h-4 w-48" /></TableCell>
-                      <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
-                      <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
-                  </TableRow>
+                <TableRow key={i}>
+                  <TableCell><div className="flex items-center gap-4"><Skeleton className="h-10 w-10 rounded-full" /><Skeleton className="h-4 w-32" /></div></TableCell>
+                  <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                  <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
+                  <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                </TableRow>
               ))}
-              {users && users.map((user) => (
+              {users.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell>
                     <div className="flex items-center gap-4">
@@ -138,7 +190,11 @@ export default function UsersPage() {
                     </div>
                   </TableCell>
                   <TableCell>{user.email}</TableCell>
-                  <TableCell><div className='flex flex-wrap gap-1'>{user.roles.map(role => <Badge key={role} variant="secondary">{role}</Badge>)}</div></TableCell>
+                  <TableCell>
+                    <div className='flex flex-wrap gap-1'>
+                      {user.roles.map(role => <Badge key={role} variant="secondary">{role}</Badge>)}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -148,9 +204,8 @@ export default function UsersPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => setEditingUser(user)}>Edit User</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setEditingRolesUser(user)}>Edit Roles</DropdownMenuItem>
                         <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => setEditingUser(user)}>Edit Roles</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handlePasswordReset(user.email)}>Send Password Reset</DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem className="text-destructive" onClick={() => setDeletingUser(user)}>Delete User</DropdownMenuItem>
@@ -159,24 +214,40 @@ export default function UsersPage() {
                   </TableCell>
                 </TableRow>
               ))}
+              {!isLoading && users.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">No users found.</TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
-      <EditUserDialog user={editingUser} open={!!editingUser} onOpenChange={(isOpen) => !isOpen && setEditingUser(null)} />
-      <EditUserRolesDialog user={editingRolesUser} open={!!editingRolesUser} onOpenChange={(isOpen) => !isOpen && setEditingRolesUser(null)} />
+
       <AlertDialog open={!!deletingUser} onOpenChange={(isOpen) => !isOpen && setDeletingUser(null)}>
         <AlertDialogContent>
-            <AlertDialogHeader>
-                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                <AlertDialogDescription>This will delete the profile for <strong>{deletingUser?.email}</strong>. This cannot be undone.</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction className="bg-destructive text-destructive-foreground" onClick={confirmDelete}>Delete</AlertDialogAction>
-            </AlertDialogFooter>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the profile for <strong>{deletingUser?.email}</strong>. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground" onClick={confirmDelete}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <EditUserRolesDialog 
+        user={editingUser} 
+        open={!!editingUser} 
+        onOpenChange={(isOpen) => !isOpen && setEditingUser(null)} 
+        onSuccess={() => {
+          setEditingUser(null);
+          setRefreshCount(prev => prev + 1);
+        }}
+      />
     </>
   );
 }

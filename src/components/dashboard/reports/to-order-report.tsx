@@ -1,37 +1,81 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { useState, useMemo } from 'react';
+import { useCollection, useSupabase, useUser, collection } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { ProcurementProductDetailsDialog } from '@/components/dashboard/procurement-product-details-dialog';
 
 type Product = {
+    id: string;
     name: string;
     sku: string;
     quantityOnHand: number;
+    supplierPricing?: { supplierName: string }[];
+    category?: string;
+    description?: string;
+    images?: string[];
 };
 
 export function ToOrderReport() {
-    const firestore = useFirestore();
+    const supabase = useSupabase();
     const { user } = useUser();
 
-    const productsQuery = useMemoFirebase(() => (firestore && user ? collection(firestore, 'products') : null), [firestore, user]);
+    const productsQuery = useMemo(() => (supabase && user ? collection(supabase, 'products') : null), [supabase, user]);
     const { data: products, isLoading } = useCollection<Product>(productsQuery);
+
+    const [selectedSupplier, setSelectedSupplier] = useState<string>('all');
+    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
     const toOrder = useMemo(() => {
         if (!products) return [];
-        // Only show products with negative stock (oversold)
-        return products.filter(p => p.quantityOnHand < 0).sort((a, b) => a.quantityOnHand - b.quantityOnHand);
+        // Only show products with negative or zero stock
+        return products.filter(p => p.quantityOnHand <= 0).sort((a, b) => a.quantityOnHand - b.quantityOnHand);
     }, [products]);
+
+    const uniqueSuppliers = useMemo(() => {
+        const suppliers = new Set<string>();
+        toOrder.forEach(p => {
+            if (p.supplierPricing && Array.isArray(p.supplierPricing)) {
+                p.supplierPricing.forEach(sp => suppliers.add(sp.supplierName));
+            }
+        });
+        return Array.from(suppliers).sort();
+    }, [toOrder]);
+
+    const filteredToOrder = useMemo(() => {
+        if (selectedSupplier === 'all') return toOrder;
+        return toOrder.filter(p => 
+            p.supplierPricing && 
+            Array.isArray(p.supplierPricing) && 
+            p.supplierPricing.some(sp => sp.supplierName === selectedSupplier)
+        );
+    }, [toOrder, selectedSupplier]);
 
     return (
         <Card>
-            <CardHeader>
-                <CardTitle>To Order (Procurement List)</CardTitle>
-                <CardDescription>Oversold products that need immediate restocking to fulfill current demand.</CardDescription>
+            <CardHeader className="flex flex-row items-start justify-between">
+                <div>
+                    <CardTitle>To Order (Procurement List)</CardTitle>
+                    <CardDescription>Oversold products that need immediate restocking to fulfill current demand.</CardDescription>
+                </div>
+                <div className="w-[200px]">
+                    <select 
+                        className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        value={selectedSupplier}
+                        onChange={(e) => setSelectedSupplier(e.target.value)}
+                        disabled={uniqueSuppliers.length === 0}
+                    >
+                        <option value="all">
+                            {uniqueSuppliers.length === 0 ? "No Suppliers Assigned" : "All Suppliers"}
+                        </option>
+                        {uniqueSuppliers.map(s => (
+                            <option key={s} value={s}>{s}</option>
+                        ))}
+                    </select>
+                </div>
             </CardHeader>
             <CardContent>
                 <Table>
@@ -49,8 +93,12 @@ export function ToOrderReport() {
                                 <TableCell><Skeleton className="h-4 w-40" /></TableCell>
                                 <TableCell><Skeleton className="h-4 w-12 ml-auto" /></TableCell>
                             </TableRow>
-                        )) : toOrder.map((p, i) => (
-                            <TableRow key={i}>
+                        )) : filteredToOrder.map((p, i) => (
+                            <TableRow 
+                                key={i} 
+                                className="cursor-pointer hover:bg-muted/50 transition-colors"
+                                onClick={() => setSelectedProduct(p)}
+                            >
                                 <TableCell className="font-mono text-xs">{p.sku}</TableCell>
                                 <TableCell className="font-medium">{p.name}</TableCell>
                                 <TableCell className="text-right">
@@ -62,13 +110,19 @@ export function ToOrderReport() {
                         ))}
                     </TableBody>
                 </Table>
-                {!isLoading && toOrder.length === 0 && (
+                {!isLoading && filteredToOrder.length === 0 && (
                     <div className="flex flex-col items-center justify-center text-center py-12 border-2 border-dashed rounded-lg mt-4">
-                        <p className="text-lg font-semibold text-primary">No negative stock items</p>
-                        <p className="text-sm text-muted-foreground mt-1">All orders are covered by current inventory levels.</p>
+                        <p className="text-lg font-semibold text-primary">All stocked up!</p>
+                        <p className="text-sm text-muted-foreground mt-1">No products have run out of stock.</p>
                     </div>
                 )}
             </CardContent>
+            
+            <ProcurementProductDetailsDialog 
+                open={!!selectedProduct} 
+                onOpenChange={(isOpen) => !isOpen && setSelectedProduct(null)} 
+                product={selectedProduct} 
+            />
         </Card>
     );
 }

@@ -13,13 +13,17 @@ import {
   ListChecks,
   LogOut,
   Menu,
+  MessageCircle,
   Package,
   Repeat,
   Upload,
+  Bot,
   ShoppingCart,
   Truck,
   Users,
   Wallet,
+  History,
+  PhilippinePeso,
 } from 'lucide-react';
 import { useAuth, useUser } from '@/firebase';
 import { usePathname, useRouter } from 'next/navigation';
@@ -29,6 +33,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { DueDateAlert } from '@/components/dashboard/due-date-alert';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,9 +61,10 @@ export default function DashboardLayout({
   const [openAccounting, setOpenAccounting] = useState(false);
 
   const roles = useMemo(() => userProfile?.roles || [], [userProfile]);
-  const isManagement = roles.includes('Owner') || roles.includes('Admin');
-  const isSales = roles.includes('Sales');
-  const isInventory = roles.includes('Inventory');
+  
+  const isManagement = useMemo(() => roles.some(r => ['owner', 'admin'].includes(String(r).toLowerCase())), [roles]);
+  const isSales = useMemo(() => roles.some(r => String(r).toLowerCase() === 'sales'), [roles]);
+  const isInventory = useMemo(() => roles.some(r => String(r).toLowerCase() === 'inventory'), [roles]);
 
   const navLinks = useMemo(() => {
     const links = [];
@@ -70,20 +76,33 @@ export default function DashboardLayout({
 
     links.push({ href: '/dashboard/orders', label: 'Orders', icon: ShoppingCart });
     links.push({ href: '/dashboard/products', label: 'Products', icon: Package });
+    
+    if (isManagement || isInventory) {
+      links.push({ href: '/dashboard/categories', label: 'Categories', icon: ListChecks });
+    }
 
-    links.push({
-      id: 'inventory',
-      label: 'Inventory Management',
-      icon: Archive,
-      isOpen: openInventory,
-      setIsOpen: setOpenInventory,
-      subItems: [
-        { href: '/dashboard/inventory/scan-receipt', label: 'Upload Receipt', icon: Upload },
+    if (isManagement || isInventory) {
+      const inventorySubItems = [
         { href: '/dashboard/inventory/receive', label: 'Bulk Receive', icon: Truck },
         { href: '/dashboard/inventory/restock', label: 'Restock / Purchase', icon: ArrowDownUp },
-        { href: '/dashboard/inventory/batches', label: 'Stock Batch List', icon: ListChecks }
-      ]
-    });
+        { href: '/dashboard/inventory/batches', label: 'Stock Batch List', icon: ListChecks },
+        { href: '/dashboard/inventory/movements', label: 'Inventory History', icon: History }
+      ];
+
+      if (isManagement) {
+        inventorySubItems.unshift({ href: '/dashboard/inventory/scan-receipt', label: 'Upload Receipt', icon: Upload });
+        inventorySubItems.push({ href: '/dashboard/inventory/pending-costs', label: 'Encode Costs', icon: PhilippinePeso });
+      }
+
+      links.push({
+        id: 'inventory',
+        label: 'Inventory Management',
+        icon: Archive,
+        isOpen: openInventory,
+        setIsOpen: setOpenInventory,
+        subItems: inventorySubItems
+      });
+    }
 
     if (isManagement) {
       links.push({
@@ -100,6 +119,11 @@ export default function DashboardLayout({
       links.push({ href: '/dashboard/customers', label: 'Customers', icon: Users });
       links.push({ href: '/dashboard/suppliers', label: 'Suppliers', icon: Building });
       links.push({ href: '/dashboard/users', label: 'User Management', icon: Users });
+      
+      // New AI/Admin Features
+      links.push({ href: '/dashboard/approval-queue', label: 'AI Approval Queue', icon: ListChecks });
+      links.push({ href: '/dashboard/simulator', label: 'AI Simulator', icon: Bot });
+      links.push({ href: '/dashboard/chat', label: 'Chat History', icon: MessageCircle });
     } else if (isSales) {
       links.push({ href: '/dashboard/customers', label: 'Customers', icon: Users });
     }
@@ -107,7 +131,7 @@ export default function DashboardLayout({
     links.push({ href: '/dashboard/reports', label: 'Reports', icon: LineChart });
 
     return links;
-  }, [isManagement, isSales, openInventory, openAccounting]);
+  }, [isManagement, isSales, isInventory, openInventory, openAccounting]);
 
   useEffect(() => {
     if (pathname.startsWith('/dashboard/inventory')) {
@@ -116,6 +140,21 @@ export default function DashboardLayout({
     if (pathname.startsWith('/dashboard/accounting')) {
       setOpenAccounting(true);
     }
+
+    // Force clean up any Radix UI dialog locks and orphaned overlays on route change
+    document.body.style.pointerEvents = 'auto';
+    document.body.removeAttribute('data-scroll-locked');
+    
+    // Remove any orphaned portals (like Dialog overlays) that get stuck during fast navigation
+    const timer = setTimeout(() => {
+      const portals = document.querySelectorAll('[data-radix-portal]');
+      portals.forEach(portal => {
+        // If they are stuck after navigation, hide them
+        portal.remove();
+      });
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, [pathname]);
 
   useEffect(() => {
@@ -198,21 +237,23 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
-      <div className="hidden border-r bg-sidebar md:block">
-        <div className="flex h-full max-h-screen flex-col gap-2">
-          <div className="flex h-14 items-center border-b border-sidebar-border px-4 lg:h-[60px] lg:px-6">
-            <Link href="/" className="flex items-center gap-2 font-semibold text-sidebar-foreground">
-              <Logo className="h-6 w-6" />
-              <span className="font-headline">RetailFlow</span>
-            </Link>
-            <Button variant="outline" size="icon" className="ml-auto h-8 w-8 bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground">
-              <Bell className="h-4 w-4" />
+    <>
+      <DueDateAlert />
+      <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
+        <div className="hidden border-r bg-sidebar md:block">
+          <div className="flex h-full max-h-screen flex-col gap-2">
+            <div className="flex h-14 items-center border-b border-sidebar-border px-4 lg:h-[60px] lg:px-6">
+              <Link href="/" className="flex items-center gap-2 font-semibold text-sidebar-foreground">
+                <Logo className="h-6 w-6" />
+                <span className="font-headline">NegosyantengPinoy.Ph</span>
+              </Link>
+              <Button variant="outline" size="icon" className="ml-auto h-8 w-8 bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground">
+                <Bell className="h-4 w-4" />
               <span className="sr-only">Toggle notifications</span>
             </Button>
           </div>
-          <div className="flex-1">
-            <nav className="grid items-start px-2 text-sm font-medium lg:px-4">
+          <div className="flex-1 overflow-y-auto">
+            <nav className="grid items-start px-2 text-sm font-medium lg:px-4 pb-4">
               {renderNavLinks()}
             </nav>
           </div>
@@ -231,15 +272,17 @@ export default function DashboardLayout({
                 <span className="sr-only">Toggle navigation menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="flex flex-col bg-sidebar text-sidebar-foreground border-sidebar-border">
-              <nav className="grid gap-2 text-lg font-medium">
+            <SheetContent side="left" className="flex flex-col bg-sidebar text-sidebar-foreground border-sidebar-border w-80 sm:w-96 p-0 overflow-y-auto">
+              <div className="flex h-14 items-center border-b border-sidebar-border px-4 mb-4 mt-4 shrink-0">
                 <Link
                   href="#"
-                  className="flex items-center gap-2 text-lg font-semibold text-sidebar-foreground mb-4"
+                  className="flex items-center gap-2 text-lg font-semibold text-sidebar-foreground"
                 >
                   <Logo className="h-6 w-6" />
-                  <span className="sr-only">RetailFlow</span>
+                  <span className="font-headline">NegosyantengPinoy.Ph</span>
                 </Link>
+              </div>
+              <nav className="grid gap-2 text-lg font-medium px-4 pb-32">
                 {renderNavLinks(true)}
               </nav>
             </SheetContent>
@@ -264,8 +307,9 @@ export default function DashboardLayout({
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>{user.email}</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Settings</DropdownMenuItem>
-              <DropdownMenuItem>Support</DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                  <Link href="/dashboard/settings">Settings</Link>
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4" />
@@ -279,5 +323,6 @@ export default function DashboardLayout({
         </main>
       </div>
     </div>
+    </>
   );
 }
