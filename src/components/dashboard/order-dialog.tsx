@@ -230,10 +230,10 @@ export function OrderDialog(props: OrderDialogProps) {
       try {
         const { data, error } = await supabase
           .from('products')
-          .select('id, name, stock_level, selling_price, parent_id')
+          .select('id, name, stock_level, selling_price, installment_price, parent_id, supplier_pricing')
           .ilike('name', `%${productSearch}%`)
-          .is('parent_id', null)
-          .limit(10);
+          .gt('selling_price', 0)  // exclude pure parent containers (price = 0)
+          .limit(15);
 
         if (error) throw error;
 
@@ -241,7 +241,10 @@ export function OrderDialog(props: OrderDialogProps) {
           id: doc.id,
           name: doc.name,
           quantityOnHand: doc.stock_level,
-          sellingPrice: doc.selling_price
+          sellingPrice: doc.selling_price,
+          installment_price: doc.installment_price,
+          supplier_pricing: doc.supplier_pricing,
+          stockBatches: [],
         } as Product));
         setProductResults(results);
       } catch (error) {
