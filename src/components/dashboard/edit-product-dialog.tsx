@@ -30,7 +30,7 @@ const editProductSchema = z.object({
   sellingPrice: z.coerce.number().min(0, "Selling price must be positive"),
   images: z.custom<File[]>().optional(),
   supplierPricing: z.array(z.object({
-      supplierId: z.string(),
+      supplierId: z.string().optional(),
       supplierName: z.string(),
       unitCost: z.coerce.number().min(0)
   })).optional().default([]),
