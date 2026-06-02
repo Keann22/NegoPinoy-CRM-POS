@@ -38,6 +38,7 @@ const editProductSchema = z.object({
       nameSuffix: z.string().min(1, "Variation name is required"),
       sku: z.string().optional(),
       sellingPrice: z.coerce.number().min(0, "Price must be positive"),
+      unitCost: z.coerce.number().min(0, "Cost must be positive").optional(),
       quantityOnHand: z.coerce.number().int().min(0, "Stock must be a non-negative integer"),
       images: z.custom<File[]>().optional(),
   })).optional().default([]),
@@ -238,13 +239,18 @@ export function EditProductDialog({ product, open, onOpenChange }: EditProductDi
                     .from('products')
                     .insert({
                         name: `${productCoreData.name} - ${v.nameSuffix}`,
+                        variant_name: v.nameSuffix,
+                        parent_id: displayProduct.id,
                         sku: vSku,
                         shelf_location: productCoreData.shelfLocation || null,
                         description: productCoreData.description,
                         category: productCoreData.categoryId,
                         selling_price: v.sellingPrice,
-                        initial_unit_cost: supplierPricing && supplierPricing.length > 0 ? supplierPricing[0].unitCost : 0,
-                        supplier_pricing: supplierPricing || [],
+                        initial_unit_cost: v.unitCost !== undefined ? v.unitCost : (supplierPricing && supplierPricing.length > 0 ? supplierPricing[0].unitCost : 0),
+                        supplier_pricing: supplierPricing && supplierPricing.length > 0 ? supplierPricing.map(sp => ({
+                              ...sp,
+                              unitCost: v.unitCost !== undefined ? v.unitCost : sp.unitCost
+                        })) : [],
                         stock_level: v.quantityOnHand,
                         images: variationImageUrls
                     })
@@ -255,7 +261,7 @@ export function EditProductDialog({ product, open, onOpenChange }: EditProductDi
 
                 if (v.quantityOnHand > 0) {
                     const firstSupplier = supplierPricing && supplierPricing.length > 0 ? supplierPricing[0] : null;
-                    const cost = firstSupplier ? firstSupplier.unitCost : 0;
+                    const cost = v.unitCost !== undefined ? v.unitCost : (firstSupplier ? firstSupplier.unitCost : 0);
                     
                     await supabase.from('inventory_movements').insert({
                         product_id: newProduct.id,
@@ -528,6 +534,19 @@ export function EditProductDialog({ product, open, onOpenChange }: EditProductDi
                                 />
                                 <FormField
                                     control={form.control}
+                                    name={`variations.${index}.unitCost`}
+                                    render={({ field: costField }) => (
+                                        <FormItem>
+                                            <FormLabel>Unit Cost (Optional)</FormLabel>
+                                            <FormControl>
+                                                <Input type="number" step="0.01" {...costField} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
                                     name={`variations.${index}.quantityOnHand`}
                                     render={({ field: stockField }) => (
                                         <FormItem>
@@ -563,7 +582,7 @@ export function EditProductDialog({ product, open, onOpenChange }: EditProductDi
                         variant="outline"
                         size="sm"
                         className="w-full mt-2"
-                        onClick={() => appendVariation({ nameSuffix: '', sku: '', sellingPrice: 0, quantityOnHand: 0, images: [] })}
+                        onClick={() => appendVariation({ nameSuffix: '', sku: '', sellingPrice: 0, unitCost: undefined, quantityOnHand: 0, images: [] })}
                     >
                         <Plus className="mr-2 h-4 w-4" />
                         Add New Variation

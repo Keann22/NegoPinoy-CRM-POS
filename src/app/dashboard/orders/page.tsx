@@ -55,6 +55,7 @@ import {
   collection,
   query,
   orderBy,
+  where
 } from '@/firebase';
 import { Progress } from '@/components/ui/progress';
 import { useRouter } from 'next/navigation';
@@ -132,8 +133,14 @@ export default function OrdersPage() {
   const isAdminOrOwner = useMemo(() => userProfile?.roles.some(r => ['Admin', 'Owner'].includes(r)), [userProfile]);
 
   const ordersQuery = useMemo(
-    () => (user ? query(collection('orders' as any), orderBy('orderDate', 'desc')) : null),
-    [user]
+    () => {
+        if (!user) return null;
+        if (userProfile && !userProfile.roles.some(r => ['Admin', 'Owner'].includes(r))) {
+            return query(collection('orders' as any), where('sales_person_id', '==', userProfile.id), orderBy('orderDate', 'desc'));
+        }
+        return query(collection('orders' as any), orderBy('orderDate', 'desc'));
+    },
+    [user, userProfile]
   );
   const { data: orders, isLoading: isLoadingOrders, refetch } = useCollection<Order>(ordersQuery);
 
@@ -459,7 +466,7 @@ export default function OrdersPage() {
                           
                           {(() => {
                             const isCompletedOrShipped = order.orderStatus === 'Completed' || order.orderStatus === 'Shipped';
-                            const canEditOrder = isAdminOrOwner || !isCompletedOrShipped;
+                            const canEditOrder = isAdminOrOwner || userProfile?.roles?.includes('Sales') || !isCompletedOrShipped;
                             
                             return (
                               <>

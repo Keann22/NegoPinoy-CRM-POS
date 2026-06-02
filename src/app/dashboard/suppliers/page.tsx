@@ -24,6 +24,7 @@ import { AddSupplierDialog } from '@/components/dashboard/add-supplier-dialog';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useState, useMemo } from 'react';
 import { ViewSupplierHistoryDialog } from '@/components/dashboard/view-supplier-history-dialog';
+import { ViewSupplierProductsDialog } from '@/components/dashboard/view-supplier-products-dialog';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
@@ -43,6 +44,7 @@ export default function SuppliersPage() {
   const { user } = useUser();
   const { userProfile } = useUserProfile();
   const [viewingHistorySupplier, setViewingHistorySupplier] = useState<Supplier | null>(null);
+  const [viewingProductsSupplier, setViewingProductsSupplier] = useState<Supplier | null>(null);
 
   const isManagement = useMemo(() => userProfile?.roles.some(r => ['Admin', 'Owner'].includes(r)), [userProfile]);
 
@@ -107,7 +109,11 @@ export default function SuppliersPage() {
                    </TableRow>
               ))}
               {suppliers && suppliers.map((supplier) => (
-                <TableRow key={supplier.id}>
+                <TableRow 
+                  key={supplier.id} 
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => setViewingProductsSupplier(supplier)}
+                >
                   <TableCell>
                     <div className="flex items-center gap-4">
                       <Avatar>
@@ -130,7 +136,7 @@ export default function SuppliersPage() {
                       supplier.email || 'N/A'
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button aria-haspopup="true" size="icon" variant="ghost">
@@ -140,9 +146,10 @@ export default function SuppliersPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => setViewingHistorySupplier(supplier)}>View Purchase History</DropdownMenuItem>
-                        <DropdownMenuItem>Edit</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setViewingProductsSupplier(supplier); }}>View Product Catalog</DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setViewingHistorySupplier(supplier); }}>View Purchase History</DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => e.stopPropagation()}>Edit</DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="text-destructive focus:text-destructive focus:bg-destructive/10">
                           Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -175,6 +182,15 @@ export default function SuppliersPage() {
         onOpenChange={(isOpen) => {
             if (!isOpen) {
                 setViewingHistorySupplier(null);
+            }
+        }}
+      />
+      <ViewSupplierProductsDialog
+        supplier={viewingProductsSupplier}
+        open={!!viewingProductsSupplier}
+        onOpenChange={(isOpen) => {
+            if (!isOpen) {
+                setViewingProductsSupplier(null);
             }
         }}
       />

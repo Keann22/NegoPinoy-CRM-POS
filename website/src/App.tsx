@@ -180,16 +180,63 @@ function Home({ searchQuery, onCategorySelect }: { searchQuery: string, onCatego
     <main>
       {!searchQuery && (
         <section className="hero">
-          <div className="hero-banner">
-            <div>
-              <h1>New Arrivals & Top Picks</h1>
-              <p style={{ marginTop: '1rem', color: '#475569', maxWidth: '600px', margin: '1rem auto 0' }}>
-                Discover our range of premium products designed for quality and excellence. Unbeatable prices every day.
-              </p>
+            <div className="hero-banner">
+              <div>
+                <h1>Mga Gamit sa Bahay na Subok at Maasahan</h1>
+                <p style={{ marginTop: '1rem', color: '#475569', maxWidth: '600px', margin: '1rem auto 0' }}>
+                  Sinisiguro namin na ang bawat item na binibili mo ay subok at de-kalidad. Dahil sa NegoPinoy, ang inyong investment para sa pamilya ay pangmatagalan.
+                </p>
+              </div>
             </div>
-          </div>
-          
-          <div className="container">
+            
+            {/* New USP Section */}
+            <div className="usp-section container">
+              <div className="usp-header">
+                <h2>Bakit NegoPinoy ang Trusted Choice ng mga Wais na Misis?</h2>
+                <p>Hindi lang kami basta nagbebenta, inaalagaan namin ang bawat customer natin.</p>
+              </div>
+              
+              <div className="usp-grid">
+                <div className="usp-card">
+                  <div className="usp-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                      <polyline points="9 12 11 14 15 10"/>
+                    </svg>
+                  </div>
+                  <h3>Subok na De-Kalidad</h3>
+                  <p>Hindi namin ibebenta sa inyo ang mga produkto na hindi namin mismo gagamitin. Sinasala naming maigi ang bawat item para makasiguro kayong high-quality at matibay ang makakarating sa inyong mga tahanan.</p>
+                </div>
+                
+                <div className="usp-card">
+                  <div className="usp-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="2" y="5" width="20" height="14" rx="2"/>
+                      <line x1="2" y1="10" x2="22" y2="10"/>
+                      <path d="M7 15h0"/>
+                      <path d="M11 15h2"/>
+                    </svg>
+                  </div>
+                  <h3>Installment at Lay-away</h3>
+                  <p>Gusto mong hulugan? Walang problema! Kami ang kaisa-isang online seller na nag-ooffer ng flexible installment plans. At kung ayaw mo namang mangutang, may lay-away option din tayo para pasok pa rin sa budget.</p>
+                </div>
+                
+                <div className="usp-card">
+                  <div className="usp-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                      <circle cx="9" cy="7" r="4"/>
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                  </div>
+                  <h3>Alagang OFW at Lokal</h3>
+                  <p>Mula sa mga masisipag nating OFW sa abroad na gustong padalhan ang pamilya, hanggang sa mga wais na nanay (at tatay!) dito sa Pilipinas—sinisiguro naming smooth at hassle-free ang bawat transaction.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="container">
             <div className="categories-row">
               {allCategories.map(cat => (
                 <div key={cat} className="category-icon" onClick={() => onCategorySelect(cat)}>

@@ -203,18 +203,20 @@ export default function DashboardPage() {
       <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
         <h1 className="text-2xl font-bold font-headline tracking-tight">Dashboard Overview</h1>
         <div className="flex items-center gap-2">
-            <Select value={selectedSalesperson} onValueChange={setSelectedSalesperson}>
-                <SelectTrigger className="w-[200px] bg-background">
-                    <Filter className="w-4 h-4 mr-2" />
-                    <SelectValue placeholder="Filter by User" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="all">Company Overall</SelectItem>
-                    {salespeople.map(rep => (
-                        <SelectItem key={rep.id} value={rep.id}>{rep.id === userProfile?.id ? 'My Sales' : rep.name}</SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
+            {isManagement && (
+                <Select value={selectedSalesperson} onValueChange={setSelectedSalesperson}>
+                    <SelectTrigger className="w-[200px] bg-background">
+                        <Filter className="w-4 h-4 mr-2" />
+                        <SelectValue placeholder="Filter by User" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">Company Overall</SelectItem>
+                        {salespeople.map(rep => (
+                            <SelectItem key={rep.id} value={rep.id}>{rep.id === userProfile?.id ? 'My Sales' : rep.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            )}
 
             <Popover>
                 <PopoverTrigger asChild>

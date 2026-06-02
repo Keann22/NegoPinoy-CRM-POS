@@ -45,7 +45,7 @@ export function MarkShippedDialog({
             const { error } = await supabase
                 .from('orders')
                 .update({
-                    order_status: 'Shipped',
+                    status: 'Shipped',
                     tracking_number: trackingNumber || null
                 })
                 .eq('id', orderId);

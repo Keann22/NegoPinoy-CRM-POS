@@ -41,6 +41,7 @@ const productSchema = z.object({
       nameSuffix: z.string().min(1, "Variation name is required"),
       sku: z.string().optional(),
       sellingPrice: z.coerce.number().min(0, "Price must be positive"),
+      unitCost: z.coerce.number().min(0, "Cost must be positive").optional(),
       quantityOnHand: z.coerce.number().int().min(0, "Stock must be a non-negative integer"),
       images: z.custom<File[]>().optional(),
   })).optional().default([]),
@@ -200,18 +201,48 @@ export function AddProductDialog(props: AddProductDialogProps) {
             );
         }
 
+        let parentProductId: string | null = null;
+        
+        if (hasVariations && variations && variations.length > 0) {
+            const { data: parentProduct, error: parentError } = await supabase
+                .from('products')
+                .insert({
+                    name: productCoreData.name,
+                    sku: finalSku,
+                    shelf_location: productCoreData.shelfLocation || null,
+                    description: productCoreData.description,
+                    category: productCoreData.categoryId,
+                    images: uploadedImageUrls,
+                    selling_price: 0,
+                    stock_level: 0,
+                    supplier_pricing: []
+                })
+                .select()
+                .single();
+                
+            if (parentError) throw parentError;
+            parentProductId = parentProduct.id;
+            
+            // Fire the onProductAdded for the parent
+            props.onProductAdded?.({ id: parentProduct.id, name: productCoreData.name });
+        }
+
         const productsToCreate = hasVariations && variations && variations.length > 0 
             ? variations.map((v, i) => ({
                 name: `${productCoreData.name} - ${v.nameSuffix}`,
+                variant_name: v.nameSuffix,
                 sku: v.sku?.trim() || `PRD-${Date.now().toString().slice(-6)}-${i}-${Math.floor(100 + Math.random() * 900)}`,
                 sellingPrice: v.sellingPrice,
+                unitCost: v.unitCost,
                 quantityOnHand: v.quantityOnHand,
                 imagesToUpload: v.images
             }))
             : [{
                 name: productCoreData.name,
+                variant_name: null,
                 sku: finalSku, // auto-generated if blank
                 sellingPrice: productCoreData.sellingPrice || 0,
+                unitCost: undefined,
                 quantityOnHand: quantityOnHand || 0,
                 imagesToUpload: [] // Using uploadedImageUrls as fallback anyway
             }];
@@ -247,13 +278,18 @@ export function AddProductDialog(props: AddProductDialogProps) {
                 .from('products')
                 .insert({
                     name: p.name,
+                    variant_name: p.variant_name,
+                    parent_id: parentProductId,
                     sku: p.sku,
                     shelf_location: productCoreData.shelfLocation || null,
                     description: productCoreData.description,
                     category: productCoreData.categoryId,
                     selling_price: p.sellingPrice,
-                    initial_unit_cost: supplierPricing && supplierPricing.length > 0 ? supplierPricing[0].unitCost : 0,
-                    supplier_pricing: supplierPricing || [],
+                    initial_unit_cost: p.unitCost !== undefined ? p.unitCost : (supplierPricing && supplierPricing.length > 0 ? supplierPricing[0].unitCost : 0),
+                    supplier_pricing: supplierPricing && supplierPricing.length > 0 ? supplierPricing.map(sp => ({
+                        ...sp,
+                        unitCost: p.unitCost !== undefined ? p.unitCost : sp.unitCost
+                    })) : [],
                     stock_level: p.quantityOnHand,
                     images: variationImageUrls
                 })
@@ -262,15 +298,15 @@ export function AddProductDialog(props: AddProductDialogProps) {
 
             if (insertError) throw insertError;
             
-            // Only fire the onProductAdded callback for the first variation so it selects something in the dropdown
-            if (i === 0) {
+            // Only fire the onProductAdded callback for standalone product
+            if (i === 0 && !parentProductId) {
                 props.onProductAdded?.({ id: newProduct.id, name: p.name });
             }
 
             if (p.quantityOnHand > 0) {
                 const firstSupplier = supplierPricing && supplierPricing.length > 0 ? supplierPricing[0] : null;
                 const selectedSupplierName = firstSupplier ? firstSupplier.supplierName : 'Initial Stock';
-                const cost = firstSupplier ? firstSupplier.unitCost : 0;
+                const cost = p.unitCost !== undefined ? p.unitCost : (firstSupplier ? firstSupplier.unitCost : 0);
                 
                 await supabase.from('inventory_movements').insert({
                     product_id: newProduct.id,
@@ -591,6 +627,19 @@ export function AddProductDialog(props: AddProductDialogProps) {
                                     />
                                     <FormField
                                         control={form.control}
+                                        name={`variations.${index}.unitCost`}
+                                        render={({ field: costField }) => (
+                                            <FormItem>
+                                                <FormLabel>Unit Cost (Optional)</FormLabel>
+                                                <FormControl>
+                                                    <Input type="number" step="0.01" {...costField} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
                                         name={`variations.${index}.quantityOnHand`}
                                         render={({ field: stockField }) => (
                                             <FormItem>
@@ -626,7 +675,7 @@ export function AddProductDialog(props: AddProductDialogProps) {
                             variant="outline"
                             size="sm"
                             className="w-full mt-2"
-                            onClick={() => appendVariation({ nameSuffix: '', sku: '', sellingPrice: 0, quantityOnHand: 0, images: [] })}
+                            onClick={() => appendVariation({ nameSuffix: '', sku: '', sellingPrice: 0, unitCost: undefined, quantityOnHand: 0, images: [] })}
                         >
                             <Plus className="mr-2 h-4 w-4" />
                             Add Variation

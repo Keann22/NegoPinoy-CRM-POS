@@ -11,7 +11,7 @@ import { type Order } from '@/app/dashboard/orders/page';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Share2, Edit } from 'lucide-react';
+import { ArrowLeft, Share2, Edit, CheckCircle } from 'lucide-react';
 import { ShareReceiptDialog } from '@/components/dashboard/share-receipt-dialog';
 import { EditOrderDialog } from '@/components/dashboard/order-dialog';
 import { MarkShippedDialog } from '@/components/dashboard/mark-shipped-dialog';
@@ -159,6 +159,7 @@ export default function OrderDetailPage() {
 
   const canEdit = userProfile?.roles?.includes('Admin') || 
                   userProfile?.roles?.includes('Owner') || 
+                  userProfile?.roles?.includes('Sales') ||
                   (order?.orderStatus !== 'Completed' && order?.orderStatus !== 'Shipped');
 
   if (isLoading) {
@@ -197,6 +198,15 @@ export default function OrderDetailPage() {
                     <Button variant="secondary" size="sm" onClick={() => setIsMarkShippedOpen(true)}>
                         <Truck className="mr-2 h-4 w-4" />
                         {order.orderStatus === 'Shipped' ? 'Update Tracking' : 'Mark Shipped'}
+                    </Button>
+                )}
+                {(order.orderStatus === 'Shipped') && (
+                    <Button variant="default" size="sm" onClick={async () => {
+                        const { error } = await supabase.from('orders').update({ status: 'Completed', completed_at: new Date().toISOString() }).eq('id', order.id);
+                        if (!error) window.location.reload();
+                    }}>
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                        Mark as Completed
                     </Button>
                 )}
                 {canEdit && (

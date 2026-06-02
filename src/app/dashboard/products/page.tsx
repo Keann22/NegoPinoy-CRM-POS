@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, ChevronDown, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -63,6 +63,10 @@ export type Product = {
   sellingPrice: number;
   quantityOnHand: number;
   shelf_location?: string;
+  supplier_pricing?: any;
+  initial_unit_cost?: number;
+  parentId?: string | null;
+  variantName?: string | null;
 };
 
 export type FormattedProduct = Product & {
@@ -70,6 +74,8 @@ export type FormattedProduct = Product & {
     price: string;
     image: string;
     shelfLocation?: string;
+    supplierPricing?: any[];
+    children?: FormattedProduct[];
 }
 
 const getStatus = (stock: number | undefined | null): { text: 'In Stock' | 'Low Stock' | 'Out of Stock'; variant: 'outline' | 'default' | 'destructive' } => {
@@ -98,6 +104,7 @@ export default function ProductsPage() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [stockFilter, setStockFilter] = useState('all');
+  const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
 
   const isManagement = useMemo(() => userProfile?.roles?.some(r => ['Admin', 'Owner'].includes(r)), [userProfile]);
 
@@ -108,17 +115,38 @@ export default function ProductsPage() {
 
   const { data: products, isLoading, refetch } = useCollection<Omit<Product, 'id'>>(productsQuery);
 
-  const formattedProducts: FormattedProduct[] = useMemo(() => {
+  const rawFormattedProducts: FormattedProduct[] = useMemo(() => {
     if (!products) return [];
-    return products.map(p => ({
-      ...p,
-      quantityOnHand: p.quantityOnHand ?? 0,
-      status: getStatus(p.quantityOnHand),
-      price: `₱${(Number(p.sellingPrice) || 0).toFixed(2)}`,
-      image: p.images?.[0] || 'https://placehold.co/64x64',
-      shelfLocation: p.shelf_location || "",
-    }));
+    return products.map(p => {
+      let sp = p.supplier_pricing || [];
+      if (sp.length === 0 && p.initial_unit_cost) {
+          sp = [{ supplierName: 'Initial Stock', unitCost: p.initial_unit_cost }];
+      }
+      return {
+        ...p,
+        quantityOnHand: p.quantityOnHand ?? 0,
+        status: getStatus(p.quantityOnHand),
+        price: `₱${(Number(p.sellingPrice) || 0).toFixed(2)}`,
+        image: p.images?.[0] || 'https://placehold.co/64x64',
+        shelfLocation: p.shelf_location || "",
+        supplierPricing: sp,
+      };
+    });
   }, [products]);
+
+  const formattedProducts: FormattedProduct[] = useMemo(() => {
+    if (!rawFormattedProducts) return [];
+    const parents = rawFormattedProducts.filter(p => !p.parentId);
+    const children = rawFormattedProducts.filter(p => p.parentId);
+
+    return parents.map(parent => {
+        const productChildren = children.filter(c => c.parentId === parent.id);
+        return {
+            ...parent,
+            children: productChildren.length > 0 ? productChildren : undefined
+        };
+    });
+  }, [rawFormattedProducts]);
 
   const filteredProducts = useMemo(() => {
     let results = formattedProducts;
@@ -345,67 +373,170 @@ export default function ProductsPage() {
                   </TableRow>
               ))}
               {paginatedProducts && paginatedProducts.map((product) => (
-                <TableRow key={product.id} data-state={selectedProductIds.includes(product.id) ? 'selected' : undefined}>
-                  <TableCell>
-                    <Checkbox
-                        onCheckedChange={(checked) => {
-                            setSelectedProductIds((prevIds) =>
-                            checked
-                                ? [...prevIds, product.id]
-                                : prevIds.filter((id) => id !== product.id)
-                            );
-                        }}
-                        checked={selectedProductIds.includes(product.id)}
-                        aria-label={`Select product ${product.name}`}
-                    />
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">
-                    <Image
-                      alt="Product image"
-                      className="aspect-square rounded-md object-cover"
-                      height="64"
-                      src={product.image}
-                      width="64"
-                      data-ai-hint="product image"
-                    />
-                  </TableCell>
-                  <TableCell className="font-medium">{product.name}</TableCell>
-                  <TableCell>
-                    <Badge variant={product.status.variant}>
-                      {product.status.text}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{product.price}</TableCell>
-                  <TableCell className="hidden md:table-cell">{product.shelfLocation || '-'}</TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    {product.quantityOnHand ?? 0}
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button aria-haspopup="true" size="icon" variant="ghost">
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">Toggle menu</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => setViewingDetailsProduct(product)}>View Details</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setEditingProduct(product)}>Edit</DropdownMenuItem>
-                        {isManagement && <DropdownMenuItem>Duplicate</DropdownMenuItem>}
-                        <DropdownMenuItem onClick={() => setViewingHistoryProduct(product)}>View History</DropdownMenuItem>
-                        {isManagement && (
-                            <DropdownMenuItem
-                            className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                            onClick={() => setDeletingProduct(product)}
-                            >
-                            Delete
-                            </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
+                <React.Fragment key={product.id}>
+                  <TableRow data-state={selectedProductIds.includes(product.id) ? 'selected' : undefined}>
+                    <TableCell>
+                      <Checkbox
+                          onCheckedChange={(checked) => {
+                              setSelectedProductIds((prevIds) =>
+                              checked
+                                  ? [...prevIds, product.id]
+                                  : prevIds.filter((id) => id !== product.id)
+                              );
+                          }}
+                          checked={selectedProductIds.includes(product.id)}
+                          aria-label={`Select product ${product.name}`}
+                      />
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      <Image
+                        alt="Product image"
+                        className="aspect-square rounded-md object-cover"
+                        height="64"
+                        src={product.image}
+                        width="64"
+                        data-ai-hint="product image"
+                      />
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                          {product.children && product.children.length > 0 && (
+                              <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-6 w-6" 
+                                  onClick={() => {
+                                      setExpandedParents(prev => {
+                                          const next = new Set(prev);
+                                          if (next.has(product.id)) next.delete(product.id);
+                                          else next.add(product.id);
+                                          return next;
+                                      });
+                                  }}
+                              >
+                                  {expandedParents.has(product.id) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                              </Button>
+                          )}
+                          {product.name}
+                          {product.children && product.children.length > 0 && (
+                              <Badge variant="secondary" className="ml-2">{product.children.length} variations</Badge>
+                          )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {product.children && product.children.length > 0 ? (
+                          <Badge variant={getStatus(product.children.reduce((acc, c) => acc + (c.quantityOnHand || 0), 0)).variant}>
+                              {getStatus(product.children.reduce((acc, c) => acc + (c.quantityOnHand || 0), 0)).text}
+                          </Badge>
+                      ) : (
+                          <Badge variant={product.status.variant}>{product.status.text}</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {product.children && product.children.length > 0 ? (
+                        <span className="text-muted-foreground">-</span>
+                      ) : (
+                        product.price
+                      )}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">{product.shelfLocation || '-'}</TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {product.children && product.children.length > 0 ? (
+                          product.children.reduce((acc, c) => acc + (c.quantityOnHand || 0), 0)
+                      ) : (
+                          product.quantityOnHand ?? 0
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button aria-haspopup="true" size="icon" variant="ghost">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Toggle menu</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuItem onClick={() => setViewingDetailsProduct(product)}>View Details</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setEditingProduct(product)}>Edit</DropdownMenuItem>
+                          {isManagement && <DropdownMenuItem>Duplicate</DropdownMenuItem>}
+                          <DropdownMenuItem onClick={() => setViewingHistoryProduct(product)}>View History</DropdownMenuItem>
+                          {isManagement && (
+                              <DropdownMenuItem
+                              className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                              onClick={() => setDeletingProduct(product)}
+                              >
+                              Delete
+                              </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                  
+                  {expandedParents.has(product.id) && product.children?.map(child => (
+                    <TableRow key={child.id} className="bg-muted/30" data-state={selectedProductIds.includes(child.id) ? 'selected' : undefined}>
+                        <TableCell>
+                          <Checkbox
+                              onCheckedChange={(checked) => {
+                                  setSelectedProductIds((prevIds) =>
+                                  checked
+                                      ? [...prevIds, child.id]
+                                      : prevIds.filter((id) => id !== child.id)
+                                  );
+                              }}
+                              checked={selectedProductIds.includes(child.id)}
+                              aria-label={`Select product ${child.name}`}
+                          />
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell">
+                          <Image
+                            alt="Product image"
+                            className="aspect-square rounded-md object-cover"
+                            height="64"
+                            src={child.image}
+                            width="64"
+                            data-ai-hint="product image"
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium pl-10">
+                            └ {child.variantName || child.name}
+                        </TableCell>
+                        <TableCell>
+                            <Badge variant={child.status.variant}>{child.status.text}</Badge>
+                        </TableCell>
+                        <TableCell>{child.price}</TableCell>
+                        <TableCell className="hidden md:table-cell">{child.shelfLocation || '-'}</TableCell>
+                        <TableCell className="hidden md:table-cell">
+                            {child.quantityOnHand ?? 0}
+                        </TableCell>
+                        <TableCell>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button aria-haspopup="true" size="icon" variant="ghost">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                    <span className="sr-only">Toggle menu</span>
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                  <DropdownMenuItem onClick={() => setViewingDetailsProduct(child)}>View Details</DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => setEditingProduct(child)}>Edit</DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => setViewingHistoryProduct(child)}>View History</DropdownMenuItem>
+                                  {isManagement && (
+                                      <DropdownMenuItem
+                                      className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                                      onClick={() => setDeletingProduct(child)}
+                                      >
+                                      Delete
+                                      </DropdownMenuItem>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                        </TableCell>
+                    </TableRow>
+                  ))}
+                </React.Fragment>
               ))}
             </TableBody>
           </Table>

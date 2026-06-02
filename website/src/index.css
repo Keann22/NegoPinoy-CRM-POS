@@ -196,6 +196,82 @@ button {
   font-weight: 800;
 }
 
+/* USP Section */
+.usp-section {
+  padding: 4rem 0;
+  background-color: var(--bg-light);
+}
+
+.usp-header {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.usp-header h2 {
+  font-size: 2rem;
+  color: var(--primary-blue);
+  font-weight: 800;
+  margin-bottom: 0.5rem;
+}
+
+.usp-header p {
+  color: #64748b;
+  font-size: 1.1rem;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.usp-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+}
+
+@media (min-width: 768px) {
+  .usp-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.usp-card {
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 2rem;
+  text-align: center;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.usp-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+}
+
+.usp-icon {
+  width: 64px;
+  height: 64px;
+  background-color: rgba(30, 58, 138, 0.1);
+  color: var(--primary-blue);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.5rem;
+}
+
+.usp-card h3 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 1rem;
+}
+
+.usp-card p {
+  color: #475569;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
 /* Category Icons Row */
 .categories-row {
   display: flex;

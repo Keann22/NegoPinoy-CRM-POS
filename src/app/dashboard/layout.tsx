@@ -9,6 +9,7 @@ import {
   Building,
   ChevronDown,
   Home,
+  CreditCard,
   LineChart,
   ListChecks,
   LogOut,
@@ -112,6 +113,7 @@ export default function DashboardLayout({
         isOpen: openAccounting,
         setIsOpen: setOpenAccounting,
         subItems: [
+          { href: '/dashboard/accounting/payments', label: 'Payments', icon: CreditCard },
           { href: '/dashboard/accounting/expenses', label: 'Expenses', icon: Wallet },
           { href: '/dashboard/accounting/recurring', label: 'Recurring', icon: Repeat },
         ]

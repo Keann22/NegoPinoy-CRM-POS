@@ -112,12 +112,12 @@ export function AddSupplierDialog() {
                 name="contactPerson"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Contact Person</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Jane Smith" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+                  <FormLabel>Contact Person (Optional)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Jane Smith" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
                 )}
               />
               <FormField
@@ -125,12 +125,12 @@ export function AddSupplierDialog() {
                 name="facebookProfileLink"
                 render={({ field }) => (
                     <FormItem>
-                    <FormLabel>Facebook Profile Link</FormLabel>
-                    <FormControl>
-                        <Input type="url" placeholder="https://facebook.com/supplier" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
+                  <FormLabel>Facebook Profile Link (Optional)</FormLabel>
+                  <FormControl>
+                      <Input type="url" placeholder="https://facebook.com/supplier" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
                 )}
                 />
                 <FormField
@@ -138,12 +138,12 @@ export function AddSupplierDialog() {
                 name="website"
                 render={({ field }) => (
                     <FormItem>
-                    <FormLabel>Website</FormLabel>
-                    <FormControl>
-                        <Input type="url" placeholder="https://supplier.com" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
+                  <FormLabel>Website (Optional)</FormLabel>
+                  <FormControl>
+                      <Input type="url" placeholder="https://supplier.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
                 )}
                 />
               <FormField

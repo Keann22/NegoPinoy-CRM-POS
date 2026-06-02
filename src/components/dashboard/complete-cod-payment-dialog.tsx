@@ -14,7 +14,11 @@ import type { Order } from "@/app/dashboard/orders/page";
 import { useEffect, useState } from "react";
 
 const codSchema = z.object({
-  amountReceived: z.coerce.number().min(0, "Amount cannot be negative"),
+  amountCollected: z.coerce.number().min(0, "Amount cannot be negative"),
+  amountRemitted: z.coerce.number().min(0, "Amount cannot be negative"),
+}).refine(data => data.amountCollected >= data.amountRemitted, {
+  message: "Remitted amount cannot be greater than collected amount",
+  path: ["amountRemitted"]
 });
 
 type CodFormValues = z.infer<typeof codSchema>;
@@ -34,20 +38,23 @@ export function CompleteCodPaymentDialog({ order, open, onOpenChange, onSuccess 
   const form = useForm<CodFormValues>({
     resolver: zodResolver(codSchema),
     defaultValues: {
-      amountReceived: order?.balanceDue ?? 0,
+      amountCollected: order?.balanceDue ?? 0,
+      amountRemitted: order?.balanceDue ?? 0,
     },
   });
 
   useEffect(() => {
     if (order && open) {
       form.reset({
-        amountReceived: order.balanceDue > 0 ? order.balanceDue : 0,
+        amountCollected: order.balanceDue > 0 ? order.balanceDue : 0,
+        amountRemitted: order.balanceDue > 0 ? order.balanceDue : 0,
       });
     }
   }, [order, open, form]);
 
-  const amountReceived = form.watch("amountReceived");
-  const processingFee = order ? Math.max(0, order.balanceDue - (amountReceived || 0)) : 0;
+  const amountCollected = form.watch("amountCollected") || 0;
+  const amountRemitted = form.watch("amountRemitted") || 0;
+  const processingFee = Math.max(0, amountCollected - amountRemitted);
 
   async function onSubmit(values: CodFormValues) {
     if (!order || !supabase) return;
@@ -66,19 +73,19 @@ export function CompleteCodPaymentDialog({ order, open, onOpenChange, onSuccess 
         }
 
         const currentBalanceDue = currentOrderData.balance_due;
-        const newAmountPaid = currentOrderData.total_amount;
-        const newBalanceDue = 0;
-        const newStatus = 'Payment Received (COD)';
+        const newAmountPaid = (currentOrderData.amount_paid || 0) + values.amountCollected;
+        const newBalanceDue = Math.max(0, currentBalanceDue - values.amountCollected);
+        const newStatus = newBalanceDue <= 0 ? 'Completed' : currentOrderData.status;
 
-        // 2. Log Payment for the full balance due to close the order
+        // 2. Log Payment for the collected amount
         const { error: paymentError } = await supabase
             .from('payments')
             .insert({
                 order_id: order.id,
                 payment_date: new Date().toISOString(),
-                amount: currentBalanceDue,
+                amount: values.amountCollected,
                 payment_method: 'COD Payed',
-                notes: processingFee > 0 ? `Remitted: ₱${values.amountReceived.toFixed(2)}, Fee: ₱${processingFee.toFixed(2)}` : 'Full Remittance',
+                notes: processingFee > 0 ? `Remitted: ₱${values.amountRemitted.toFixed(2)}, Fee: ₱${processingFee.toFixed(2)}` : 'Full Remittance',
             });
 
         if (paymentError) throw paymentError;
@@ -112,8 +119,8 @@ export function CompleteCodPaymentDialog({ order, open, onOpenChange, onSuccess 
         toast({
             title: "COD Payment Completed",
             description: processingFee > 0 
-                ? `Logged ₱${values.amountReceived.toFixed(2)} received and ₱${processingFee.toFixed(2)} processing fee.` 
-                : `Order fully paid.`,
+                ? `Logged ₱${values.amountCollected.toFixed(2)} received and ₱${processingFee.toFixed(2)} processing fee.` 
+                : `Order payment of ₱${values.amountCollected.toFixed(2)} logged.`,
         });
         
         onSuccess();
@@ -133,7 +140,7 @@ export function CompleteCodPaymentDialog({ order, open, onOpenChange, onSuccess 
         <DialogHeader>
           <DialogTitle>Complete COD Payment</DialogTitle>
           <DialogDescription>
-            Enter the exact cash amount remitted by the courier for Order #{order.id.substring(0, 7).toUpperCase()}.
+            Enter the details for the COD delivery of Order #{order.id.substring(0, 7).toUpperCase()}.
           </DialogDescription>
         </DialogHeader>
 
@@ -142,12 +149,12 @@ export function CompleteCodPaymentDialog({ order, open, onOpenChange, onSuccess 
             
             <div className="rounded-lg border p-4 bg-muted/50 space-y-2">
                 <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Expected Balance Due:</span>
+                    <span className="text-muted-foreground">Order Balance Due:</span>
                     <span className="font-medium">₱{order.balanceDue.toFixed(2)}</span>
                 </div>
                 {processingFee > 0 && (
                     <div className="flex justify-between text-sm text-destructive">
-                        <span>Processing Fee:</span>
+                        <span>Courier Processing Fee:</span>
                         <span className="font-medium">- ₱{processingFee.toFixed(2)}</span>
                     </div>
                 )}
@@ -155,10 +162,29 @@ export function CompleteCodPaymentDialog({ order, open, onOpenChange, onSuccess 
 
             <FormField
               control={form.control}
-              name="amountReceived"
+              name="amountCollected"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Actual Amount Received (₱)</FormLabel>
+                  <FormLabel>Amount Collected from Customer (₱)</FormLabel>
+                  <FormControl>
+                    <Input 
+                        type="number" 
+                        step="0.01" 
+                        placeholder="0.00" 
+                        {...field} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="amountRemitted"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Actual Amount Remitted to You (₱)</FormLabel>
                   <FormControl>
                     <Input 
                         type="number" 
@@ -174,7 +200,7 @@ export function CompleteCodPaymentDialog({ order, open, onOpenChange, onSuccess 
 
             {processingFee > 0 && (
                 <p className="text-sm text-muted-foreground">
-                    A <span className="font-medium text-black">₱{processingFee.toFixed(2)}</span> processing fee will automatically be recorded in Accounting &gt; Expenses. The customer's order will still be marked as fully paid.
+                    A <span className="font-medium text-black">₱{processingFee.toFixed(2)}</span> processing fee will automatically be recorded in Accounting &gt; Expenses. The collected amount will be credited to the customer.
                 </p>
             )}
 

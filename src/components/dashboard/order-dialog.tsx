@@ -184,14 +184,11 @@ export function OrderDialog(props: OrderDialogProps) {
       if (!supabase || !user) return;
 
       setIsSearchingCustomers(true);
-      const searchTermCapitalized = customerSearch.charAt(0).toUpperCase() + customerSearch.slice(1);
-
       try {
         const { data, error } = await supabase
           .from('customers')
           .select('*')
-          .gte('full_name', searchTermCapitalized)
-          .lt('full_name', searchTermCapitalized + '\uf8ff')
+          .ilike('full_name', `%${customerSearch}%`)
           .limit(10);
 
         if (error) throw error;
@@ -227,21 +224,19 @@ export function OrderDialog(props: OrderDialogProps) {
       if (!supabase || !user) return;
 
       setIsSearchingProducts(true);
-      const searchTermCapitalized = productSearch.charAt(0).toUpperCase() + productSearch.slice(1);
-
       try {
         const { data, error } = await supabase
           .from('products')
-          .select('*')
-          .gte('name', searchTermCapitalized)
-          .lt('name', searchTermCapitalized + '\uf8ff')
+          .select('id, name, stock_level, selling_price, parent_id')
+          .ilike('name', `%${productSearch}%`)
+          .is('parent_id', null)
           .limit(10);
 
         if (error) throw error;
 
         const results = (data || []).map(doc => ({
           id: doc.id,
-          ...doc,
+          name: doc.name,
           quantityOnHand: doc.stock_level,
           sellingPrice: doc.selling_price
         } as Product));
@@ -256,6 +251,10 @@ export function OrderDialog(props: OrderDialogProps) {
 
     return () => clearTimeout(handler);
   }, [productSearch, supabase, user, toast]);
+
+  const [variantSelectionProduct, setVariantSelectionProduct] = useState<Product | null>(null);
+  const [variantSelectionOptions, setVariantSelectionOptions] = useState<any[]>([]);
+
 
   // -------------------------------------------------------------------------
   // Field array for order items
@@ -671,7 +670,8 @@ export function OrderDialog(props: OrderDialogProps) {
   // Render
   // -------------------------------------------------------------------------
   return (
-    <Dialog open={dialogOpen} onOpenChange={handleOpenChange}>
+    <>
+      <Dialog open={dialogOpen} onOpenChange={handleOpenChange}>
       {/* Create mode: render a trigger button; edit mode: no trigger */}
       {!isEditing && (
         <DialogTrigger asChild>
@@ -957,7 +957,18 @@ export function OrderDialog(props: OrderDialogProps) {
                                         value={p.name}
                                         key={p.id}
                                         onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                                        onSelect={() => {
+                                        onSelect={async () => {
+                                            const { data: variants } = await supabase
+                                                .from('products')
+                                                .select('id, name, variant_name, stock_level, selling_price, initial_unit_cost, stock_batches(*)')
+                                                .eq('parent_id', p.id);
+
+                                            if (variants && variants.length > 0) {
+                                                setVariantSelectionProduct(p);
+                                                setVariantSelectionOptions(variants);
+                                                return;
+                                            }
+
                                             const isAlreadyAdded = fields.some(item => item.productId === p.id);
                                             if (isAlreadyAdded) {
                                                 toast({
@@ -1128,6 +1139,59 @@ export function OrderDialog(props: OrderDialogProps) {
         }}
       />
     </Dialog>
+      <Dialog open={!!variantSelectionProduct} onOpenChange={(open) => !open && setVariantSelectionProduct(null)}>
+        <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle>Select Variant for {variantSelectionProduct?.name}</DialogTitle>
+                <DialogDescription>Choose a variant to add to the order.</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-2 py-4">
+                {variantSelectionOptions.map((v) => (
+                    <Button 
+                        key={v.id} 
+                        variant="outline" 
+                        className="justify-between h-auto py-3"
+                        onClick={() => {
+                            const isAlreadyAdded = fields.some(item => item.productId === v.id);
+                            if (isAlreadyAdded) {
+                                toast({
+                                    variant: "default",
+                                    title: "Variant already in order",
+                                    description: `${v.variant_name} is already in this order. You can adjust the quantity above.`,
+                                });
+                            } else {
+                                const costPriceAtSale = v.stock_batches?.length > 0
+                                    ? v.stock_batches[0].unitCost
+                                    : (v.initial_unit_cost || 0);
+
+                                append({
+                                    productId: v.id,
+                                    productName: v.name,
+                                    quantity: 1,
+                                    costPriceAtSale: costPriceAtSale,
+                                    sellingPriceAtSale: v.selling_price,
+                                    discount: 0
+                                });
+                            }
+                            setVariantSelectionProduct(null);
+                            setProductSearch('');
+                            setProductResults([]);
+                        }}
+                    >
+                        <span>{v.variant_name || v.name}</span>
+                        <div className="flex gap-4">
+                            <span className="text-muted-foreground text-sm font-normal">Stock: {v.stock_level}</span>
+                            <span>₱{(v.selling_price || 0).toFixed(2)}</span>
+                        </div>
+                    </Button>
+                ))}
+            </div>
+            <DialogFooter>
+                <Button variant="ghost" onClick={() => setVariantSelectionProduct(null)}>Cancel</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
