@@ -30,6 +30,7 @@ const productSchema = z.object({
   categoryId: z.string().optional(),
   images: z.custom<File[]>().optional(),
   sellingPrice: z.coerce.number().min(0, "Selling price must be positive").optional().default(0),
+  installmentPrice: z.coerce.number().min(0).optional(),
   quantityOnHand: z.coerce.number().int().min(0, "Stock must be a non-negative integer").optional().default(0),
   supplierPricing: z.array(z.object({
       supplierId: z.string(),
@@ -174,7 +175,7 @@ export function AddProductDialog(props: AddProductDialogProps) {
       description: `Your product "${values.name}" is being added.`,
     });
 
-    const { images: imageFiles, quantityOnHand, supplierPricing, hasVariations, variations, ...productCoreData } = values;
+    const { images: imageFiles, quantityOnHand, supplierPricing, hasVariations, variations, installmentPrice, ...productCoreData } = values;
 
     try {
         let uploadedImageUrls: string[] = [];
@@ -214,6 +215,7 @@ export function AddProductDialog(props: AddProductDialogProps) {
                     category: productCoreData.categoryId,
                     images: uploadedImageUrls,
                     selling_price: 0,
+                    installment_price: null,
                     stock_level: 0,
                     supplier_pricing: []
                 })
@@ -285,6 +287,7 @@ export function AddProductDialog(props: AddProductDialogProps) {
                     description: productCoreData.description,
                     category: productCoreData.categoryId,
                     selling_price: p.sellingPrice,
+                    installment_price: installmentPrice ?? null,
                     initial_unit_cost: p.unitCost !== undefined ? p.unitCost : (supplierPricing && supplierPricing.length > 0 ? supplierPricing[0].unitCost : 0),
                     supplier_pricing: supplierPricing && supplierPricing.length > 0 ? supplierPricing.map(sp => ({
                         ...sp,
@@ -539,13 +542,15 @@ export function AddProductDialog(props: AddProductDialogProps) {
                 </div>
 
                 {!hasVariations ? (
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-4 rounded-lg border p-4">
+                      <p className="text-sm font-semibold">Pricing</p>
+                      <div className="grid grid-cols-2 gap-4">
                         <FormField
                             control={form.control}
                             name="sellingPrice"
                             render={({ field }) => (
                                 <FormItem>
-                                <FormLabel>Selling Price (₱)</FormLabel>
+                                <FormLabel>Cash Price (₱)</FormLabel>
                                 <FormControl>
                                     <Input type="number" step="0.01" placeholder="49.99" {...field} />
                                 </FormControl>
@@ -555,17 +560,31 @@ export function AddProductDialog(props: AddProductDialogProps) {
                         />
                         <FormField
                             control={form.control}
-                            name="quantityOnHand"
+                            name="installmentPrice"
                             render={({ field }) => (
                                 <FormItem>
-                                <FormLabel>Initial Stock</FormLabel>
+                                <FormLabel>Installment Price (₱) <span className="text-muted-foreground text-xs font-normal">First-timers only</span></FormLabel>
                                 <FormControl>
-                                    <Input type="number" placeholder="120" {...field} />
+                                    <Input type="number" step="0.01" placeholder="Leave blank if not eligible" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))} />
                                 </FormControl>
                                 <FormMessage />
                                 </FormItem>
                             )}
                         />
+                      </div>
+                      <FormField
+                          control={form.control}
+                          name="quantityOnHand"
+                          render={({ field }) => (
+                              <FormItem>
+                              <FormLabel>Initial Stock</FormLabel>
+                              <FormControl>
+                                  <Input type="number" placeholder="120" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                              </FormItem>
+                          )}
+                      />
                     </div>
                 ) : (
                     <div className="space-y-4 pt-4">
