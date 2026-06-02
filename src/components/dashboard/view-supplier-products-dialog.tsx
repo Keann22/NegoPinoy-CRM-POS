@@ -22,11 +22,12 @@ export function ViewSupplierProductsDialog({ supplier, open, onOpenChange }: Vie
     const fetchProducts = async () => {
       setIsLoading(true);
       try {
-        // Query products where supplier_pricing array contains an object with this supplierId
+        // Use a raw JSONB filter to find products where supplier_pricing array
+        // contains at least one object with this supplierId (partial object match)
         const { data, error } = await supabase
           .from('products')
           .select('*')
-          .contains('supplier_pricing', [{ supplierId: supplier.id }]);
+          .filter('supplier_pricing', 'cs', JSON.stringify([{ supplierId: supplier.id }]));
 
         if (error) throw error;
         setProducts(data || []);
