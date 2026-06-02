@@ -168,20 +168,35 @@ export default function RestockPage() {
                 <FormItem className="flex flex-col">
                   <FormLabel>Product</FormLabel>
                   {selectedProduct ? (
-                    <div className="flex items-center justify-between rounded-md border border-input bg-background p-2 text-sm h-10">
-                      <p>{selectedProduct.name}</p>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedProduct(null);
-                          form.resetField('productId');
-                          form.resetField('productName');
-                        }}
-                      >
-                        Change
-                      </Button>
+                    <div className="rounded-md border border-input bg-background p-3 text-sm space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="font-medium">{selectedProduct.name}</p>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedProduct(null);
+                            form.resetField('productId');
+                            form.resetField('productName');
+                          }}
+                        >
+                          Change
+                        </Button>
+                      </div>
+                      {selectedProduct.supplier_pricing && selectedProduct.supplier_pricing.length > 0 && (
+                        <div className="pt-1 border-t space-y-1">
+                          <p className="text-xs text-muted-foreground font-medium">Supplier Reference Codes:</p>
+                          {selectedProduct.supplier_pricing.map((sp: any, i: number) => (
+                            sp.supplierCode ? (
+                              <div key={i} className="flex items-center gap-2 text-xs">
+                                <span className="text-muted-foreground">{sp.supplierName}:</span>
+                                <span className="font-mono bg-muted px-1.5 py-0.5 rounded border font-medium">{sp.supplierCode}</span>
+                              </div>
+                            ) : null
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <Command className="rounded-lg border">

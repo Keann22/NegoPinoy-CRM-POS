@@ -57,7 +57,8 @@ export function ViewSupplierProductsDialog({ supplier, open, onOpenChange }: Vie
           <Table>
             <TableHeader className="bg-muted sticky top-0 z-10">
               <TableRow>
-                <TableHead>Product</TableHead>
+                <TableHead>Product (Your Name)</TableHead>
+                <TableHead>Supplier Code</TableHead>
                 <TableHead>SKU</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead className="text-right">Unit Cost</TableHead>
@@ -104,6 +105,13 @@ export function ViewSupplierProductsDialog({ supplier, open, onOpenChange }: Vie
                         </div>
                         <span className="font-medium line-clamp-2">{product.name}</span>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      {pricingEntry?.supplierCode ? (
+                        <span className="font-mono text-sm bg-muted px-2 py-1 rounded border">{pricingEntry.supplierCode}</span>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">—</span>
+                      )}
                     </TableCell>
                     <TableCell className="font-mono text-sm">{product.sku || '-'}</TableCell>
                     <TableCell>{product.category || product.categoryId || '-'}</TableCell>

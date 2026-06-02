@@ -32,6 +32,7 @@ const editProductSchema = z.object({
   supplierPricing: z.array(z.object({
       supplierId: z.string().optional(),
       supplierName: z.string(),
+      supplierCode: z.string().optional(),
       unitCost: z.coerce.number().min(0)
   })).optional().default([]),
   variations: z.array(z.object({
@@ -403,24 +404,39 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Ed
                       <FormLabel className="text-base">Suppliers & Pricing</FormLabel>
                       <div className="space-y-2">
                         {supplierFields.map((field, index) => (
-                            <div key={field.id} className="flex items-center gap-2 p-2 bg-muted/50 rounded-md border">
-                                <div className="flex-1 truncate text-sm font-medium">
-                                    {field.supplierName}
+                            <div key={field.id} className="p-3 bg-muted/50 rounded-md border space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm font-semibold">{field.supplierName}</span>
+                                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeSupplier(index)}>
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
                                 </div>
-                                <FormField
-                                    control={form.control}
-                                    name={`supplierPricing.${index}.unitCost`}
-                                    render={({ field: costField }) => (
-                                        <FormItem className="w-24">
-                                            <FormControl>
-                                                <Input type="number" step="0.01" className="h-8 text-right" {...costField} />
-                                            </FormControl>
-                                        </FormItem>
-                                    )}
-                                />
-                                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeSupplier(index)}>
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <FormField
+                                        control={form.control}
+                                        name={`supplierPricing.${index}.supplierCode`}
+                                        render={({ field: codeField }) => (
+                                            <FormItem>
+                                                <FormLabel className="text-xs text-muted-foreground">Supplier's Product Code</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="e.g. WK-32-SS" className="h-8" {...codeField} />
+                                                </FormControl>
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name={`supplierPricing.${index}.unitCost`}
+                                        render={({ field: costField }) => (
+                                            <FormItem>
+                                                <FormLabel className="text-xs text-muted-foreground">Unit Cost (₱)</FormLabel>
+                                                <FormControl>
+                                                    <Input type="number" step="0.01" className="h-8" {...costField} />
+                                                </FormControl>
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
                             </div>
                         ))}
                       </div>
