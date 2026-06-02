@@ -398,7 +398,7 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Ed
                         </FormItem>
                     )}
                 />
-                {isManagement && (
+                {isManagement && !displayProduct.children?.length && (
                   <div className="space-y-4 rounded-lg border p-4">
                       <FormLabel className="text-base">Suppliers & Pricing</FormLabel>
                       <div className="space-y-2">

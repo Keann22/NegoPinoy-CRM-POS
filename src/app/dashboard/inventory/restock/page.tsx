@@ -23,7 +23,6 @@ const restockSchema = z.object({
   productName: z.string(),
   quantity: z.coerce.number().positive('Quantity must be a positive number.'),
   unitCost: z.coerce.number().min(0, 'Unit cost cannot be negative.'),
-  supplierName: z.string().optional(),
   purchaseDate: z.date({ required_error: 'A purchase date is required.' }),
 });
 
@@ -63,7 +62,6 @@ export default function RestockPage() {
     resolver: zodResolver(restockSchema),
     defaultValues: {
       purchaseDate: new Date(),
-      supplierName: '',
     },
   });
 
@@ -249,20 +247,6 @@ export default function RestockPage() {
                 )}
             </div>
             
-            <FormField
-              control={form.control}
-              name="supplierName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Supplier Name (Optional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., Global Imports Inc." {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             <FormField
               control={form.control}
               name="purchaseDate"

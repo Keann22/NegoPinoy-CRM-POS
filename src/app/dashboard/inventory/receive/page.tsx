@@ -23,7 +23,6 @@ const shipmentItemSchema = z.object({
   productName: z.string(),
   quantity: z.coerce.number().positive(),
   unitCost: z.coerce.number().min(0),
-  supplierName: z.string().optional(),
 });
 
 const shipmentSchema = z.object({
@@ -121,7 +120,7 @@ export default function BulkReceivePage() {
   });
 
   const addNewItem = () => {
-    append({ productId: '', productName: '', quantity: 1, unitCost: 0, supplierName: '' });
+    append({ productId: '', productName: '', quantity: 1, unitCost: 0 });
   };
   
   const items = useWatch({ control: form.control, name: 'items' });
@@ -270,8 +269,7 @@ export default function BulkReceivePage() {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className='w-[30%]'>Product</TableHead>
-                            <TableHead>Supplier (Optional)</TableHead>
+                            <TableHead className='w-[40%]'>Product</TableHead>
                             <TableHead>Quantity</TableHead>
                             {isManagement && <TableHead>Unit Cost (₱)</TableHead>}
                             <TableHead className='w-[50px] text-right'></TableHead>
@@ -295,20 +293,6 @@ export default function BulkReceivePage() {
                                         />
                                     )}
                                     <FormMessage>{form.formState.errors?.items?.[index]?.productId?.message}</FormMessage>
-                                </TableCell>
-                                <TableCell>
-                                     <FormField
-                                        control={form.control}
-                                        name={`items.${index}.supplierName`}
-                                        render={({ field }) => (
-                                            <FormItem>
-                                            <FormControl>
-                                                <Input placeholder="Optional" {...field} />
-                                            </FormControl>
-                                            <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
                                 </TableCell>
                                 <TableCell>
                                      <FormField
