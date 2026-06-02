@@ -50,9 +50,10 @@ interface EditProductDialogProps {
   product: FormattedProduct | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void;
 }
 
-export function EditProductDialog({ product, open, onOpenChange }: EditProductDialogProps) {
+export function EditProductDialog({ product, open, onOpenChange, onSuccess }: EditProductDialogProps) {
   const supabase = useSupabase();
   const { user } = useUser();
   const { toast } = useToast();
@@ -280,6 +281,7 @@ export function EditProductDialog({ product, open, onOpenChange }: EditProductDi
           title: "Product Updated",
           description: `${values.name} has been successfully updated.`,
         });
+        onSuccess?.();
     } catch (error: any) {
         console.error("Error updating product:", error);
         toast({

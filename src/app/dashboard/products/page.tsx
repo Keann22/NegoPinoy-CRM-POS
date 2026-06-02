@@ -583,6 +583,7 @@ export default function ProductsPage() {
         product={editingProduct}
         open={!!editingProduct}
         onOpenChange={(isOpen) => !isOpen && setEditingProduct(null)}
+        onSuccess={() => refetch()}
       />
 
       <ViewProductDetailsDialog
