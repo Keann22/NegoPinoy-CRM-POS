@@ -76,6 +76,8 @@ export function OrderDialog(props: OrderDialogProps) {
   const [productSearch, setProductSearch] = useState('');
   const [productResults, setProductResults] = useState<Product[]>([]);
   const [isSearchingProducts, setIsSearchingProducts] = useState(false);
+  // Cache of { cashPrice, installmentPrice } keyed by productId so we can re-price when checkbox changes
+  const [productPriceCache, setProductPriceCache] = useState<Record<string, { cashPrice: number; installmentPrice: number | null }>>({});
 
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderSchema),
@@ -260,6 +262,28 @@ export function OrderDialog(props: OrderDialogProps) {
 
   const [variantSelectionProduct, setVariantSelectionProduct] = useState<Product | null>(null);
   const [variantSelectionOptions, setVariantSelectionOptions] = useState<any[]>([]);
+
+  // -------------------------------------------------------------------------
+  // Re-price all items when first-timer checkbox or payment type changes
+  // -------------------------------------------------------------------------
+  const isInstallmentFirstTimer = form.watch('isInstallmentFirstTimer');
+  const watchedPaymentType = form.watch('paymentType');
+  useEffect(() => {
+    const currentItems = form.getValues('orderItems');
+    if (!currentItems || currentItems.length === 0) return;
+    currentItems.forEach((item, index) => {
+      const cached = productPriceCache[item.productId];
+      if (!cached) return;
+      const useInstallment =
+        watchedPaymentType === 'Installment' &&
+        isInstallmentFirstTimer &&
+        cached.installmentPrice &&
+        cached.installmentPrice > 0;
+      const newPrice = useInstallment ? cached.installmentPrice! : cached.cashPrice;
+      form.setValue(`orderItems.${index}.sellingPriceAtSale`, newPrice);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInstallmentFirstTimer, watchedPaymentType]);
 
 
   // -------------------------------------------------------------------------
@@ -1037,6 +1061,14 @@ export function OrderDialog(props: OrderDialogProps) {
                                                     sellingPriceAtSale: useInstallmentPrice ? productToAdd.installment_price : productToAdd.sellingPrice,
                                                     discount: 0
                                                 });
+                                                // Cache prices for re-pricing when first-timer checkbox changes
+                                                setProductPriceCache(prev => ({
+                                                    ...prev,
+                                                    [productToAdd.id]: {
+                                                        cashPrice: productToAdd.sellingPrice,
+                                                        installmentPrice: productToAdd.installment_price ?? null,
+                                                    }
+                                                }));
                                             }
                                             setProductSearch('');
                                             setProductResults([]);
