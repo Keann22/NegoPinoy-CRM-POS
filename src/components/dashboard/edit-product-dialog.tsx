@@ -28,6 +28,7 @@ const editProductSchema = z.object({
   description: z.string().optional(),
   categoryId: z.string().optional(),
   sellingPrice: z.coerce.number().min(0, "Selling price must be positive"),
+  installmentPrice: z.coerce.number().min(0).optional(),
   images: z.custom<File[]>().optional(),
   supplierPricing: z.array(z.object({
       supplierId: z.string().optional(),
@@ -124,6 +125,7 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Ed
         description: product.description,
         categoryId: product.categoryId,
         sellingPrice: product.sellingPrice,
+        installmentPrice: product.installment_price ?? undefined,
         supplierPricing: product.supplierPricing || [],
         variations: [],
       });
@@ -209,6 +211,7 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Ed
                 description: productCoreData.description,
                 category: productCoreData.categoryId,
                 selling_price: productCoreData.sellingPrice,
+                installment_price: values.installmentPrice ?? null,
                 images: uploadedImageUrls,
                 supplier_pricing: supplierPricing || []
             })
@@ -480,12 +483,13 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Ed
                       </Command>
                   </div>
                 )}
+                <div className="grid grid-cols-2 gap-4">
                  <FormField
                     control={form.control}
                     name="sellingPrice"
                     render={({ field }) => (
                         <FormItem>
-                        <FormLabel>Selling Price (₱)</FormLabel>
+                        <FormLabel>Cash Price (₱)</FormLabel>
                         <FormControl>
                             <Input type="number" step="0.01" placeholder="49.99" {...field} />
                         </FormControl>
@@ -493,6 +497,20 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Ed
                         </FormItem>
                     )}
                 />
+                <FormField
+                    control={form.control}
+                    name="installmentPrice"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Installment Price (₱) <span className="text-muted-foreground text-xs font-normal">First-timers only</span></FormLabel>
+                        <FormControl>
+                            <Input type="number" step="0.01" placeholder="Leave blank if not eligible" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                </div>
                 <div className="pt-4 border-t space-y-4">
                     {displayProduct.children && displayProduct.children.length > 0 && (
                         <div className="space-y-3 mb-6">

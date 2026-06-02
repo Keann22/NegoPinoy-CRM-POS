@@ -89,6 +89,9 @@ export function OrderDialog(props: OrderDialogProps) {
       applyOverpayment: false,
       platformFees: 0,
       proofOfPayment: [],
+      isInstallmentFirstTimer: false,
+      installmentMonths: undefined,
+      monthlyPayment: undefined,
     },
   });
 
@@ -857,6 +860,29 @@ export function OrderDialog(props: OrderDialogProps) {
                             />
                         </div>
                     )}
+                    {/* First-timer installment checkbox */}
+                    {form.watch('paymentType') === 'Installment' && (
+                        <div className="flex items-start space-x-3 rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-3">
+                            <FormField
+                                control={form.control}
+                                name="isInstallmentFirstTimer"
+                                render={({ field }) => (
+                                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                        <FormControl>
+                                            <Checkbox
+                                                checked={field.value}
+                                                onCheckedChange={field.onChange}
+                                            />
+                                        </FormControl>
+                                        <div className="space-y-1 leading-none">
+                                            <FormLabel className="text-amber-800 dark:text-amber-300 font-semibold">First-time installment customer</FormLabel>
+                                            <p className="text-xs text-amber-700 dark:text-amber-400">Check this to apply the higher installment prices to eligible products when adding them below. Products without an installment price set will use the regular cash price.</p>
+                                        </div>
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+                    )}
                     {/* Downpayment + COD checkbox */}
                     {form.watch("paymentType") !== "Full Payment" && form.watch("paymentType") !== "COD" && form.watch("paymentType") !== "Pending" && (
                         <div className="space-y-4">
@@ -987,12 +1013,25 @@ export function OrderDialog(props: OrderDialogProps) {
                                                     ? productToAdd.stockBatches[0].unitCost
                                                     : 0;
 
+                                                const isInstallmentFirstTimer = form.getValues('isInstallmentFirstTimer');
+                                                const paymentType = form.getValues('paymentType');
+                                                const useInstallmentPrice = 
+                                                    paymentType === 'Installment' &&
+                                                    isInstallmentFirstTimer &&
+                                                    productToAdd.installment_price &&
+                                                    productToAdd.installment_price > 0;
+
+                                                const bundleTotal = fields.reduce((sum, item) => sum + (item.sellingPriceAtSale * item.quantity), 0) + productToAdd.sellingPrice;
+                                                if (paymentType === 'Installment' && bundleTotal < 700 && (!productToAdd.installment_price)) {
+                                                    toast({ variant: 'default', title: 'Not eligible for installment', description: `This product is under ₱700 and has no installment price set.` });
+                                                }
+
                                                 append({
                                                     productId: productToAdd.id,
                                                     productName: productToAdd.name,
                                                     quantity: 1,
                                                     costPriceAtSale: costPriceAtSale,
-                                                    sellingPriceAtSale: productToAdd.sellingPrice,
+                                                    sellingPriceAtSale: useInstallmentPrice ? productToAdd.installment_price : productToAdd.sellingPrice,
                                                     discount: 0
                                                 });
                                             }

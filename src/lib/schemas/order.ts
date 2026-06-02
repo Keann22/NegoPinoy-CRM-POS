@@ -28,6 +28,7 @@ export const orderSchema = z.object({
   applyOverpayment: z.boolean().default(false),
   platformFees: z.coerce.number().min(0).optional(),
   proofOfPayment: z.any().optional(),
+  isInstallmentFirstTimer: z.boolean().default(false),
 }).refine(data => {
     if (data.paymentType === 'Installment') {
         return data.installmentMonths && data.installmentMonths > 0;
