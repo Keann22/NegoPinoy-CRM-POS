@@ -476,7 +476,23 @@ export function EditProductDialog({ product, open, onOpenChange }: EditProductDi
                     )}
                 />
                 <div className="pt-4 border-t space-y-4">
-                    <FormLabel className="text-base">Create New Variations</FormLabel>
+                    {displayProduct.children && displayProduct.children.length > 0 && (
+                        <div className="space-y-3 mb-6">
+                            <FormLabel className="text-base font-semibold">Existing Variations</FormLabel>
+                            <DialogDescription>
+                                These are the variations that already exist for this product. To edit them directly, expand the parent row on the main Products table and click Edit on the specific variation.
+                            </DialogDescription>
+                            <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
+                               {displayProduct.children.map(child => (
+                                   <div key={child.id} className="flex justify-between items-center bg-muted/30 p-2 rounded-md border text-sm">
+                                       <span className="font-medium text-foreground">{child.variantName || child.name}</span>
+                                       <span className="text-muted-foreground">{child.price} &bull; Stock: {child.quantityOnHand ?? 0}</span>
+                                   </div>
+                               ))}
+                            </div>
+                        </div>
+                    )}
+                    <FormLabel className="text-base font-semibold">Create New Variations</FormLabel>
                     <DialogDescription>
                         Create new variations (e.g. "5L", "Red") based on this product's details. Each variation will be created as a new separate product.
                     </DialogDescription>
