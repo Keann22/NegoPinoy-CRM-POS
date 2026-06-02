@@ -98,6 +98,7 @@ function ProductSearch({ onProductSelect }: { onProductSelect: (product: Product
   );
 }
 
+import { NeedsProcurementList } from '@/components/dashboard/needs-procurement-list';
 
 export default function BulkReceivePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -222,7 +223,9 @@ export default function BulkReceivePage() {
   };
 
   return (
-    <Card>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="lg:col-span-2">
+        <Card>
       <CardHeader>
         <CardTitle className="font-headline">Bulk Inventory Receiving</CardTitle>
         <CardDescription>
@@ -375,5 +378,46 @@ export default function BulkReceivePage() {
         </Form>
       </CardContent>
     </Card>
+    </div>
+    
+    <div className="hidden lg:block lg:col-span-1 h-[calc(100vh-12rem)] sticky top-6">
+      <NeedsProcurementList 
+        onAddProduct={(product) => {
+          append({ 
+            productId: product.id, 
+            productName: product.name, 
+            quantity: 1, 
+            unitCost: 0, 
+            supplierName: '' 
+          });
+          toast({
+            title: "Added to Shipment",
+            description: `${product.name} has been added to your receive list.`,
+          });
+        }} 
+      />
+    </div>
+    
+    {/* Mobile view of the list */}
+    <div className="block lg:hidden mt-6">
+      <NeedsProcurementList 
+        onAddProduct={(product) => {
+          append({ 
+            productId: product.id, 
+            productName: product.name, 
+            quantity: 1, 
+            unitCost: 0, 
+            supplierName: '' 
+          });
+          toast({
+            title: "Added to Shipment",
+            description: `${product.name} has been added to your receive list.`,
+          });
+          // scroll to bottom to see the added item
+          window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        }} 
+      />
+    </div>
+    </div>
   );
 }

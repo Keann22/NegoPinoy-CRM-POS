@@ -30,6 +30,8 @@ const restockSchema = z.object({
 type RestockFormValues = z.infer<typeof restockSchema>;
 type Product = { id: string; name: string; quantityOnHand: number; [key: string]: any; };
 
+import { NeedsProcurementList } from '@/components/dashboard/needs-procurement-list';
+
 export default function RestockPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -149,7 +151,9 @@ export default function RestockPage() {
   };
 
   return (
-    <Card>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="lg:col-span-2">
+        <Card>
       <CardHeader>
         <CardTitle className="font-headline">Restock / Purchase</CardTitle>
         <CardDescription>
@@ -294,5 +298,39 @@ export default function RestockPage() {
         </Form>
       </CardContent>
     </Card>
+    </div>
+    
+    <div className="hidden lg:block lg:col-span-1 h-[calc(100vh-12rem)] sticky top-6">
+      <NeedsProcurementList 
+        onAddProduct={(product) => {
+          form.setValue('productId', product.id);
+          form.setValue('productName', product.name);
+          // Construct a mock product to satisfy selectedProduct state
+          setSelectedProduct({ id: product.id, name: product.name, quantityOnHand: 0 });
+          toast({
+            title: "Selected for Purchase",
+            description: `${product.name} is ready to restock.`,
+          });
+          // Scroll to top where the form is
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }} 
+      />
+    </div>
+    
+    <div className="block lg:hidden mt-6">
+      <NeedsProcurementList 
+        onAddProduct={(product) => {
+          form.setValue('productId', product.id);
+          form.setValue('productName', product.name);
+          setSelectedProduct({ id: product.id, name: product.name, quantityOnHand: 0 });
+          toast({
+            title: "Selected for Purchase",
+            description: `${product.name} is ready to restock.`,
+          });
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }} 
+      />
+    </div>
+    </div>
   );
 }
