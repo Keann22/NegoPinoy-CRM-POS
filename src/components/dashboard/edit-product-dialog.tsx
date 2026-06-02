@@ -402,9 +402,41 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Ed
                         </FormItem>
                     )}
                 />
+                {/* ---- Pricing ---- */}
+                <div className="grid grid-cols-2 gap-4 rounded-lg border p-4">
+                  <div className="col-span-2">
+                    <p className="text-sm font-semibold">Pricing</p>
+                  </div>
+                  <FormField
+                    control={form.control}
+                    name="sellingPrice"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Cash Price (₱)</FormLabel>
+                        <FormControl>
+                            <Input type="number" step="0.01" placeholder="49.99" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="installmentPrice"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Installment Price (₱) <span className="text-muted-foreground text-xs font-normal">First-timers only</span></FormLabel>
+                        <FormControl>
+                            <Input type="number" step="0.01" placeholder="Leave blank if not eligible" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                  />
+                </div>
                 {isManagement && !displayProduct.children?.length && (
                   <div className="space-y-4 rounded-lg border p-4">
-                      <FormLabel className="text-base">Suppliers & Pricing</FormLabel>
+                      <FormLabel className="text-base">Suppliers &amp; Pricing</FormLabel>
                       <div className="space-y-2">
                         {supplierFields.map((field, index) => (
                             <div key={field.id} className="p-3 bg-muted/50 rounded-md border space-y-2">
@@ -483,34 +515,6 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Ed
                       </Command>
                   </div>
                 )}
-                <div className="grid grid-cols-2 gap-4">
-                 <FormField
-                    control={form.control}
-                    name="sellingPrice"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Cash Price (₱)</FormLabel>
-                        <FormControl>
-                            <Input type="number" step="0.01" placeholder="49.99" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="installmentPrice"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Installment Price (₱) <span className="text-muted-foreground text-xs font-normal">First-timers only</span></FormLabel>
-                        <FormControl>
-                            <Input type="number" step="0.01" placeholder="Leave blank if not eligible" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))} />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                </div>
                 <div className="pt-4 border-t space-y-4">
                     {displayProduct.children && displayProduct.children.length > 0 && (
                         <div className="space-y-3 mb-6">
