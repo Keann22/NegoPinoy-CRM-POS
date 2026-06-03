@@ -15,7 +15,7 @@ type Product = {
     name: string;
     sku: string;
     quantityOnHand: number;
-    supplierPricing?: { supplierName: string }[];
+    supplier_pricing?: { supplierName: string }[];
     category?: string;
     description?: string;
     images?: string[];
@@ -40,8 +40,8 @@ export function ToOrderReport() {
     const uniqueSuppliers = useMemo(() => {
         const suppliers = new Set<string>();
         toOrder.forEach(p => {
-            if (p.supplierPricing && Array.isArray(p.supplierPricing)) {
-                p.supplierPricing.forEach(sp => suppliers.add(sp.supplierName));
+            if (p.supplier_pricing && Array.isArray(p.supplier_pricing)) {
+                p.supplier_pricing.forEach(sp => suppliers.add(sp.supplierName));
             }
         });
         return Array.from(suppliers).sort();
@@ -50,9 +50,9 @@ export function ToOrderReport() {
     const filteredToOrder = useMemo(() => {
         if (selectedSupplier === 'all') return toOrder;
         return toOrder.filter(p => 
-            p.supplierPricing && 
-            Array.isArray(p.supplierPricing) && 
-            p.supplierPricing.some(sp => sp.supplierName === selectedSupplier)
+            p.supplier_pricing && 
+            Array.isArray(p.supplier_pricing) && 
+            p.supplier_pricing.some(sp => sp.supplierName === selectedSupplier)
         );
     }, [toOrder, selectedSupplier]);
 
