@@ -181,7 +181,7 @@ export default function PendingCostsPage() {
           expense_date: movement.timestamp,
           amount: costValue * newQuantity,
           category: 'Cost of Goods Sold',
-          description: `${movement.reason} (Cost Encoded Later)`
+          description: `[${movement.products.name}] ${movement.reason} (Cost Encoded Later)`
         });
 
       if (expError) throw expError;
