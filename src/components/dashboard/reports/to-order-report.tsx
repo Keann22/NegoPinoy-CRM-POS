@@ -33,8 +33,8 @@ export function ToOrderReport() {
 
     const toOrder = useMemo(() => {
         if (!products) return [];
-        // Only show products with negative or zero stock
-        return products.filter(p => p.quantityOnHand <= 0).sort((a, b) => a.quantityOnHand - b.quantityOnHand);
+        // Only show products with strictly negative stock
+        return products.filter(p => p.quantityOnHand < 0).sort((a, b) => a.quantityOnHand - b.quantityOnHand);
     }, [products]);
 
     const uniqueSuppliers = useMemo(() => {
