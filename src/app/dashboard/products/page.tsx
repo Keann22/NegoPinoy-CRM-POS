@@ -76,6 +76,7 @@ export type FormattedProduct = Product & {
     shelfLocation?: string;
     supplierPricing?: any[];
     children?: FormattedProduct[];
+    reservedStock?: number;
 }
 
 const getStatus = (stock: number | undefined | null): { text: 'In Stock' | 'Low Stock' | 'Out of Stock'; variant: 'outline' | 'default' | 'destructive' } => {
@@ -105,6 +106,30 @@ export default function ProductsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [stockFilter, setStockFilter] = useState('all');
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
+  const [reservedStockMap, setReservedStockMap] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    const fetchReserved = async () => {
+      if (!supabase) return;
+      try {
+        const { data, error } = await supabase
+          .from('order_items')
+          .select('product_id, quantity, orders!inner(status)')
+          .in('orders.status', ['Pending Payment', 'Processing']);
+        
+        if (error) throw error;
+        
+        const map: Record<string, number> = {};
+        data?.forEach((item: any) => {
+          map[item.product_id] = (map[item.product_id] || 0) + item.quantity;
+        });
+        setReservedStockMap(map);
+      } catch (err) {
+        console.error("Failed to fetch reserved stock", err);
+      }
+    };
+    fetchReserved();
+  }, [supabase, products]);
 
   const isManagement = useMemo(() => userProfile?.roles?.some(r => ['Admin', 'Owner'].includes(r)), [userProfile]);
 
@@ -130,9 +155,10 @@ export default function ProductsPage() {
         image: p.images?.[0] || 'https://placehold.co/64x64',
         shelfLocation: p.shelf_location || "",
         supplierPricing: sp,
+        reservedStock: reservedStockMap[p.id] || 0,
       };
     });
-  }, [products]);
+  }, [products, reservedStockMap]);
 
   const formattedProducts: FormattedProduct[] = useMemo(() => {
     if (!rawFormattedProducts) return [];
@@ -442,9 +468,23 @@ export default function ProductsPage() {
                     <TableCell className="hidden md:table-cell">{product.shelfLocation || '-'}</TableCell>
                     <TableCell className="hidden md:table-cell">
                       {product.children && product.children.length > 0 ? (
-                          product.children.reduce((acc, c) => acc + (c.quantityOnHand || 0), 0)
+                          <div className="space-y-1">
+                              <p className="font-medium">{product.children.reduce((acc, c) => acc + (c.quantityOnHand || 0), 0)}</p>
+                              {product.children.reduce((acc, c) => acc + (c.reservedStock || 0), 0) > 0 && (
+                                <p className="text-xs text-amber-600 dark:text-amber-400">
+                                    {product.children.reduce((acc, c) => acc + (c.reservedStock || 0), 0)} Reserved
+                                </p>
+                              )}
+                          </div>
                       ) : (
-                          product.quantityOnHand ?? 0
+                          <div className="space-y-1">
+                              <p className="font-medium">{product.quantityOnHand ?? 0}</p>
+                              {(product.reservedStock || 0) > 0 && (
+                                <p className="text-xs text-amber-600 dark:text-amber-400">
+                                    {product.reservedStock} Reserved
+                                </p>
+                              )}
+                          </div>
                       )}
                     </TableCell>
                     <TableCell>
@@ -508,7 +548,14 @@ export default function ProductsPage() {
                         <TableCell>{child.price}</TableCell>
                         <TableCell className="hidden md:table-cell">{child.shelfLocation || '-'}</TableCell>
                         <TableCell className="hidden md:table-cell">
-                            {child.quantityOnHand ?? 0}
+                            <div className="space-y-1">
+                                <p className="font-medium">{child.quantityOnHand ?? 0}</p>
+                                {(child.reservedStock || 0) > 0 && (
+                                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                                        {child.reservedStock} Reserved
+                                    </p>
+                                )}
+                            </div>
                         </TableCell>
                         <TableCell>
                             <DropdownMenu>

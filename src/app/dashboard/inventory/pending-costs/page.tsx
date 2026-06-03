@@ -10,6 +10,8 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { Loader2, PhilippinePeso } from 'lucide-react';
 import { useRoleCheck } from '@/hooks/useRoleCheck';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import Image from 'next/image';
 
 type PendingMovement = {
   id: string;
@@ -20,6 +22,8 @@ type PendingMovement = {
   supplier_name: string | null;
   products: {
     name: string;
+    description?: string;
+    images?: string[];
   };
 };
 
@@ -29,6 +33,7 @@ export default function PendingCostsPage() {
   const [costs, setCosts] = useState<Record<string, string>>({});
   const [suppliers, setSuppliers] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<PendingMovement['products'] | null>(null);
 
   const supabase = useSupabase();
   const { toast } = useToast();
@@ -49,7 +54,7 @@ export default function PendingCostsPage() {
             timestamp,
             reason,
             supplier_name,
-            products!inner(name)
+            products!inner(name, description, images)
           `)
           .eq('unit_cost', 0)
           .eq('movement_type', 'RESTOCK')
@@ -153,6 +158,7 @@ export default function PendingCostsPage() {
   }
 
   return (
+    <>
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><PhilippinePeso className="h-5 w-5" /> Encode Pending Costs</CardTitle>
@@ -185,7 +191,14 @@ export default function PendingCostsPage() {
                 movements.map((m) => (
                   <TableRow key={m.id}>
                     <TableCell className="whitespace-nowrap">{format(new Date(m.timestamp), 'MMM d, yyyy')}</TableCell>
-                    <TableCell className="font-medium">{m.products.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <button 
+                        onClick={() => setSelectedProduct(m.products)}
+                        className="text-primary hover:underline text-left transition-colors"
+                      >
+                        {m.products.name}
+                      </button>
+                    </TableCell>
                     <TableCell>{m.quantity_change}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{m.reason}</TableCell>
                     <TableCell>
@@ -223,5 +236,31 @@ export default function PendingCostsPage() {
         </div>
       </CardContent>
     </Card>
+
+    <Dialog open={!!selectedProduct} onOpenChange={(open) => !open && setSelectedProduct(null)}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{selectedProduct?.name}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          {selectedProduct?.images && selectedProduct.images.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto pb-2">
+                {selectedProduct.images.filter(img => !img.includes('placehold.co')).map((img, i) => (
+                    <div key={i} className="relative w-24 h-24 shrink-0 rounded-md overflow-hidden border">
+                        <Image src={img} alt={`${selectedProduct.name} ${i+1}`} fill className="object-cover" />
+                    </div>
+                ))}
+            </div>
+          )}
+          <div>
+              <h4 className="text-sm font-medium text-muted-foreground mb-1">Description</h4>
+              <div className="bg-muted/50 rounded-md p-3 text-sm whitespace-pre-wrap text-foreground min-h-[60px]">
+                  {selectedProduct?.description || <span className="text-muted-foreground italic">No description provided.</span>}
+              </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
