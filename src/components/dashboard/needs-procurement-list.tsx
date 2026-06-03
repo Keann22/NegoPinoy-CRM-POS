@@ -45,7 +45,7 @@ export function NeedsProcurementList({ onAddProduct }: NeedsProcurementListProps
           </Button>
         </CardTitle>
         <CardDescription>
-          Products with negative stock that need to be purchased.
+          Products with negative Available stock that need to be purchased.
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0 flex-1 overflow-hidden">
@@ -70,7 +70,7 @@ export function NeedsProcurementList({ onAddProduct }: NeedsProcurementListProps
                           {displayName}
                         </p>
                         <p className="text-sm text-destructive font-semibold mt-1">
-                          Stock: {product.stock_level}
+                          Available to Sell: {product.stock_level}
                         </p>
                       </div>
                       <Button 

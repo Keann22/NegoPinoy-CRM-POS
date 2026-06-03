@@ -378,7 +378,7 @@ export default function ProductsPage() {
                 <TableHead>Price</TableHead>
                 <TableHead className="hidden md:table-cell">Location</TableHead>
                 <TableHead className="hidden md:table-cell">
-                  Stock
+                  Inventory
                 </TableHead>
                 <TableHead>
                   <span className="sr-only">Actions</span>
@@ -468,20 +468,30 @@ export default function ProductsPage() {
                     <TableCell className="hidden md:table-cell">{product.shelfLocation || '-'}</TableCell>
                     <TableCell className="hidden md:table-cell">
                       {product.children && product.children.length > 0 ? (
-                          <div className="space-y-1">
-                              <p className="font-medium">{product.children.reduce((acc, c) => acc + (c.quantityOnHand || 0), 0)}</p>
+                          <div className="space-y-1 text-sm">
+                              <p className="font-medium text-foreground">
+                                  Physical: {(product.children.reduce((acc, c) => acc + (c.quantityOnHand || 0), 0)) + (product.children.reduce((acc, c) => acc + (c.reservedStock || 0), 0))}
+                              </p>
+                              <p className="text-muted-foreground">
+                                  Available: {product.children.reduce((acc, c) => acc + (c.quantityOnHand || 0), 0)}
+                              </p>
                               {product.children.reduce((acc, c) => acc + (c.reservedStock || 0), 0) > 0 && (
-                                <p className="text-xs text-amber-600 dark:text-amber-400">
-                                    {product.children.reduce((acc, c) => acc + (c.reservedStock || 0), 0)} Reserved
+                                <p className="text-amber-600 dark:text-amber-400">
+                                    Reserved: {product.children.reduce((acc, c) => acc + (c.reservedStock || 0), 0)}
                                 </p>
                               )}
                           </div>
                       ) : (
-                          <div className="space-y-1">
-                              <p className="font-medium">{product.quantityOnHand ?? 0}</p>
+                          <div className="space-y-1 text-sm">
+                              <p className="font-medium text-foreground">
+                                  Physical: {(product.quantityOnHand ?? 0) + (product.reservedStock || 0)}
+                              </p>
+                              <p className="text-muted-foreground">
+                                  Available: {product.quantityOnHand ?? 0}
+                              </p>
                               {(product.reservedStock || 0) > 0 && (
-                                <p className="text-xs text-amber-600 dark:text-amber-400">
-                                    {product.reservedStock} Reserved
+                                <p className="text-amber-600 dark:text-amber-400">
+                                    Reserved: {product.reservedStock}
                                 </p>
                               )}
                           </div>
@@ -548,11 +558,16 @@ export default function ProductsPage() {
                         <TableCell>{child.price}</TableCell>
                         <TableCell className="hidden md:table-cell">{child.shelfLocation || '-'}</TableCell>
                         <TableCell className="hidden md:table-cell">
-                            <div className="space-y-1">
-                                <p className="font-medium">{child.quantityOnHand ?? 0}</p>
+                            <div className="space-y-1 text-sm">
+                                <p className="font-medium text-foreground">
+                                    Physical: {(child.quantityOnHand ?? 0) + (child.reservedStock || 0)}
+                                </p>
+                                <p className="text-muted-foreground">
+                                    Available: {child.quantityOnHand ?? 0}
+                                </p>
                                 {(child.reservedStock || 0) > 0 && (
-                                    <p className="text-xs text-amber-600 dark:text-amber-400">
-                                        {child.reservedStock} Reserved
+                                    <p className="text-amber-600 dark:text-amber-400">
+                                        Reserved: {child.reservedStock}
                                     </p>
                                 )}
                             </div>
