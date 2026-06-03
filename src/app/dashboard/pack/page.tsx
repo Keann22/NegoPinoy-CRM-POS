@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Html5QrcodeScanner } from 'html5-qrcode';
 import { useSupabase } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,12 +8,12 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, PackageCheck, ScanLine, X, Check } from 'lucide-react';
+import { Loader2, Package, ScanLine, X, Check } from 'lucide-react';
 
 export default function PackerApp() {
   const supabase = useSupabase();
   const { toast } = useToast();
-  const [scanner, setScanner] = useState<Html5QrcodeScanner | null>(null);
+  const [scanner, setScanner] = useState<any>(null);
   const [scanning, setScanning] = useState(false);
   const [scannedOrderId, setScannedOrderId] = useState<string | null>(null);
   const [orderDetails, setOrderDetails] = useState<any>(null);
@@ -26,7 +25,7 @@ export default function PackerApp() {
   const [height, setHeight] = useState('');
   const [weight, setWeight] = useState('');
 
-  const startScanner = () => {
+  const startScanner = async () => {
     setScanning(true);
     setScannedOrderId(null);
     setOrderDetails(null);
@@ -34,6 +33,8 @@ export default function PackerApp() {
     setWidth('');
     setHeight('');
     setWeight('');
+
+    const { Html5QrcodeScanner } = await import('html5-qrcode');
 
     setTimeout(() => {
       const newScanner = new Html5QrcodeScanner(
@@ -151,7 +152,7 @@ export default function PackerApp() {
     <div className="flex flex-col h-full max-w-md mx-auto p-4 space-y-4">
       <div className="text-center mb-4">
         <h1 className="text-2xl font-bold font-headline flex items-center justify-center gap-2">
-          <PackageCheck className="h-6 w-6 text-primary" />
+          <Package className="h-6 w-6 text-primary" />
           Packer App
         </h1>
         <p className="text-muted-foreground text-sm">Scan packing slips to process orders.</p>
