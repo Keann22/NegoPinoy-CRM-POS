@@ -7,11 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { toast } from '@/components/ui/use-toast';
-import { Loader2, PackageCheck, ScanLine, X } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, PackageCheck, ScanLine, X, Check } from 'lucide-react';
 
 export default function PackerApp() {
   const supabase = useSupabase();
+  const { toast } = useToast();
   const [scanner, setScanner] = useState<Html5QrcodeScanner | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scannedOrderId, setScannedOrderId] = useState<string | null>(null);
@@ -245,7 +247,3 @@ export default function PackerApp() {
     </div>
   );
 }
-
-// Temporary polyfill for Check and Badge if missing imports
-import { Check } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
