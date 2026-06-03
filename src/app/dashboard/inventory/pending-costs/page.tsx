@@ -40,6 +40,7 @@ export default function PendingCostsPage() {
   const [allSuppliers, setAllSuppliers] = useState<{id: string, name: string}[]>([]);
   const [showAddSupplier, setShowAddSupplier] = useState(false);
   const [addingSupplierFor, setAddingSupplierFor] = useState<string | null>(null);
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
 
   const supabase = useSupabase();
   const { toast } = useToast();
@@ -82,12 +83,15 @@ export default function PendingCostsPage() {
         // Initialize state
         const initialCosts: Record<string, string> = {};
         const initialSuppliers: Record<string, string> = {};
+        const initialQuantities: Record<string, number> = {};
         data?.forEach((m: any) => {
           initialCosts[m.id] = '';
           initialSuppliers[m.id] = m.supplier_name || '';
+          initialQuantities[m.id] = m.quantity_change;
         });
         setCosts(initialCosts);
         setSuppliers(initialSuppliers);
+        setQuantities(initialQuantities);
       } catch (error) {
         console.error("Error fetching pending costs:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Failed to load pending costs.' });
@@ -106,24 +110,41 @@ export default function PendingCostsPage() {
   const handleSave = async (movement: PendingMovement) => {
     const costValue = parseFloat(costs[movement.id]);
     const supplierValue = suppliers[movement.id];
+    const newQuantity = quantities[movement.id] !== undefined ? quantities[movement.id] : movement.quantity_change;
 
     if (isNaN(costValue) || costValue <= 0) {
       toast({ variant: 'destructive', title: 'Invalid Cost', description: 'Please enter a valid unit cost greater than 0.' });
       return;
     }
 
+    if (isNaN(newQuantity) || newQuantity <= 0) {
+      toast({ variant: 'destructive', title: 'Invalid Quantity', description: 'Please enter a valid quantity greater than 0.' });
+      return;
+    }
+
     setSavingId(movement.id);
     try {
+      const qtyDifference = newQuantity - movement.quantity_change;
+
       // 1. Update the inventory movement
       const { error: moveError } = await supabase
         .from('inventory_movements')
         .update({ 
             unit_cost: costValue,
-            supplier_name: supplierValue || null
+            supplier_name: supplierValue || null,
+            quantity_change: newQuantity
         })
         .eq('id', movement.id);
       
       if (moveError) throw moveError;
+
+      // Update product stock if quantity changed
+      if (qtyDifference !== 0) {
+        const { data: prodData } = await supabase.from('products').select('stock_level').eq('id', movement.product_id).single();
+        if (prodData) {
+            await supabase.from('products').update({ stock_level: (prodData.stock_level || 0) + qtyDifference }).eq('id', movement.product_id);
+        }
+      }
 
       // 2. Update the product's initial_unit_cost and supplier_pricing
       let updatedSupplierPricing = movement.products.supplier_pricing || [];
@@ -157,7 +178,7 @@ export default function PendingCostsPage() {
         .from('expenses')
         .insert({
           expense_date: movement.timestamp,
-          amount: costValue * movement.quantity_change,
+          amount: costValue * newQuantity,
           category: 'Cost of Goods Sold',
           description: `${movement.reason} (Cost Encoded Later)`
         });
@@ -233,7 +254,14 @@ export default function PendingCostsPage() {
                         {m.products.name}
                       </button>
                     </TableCell>
-                    <TableCell>{m.quantity_change}</TableCell>
+                    <TableCell>
+                      <Input 
+                        type="number"
+                        value={quantities[m.id] !== undefined ? quantities[m.id] : m.quantity_change}
+                        onChange={(e) => setQuantities({ ...quantities, [m.id]: parseInt(e.target.value) || 0 })}
+                        className="h-8 w-20 text-sm"
+                      />
+                    </TableCell>
                     <TableCell className="text-muted-foreground text-sm">{m.reason}</TableCell>
                     <TableCell>
                       <Select 
