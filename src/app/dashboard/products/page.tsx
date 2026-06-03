@@ -138,7 +138,7 @@ export default function ProductsPage() {
     [supabase, user]
   );
 
-  const { data: products, isLoading, refetch } = useCollection<Omit<Product, 'id'>>(productsQuery);
+  const { data: products, isLoading, refetch } = useCollection<Product>(productsQuery);
 
   const rawFormattedProducts: FormattedProduct[] = useMemo(() => {
     if (!products) return [];
@@ -239,7 +239,7 @@ export default function ProductsPage() {
           title: "Product Deleted",
           description: `"${productToDelete.name}" has been removed from your catalog.`,
         });
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error deleting product:", error);
         toast({
             variant: 'destructive',

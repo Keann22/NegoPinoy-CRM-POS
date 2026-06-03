@@ -199,8 +199,8 @@ export function ViewSupplierProductsDialog({ supplier, open, onOpenChange }: Vie
                         onClick={() => setSelectedProduct(product)}
                       >
                         <div className="relative w-10 h-10 border rounded-md bg-muted flex items-center justify-center overflow-hidden shrink-0">
-                          {product.image_url ? (
-                            <Image src={product.image_url} alt={product.name} fill className="object-cover" />
+                          {product.images && product.images.length > 0 ? (
+                            <Image src={product.images[0]} alt={product.name} fill className="object-cover" />
                           ) : (
                             <span className="text-xs text-muted-foreground">No img</span>
                           )}
@@ -245,8 +245,8 @@ export function ViewSupplierProductsDialog({ supplier, open, onOpenChange }: Vie
         {selectedProduct && (
           <div className="flex flex-col items-center gap-4 py-4 text-center">
             <div className="relative w-48 h-48 border rounded-lg bg-muted flex items-center justify-center overflow-hidden">
-              {selectedProduct.image_url ? (
-                <Image src={selectedProduct.image_url} alt={selectedProduct.name} fill className="object-cover" />
+              {selectedProduct.images && selectedProduct.images.length > 0 ? (
+                <Image src={selectedProduct.images[0]} alt={selectedProduct.name} fill className="object-cover" />
               ) : (
                 <span className="text-muted-foreground">No image available</span>
               )}
