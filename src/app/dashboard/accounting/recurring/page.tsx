@@ -39,7 +39,7 @@ export default function RecurringExpensesPage() {
 
   // CRITICAL: Strict role check before query
   const recurringExpensesQuery = useMemo(
-    () => (supabase && user && isManagement ? query(collection(supabase, 'recurringExpenses'), orderBy('dayOfMonth', 'asc')) : null),
+    () => (supabase && user && isManagement ? query(collection(supabase, 'recurring_expenses'), orderBy('day_of_month', 'asc')) : null),
     [supabase, user, isManagement]
   );
   const { data: recurringExpenses, isLoading } = useCollection<RecurringExpense>(recurringExpensesQuery);
