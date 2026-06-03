@@ -710,6 +710,12 @@ export default function ProductsPage() {
             </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <ReservedStockDialog
+          productId={viewingReservedProduct?.id || ''}
+          productName={viewingReservedProduct?.name || ''}
+          isOpen={!!viewingReservedProduct}
+          onClose={() => setViewingReservedProduct(null)}
+      />
     </>
   );
 }
