@@ -4,6 +4,78 @@ import { useSupabase } from "@/firebase";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2 } from "lucide-react";
+
+interface EditableSupplierCodeProps {
+  productId: string;
+  supplierId: string;
+  currentSupplierPricing: any[];
+}
+
+function EditableSupplierCode({ productId, supplierId, currentSupplierPricing }: EditableSupplierCodeProps) {
+  const supabase = useSupabase();
+  const { toast } = useToast();
+  
+  const pricingEntry = currentSupplierPricing.find((sp: any) => sp.supplierId === supplierId);
+  const initialCode = pricingEntry?.supplierCode || '';
+  
+  const [value, setValue] = useState(initialCode);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Sync state if props change
+  useEffect(() => {
+    setValue(initialCode);
+  }, [initialCode]);
+
+  const handleBlur = async () => {
+    if (value === initialCode) return; // No change
+    
+    setIsSaving(true);
+    try {
+      // Create a new array with the updated supplier code
+      let updatedPricing = [...currentSupplierPricing];
+      const entryIndex = updatedPricing.findIndex(sp => sp.supplierId === supplierId);
+      
+      if (entryIndex >= 0) {
+        updatedPricing[entryIndex] = { ...updatedPricing[entryIndex], supplierCode: value };
+      } else {
+        // Technically shouldn't happen based on how this dialog works, but just in case
+        updatedPricing.push({ supplierId, supplierCode: value, unitCost: 0 });
+      }
+
+      const { error } = await supabase
+        .from('products')
+        .update({ supplier_pricing: updatedPricing })
+        .eq('id', productId);
+
+      if (error) throw error;
+      
+      toast({ title: "Supplier Code Updated", description: "Saved successfully.", duration: 2000 });
+    } catch (error: any) {
+      console.error("Error updating supplier code:", error);
+      toast({ variant: "destructive", title: "Error", description: "Could not save supplier code." });
+      setValue(initialCode); // Revert on error
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="relative flex items-center max-w-[120px]">
+      <Input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={handleBlur}
+        placeholder="Add code..."
+        className="font-mono text-sm h-8"
+        disabled={isSaving}
+      />
+      {isSaving && <Loader2 className="w-3 h-3 absolute right-2 animate-spin text-muted-foreground" />}
+    </div>
+  );
+}
 
 interface ViewSupplierProductsDialogProps {
   supplier: { id: string; name: string } | null;
@@ -107,11 +179,11 @@ export function ViewSupplierProductsDialog({ supplier, open, onOpenChange }: Vie
                       </div>
                     </TableCell>
                     <TableCell>
-                      {pricingEntry?.supplierCode ? (
-                        <span className="font-mono text-sm bg-muted px-2 py-1 rounded border">{pricingEntry.supplierCode}</span>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">—</span>
-                      )}
+                      <EditableSupplierCode 
+                        productId={product.id} 
+                        supplierId={supplier.id} 
+                        currentSupplierPricing={product.supplier_pricing || []} 
+                      />
                     </TableCell>
                     <TableCell className="font-mono text-sm">{product.sku || '-'}</TableCell>
                     <TableCell>{product.category || product.categoryId || '-'}</TableCell>

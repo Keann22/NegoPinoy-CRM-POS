@@ -91,6 +91,7 @@ export function AddCustomerDialog(props: AddCustomerDialogProps) {
           email: values.email || null,
           mobile_number: values.phoneNumber || null,
           address_line: addressLine || null,
+          facebook_profile_link: values.facebookProfileLink || null,
           suki_tier: 'NEWBIE'
         })
         .select()

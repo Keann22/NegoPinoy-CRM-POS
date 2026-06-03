@@ -116,8 +116,8 @@ export default function RestockPage() {
 
       if (movementError) throw movementError;
 
-      // 4. Record expense if there is a cost
-      if (values.unitCost > 0) {
+      // 4. Record expense if there is a cost AND it's not from Internal Inventory
+      if (values.unitCost > 0 && values.supplierName !== 'Internal Inventory') {
         const { error: expenseError } = await supabase
           .from('expenses')
           .insert({

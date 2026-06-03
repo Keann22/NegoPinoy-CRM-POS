@@ -151,8 +151,10 @@ export default function BulkReceivePage() {
           }
       }
 
-      // 2. Record Expense
-      const totalExpense = values.items.reduce((sum, item) => sum + (item.quantity * item.unitCost), 0);
+      // 2. Record Expense (exclude items from Internal Inventory)
+      const totalExpense = values.items
+        .filter(item => item.supplierName !== 'Internal Inventory')
+        .reduce((sum, item) => sum + (item.quantity * item.unitCost), 0);
       if (totalExpense > 0) {
         // Collect unique supplier names for the description if any
         const suppliers = Array.from(new Set(values.items.map(i => i.supplierName).filter(Boolean)));

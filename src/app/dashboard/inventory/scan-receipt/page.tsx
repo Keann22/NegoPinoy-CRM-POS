@@ -269,9 +269,9 @@ export default function ScanReceiptPage() {
                 }
             }
 
-            // 2. Record Expense
+            // 2. Record Expense (exclude if supplier is Internal Inventory)
             const totalExpense = values.items.reduce((sum, item) => sum + (item.quantity * item.unitCost), 0);
-            if (totalExpense > 0) {
+            if (totalExpense > 0 && values.supplierName !== 'Internal Inventory') {
                 const { error: expenseError } = await supabase
                     .from('expenses')
                     .insert({
