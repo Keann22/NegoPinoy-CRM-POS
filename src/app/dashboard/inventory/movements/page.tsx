@@ -1,16 +1,21 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useCollection, useUser, useSupabase, collection, orderBy } from '@/firebase';
+import { useCollection, useUser, useSupabase, collection, query, orderBy, where, limit } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { format } from 'date-fns';
-import { Edit2, History } from 'lucide-react';
+import { format, startOfDay, endOfDay, subDays } from 'date-fns';
+import { Calendar as CalendarIcon, Edit2, History, FilterX } from 'lucide-react';
 import { EditMovementDialog } from '@/components/dashboard/inventory/edit-movement-dialog';
 import { MovementHistoryDialog } from '@/components/dashboard/inventory/movement-history-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { DateRange } from 'react-day-picker';
+import { cn } from '@/lib/utils';
 
 type InventoryMovement = {
   id: string;
@@ -32,25 +37,50 @@ type Product = {
 export default function InventoryHistoryPage() {
   const supabase = useSupabase();
 
-  // Queries
-  // In a real app we'd want pagination or limits, but for now let's just fetch the last 100 movements
-  const movementsQuery = {
-    path: 'inventory_movements',
-    constraints: [
-      { type: 'where', field: 'movement_type', op: '!=', value: 'sale' },
-      { type: 'orderBy', field: 'timestamp', direction: 'desc' },
-      { type: 'limit', value: 100 }
-    ]
-  };
+  const [dateFilter, setDateFilter] = useState<'today' | 'yesterday' | 'custom' | 'all'>('today');
+  const [date, setDate] = useState<DateRange | undefined>(undefined);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [selectedMovement, setSelectedMovement] = useState<InventoryMovement | null>(null);
+
+  const movementsQuery = useMemo(() => {
+    let constraints: any[] = [
+      where('movement_type', '!=', 'sale'),
+      orderBy('timestamp', 'desc'),
+    ];
+
+    let fromTime: Date | undefined;
+    let toTime: Date | undefined;
+
+    if (dateFilter === 'today') {
+        const d = new Date();
+        fromTime = startOfDay(d);
+        toTime = endOfDay(d);
+    } else if (dateFilter === 'yesterday') {
+        const d = subDays(new Date(), 1);
+        fromTime = startOfDay(d);
+        toTime = endOfDay(d);
+    } else if (dateFilter === 'custom' && date?.from) {
+        fromTime = startOfDay(date.from);
+        toTime = date.to ? endOfDay(date.to) : endOfDay(date.from);
+    }
+
+    if (fromTime) {
+        constraints.push(where('timestamp', '>=', fromTime.toISOString()));
+    }
+    if (toTime) {
+        constraints.push(where('timestamp', '<=', toTime.toISOString()));
+    }
+    
+    constraints.push(limit(500));
+
+    return query('inventory_movements', ...constraints);
+  }, [dateFilter, date]);
   
   const productsQuery = { path: 'products' };
 
   const { data: movements, isLoading: isLoadingMovements } = useCollection<InventoryMovement>(movementsQuery);
   const { data: products, isLoading: isLoadingProducts } = useCollection<Product>(productsQuery);
-
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
-  const [selectedMovement, setSelectedMovement] = useState<InventoryMovement | null>(null);
 
   const productMap = useMemo(() => {
     if (!products) return new Map<string, string>();
@@ -79,6 +109,39 @@ export default function InventoryHistoryPage() {
         </CardDescription>
       </CardHeader>
       <CardContent>
+        <div className="flex flex-wrap items-center gap-4 mb-6">
+            <Select value={dateFilter} onValueChange={(val: any) => setDateFilter(val)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by Date" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="yesterday">Yesterday</SelectItem>
+                <SelectItem value="custom">Date Range</SelectItem>
+                <SelectItem value="all">All Time</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {dateFilter === 'custom' && (
+                <Popover>
+                    <PopoverTrigger asChild>
+                    <Button variant={"outline"} className={cn("w-[240px] justify-start text-left font-normal", !date && "text-muted-foreground")}>
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {date?.from ? (date.to ? <>{format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}</> : format(date.from, "LLL dd, y")) : <span>Pick a date range</span>}
+                    </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar initialFocus mode="range" defaultMonth={date?.from} selected={date} onSelect={setDate} numberOfMonths={2} />
+                    </PopoverContent>
+                </Popover>
+            )}
+
+            {(dateFilter !== 'today') && (
+              <Button variant="ghost" onClick={() => { setDateFilter('today'); setDate(undefined); }} className="text-muted-foreground hover:text-foreground">
+                <FilterX className="mr-2 h-4 w-4" /> Reset to Today
+              </Button>
+            )}
+        </div>
         <div className="border rounded-lg">
           <Table>
             <TableHeader>
