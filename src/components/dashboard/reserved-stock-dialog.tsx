@@ -59,7 +59,7 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose }:
               id,
               order_date,
               status,
-              customers!inner(name)
+              customers!inner(full_name)
             )
           `)
           .in('product_id', targetProductIds)
@@ -70,7 +70,7 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose }:
         const formattedOrders: ReservedOrder[] = (data || []).map((item: any) => ({
           id: item.orders.id,
           orderId: item.orders.id.split('-')[0].toUpperCase(), // Short ID
-          customerName: item.orders.customers?.name || 'Unknown',
+          customerName: item.orders.customers?.full_name || 'Unknown',
           quantity: item.quantity,
           orderDate: item.orders.order_date,
           status: item.orders.status,

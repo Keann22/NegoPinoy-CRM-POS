@@ -41,7 +41,7 @@ export function StaleReservationsReport() {
               id,
               order_date,
               status,
-              customers!inner(name)
+              customers!inner(full_name)
             )
           `)
           .in('orders.status', ['Pending Payment', 'Processing']);
@@ -58,7 +58,7 @@ export function StaleReservationsReport() {
           return {
             id: `${item.orders.id}-${item.products.name}`, // Uniqueish key
             orderId: item.orders.id.split('-')[0].toUpperCase(),
-            customerName: item.orders.customers?.name || 'Unknown',
+            customerName: item.orders.customers?.full_name || 'Unknown',
             productName: productName,
             quantity: item.quantity,
             orderDate: item.orders.order_date,
