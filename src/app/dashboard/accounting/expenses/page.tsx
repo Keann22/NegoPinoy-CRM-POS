@@ -1,9 +1,10 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useCollection, useSupabase, useUser, collection, query, orderBy } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { DateRange } from 'react-day-picker';
 import {
   Card,
   CardContent,
@@ -23,6 +24,7 @@ import {
 import { AddExpenseDialog } from '@/components/dashboard/accounting/add-expense-dialog';
 import { PostRecurringExpensesButton } from '@/components/dashboard/accounting/post-recurring-expenses-button';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { ReportDateFilter } from '@/components/dashboard/reports/report-date-filter';
 
 // Matches the Firestore document structure for an expense
 type Expense = {
@@ -38,6 +40,11 @@ export default function ExpensesPage() {
   const { user } = useUser();
   const { userProfile } = useUserProfile();
 
+  const [date, setDate] = useState<DateRange | undefined>({
+      from: startOfMonth(new Date()),
+      to: endOfMonth(new Date()),
+  });
+
   const isManagement = useMemo(() => userProfile?.roles.some(r => ['Admin', 'Owner'].includes(r)), [userProfile]);
 
   // CRITICAL: Strict role check before query
@@ -47,10 +54,25 @@ export default function ExpensesPage() {
   );
   const { data: expenses, isLoading } = useCollection<Omit<Expense, 'id'>>(expensesQuery);
 
+  const filteredExpenses = useMemo(() => {
+      if (!expenses) return null;
+      if (!date?.from || !date?.to) return expenses;
+
+      const fromTime = date.from.getTime();
+      const toDate = new Date(date.to);
+      toDate.setHours(23, 59, 59, 999);
+      const toTime = toDate.getTime();
+
+      return expenses.filter(exp => {
+          const t = new Date(exp.expenseDate).getTime();
+          return t >= fromTime && t <= toTime;
+      });
+  }, [expenses, date]);
+
   const totalExpenses = useMemo(() => {
-    if (!expenses) return 0;
-    return expenses.reduce((sum, exp) => sum + exp.amount, 0);
-  }, [expenses]);
+    if (!filteredExpenses) return 0;
+    return filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+  }, [filteredExpenses]);
 
   if (userProfile && !isManagement) {
     return (
@@ -78,6 +100,9 @@ export default function ExpensesPage() {
         </div>
       </CardHeader>
       <CardContent>
+        <div className="mb-4">
+          <ReportDateFilter date={date} setDate={setDate} />
+        </div>
         <Table>
           <TableHeader>
             <TableRow>
@@ -96,7 +121,7 @@ export default function ExpensesPage() {
                     <TableCell className="text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
                  </TableRow>
             ))}
-            {expenses && expenses.map((expense) => (
+            {filteredExpenses && filteredExpenses.map((expense) => (
               <TableRow key={expense.id}>
                 <TableCell>{format(new Date(expense.expenseDate), 'MMM d, yyyy')}</TableCell>
                 <TableCell className="font-medium">{expense.description || 'N/A'}</TableCell>
@@ -106,7 +131,7 @@ export default function ExpensesPage() {
             ))}
           </TableBody>
         </Table>
-        {!isLoading && (!expenses || expenses.length === 0) && (
+        {!isLoading && (!filteredExpenses || filteredExpenses.length === 0) && (
             <div className="flex flex-col items-center justify-center text-center border-2 border-dashed rounded-lg p-12 mt-4">
                 <p className="text-lg font-semibold">No expenses found</p>
                 <p className="text-muted-foreground mt-2">
@@ -115,7 +140,7 @@ export default function ExpensesPage() {
             </div>
         )}
       </CardContent>
-      {expenses && expenses.length > 0 && (
+      {filteredExpenses && filteredExpenses.length > 0 && (
         <CardFooter className="justify-end space-x-2 font-semibold">
            <span>Total Expenses:</span> 
            <span>₱{totalExpenses.toFixed(2)}</span>
