@@ -14,6 +14,8 @@ interface ReservedStockDialogProps {
   productName: string;
   isOpen: boolean;
   onClose: () => void;
+  statusFilter?: string[];
+  title?: string;
 }
 
 type ReservedOrder = {
@@ -25,7 +27,7 @@ type ReservedOrder = {
   status: string;
 };
 
-export function ReservedStockDialog({ productId, productName, isOpen, onClose }: ReservedStockDialogProps) {
+export function ReservedStockDialog({ productId, productName, isOpen, onClose, statusFilter = ['Pending Payment', 'Processing'], title = "Reserved Stock Details" }: ReservedStockDialogProps) {
   const supabase = useSupabase();
   const [loading, setLoading] = useState(false);
   const [reservedOrders, setReservedOrders] = useState<ReservedOrder[]>([]);
@@ -64,7 +66,7 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose }:
             )
           `)
           .in('product_id', targetProductIds)
-          .in('orders.status', ['Pending Payment', 'Processing']);
+          .in('orders.status', statusFilter);
         
         if (error) throw error;
 
@@ -94,9 +96,9 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose }:
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Reserved Stock Details</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            Active reservations for <span className="font-semibold text-foreground">{productName}</span>
+            Active orders for <span className="font-semibold text-foreground">{productName}</span>
           </DialogDescription>
         </DialogHeader>
 

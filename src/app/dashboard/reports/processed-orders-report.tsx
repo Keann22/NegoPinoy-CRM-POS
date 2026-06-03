@@ -9,6 +9,7 @@ import {
   isValid,
 } from 'date-fns';
 import { Calendar as CalendarIcon, Printer, CheckCircle, Check, Undo2 } from 'lucide-react';
+import { QRCodeCanvas } from 'qrcode.react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -382,14 +383,17 @@ export function ProcessedOrdersReport() {
                     <div key={order.id} className="mb-4 break-inside-avoid">
                         <div className="border-2 border-black flex flex-col">
                             {/* Header Section */}
-                            <div className="flex border-b-2 border-black">
-                                <div className="w-1/2 p-2 border-r-2 border-black">
+                            <div className="flex border-b-2 border-black items-center">
+                                <div className="flex-1 p-2 border-r-2 border-black">
                                     <div className="font-bold">Negosyanteng Pinoy PH</div>
                                     <div className="text-xs">http://facebook.com/NegoPinoyPH</div>
                                 </div>
-                                <div className="w-1/2 p-2 text-xs">
-                                    <div className="font-bold">Order #{order.id.substring(0, 7).toUpperCase()}</div>
+                                <div className="flex-1 p-2 text-xs border-r-2 border-black">
+                                    <div className="font-bold text-base">Order #{order.id.substring(0, 7).toUpperCase()}</div>
                                     <div>Created At: {order.orderDate && isValid(new Date(order.orderDate)) ? format(new Date(order.orderDate), 'MM/dd/yyyy') : '—'}</div>
+                                </div>
+                                <div className="p-2 flex justify-center items-center">
+                                    <QRCodeCanvas value={order.id} size={50} />
                                 </div>
                             </div>
                             

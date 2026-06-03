@@ -78,6 +78,7 @@ export type FormattedProduct = Product & {
     supplierPricing?: any[];
     children?: FormattedProduct[];
     reservedStock?: number;
+    packedStock?: number;
 }
 
 const getStatus = (stock: number | undefined | null): { text: 'In Stock' | 'Low Stock' | 'Out of Stock'; variant: 'outline' | 'default' | 'destructive' } => {
@@ -108,7 +109,9 @@ export default function ProductsPage() {
   const [stockFilter, setStockFilter] = useState('all');
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
   const [viewingReservedProduct, setViewingReservedProduct] = useState<{ id: string; name: string } | null>(null);
+  const [viewingPackedProduct, setViewingPackedProduct] = useState<{ id: string; name: string } | null>(null);
   const [reservedStockMap, setReservedStockMap] = useState<Record<string, number>>({});
+  const [packedStockMap, setPackedStockMap] = useState<Record<string, number>>({});
 
   useEffect(() => {
     const fetchReserved = async () => {
@@ -117,15 +120,21 @@ export default function ProductsPage() {
         const { data, error } = await supabase
           .from('order_items')
           .select('product_id, quantity, orders!inner(status)')
-          .in('orders.status', ['Pending Payment', 'Processing']);
+          .in('orders.status', ['Pending Payment', 'Processing', 'Packed']);
         
         if (error) throw error;
         
         const map: Record<string, number> = {};
+        const packedMap: Record<string, number> = {};
         data?.forEach((item: any) => {
-          map[item.product_id] = (map[item.product_id] || 0) + item.quantity;
+          if (item.orders.status === 'Packed') {
+             packedMap[item.product_id] = (packedMap[item.product_id] || 0) + item.quantity;
+          } else {
+             map[item.product_id] = (map[item.product_id] || 0) + item.quantity;
+          }
         });
         setReservedStockMap(map);
+        setPackedStockMap(packedMap);
       } catch (err) {
         console.error("Failed to fetch reserved stock", err);
       }
@@ -158,9 +167,10 @@ export default function ProductsPage() {
         shelfLocation: p.shelf_location || "",
         supplierPricing: sp,
         reservedStock: reservedStockMap[p.id] || 0,
+        packedStock: packedStockMap[p.id] || 0,
       };
     });
-  }, [products, reservedStockMap]);
+  }, [products, reservedStockMap, packedStockMap]);
 
   const formattedProducts: FormattedProduct[] = useMemo(() => {
     if (!rawFormattedProducts) return [];
@@ -485,6 +495,14 @@ export default function ProductsPage() {
                                     Reserved: {product.children.reduce((acc, c) => acc + (c.reservedStock || 0), 0)}
                                 </p>
                               )}
+                              {product.children.reduce((acc, c) => acc + (c.packedStock || 0), 0) > 0 && (
+                                <p 
+                                  className="text-blue-600 dark:text-blue-400 cursor-pointer hover:underline"
+                                  onClick={() => setViewingPackedProduct({ id: product.id, name: product.name })}
+                                >
+                                    Packed: {product.children.reduce((acc, c) => acc + (c.packedStock || 0), 0)}
+                                </p>
+                              )}
                           </div>
                       ) : (
                           <div className="space-y-1 text-sm">
@@ -500,6 +518,14 @@ export default function ProductsPage() {
                                   onClick={() => setViewingReservedProduct({ id: product.id, name: product.name })}
                                 >
                                     Reserved: {product.reservedStock}
+                                </p>
+                              )}
+                              {(product.packedStock || 0) > 0 && (
+                                <p 
+                                  className="text-blue-600 dark:text-blue-400 cursor-pointer hover:underline"
+                                  onClick={() => setViewingPackedProduct({ id: product.id, name: product.name })}
+                                >
+                                    Packed: {product.packedStock}
                                 </p>
                               )}
                           </div>
@@ -579,6 +605,14 @@ export default function ProductsPage() {
                                       onClick={() => setViewingReservedProduct({ id: child.id, name: child.variantName || child.name })}
                                     >
                                         Reserved: {child.reservedStock}
+                                    </p>
+                                )}
+                                {(child.packedStock || 0) > 0 && (
+                                    <p 
+                                      className="text-blue-600 dark:text-blue-400 cursor-pointer hover:underline"
+                                      onClick={() => setViewingPackedProduct({ id: child.id, name: child.variantName || child.name })}
+                                    >
+                                        Packed: {child.packedStock}
                                     </p>
                                 )}
                             </div>
@@ -715,6 +749,14 @@ export default function ProductsPage() {
           productName={viewingReservedProduct?.name || ''}
           isOpen={!!viewingReservedProduct}
           onClose={() => setViewingReservedProduct(null)}
+      />
+      <ReservedStockDialog
+          productId={viewingPackedProduct?.id || ''}
+          productName={viewingPackedProduct?.name || ''}
+          isOpen={!!viewingPackedProduct}
+          onClose={() => setViewingPackedProduct(null)}
+          statusFilter={['Packed']}
+          title="Packed Stock Details"
       />
     </>
   );
