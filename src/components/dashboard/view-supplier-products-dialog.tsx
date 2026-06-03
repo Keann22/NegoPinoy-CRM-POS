@@ -1,5 +1,5 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useSupabase } from "@/firebase";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -7,6 +7,7 @@ import Image from "next/image";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface EditableSupplierCodeProps {
   productId: string;
@@ -87,6 +88,20 @@ export function ViewSupplierProductsDialog({ supplier, open, onOpenChange }: Vie
   const supabase = useSupabase();
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+
+  const categories = useMemo(() => {
+    return Array.from(new Set(products.map(p => p.category).filter(Boolean))).sort();
+  }, [products]);
+
+  const filteredAndSortedProducts = useMemo(() => {
+    let result = products;
+    if (selectedCategory !== 'all') {
+      result = products.filter(p => p.category === selectedCategory);
+    }
+    return result.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }, [products, selectedCategory]);
 
   useEffect(() => {
     if (!open || !supplier || !supabase) return;
@@ -116,6 +131,7 @@ export function ViewSupplierProductsDialog({ supplier, open, onOpenChange }: Vie
   if (!supplier) return null;
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[700px] max-h-[85vh] flex flex-col overflow-hidden">
         <DialogHeader>
@@ -124,6 +140,20 @@ export function ViewSupplierProductsDialog({ supplier, open, onOpenChange }: Vie
             Products available to purchase from <strong>{supplier.name}</strong>.
           </DialogDescription>
         </DialogHeader>
+
+        <div className="flex justify-between items-center mt-2">
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Filter by Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map((cat: any) => (
+                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+        </div>
 
         <div className="flex-1 overflow-y-auto mt-4 border rounded-md">
           <Table>
@@ -150,46 +180,54 @@ export function ViewSupplierProductsDialog({ supplier, open, onOpenChange }: Vie
                   <TableCell className="text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
                 </TableRow>
               ))}
-
-              {!isLoading && products.length === 0 && (
+              {!isLoading && filteredAndSortedProducts.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
-                    No products found for this supplier.
+                  <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">
+                    {products.length === 0 ? "No products found for this supplier." : "No products found in this category."}
                   </TableCell>
                 </TableRow>
               )}
-
-              {!isLoading && products.map((product) => {
-                // Find the specific pricing entry for this supplier
-                const pricingEntry = (product.supplier_pricing || []).find(
-                  (sp: any) => sp.supplierId === supplier.id
-                );
+              {!isLoading && filteredAndSortedProducts.map(product => {
+                const pricingEntry = product.supplier_pricing?.find((sp: any) => sp.supplierId === supplier.id);
+                const unitCost = pricingEntry?.unitCost || 0;
                 
-                const imageUrl = product.images && product.images.length > 0 ? product.images[0] : 'https://placehold.co/64x64';
-
                 return (
                   <TableRow key={product.id}>
                     <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="relative h-10 w-10 rounded-md overflow-hidden border shrink-0">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={imageUrl} alt={product.name} className="object-cover w-full h-full" />
+                      <div 
+                        className="flex items-center gap-3 cursor-pointer hover:bg-muted/50 p-1 rounded-md transition-colors"
+                        onClick={() => setSelectedProduct(product)}
+                      >
+                        <div className="relative w-10 h-10 border rounded-md bg-muted flex items-center justify-center overflow-hidden shrink-0">
+                          {product.image_url ? (
+                            <Image src={product.image_url} alt={product.name} fill className="object-cover" />
+                          ) : (
+                            <span className="text-xs text-muted-foreground">No img</span>
+                          )}
                         </div>
-                        <span className="font-medium line-clamp-2">{product.name}</span>
+                        <div className="font-medium max-w-[200px] truncate" title={product.name}>
+                          {product.name}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
                       <EditableSupplierCode 
                         productId={product.id} 
-                        supplierId={supplier.id} 
-                        currentSupplierPricing={product.supplier_pricing || []} 
+                        supplierId={supplier.id}
+                        currentSupplierPricing={product.supplier_pricing || []}
                       />
                     </TableCell>
-                    <TableCell className="font-mono text-sm">{product.sku || '-'}</TableCell>
-                    <TableCell>{product.category || product.categoryId || '-'}</TableCell>
-                    <TableCell className="text-right font-semibold">
-                      {pricingEntry ? `₱${Number(pricingEntry.unitCost).toFixed(2)}` : '-'}
+                    <TableCell className="text-muted-foreground">{product.sku || '-'}</TableCell>
+                    <TableCell>
+                      {product.category ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-secondary text-secondary-foreground">
+                          {product.category}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
                     </TableCell>
+                    <TableCell className="text-right font-medium">₱{unitCost.toFixed(2)}</TableCell>
                   </TableRow>
                 );
               })}
@@ -198,5 +236,29 @@ export function ViewSupplierProductsDialog({ supplier, open, onOpenChange }: Vie
         </div>
       </DialogContent>
     </Dialog>
+
+    <Dialog open={!!selectedProduct} onOpenChange={(open) => !open && setSelectedProduct(null)}>
+      <DialogContent className="sm:max-w-[400px]">
+        <DialogHeader>
+          <DialogTitle>Product Details</DialogTitle>
+        </DialogHeader>
+        {selectedProduct && (
+          <div className="flex flex-col items-center gap-4 py-4 text-center">
+            <div className="relative w-48 h-48 border rounded-lg bg-muted flex items-center justify-center overflow-hidden">
+              {selectedProduct.image_url ? (
+                <Image src={selectedProduct.image_url} alt={selectedProduct.name} fill className="object-cover" />
+              ) : (
+                <span className="text-muted-foreground">No image available</span>
+              )}
+            </div>
+            <h3 className="text-lg font-bold leading-tight">{selectedProduct.name}</h3>
+            {selectedProduct.sku && (
+              <p className="text-sm text-muted-foreground">SKU: {selectedProduct.sku}</p>
+            )}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
