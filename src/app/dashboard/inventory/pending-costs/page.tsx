@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { Loader2, PhilippinePeso } from 'lucide-react';
+import { Loader2, PhilippinePeso, Pencil, Check } from 'lucide-react';
 import { useRoleCheck } from '@/hooks/useRoleCheck';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import Image from 'next/image';
@@ -41,6 +41,7 @@ export default function PendingCostsPage() {
   const [showAddSupplier, setShowAddSupplier] = useState(false);
   const [addingSupplierFor, setAddingSupplierFor] = useState<string | null>(null);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [editingQtyId, setEditingQtyId] = useState<string | null>(null);
 
   const supabase = useSupabase();
   const { toast } = useToast();
@@ -255,12 +256,27 @@ export default function PendingCostsPage() {
                       </button>
                     </TableCell>
                     <TableCell>
-                      <Input 
-                        type="number"
-                        value={quantities[m.id] !== undefined ? quantities[m.id] : m.quantity_change}
-                        onChange={(e) => setQuantities({ ...quantities, [m.id]: parseInt(e.target.value) || 0 })}
-                        className="h-8 w-20 text-sm"
-                      />
+                      {editingQtyId === m.id ? (
+                        <div className="flex items-center gap-1">
+                          <Input 
+                            type="number"
+                            value={quantities[m.id] !== undefined ? quantities[m.id] : m.quantity_change}
+                            onChange={(e) => setQuantities({ ...quantities, [m.id]: parseInt(e.target.value) || 0 })}
+                            className="h-8 w-20 text-sm"
+                            autoFocus
+                          />
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:text-green-700" onClick={() => setEditingQtyId(null)}>
+                            <Check className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 group min-h-8">
+                          <span>{quantities[m.id] !== undefined ? quantities[m.id] : m.quantity_change}</span>
+                          <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setEditingQtyId(m.id)}>
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">{m.reason}</TableCell>
                     <TableCell>
