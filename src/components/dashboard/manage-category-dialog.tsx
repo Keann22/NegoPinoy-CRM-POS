@@ -65,10 +65,12 @@ export function ManageCategoryDialog({ category, open, onOpenChange, onSuccess }
 
     try {
       if (category) {
+        const slug = values.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
         const { error } = await supabase
           .from('categories')
           .update({
             name: values.name,
+            slug,
             description: values.description,
           })
           .eq('id', category.id);
@@ -80,10 +82,12 @@ export function ManageCategoryDialog({ category, open, onOpenChange, onSuccess }
           description: `"${values.name}" has been updated.`,
         });
       } else {
+        const slug = values.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
         const { error } = await supabase
           .from('categories')
           .insert({
             name: values.name,
+            slug,
             description: values.description,
           });
           
