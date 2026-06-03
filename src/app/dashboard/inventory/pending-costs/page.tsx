@@ -270,9 +270,9 @@ export default function PendingCostsPage() {
                           </Button>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2 group min-h-8">
+                        <div className="flex items-center gap-2 min-h-8">
                           <span>{quantities[m.id] !== undefined ? quantities[m.id] : m.quantity_change}</span>
-                          <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setEditingQtyId(m.id)}>
+                          <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-foreground" onClick={() => setEditingQtyId(m.id)}>
                             <Pencil className="h-3 w-3" />
                           </Button>
                         </div>
