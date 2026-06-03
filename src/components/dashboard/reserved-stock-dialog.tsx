@@ -54,6 +54,7 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose }:
         const { data, error } = await supabase
           .from('order_items')
           .select(`
+            id,
             quantity,
             orders!inner(
               id,
@@ -68,7 +69,7 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose }:
         if (error) throw error;
 
         const formattedOrders: ReservedOrder[] = (data || []).map((item: any) => ({
-          id: item.orders.id,
+          id: item.id,
           orderId: item.orders.id.split('-')[0].toUpperCase(), // Short ID
           customerName: item.orders.customers?.full_name || 'Unknown',
           quantity: item.quantity,
