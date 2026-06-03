@@ -15,7 +15,7 @@ type Product = {
     name: string;
     sku: string;
     quantityOnHand: number;
-    supplier_pricing?: { supplierName: string }[];
+    supplierPricing?: { supplierName: string }[];
     category?: string;
     description?: string;
     images?: string[];
@@ -40,8 +40,8 @@ export function ToOrderReport() {
     const uniqueSuppliers = useMemo(() => {
         const suppliers = new Set<string>();
         toOrder.forEach(p => {
-            if (p.supplier_pricing && Array.isArray(p.supplier_pricing)) {
-                p.supplier_pricing.forEach(sp => suppliers.add(sp.supplierName));
+            if (p.supplierPricing && Array.isArray(p.supplierPricing)) {
+                p.supplierPricing.forEach(sp => suppliers.add(sp.supplierName));
             }
         });
         return Array.from(suppliers).sort();
@@ -50,9 +50,9 @@ export function ToOrderReport() {
     const filteredToOrder = useMemo(() => {
         if (selectedSupplier === 'all') return toOrder;
         return toOrder.filter(p => 
-            p.supplier_pricing && 
-            Array.isArray(p.supplier_pricing) && 
-            p.supplier_pricing.some(sp => sp.supplierName === selectedSupplier)
+            p.supplierPricing && 
+            Array.isArray(p.supplierPricing) && 
+            p.supplierPricing.some(sp => sp.supplierName === selectedSupplier)
         );
     }, [toOrder, selectedSupplier]);
 
@@ -90,8 +90,9 @@ export function ToOrderReport() {
                         <TableRow>
                             <TableHead>SKU</TableHead>
                             <TableHead>Product Name</TableHead>
+                            <TableHead>Supplier</TableHead>
                             <TableHead className="text-center">Needed Qty</TableHead>
-                            <TableHead className="text-center">Actual Qty Bought</TableHead>
+                            <TableHead className="text-center w-32">Actual Qty Bought</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -99,6 +100,7 @@ export function ToOrderReport() {
                             <TableRow key={i}>
                                 <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                                 <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                                <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                                 <TableCell className="text-center"><Skeleton className="h-4 w-12 mx-auto" /></TableCell>
                                 <TableCell className="text-center"><Skeleton className="h-4 w-12 mx-auto" /></TableCell>
                             </TableRow>
@@ -110,6 +112,9 @@ export function ToOrderReport() {
                             >
                                 <TableCell className="font-mono text-xs">{p.sku}</TableCell>
                                 <TableCell className="font-medium">{p.name}</TableCell>
+                                <TableCell className="text-muted-foreground text-sm">
+                                    {p.supplierPricing && p.supplierPricing.length > 0 ? p.supplierPricing.map(sp => sp.supplierName).join(', ') : 'Unassigned'}
+                                </TableCell>
                                 <TableCell className="text-center">
                                     <Badge variant="destructive" className="text-sm px-2">
                                         {Math.abs(p.quantityOnHand)}
