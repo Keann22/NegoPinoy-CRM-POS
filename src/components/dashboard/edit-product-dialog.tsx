@@ -119,12 +119,12 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Ed
   useEffect(() => {
     if (product && open) {
       form.reset({
-        name: product.name,
-        sku: product.sku,
+        name: product.name ?? "",
+        sku: product.sku ?? "",
         shelfLocation: product.shelfLocation || "",
-        description: product.description,
-        categoryId: product.categoryId,
-        sellingPrice: product.sellingPrice,
+        description: product.description ?? "",
+        categoryId: product.categoryId ?? undefined,
+        sellingPrice: product.sellingPrice ?? 0,
         installmentPrice: product.installment_price ?? undefined,
         supplierPricing: product.supplierPricing || [],
         variations: [],
