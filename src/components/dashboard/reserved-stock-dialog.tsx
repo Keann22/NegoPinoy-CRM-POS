@@ -36,6 +36,21 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose }:
       
       setLoading(true);
       try {
+        // 1. Get the product and any of its children if it's a parent
+        const { data: family } = await supabase
+          .from('products')
+          .select('id')
+          .or(`id.eq.${productId},parent_id.eq.${productId}`);
+        
+        const targetProductIds = (family || []).map(f => f.id);
+
+        if (targetProductIds.length === 0) {
+            setReservedOrders([]);
+            setLoading(false);
+            return;
+        }
+
+        // 2. Fetch reservations for any of these IDs
         const { data, error } = await supabase
           .from('order_items')
           .select(`
@@ -47,7 +62,7 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose }:
               customers!inner(name)
             )
           `)
-          .eq('product_id', productId)
+          .in('product_id', targetProductIds)
           .in('orders.status', ['Pending Payment', 'Processing']);
         
         if (error) throw error;
