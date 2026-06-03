@@ -31,7 +31,7 @@ import { useCollection, useUser, useSupabase } from '@/firebase';
 import { AddProductDialog } from '@/components/dashboard/add-product-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BulkUploadProductsDialog } from '@/components/dashboard/bulk-upload-products-dialog';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -129,7 +129,7 @@ export default function ProductsPage() {
       }
     };
     fetchReserved();
-  }, [supabase, products]);
+  }, [supabase]);
 
   const isManagement = useMemo(() => userProfile?.roles?.some(r => ['Admin', 'Owner'].includes(r)), [userProfile]);
 

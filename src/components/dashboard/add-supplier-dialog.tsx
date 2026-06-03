@@ -20,8 +20,19 @@ const supplierSchema = z.object({
   website: z.string().url("Must be a valid URL").optional().or(z.literal('')),
 });
 
-export function AddSupplierDialog() {
-  const [open, setOpen] = useState(false);
+interface AddSupplierDialogProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  onSuccess?: (supplier: { id: string; name: string }) => void;
+  children?: React.ReactNode;
+}
+
+export function AddSupplierDialog({ open: controlledOpen, onOpenChange: setControlledOpen, onSuccess, children }: AddSupplierDialogProps = {}) {
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  
+  const open = controlledOpen !== undefined ? controlledOpen : uncontrolledOpen;
+  const setOpen = setControlledOpen !== undefined ? setControlledOpen : setUncontrolledOpen;
+  
   const supabase = useSupabase();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
@@ -48,7 +59,7 @@ export function AddSupplierDialog() {
     });
 
     try {
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from('suppliers')
             .insert({
                 name: values.name,
@@ -57,9 +68,14 @@ export function AddSupplierDialog() {
                 phone_number: values.phoneNumber || null,
                 facebook_profile_link: values.facebookProfileLink || null,
                 website: values.website || null,
-            });
+            })
+            .select();
 
         if (error) throw error;
+
+        if (data && data.length > 0) {
+            onSuccess?.({ id: data[0].id, name: data[0].name });
+        }
 
         toast({
             title: "Supplier Added",
@@ -81,9 +97,15 @@ export function AddSupplierDialog() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>Add Supplier</Button>
-      </DialogTrigger>
+      {children ? (
+        <DialogTrigger asChild>
+          {children}
+        </DialogTrigger>
+      ) : (
+        <DialogTrigger asChild>
+          <Button>Add Supplier</Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Add New Supplier</DialogTitle>

@@ -12,6 +12,8 @@ import { Loader2, PhilippinePeso } from 'lucide-react';
 import { useRoleCheck } from '@/hooks/useRoleCheck';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import Image from 'next/image';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator } from '@/components/ui/select';
+import { AddSupplierDialog } from '@/components/dashboard/add-supplier-dialog';
 
 type PendingMovement = {
   id: string;
@@ -34,6 +36,9 @@ export default function PendingCostsPage() {
   const [suppliers, setSuppliers] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<PendingMovement['products'] | null>(null);
+  const [allSuppliers, setAllSuppliers] = useState<{id: string, name: string}[]>([]);
+  const [showAddSupplier, setShowAddSupplier] = useState(false);
+  const [addingSupplierFor, setAddingSupplierFor] = useState<string | null>(null);
 
   const supabase = useSupabase();
   const { toast } = useToast();
@@ -61,6 +66,15 @@ export default function PendingCostsPage() {
           .order('timestamp', { ascending: false });
 
         if (error) throw error;
+        
+        const { data: supplierData } = await supabase
+          .from('suppliers')
+          .select('id, name')
+          .order('name');
+        
+        if (supplierData) {
+          setAllSuppliers(supplierData);
+        }
         
         setMovements(data as unknown as PendingMovement[]);
         
@@ -202,12 +216,28 @@ export default function PendingCostsPage() {
                     <TableCell>{m.quantity_change}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{m.reason}</TableCell>
                     <TableCell>
-                      <Input 
-                        placeholder="Supplier..." 
+                      <Select 
                         value={suppliers[m.id] || ''} 
-                        onChange={(e) => setSuppliers({ ...suppliers, [m.id]: e.target.value })}
-                        className="h-8 text-sm"
-                      />
+                        onValueChange={(val) => {
+                          if (val === 'ADD_NEW') {
+                            setAddingSupplierFor(m.id);
+                            setShowAddSupplier(true);
+                          } else {
+                            setSuppliers({ ...suppliers, [m.id]: val });
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="h-8 text-sm w-[180px]">
+                          <SelectValue placeholder="Select supplier..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {allSuppliers.map(s => (
+                            <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
+                          ))}
+                          {allSuppliers.length > 0 && <SelectSeparator />}
+                          <SelectItem value="ADD_NEW" className="text-primary font-medium focus:text-primary focus:bg-primary/10 cursor-pointer">+ Add Supplier</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </TableCell>
                     <TableCell>
                       <Input 
@@ -261,6 +291,16 @@ export default function PendingCostsPage() {
         </div>
       </DialogContent>
     </Dialog>
+    <AddSupplierDialog 
+        open={showAddSupplier} 
+        onOpenChange={setShowAddSupplier} 
+        onSuccess={(newSupplier) => {
+            setAllSuppliers(prev => [...prev, newSupplier].sort((a, b) => a.name.localeCompare(b.name)));
+            if (addingSupplierFor) {
+                setSuppliers({ ...suppliers, [addingSupplierFor]: newSupplier.name });
+            }
+        }} 
+    />
     </>
   );
 }
