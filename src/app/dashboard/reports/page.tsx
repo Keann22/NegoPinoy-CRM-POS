@@ -12,6 +12,7 @@ import { SalesByProductReport } from '@/components/dashboard/reports/sales-by-pr
 import { ToOrderReport } from '@/components/dashboard/reports/to-order-report';
 import { SalesSummaryReport } from '@/components/dashboard/reports/sales-summary-report';
 import { CommissionReport } from '@/components/dashboard/reports/commission-report';
+import { StaleReservationsReport } from '@/components/dashboard/reports/stale-reservations-report';
 import { useMemo } from 'react';
 
 export default function ReportsPage() {
@@ -47,6 +48,10 @@ export default function ReportsPage() {
           <TabsTrigger value="sales-product">Sales by Product</TabsTrigger>
           {(isManagement || isInventory) && (
             <TabsTrigger value="to-order">To Order (Procurement)</TabsTrigger>
+          )}
+          
+          {(isManagement || isSales || isInventory) && (
+            <TabsTrigger value="stale-reservations">Stale Reservations</TabsTrigger>
           )}
           
           {isManagement && (
@@ -90,6 +95,12 @@ export default function ReportsPage() {
       {(isManagement || isInventory) && (
         <TabsContent value="to-order">
           <ToOrderReport />
+        </TabsContent>
+      )}
+
+      {(isManagement || isSales || isInventory) && (
+        <TabsContent value="stale-reservations">
+          <StaleReservationsReport />
         </TabsContent>
       )}
 

@@ -31,6 +31,7 @@ import { useCollection, useUser, useSupabase } from '@/firebase';
 import { AddProductDialog } from '@/components/dashboard/add-product-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BulkUploadProductsDialog } from '@/components/dashboard/bulk-upload-products-dialog';
+import { ReservedStockDialog } from '@/components/dashboard/reserved-stock-dialog';
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   AlertDialog,
@@ -476,7 +477,10 @@ export default function ProductsPage() {
                                   Available: {product.children.reduce((acc, c) => acc + (c.quantityOnHand || 0), 0)}
                               </p>
                               {product.children.reduce((acc, c) => acc + (c.reservedStock || 0), 0) > 0 && (
-                                <p className="text-amber-600 dark:text-amber-400">
+                                <p 
+                                  className="text-amber-600 dark:text-amber-400 cursor-pointer hover:underline"
+                                  onClick={() => setViewingReservedProduct({ id: product.id, name: product.name })}
+                                >
                                     Reserved: {product.children.reduce((acc, c) => acc + (c.reservedStock || 0), 0)}
                                 </p>
                               )}
@@ -490,7 +494,10 @@ export default function ProductsPage() {
                                   Available: {product.quantityOnHand ?? 0}
                               </p>
                               {(product.reservedStock || 0) > 0 && (
-                                <p className="text-amber-600 dark:text-amber-400">
+                                <p 
+                                  className="text-amber-600 dark:text-amber-400 cursor-pointer hover:underline"
+                                  onClick={() => setViewingReservedProduct({ id: product.id, name: product.name })}
+                                >
                                     Reserved: {product.reservedStock}
                                 </p>
                               )}
@@ -566,7 +573,10 @@ export default function ProductsPage() {
                                     Available: {child.quantityOnHand ?? 0}
                                 </p>
                                 {(child.reservedStock || 0) > 0 && (
-                                    <p className="text-amber-600 dark:text-amber-400">
+                                    <p 
+                                      className="text-amber-600 dark:text-amber-400 cursor-pointer hover:underline"
+                                      onClick={() => setViewingReservedProduct({ id: child.id, name: child.variantName || child.name })}
+                                    >
                                         Reserved: {child.reservedStock}
                                     </p>
                                 )}
