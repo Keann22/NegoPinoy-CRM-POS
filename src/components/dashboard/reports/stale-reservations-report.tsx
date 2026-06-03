@@ -44,8 +44,7 @@ export function StaleReservationsReport() {
               customers!inner(name)
             )
           `)
-          .in('orders.status', ['Pending Payment', 'Processing'])
-          .order('orders(order_date)', { ascending: true });
+          .in('orders.status', ['Pending Payment', 'Processing']);
         
         if (error) throw error;
 

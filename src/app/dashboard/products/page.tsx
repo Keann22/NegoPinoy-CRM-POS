@@ -107,6 +107,7 @@ export default function ProductsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [stockFilter, setStockFilter] = useState('all');
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
+  const [viewingReservedProduct, setViewingReservedProduct] = useState<{ id: string; name: string } | null>(null);
   const [reservedStockMap, setReservedStockMap] = useState<Record<string, number>>({});
 
   useEffect(() => {

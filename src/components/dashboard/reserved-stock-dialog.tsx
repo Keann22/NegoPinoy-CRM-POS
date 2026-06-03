@@ -48,8 +48,7 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose }:
             )
           `)
           .eq('product_id', productId)
-          .in('orders.status', ['Pending Payment', 'Processing'])
-          .order('orders(order_date)', { ascending: true });
+          .in('orders.status', ['Pending Payment', 'Processing']);
         
         if (error) throw error;
 
@@ -61,6 +60,8 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose }:
           orderDate: item.orders.order_date,
           status: item.orders.status,
         }));
+
+        formattedOrders.sort((a, b) => new Date(a.orderDate).getTime() - new Date(b.orderDate).getTime());
 
         setReservedOrders(formattedOrders);
       } catch (err) {
