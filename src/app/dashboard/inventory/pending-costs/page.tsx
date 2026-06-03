@@ -26,6 +26,7 @@ type PendingMovement = {
     name: string;
     description?: string;
     images?: string[];
+    supplier_pricing?: any[];
   };
 };
 
@@ -59,7 +60,7 @@ export default function PendingCostsPage() {
             timestamp,
             reason,
             supplier_name,
-            products!inner(name, description, images)
+            products!inner(name, description, images, supplier_pricing)
           `)
           .eq('unit_cost', 0)
           .eq('movement_type', 'RESTOCK')
@@ -124,10 +125,29 @@ export default function PendingCostsPage() {
       
       if (moveError) throw moveError;
 
-      // 2. Update the product's initial_unit_cost
+      // 2. Update the product's initial_unit_cost and supplier_pricing
+      let updatedSupplierPricing = movement.products.supplier_pricing || [];
+      const supplierObj = allSuppliers.find(s => s.name === supplierValue);
+      
+      if (supplierObj) {
+         const existingIndex = updatedSupplierPricing.findIndex((sp: any) => sp.supplierId === supplierObj.id);
+         if (existingIndex >= 0) {
+             updatedSupplierPricing[existingIndex].unitCost = costValue;
+         } else {
+             updatedSupplierPricing.push({
+                 supplierId: supplierObj.id,
+                 supplierName: supplierObj.name,
+                 unitCost: costValue
+             });
+         }
+      }
+
       const { error: prodError } = await supabase
         .from('products')
-        .update({ initial_unit_cost: costValue })
+        .update({ 
+            initial_unit_cost: costValue,
+            supplier_pricing: updatedSupplierPricing 
+        })
         .eq('id', movement.product_id);
 
       if (prodError) throw prodError;
