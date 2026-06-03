@@ -57,7 +57,7 @@ export function ToOrderReport() {
     }, [toOrder, selectedSupplier]);
 
     return (
-        <Card>
+        <Card className="printable-area">
             <CardHeader className="flex flex-row items-start justify-between">
                 <div>
                     <CardTitle>To Order (Procurement List)</CardTitle>

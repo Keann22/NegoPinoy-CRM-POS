@@ -17,28 +17,14 @@ import {
   TableRow,
   TableFooter,
 } from '@/components/ui/table';
-import { useCollection, useSupabase, useUser, collection } from '@/firebase';
+import { useSupabase } from '@/firebase';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useState, useEffect } from 'react';
 
-// Types based on existing files
 type Supplier = {
   id: string;
   name: string;
-};
-
-type StockBatch = {
-  batchId: string;
-  purchaseDate: string; // ISO string
-  originalQty: number;
-  unitCost: number;
-  supplierName: string;
-};
-
-type Product = {
-  id: string;
-  name: string;
-  stockBatches?: StockBatch[];
 };
 
 type PurchaseHistoryItem = {
@@ -59,46 +45,54 @@ interface ViewSupplierHistoryDialogProps {
 
 export function ViewSupplierHistoryDialog({ supplier, open, onOpenChange }: ViewSupplierHistoryDialogProps) {
   const supabase = useSupabase();
-  const { user } = useUser();
 
-  const productsQuery = useMemo(
-    () => (supabase && user ? collection(supabase, 'products') : null),
-    [supabase, user]
-  );
-  const { data: products, isLoading } = useCollection<Product>(productsQuery);
+  const [purchaseHistory, setPurchaseHistory] = useState<PurchaseHistoryItem[]>([]);
+  const [grandTotal, setGrandTotal] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const { purchaseHistory, grandTotal } = useMemo(() => {
-    if (!products || !supplier) {
-      return { purchaseHistory: [], grandTotal: 0 };
-    }
+  useEffect(() => {
+    if (!supplier || !open || !supabase) return;
 
-    const history: PurchaseHistoryItem[] = [];
+    const fetchHistory = async () => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('inventory_movements')
+          .select('id, timestamp, quantity_change, unit_cost, products(name)')
+          .eq('supplier_name', supplier.name)
+          .order('timestamp', { ascending: false });
 
-    products.forEach(product => {
-      if (product.stockBatches) {
-        product.stockBatches.forEach(batch => {
-          if (batch.supplierName === supplier.name) {
-            history.push({
-              productId: product.id,
-              productName: product.name,
-              batchId: batch.batchId,
-              purchaseDate: batch.purchaseDate,
-              quantity: batch.originalQty,
-              unitCost: batch.unitCost,
-              totalCost: batch.originalQty * batch.unitCost,
-            });
-          }
+        if (error) throw error;
+
+        let total = 0;
+        const history: PurchaseHistoryItem[] = (data || []).map((movement: any) => {
+          const qty = movement.quantity_change || 0;
+          const cost = Number(movement.unit_cost) || 0;
+          const itemTotal = qty * cost;
+          total += itemTotal;
+
+          return {
+            productId: '',
+            productName: movement.products?.name || 'Unknown Product',
+            batchId: movement.id,
+            purchaseDate: movement.timestamp,
+            quantity: qty,
+            unitCost: cost,
+            totalCost: itemTotal,
+          };
         });
+
+        setPurchaseHistory(history);
+        setGrandTotal(total);
+      } catch (error) {
+        console.error('Failed to load purchase history:', error);
+      } finally {
+        setIsLoading(false);
       }
-    });
-    
-    // Sort by most recent purchase first
-    history.sort((a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime());
+    };
 
-    const total = history.reduce((sum, item) => sum + item.totalCost, 0);
-
-    return { purchaseHistory: history, grandTotal: total };
-  }, [products, supplier]);
+    fetchHistory();
+  }, [supplier, open, supabase]);
   
   if (!supplier) {
       return null;

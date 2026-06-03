@@ -345,7 +345,7 @@ export function ProcessedOrdersReport() {
         </div>
 
         {/* --- PRINT ONLY CONTENT --- */}
-        <div id="print-area" className="hidden print:block w-full bg-white">
+        <div id="print-area" className="hidden print:block w-full bg-white printable-area">
             <div className="mb-8">
                 <div className="flex justify-between items-center mb-4 border-b-2 border-black pb-2">
                     <h1 className="text-2xl font-bold uppercase">Order Batch Summary</h1>

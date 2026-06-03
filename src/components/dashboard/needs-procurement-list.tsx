@@ -31,7 +31,7 @@ export function NeedsProcurementList({ onAddProduct }: NeedsProcurementListProps
   const { data: products, isLoading } = useCollection<Product>(negativeStockQuery);
 
   return (
-    <Card className="h-full flex flex-col border-destructive/20 shadow-sm">
+    <Card className="h-full flex flex-col border-destructive/20 shadow-sm printable-area">
       <CardHeader className="pb-3 bg-destructive/5 rounded-t-xl">
         <CardTitle className="text-lg font-headline flex items-center justify-between">
           <div className="flex items-center gap-2">
