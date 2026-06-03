@@ -7,6 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { ProcurementProductDetailsDialog } from '@/components/dashboard/procurement-product-details-dialog';
+import { Button } from '@/components/ui/button';
+import { Printer } from 'lucide-react';
 
 type Product = {
     id: string;
@@ -61,7 +63,11 @@ export function ToOrderReport() {
                     <CardTitle>To Order (Procurement List)</CardTitle>
                     <CardDescription>Oversold products that need immediate restocking to fulfill current demand.</CardDescription>
                 </div>
-                <div className="w-[200px]">
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="icon" onClick={() => window.print()} title="Print Procurement List">
+                        <Printer className="h-4 w-4" />
+                    </Button>
+                    <div className="w-[200px]">
                     <select 
                         className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                         value={selectedSupplier}
@@ -75,6 +81,7 @@ export function ToOrderReport() {
                             <option key={s} value={s}>{s}</option>
                         ))}
                     </select>
+                </div>
                 </div>
             </CardHeader>
             <CardContent>

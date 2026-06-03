@@ -184,6 +184,7 @@ export default function CustomerDetailPage() {
                 <TableRow>
                   <TableHead>Order Date</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Assigned Agent</TableHead>
                   <TableHead className="text-right">Total Amount</TableHead>
                   <TableHead><span className="sr-only">Actions</span></TableHead>
                 </TableRow>
@@ -193,6 +194,7 @@ export default function CustomerDetailPage() {
                   <TableRow key={order.id}>
                     <TableCell>{format(new Date(order.orderDate), 'PPP')}</TableCell>
                     <TableCell><Badge variant={getStatusVariant(order.orderStatus)}>{order.orderStatus}</Badge></TableCell>
+                    <TableCell>{order.salesPersonName || 'Unassigned'}</TableCell>
                     <TableCell className="text-right">₱{order.totalAmount.toFixed(2)}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="outline" size="sm" onClick={() => router.push(`/dashboard/orders/${order.id}`)}>

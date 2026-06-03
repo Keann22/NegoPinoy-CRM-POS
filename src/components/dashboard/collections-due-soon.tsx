@@ -30,7 +30,7 @@ export function CollectionsDueSoon() {
 
                 let query = supabase
                     .from('orders')
-                    .select('id, customer_id, balance_due, next_due_date, payment_method, status')
+                    .select('id, customer_id, balance_due, next_due_date, payment_method, status, sales_person_name')
                     .gt('balance_due', 0)
                     .not('next_due_date', 'is', null)
                     .lte('next_due_date', fiveDaysFromNow.toISOString())
@@ -99,6 +99,7 @@ export function CollectionsDueSoon() {
                 <TableRow>
                     <TableHead>Customer</TableHead>
                     <TableHead>Due Date</TableHead>
+                    <TableHead>Agent</TableHead>
                     <TableHead className="text-right">Balance Due</TableHead>
                 </TableRow>
             </TableHeader>
@@ -117,6 +118,9 @@ export function CollectionsDueSoon() {
                                     {format(dueDate, 'MMM d, yyyy')}
                                 </span>
                                 {isOverdue && <Badge variant="destructive" className="ml-2 text-[10px]">Overdue</Badge>}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {order.sales_person_name || 'Unassigned'}
                             </TableCell>
                             <TableCell className="text-right font-semibold text-destructive">
                                 ₱{order.balance_due.toLocaleString('en-US', { minimumFractionDigits: 2 })}

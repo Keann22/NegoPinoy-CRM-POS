@@ -1,9 +1,10 @@
 'use client';
 
-import { MoreHorizontal, Calendar as CalendarIcon, FilterX } from 'lucide-react';
+import { MoreHorizontal, Calendar as CalendarIcon, FilterX, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import {
   Card,
   CardContent,
@@ -78,6 +79,7 @@ export type Order = {
   monthlyPayment?: number;
   insurance_fee?: number;
   tracking_number?: string;
+  salesPersonName?: string;
 };
 
 type Customer = {
@@ -123,6 +125,7 @@ export default function OrdersPage() {
   const [date, setDate] = useState<DateRange | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
   const supabase = useSupabase();
   const { user } = useUser();
@@ -194,6 +197,13 @@ export default function OrdersPage() {
     if (typeFilter !== 'all') {
         filtered = filtered.filter(o => o.paymentType === typeFilter);
     }
+    if (searchQuery.trim() !== '') {
+        const query = searchQuery.toLowerCase().trim();
+        filtered = filtered.filter(o => 
+            (o.id || '').toLowerCase().includes(query) ||
+            (customerMap.get(o.customerId) || '').toLowerCase().includes(query)
+        );
+    }
     if (date?.from) {
         const fromTime = date.from.getTime();
         const toTime = date.to ? endOfDay(date.to).getTime() : endOfDay(date.from).getTime();
@@ -228,7 +238,7 @@ export default function OrdersPage() {
         formattedTotal: `₱${(Number(order.totalAmount) || 0).toFixed(2)}`,
       };
     });
-  }, [orders, customerMap, date, statusFilter, typeFilter]);
+  }, [orders, customerMap, date, statusFilter, typeFilter, searchQuery]);
   
 
   const handleStatusChange = async (orderId: string, newStatus: Order['orderStatus']) => {
@@ -301,6 +311,16 @@ export default function OrdersPage() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap items-center gap-4 mb-6">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search name or ID..."
+                className="w-full bg-background pl-8 md:w-[200px] lg:w-[300px]"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant={"outline"} className={cn("w-[240px] justify-start text-left font-normal", !date && "text-muted-foreground")}>
@@ -336,8 +356,8 @@ export default function OrdersPage() {
               </SelectContent>
             </Select>
 
-            {(date || statusFilter !== 'all' || typeFilter !== 'all') && (
-              <Button variant="ghost" onClick={() => { setDate(undefined); setStatusFilter('all'); setTypeFilter('all'); }} className="text-muted-foreground hover:text-foreground">
+            {(date || statusFilter !== 'all' || typeFilter !== 'all' || searchQuery.trim() !== '') && (
+              <Button variant="ghost" onClick={() => { setDate(undefined); setStatusFilter('all'); setTypeFilter('all'); setSearchQuery(''); }} className="text-muted-foreground hover:text-foreground">
                 <FilterX className="mr-2 h-4 w-4" /> Clear Filters
               </Button>
             )}

@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, PlusCircle } from 'lucide-react';
+import { Loader2, PlusCircle, Printer } from 'lucide-react';
 
 type Product = { id: string; name: string; stock_level: number; variant_name?: string; [key: string]: any; };
 
@@ -34,10 +34,15 @@ export function NeedsProcurementList({ onAddProduct }: NeedsProcurementListProps
     <Card className="h-full flex flex-col border-destructive/20 shadow-sm">
       <CardHeader className="pb-3 bg-destructive/5 rounded-t-xl">
         <CardTitle className="text-lg font-headline flex items-center justify-between">
-          To Procure List
-          {products && products.length > 0 && (
-            <Badge variant="destructive">{products.length} Items</Badge>
-          )}
+          <div className="flex items-center gap-2">
+            To Procure List
+            {products && products.length > 0 && (
+              <Badge variant="destructive">{products.length} Items</Badge>
+            )}
+          </div>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => window.print()} title="Print List">
+            <Printer className="h-4 w-4" />
+          </Button>
         </CardTitle>
         <CardDescription>
           Products with negative stock that need to be purchased.
