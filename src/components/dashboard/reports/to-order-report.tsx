@@ -67,21 +67,6 @@ export function ToOrderReport() {
                     <Button variant="outline" size="icon" onClick={() => window.print()} title="Print Procurement List">
                         <Printer className="h-4 w-4" />
                     </Button>
-                    <div className="w-[200px]">
-                    <select 
-                        className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                        value={selectedSupplier}
-                        onChange={(e) => setSelectedSupplier(e.target.value)}
-                        disabled={uniqueSuppliers.length === 0}
-                    >
-                        <option value="all">
-                            {uniqueSuppliers.length === 0 ? "No Suppliers Assigned" : "All Suppliers"}
-                        </option>
-                        {uniqueSuppliers.map(s => (
-                            <option key={s} value={s}>{s}</option>
-                        ))}
-                    </select>
-                </div>
                 </div>
             </CardHeader>
             <CardContent>
@@ -90,7 +75,6 @@ export function ToOrderReport() {
                         <TableRow>
                             <TableHead>SKU</TableHead>
                             <TableHead>Product Name</TableHead>
-                            <TableHead>Supplier</TableHead>
                             <TableHead className="text-center">Needed Qty</TableHead>
                             <TableHead className="text-center w-32">Actual Qty Bought</TableHead>
                         </TableRow>
@@ -100,7 +84,6 @@ export function ToOrderReport() {
                             <TableRow key={i}>
                                 <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                                 <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                                <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                                 <TableCell className="text-center"><Skeleton className="h-4 w-12 mx-auto" /></TableCell>
                                 <TableCell className="text-center"><Skeleton className="h-4 w-12 mx-auto" /></TableCell>
                             </TableRow>
@@ -112,9 +95,6 @@ export function ToOrderReport() {
                             >
                                 <TableCell className="font-mono text-xs">{p.sku}</TableCell>
                                 <TableCell className="font-medium">{p.name}</TableCell>
-                                <TableCell className="text-muted-foreground text-sm">
-                                    {p.supplierPricing && p.supplierPricing.length > 0 ? p.supplierPricing.map(sp => sp.supplierName).join(', ') : 'Unassigned'}
-                                </TableCell>
                                 <TableCell className="text-center">
                                     <Badge variant="destructive" className="text-sm px-2">
                                         {Math.abs(p.quantityOnHand)}
