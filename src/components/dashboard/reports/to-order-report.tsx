@@ -90,7 +90,8 @@ export function ToOrderReport() {
                         <TableRow>
                             <TableHead>SKU</TableHead>
                             <TableHead>Product Name</TableHead>
-                            <TableHead className="text-right">Stock Level</TableHead>
+                            <TableHead className="text-center">Needed Qty</TableHead>
+                            <TableHead className="text-center">Actual Qty Bought</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -98,7 +99,8 @@ export function ToOrderReport() {
                             <TableRow key={i}>
                                 <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                                 <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                                <TableCell><Skeleton className="h-4 w-12 ml-auto" /></TableCell>
+                                <TableCell className="text-center"><Skeleton className="h-4 w-12 mx-auto" /></TableCell>
+                                <TableCell className="text-center"><Skeleton className="h-4 w-12 mx-auto" /></TableCell>
                             </TableRow>
                         )) : filteredToOrder.map((p, i) => (
                             <TableRow 
@@ -108,10 +110,13 @@ export function ToOrderReport() {
                             >
                                 <TableCell className="font-mono text-xs">{p.sku}</TableCell>
                                 <TableCell className="font-medium">{p.name}</TableCell>
-                                <TableCell className="text-right">
-                                    <Badge variant="destructive">
-                                        {p.quantityOnHand}
+                                <TableCell className="text-center">
+                                    <Badge variant="destructive" className="text-sm px-2">
+                                        {Math.abs(p.quantityOnHand)}
                                     </Badge>
+                                </TableCell>
+                                <TableCell className="text-center">
+                                    <div className="w-16 h-6 border-b border-black mx-auto"></div>
                                 </TableCell>
                             </TableRow>
                         ))}
