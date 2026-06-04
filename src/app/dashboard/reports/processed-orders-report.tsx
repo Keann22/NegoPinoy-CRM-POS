@@ -66,8 +66,7 @@ export function ProcessedOrdersReport() {
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date()),
   });
-  const [activeTab, setActiveTab] = useState<'to-print' | 'printed' | 'reprint'>('to-print');
-  const [reprintOrderId, setReprintOrderId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'to-print' | 'printed'>('to-print');
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
 
   // Clear selection when tab changes
@@ -90,15 +89,7 @@ export function ProcessedOrdersReport() {
       setSelectedOrderIds(next);
   };
 
-  useEffect(() => {
-    if (reprintOrderId) {
-      const timer = setTimeout(() => {
-        window.print();
-        setReprintOrderId(null);
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [reprintOrderId]);
+
 
   const supabase = useSupabase();
   const { user } = useUser();
@@ -154,7 +145,7 @@ export function ProcessedOrdersReport() {
       const orderTime = new Date(order.orderDate).getTime();
       const withinDate = orderTime >= fromTime && orderTime <= toTime;
       const validStatus = order.orderStatus !== 'Cancelled' && order.orderStatus !== 'Returned';
-      const matchesTab = activeTab === 'reprint' ? true : (activeTab === 'to-print' ? !order.isPrinted : !!order.isPrinted);
+      const matchesTab = activeTab === 'to-print' ? !order.isPrinted : !!order.isPrinted;
       
       return withinDate && validStatus && matchesTab;
     });
@@ -280,19 +271,12 @@ export function ProcessedOrdersReport() {
             <CardDescription>View and print orders currently in "Processing" state.</CardDescription>
           </div>
           <div className="flex gap-2">
-            {activeTab !== 'reprint' && (
-                <Button variant="outline" size="sm" onClick={handlePrint} disabled={orders.length === 0}>
-                    <Printer className="mr-2 h-4 w-4" /> {selectedOrderIds.size > 0 ? `Print Selected (${selectedOrderIds.size})` : 'Print All'}
-                </Button>
-            )}
+            <Button variant="outline" size="sm" onClick={handlePrint} disabled={orders.length === 0}>
+                <Printer className="mr-2 h-4 w-4" /> {selectedOrderIds.size > 0 ? `Print Selected (${selectedOrderIds.size})` : 'Print All'}
+            </Button>
             {activeTab === 'to-print' && orders.length > 0 && (
                 <Button variant="default" size="sm" onClick={handleMarkBatchPrinted}>
                     <CheckCircle className="mr-2 h-4 w-4" /> {selectedOrderIds.size > 0 ? 'Mark Selected as Printed' : 'Mark Batch as Printed'}
-                </Button>
-            )}
-            {activeTab === 'reprint' && (
-                <Button variant="outline" size="sm" onClick={handlePrint} disabled={selectedOrderIds.size === 0}>
-                    <Printer className="mr-2 h-4 w-4" /> {selectedOrderIds.size > 0 ? `Print Selected (${selectedOrderIds.size})` : 'Print Selected'}
                 </Button>
             )}
           </div>
@@ -304,7 +288,6 @@ export function ProcessedOrdersReport() {
                 <TabsList>
                     <TabsTrigger value="to-print">To Print</TabsTrigger>
                     <TabsTrigger value="printed">Already Printed</TabsTrigger>
-                    <TabsTrigger value="reprint">Reprint</TabsTrigger>
                 </TabsList>
             </Tabs>
             <Popover>
@@ -378,29 +361,18 @@ export function ProcessedOrdersReport() {
                     </TableCell>
                     <TableCell className="text-right">{order.items?.length || 0}</TableCell>
                     <TableCell className="text-center">
-                        {activeTab === 'reprint' ? (
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                title="Reprint Order"
-                                onClick={() => setReprintOrderId(order.id)}
-                            >
-                                <Printer className="h-4 w-4 text-muted-foreground" />
-                            </Button>
-                        ) : (
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                title={order.isPrinted ? "Mark as To Print" : "Mark as Printed"}
-                                onClick={() => togglePrintStatus(order.id, !!order.isPrinted)}
-                            >
-                                {order.isPrinted ? (
-                                    <Undo2 className="h-4 w-4 text-muted-foreground" />
-                                ) : (
-                                    <Check className="h-4 w-4 text-muted-foreground" />
-                                )}
-                            </Button>
-                        )}
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            title={order.isPrinted ? "Mark as To Print" : "Mark as Printed"}
+                            onClick={() => togglePrintStatus(order.id, !!order.isPrinted)}
+                        >
+                            {order.isPrinted ? (
+                                <Undo2 className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                                <Check className="h-4 w-4 text-muted-foreground" />
+                            )}
+                        </Button>
                     </TableCell>
                 </TableRow>
                 ))}
@@ -409,7 +381,7 @@ export function ProcessedOrdersReport() {
             {!isLoading && orders.length === 0 && (
             <div className="flex flex-col items-center justify-center text-center border-2 border-dashed rounded-lg p-12 mt-4">
                 <p className="text-lg font-semibold">No Orders Found</p>
-                <p className="text-muted-foreground mt-2">There are no orders in the {activeTab === 'to-print' ? '"To Print"' : activeTab === 'printed' ? '"Already Printed"' : '"Reprint Single"'} list.</p>
+                <p className="text-muted-foreground mt-2">There are no orders in the {activeTab === 'to-print' ? '"To Print"' : '"Already Printed"'} list.</p>
             </div>
             )}
         </div>
@@ -417,13 +389,11 @@ export function ProcessedOrdersReport() {
         {/* --- PRINT ONLY CONTENT --- */}
         <div id="print-area" className="hidden print:block w-full bg-white printable-area">
             {(() => {
-                const printOrders = activeTab === 'reprint' && reprintOrderId 
-                    ? orders.filter(o => o.id === reprintOrderId) 
-                    : (selectedOrderIds.size > 0 ? orders.filter(o => selectedOrderIds.has(o.id)) : orders);
+                const printOrders = selectedOrderIds.size > 0 ? orders.filter(o => selectedOrderIds.has(o.id)) : orders;
                 
                 return (
                     <>
-                        {!(activeTab === 'reprint' && reprintOrderId) && (
+                        {activeTab === 'to-print' && (
                         <div className="mb-8">
                             <div className="flex justify-between items-center mb-4 border-b-2 border-black pb-2">
                                 <h1 className="text-2xl font-bold uppercase">Order Batch Summary</h1>
