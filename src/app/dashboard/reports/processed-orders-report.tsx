@@ -68,6 +68,27 @@ export function ProcessedOrdersReport() {
   });
   const [activeTab, setActiveTab] = useState<'to-print' | 'printed' | 'reprint'>('to-print');
   const [reprintOrderId, setReprintOrderId] = useState<string | null>(null);
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
+
+  // Clear selection when tab changes
+  useEffect(() => {
+    setSelectedOrderIds(new Set());
+  }, [activeTab]);
+
+  const toggleSelectAll = () => {
+      if (selectedOrderIds.size === enrichedOrders.length) {
+          setSelectedOrderIds(new Set());
+      } else {
+          setSelectedOrderIds(new Set(enrichedOrders.map(o => o.id)));
+      }
+  };
+
+  const toggleSelect = (id: string) => {
+      const next = new Set(selectedOrderIds);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      setSelectedOrderIds(next);
+  };
 
   useEffect(() => {
     if (reprintOrderId) {
@@ -231,9 +252,10 @@ export function ProcessedOrdersReport() {
   const handleMarkBatchPrinted = async () => {
     if (!supabase || orders.length === 0) return;
     try {
-        const orderIds = orders.map(o => o.id);
+        const orderIds = selectedOrderIds.size > 0 ? Array.from(selectedOrderIds) : orders.map(o => o.id);
         await supabase.from('orders').update({ is_printed: true }).in('id', orderIds);
         setAllOrders(prev => prev.map(o => orderIds.includes(o.id) ? { ...o, isPrinted: true } : o));
+        setSelectedOrderIds(new Set());
     } catch (err) {
         console.error('Error marking batch as printed:', err);
     }
@@ -260,12 +282,17 @@ export function ProcessedOrdersReport() {
           <div className="flex gap-2">
             {activeTab !== 'reprint' && (
                 <Button variant="outline" size="sm" onClick={handlePrint} disabled={orders.length === 0}>
-                    <Printer className="mr-2 h-4 w-4" /> Print Batch
+                    <Printer className="mr-2 h-4 w-4" /> {selectedOrderIds.size > 0 ? `Print Selected (${selectedOrderIds.size})` : 'Print All'}
                 </Button>
             )}
             {activeTab === 'to-print' && orders.length > 0 && (
                 <Button variant="default" size="sm" onClick={handleMarkBatchPrinted}>
-                    <CheckCircle className="mr-2 h-4 w-4" /> Mark Batch as Printed
+                    <CheckCircle className="mr-2 h-4 w-4" /> {selectedOrderIds.size > 0 ? 'Mark Selected as Printed' : 'Mark Batch as Printed'}
+                </Button>
+            )}
+            {activeTab === 'reprint' && (
+                <Button variant="outline" size="sm" onClick={handlePrint} disabled={selectedOrderIds.size === 0}>
+                    <Printer className="mr-2 h-4 w-4" /> {selectedOrderIds.size > 0 ? `Print Selected (${selectedOrderIds.size})` : 'Print Selected'}
                 </Button>
             )}
           </div>
@@ -277,7 +304,7 @@ export function ProcessedOrdersReport() {
                 <TabsList>
                     <TabsTrigger value="to-print">To Print</TabsTrigger>
                     <TabsTrigger value="printed">Already Printed</TabsTrigger>
-                    <TabsTrigger value="reprint">Reprint Single</TabsTrigger>
+                    <TabsTrigger value="reprint">Reprint</TabsTrigger>
                 </TabsList>
             </Tabs>
             <Popover>
@@ -298,6 +325,14 @@ export function ProcessedOrdersReport() {
             <Table>
             <TableHeader>
                 <TableRow>
+                <TableHead className="w-12 text-center">
+                    <input 
+                        type="checkbox" 
+                        className="w-4 h-4 cursor-pointer"
+                        checked={orders.length > 0 && selectedOrderIds.size === orders.length}
+                        onChange={toggleSelectAll}
+                    />
+                </TableHead>
                 <TableHead>Order ID</TableHead>
                 <TableHead>Customer</TableHead>
                 <TableHead>Date</TableHead>
@@ -309,6 +344,7 @@ export function ProcessedOrdersReport() {
             <TableBody>
                 {isLoading && Array.from({ length: 3 }).map((_, i) => (
                 <TableRow key={i}>
+                    <TableCell><Skeleton className="h-4 w-4 mx-auto" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-40" /></TableCell>
@@ -318,7 +354,15 @@ export function ProcessedOrdersReport() {
                 </TableRow>
                 ))}
                 {orders.map((order) => (
-                <TableRow key={order.id || Math.random().toString()}>
+                <TableRow key={order.id || Math.random().toString()} className={selectedOrderIds.has(order.id) ? "bg-muted/50" : ""}>
+                    <TableCell className="text-center">
+                        <input 
+                            type="checkbox" 
+                            className="w-4 h-4 cursor-pointer"
+                            checked={selectedOrderIds.has(order.id)}
+                            onChange={() => toggleSelect(order.id)}
+                        />
+                    </TableCell>
                     <TableCell className="font-mono text-xs">{order.id ? order.id.substring(0, 7).toUpperCase() : 'N/A'}</TableCell>
                     <TableCell className="font-medium">{order.customerName}</TableCell>
                     <TableCell>{order.orderDate && isValid(new Date(order.orderDate)) ? format(new Date(order.orderDate), 'PPP p') : '—'}</TableCell>
@@ -372,41 +416,48 @@ export function ProcessedOrdersReport() {
 
         {/* --- PRINT ONLY CONTENT --- */}
         <div id="print-area" className="hidden print:block w-full bg-white printable-area">
-            {!(activeTab === 'reprint' && reprintOrderId) && (
-            <div className="mb-8">
-                <div className="flex justify-between items-center mb-4 border-b-2 border-black pb-2">
-                    <h1 className="text-2xl font-bold uppercase">Order Batch Summary</h1>
-                    <div className="text-right text-sm">
-                        <p>Date Printed: {format(new Date(), 'PPPP p')}</p>
-                        <p>Total Orders: {orders.length}</p>
-                    </div>
-                </div>
-                <table className="w-full border-collapse border border-black">
-                    <thead>
-                        <tr className="bg-gray-100">
-                            <th className="border border-black px-2 py-1 text-left text-xs uppercase w-[15%]">Order ID</th>
-                            <th className="border border-black px-2 py-1 text-left text-xs uppercase w-[25%]">Customer Name</th>
-                            <th className="border border-black px-2 py-1 text-left text-xs uppercase w-[15%]">Status</th>
-                            <th className="border border-black px-2 py-1 text-left text-xs uppercase w-[45%]">Notes / Shipping Details</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {orders.map(order => (
-                            <tr key={order.id}>
-                                <td className="border border-black px-2 py-1 text-sm font-mono">{order.id.substring(0, 7).toUpperCase()}</td>
-                                <td className="border border-black px-2 py-1 text-sm font-bold">{order.customerName}</td>
-                                <td className="border border-black px-2 py-1 text-xs font-semibold">{order.orderStatus}</td>
-                                <td className="border border-black px-2 py-1 text-xs">{order.shippingDetails || '—'}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-                <div className="page-break-after" />
-            </div>
-            )}
+            {(() => {
+                const printOrders = activeTab === 'reprint' && reprintOrderId 
+                    ? orders.filter(o => o.id === reprintOrderId) 
+                    : (selectedOrderIds.size > 0 ? orders.filter(o => selectedOrderIds.has(o.id)) : orders);
+                
+                return (
+                    <>
+                        {!(activeTab === 'reprint' && reprintOrderId) && (
+                        <div className="mb-8">
+                            <div className="flex justify-between items-center mb-4 border-b-2 border-black pb-2">
+                                <h1 className="text-2xl font-bold uppercase">Order Batch Summary</h1>
+                                <div className="text-right text-sm">
+                                    <p>Date Printed: {format(new Date(), 'PPPP p')}</p>
+                                    <p>Total Orders: {printOrders.length}</p>
+                                </div>
+                            </div>
+                            <table className="w-full border-collapse border border-black">
+                                <thead>
+                                    <tr className="bg-gray-100">
+                                        <th className="border border-black px-2 py-1 text-left text-xs uppercase w-[15%]">Order ID</th>
+                                        <th className="border border-black px-2 py-1 text-left text-xs uppercase w-[25%]">Customer Name</th>
+                                        <th className="border border-black px-2 py-1 text-left text-xs uppercase w-[15%]">Status</th>
+                                        <th className="border border-black px-2 py-1 text-left text-xs uppercase w-[45%]">Notes / Shipping Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {printOrders.map(order => (
+                                        <tr key={order.id}>
+                                            <td className="border border-black px-2 py-1 text-sm font-mono">{order.id.substring(0, 7).toUpperCase()}</td>
+                                            <td className="border border-black px-2 py-1 text-sm font-bold">{order.customerName}</td>
+                                            <td className="border border-black px-2 py-1 text-xs font-semibold">{order.orderStatus}</td>
+                                            <td className="border border-black px-2 py-1 text-xs">{order.shippingDetails || '—'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            <div className="page-break-after" />
+                        </div>
+                        )}
 
-            <div className="font-sans text-sm pb-10">
-                {(activeTab === 'reprint' && reprintOrderId ? orders.filter(o => o.id === reprintOrderId) : orders).map((order, idx, arr) => (
+                        <div className="font-sans text-sm pb-10">
+                            {printOrders.map((order, idx, arr) => (
                     <div key={order.id} className="mb-4 break-inside-avoid">
                         <div className="border-2 border-black flex flex-col">
                             {/* Header Section */}
@@ -496,6 +547,9 @@ export function ProcessedOrdersReport() {
                     </div>
                 ))}
             </div>
+            </>
+            );
+            })()}
         </div>
       </CardContent>
       <style>{`
