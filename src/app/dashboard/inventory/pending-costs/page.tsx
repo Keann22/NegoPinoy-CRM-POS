@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { Loader2, PhilippinePeso, Pencil, Check } from 'lucide-react';
+import { Loader2, PhilippinePeso, Pencil, Check, Trash2 } from 'lucide-react';
 import { useRoleCheck } from '@/hooks/useRoleCheck';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import Image from 'next/image';
@@ -42,6 +42,7 @@ export default function PendingCostsPage() {
   const [addingSupplierFor, setAddingSupplierFor] = useState<string | null>(null);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [editingQtyId, setEditingQtyId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const supabase = useSupabase();
   const { toast } = useToast();
@@ -198,6 +199,32 @@ export default function PendingCostsPage() {
     }
   };
 
+  const handleDelete = async (movement: PendingMovement) => {
+    if (!window.confirm(`Are you sure you want to delete this pending receive for ${movement.products.name}? This will also subtract ${movement.quantity_change} from the inventory.`)) {
+        return;
+    }
+
+    setDeletingId(movement.id);
+    try {
+        const { data: prodData, error: prodErr } = await supabase.from('products').select('stock_level').eq('id', movement.product_id).single();
+        if (prodErr) throw prodErr;
+        
+        const { error: updateErr } = await supabase.from('products').update({ stock_level: Math.max(0, (prodData.stock_level || 0) - movement.quantity_change) }).eq('id', movement.product_id);
+        if (updateErr) throw updateErr;
+
+        const { error: delErr } = await supabase.from('inventory_movements').delete().eq('id', movement.id);
+        if (delErr) throw delErr;
+
+        toast({ title: 'Deleted', description: 'The pending receipt has been deleted and inventory adjusted.' });
+        setMovements(prev => prev.filter(m => m.id !== movement.id));
+    } catch (error) {
+        console.error("Error deleting pending cost:", error);
+        toast({ variant: 'destructive', title: 'Delete Failed', description: 'Could not delete the pending receipt.' });
+    } finally {
+        setDeletingId(null);
+    }
+  };
+
   if (isRoleLoading || isLoading) {
     return <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   }
@@ -314,13 +341,25 @@ export default function PendingCostsPage() {
                       />
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button 
-                        size="sm" 
-                        onClick={() => handleSave(m)} 
-                        disabled={savingId === m.id || !costs[m.id]}
-                      >
-                        {savingId === m.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
-                      </Button>
+                      <div className="flex items-center justify-end gap-2">
+                          <Button 
+                            size="icon" 
+                            variant="ghost" 
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => handleDelete(m)} 
+                            disabled={deletingId === m.id || savingId === m.id}
+                            title="Delete this receipt"
+                          >
+                            {deletingId === m.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            onClick={() => handleSave(m)} 
+                            disabled={savingId === m.id || deletingId === m.id || !costs[m.id]}
+                          >
+                            {savingId === m.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
+                          </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
