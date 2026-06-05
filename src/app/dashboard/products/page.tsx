@@ -68,6 +68,7 @@ export type Product = {
   initial_unit_cost?: number;
   parentId?: string | null;
   variantName?: string | null;
+  assembly_recipe?: { productId: string; productName: string; quantity: number }[] | null;
 };
 
 export type FormattedProduct = Product & {

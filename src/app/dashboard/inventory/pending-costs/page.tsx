@@ -24,6 +24,7 @@ type PendingMovement = {
   supplier_name: string | null;
   products: {
     name: string;
+    sku?: string | null;
     description?: string;
     images?: string[];
     supplier_pricing?: any[];
@@ -63,7 +64,7 @@ export default function PendingCostsPage() {
             timestamp,
             reason,
             supplier_name,
-            products!inner(name, description, images, supplier_pricing)
+            products!inner(name, sku, description, images, supplier_pricing)
           `)
           .eq('unit_cost', 0)
           .eq('movement_type', 'RESTOCK')
@@ -277,9 +278,10 @@ export default function PendingCostsPage() {
                     <TableCell className="font-medium">
                       <button 
                         onClick={() => setSelectedProduct(m.products)}
-                        className="text-primary hover:underline text-left transition-colors"
+                        className="text-primary hover:underline text-left transition-colors flex flex-col"
                       >
-                        {m.products.name}
+                        <span>{m.products.name}</span>
+                        {m.products.sku && <span className="text-xs text-muted-foreground font-mono mt-0.5">{m.products.sku}</span>}
                       </button>
                     </TableCell>
                     <TableCell>

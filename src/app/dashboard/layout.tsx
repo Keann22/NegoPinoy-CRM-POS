@@ -16,6 +16,7 @@ import {
   Menu,
   MessageCircle,
   Package,
+  PackagePlus,
   Repeat,
   Upload,
   Bot,
@@ -88,6 +89,7 @@ export default function DashboardLayout({
         { href: '/dashboard/inventory/receive', label: 'Bulk Receive', icon: Truck },
         { href: '/dashboard/inventory/restock', label: 'Restock / Purchase', icon: ArrowDownUp },
         { href: '/dashboard/inventory/batches', label: 'Stock Batch List', icon: ListChecks },
+        { href: '/dashboard/inventory/assemble', label: 'Assemble Kits', icon: PackagePlus },
         { href: '/dashboard/inventory/movements', label: 'Inventory History', icon: History }
       ];
 

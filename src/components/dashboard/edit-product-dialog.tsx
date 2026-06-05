@@ -44,6 +44,11 @@ const editProductSchema = z.object({
       quantityOnHand: z.coerce.number().int().min(0, "Stock must be a non-negative integer"),
       images: z.custom<File[]>().optional(),
   })).optional().default([]),
+  assemblyRecipe: z.array(z.object({
+      productId: z.string().min(1),
+      productName: z.string(),
+      quantity: z.coerce.number().min(1)
+  })).optional().default([]),
 });
 
 type EditProductFormValues = z.infer<typeof editProductSchema>;
@@ -62,6 +67,7 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Ed
   const { userProfile } = useUserProfile();
 
   const [supplierSearch, setSupplierSearch] = useState('');
+  const [componentSearch, setComponentSearch] = useState('');
   const [localProduct, setLocalProduct] = useState<FormattedProduct | null>(null);
 
   useEffect(() => {
@@ -97,12 +103,32 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Ed
   );
   const { data: categoryResults, isLoading: isLoadingCategories } = useCollection<{ id: string, name: string }>(categoriesQuery);
 
+  const productSearchQuery = useMemo(
+    () => {
+      if (!supabase || !user || !isManagement || componentSearch.length < 1) return null;
+      const searchTermCapitalized = componentSearch.charAt(0).toUpperCase() + componentSearch.slice(1);
+      return {
+        path: 'products',
+        constraints: [
+            { type: 'orderBy', field: 'name' },
+            { type: 'where', field: 'name', op: '>=', value: searchTermCapitalized },
+            { type: 'where', field: 'name', op: '<=', value: searchTermCapitalized + '\uf8ff' },
+            { type: 'limit', value: 10 }
+        ]
+      };
+    },
+    [user, componentSearch, isManagement]
+  );
+  const { data: componentResults, isLoading: isLoadingComponents } = useCollection<{ id: string, name: string }>(productSearchQuery);
+
+
 
   const form = useForm<EditProductFormValues>({
     resolver: zodResolver(editProductSchema),
     defaultValues: {
       supplierPricing: [],
-      variations: []
+      variations: [],
+      assemblyRecipe: []
     }
   });
 
@@ -114,6 +140,11 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Ed
   const { fields: variationFields, append: appendVariation, remove: removeVariation } = useFieldArray({
       control: form.control,
       name: "variations"
+  });
+
+  const { fields: recipeFields, append: appendRecipe, remove: removeRecipe } = useFieldArray({
+      control: form.control,
+      name: "assemblyRecipe"
   });
 
   useEffect(() => {
@@ -128,11 +159,13 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Ed
         installmentPrice: product.installment_price ?? undefined,
         supplierPricing: product.supplierPricing || [],
         variations: [],
+        assemblyRecipe: product.assembly_recipe || [],
       });
       
     } else if (!open) {
       form.reset();
       setSupplierSearch('');
+      setComponentSearch('');
     }
   }, [product, open, form, supabase, isManagement]);
   
@@ -173,7 +206,7 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Ed
       description: `Your product "${values.name}" is being updated.`,
     });
 
-    const { images: imageFiles, supplierPricing, variations, ...productCoreData } = values;
+    const { images: imageFiles, supplierPricing, variations, assemblyRecipe, ...productCoreData } = values;
 
     try {
         let uploadedImageUrls: string[] = displayProduct.images || [];
@@ -213,7 +246,8 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Ed
                 selling_price: productCoreData.sellingPrice,
                 installment_price: values.installmentPrice ?? null,
                 images: uploadedImageUrls,
-                supplier_pricing: supplierPricing || []
+                supplier_pricing: supplierPricing || [],
+                assembly_recipe: assemblyRecipe || []
             })
             .eq('id', displayProduct.id);
 
@@ -515,6 +549,80 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Ed
                       </Command>
                   </div>
                 )}
+                
+                {/* ---- Assembly Recipe ---- */}
+                {isManagement && (
+                  <div className="space-y-4 rounded-lg border p-4">
+                      <FormLabel className="text-base">Assembly Recipe (Bundling)</FormLabel>
+                      <DialogDescription>
+                          If this product is a bundle (e.g. Wok + Cover), add the individual component products here. This allows the Assemble Kit tool to know what parts to deduct.
+                      </DialogDescription>
+                      <div className="space-y-2">
+                        {recipeFields.map((field, index) => (
+                            <div key={field.id} className="p-3 bg-muted/50 rounded-md border flex items-center justify-between gap-4">
+                                <div className="flex-1">
+                                    <span className="text-sm font-semibold">{field.productName}</span>
+                                </div>
+                                <div className="w-24">
+                                    <FormField
+                                        control={form.control}
+                                        name={`assemblyRecipe.${index}.quantity`}
+                                        render={({ field: qtyField }) => (
+                                            <FormItem>
+                                                <FormControl>
+                                                    <Input type="number" min="1" className="h-8" {...qtyField} />
+                                                </FormControl>
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+                                <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeRecipe(index)}>
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                            </div>
+                        ))}
+                      </div>
+
+                      <Command className="rounded-lg border">
+                          <CommandInput 
+                              placeholder="Search to add a component product..." 
+                              value={componentSearch} 
+                              onValueChange={setComponentSearch}
+                          />
+                          {componentSearch.length > 0 && (
+                              <CommandList>
+                                  {isLoadingComponents && <CommandItem disabled>Searching...</CommandItem>}
+                                  {componentResults && componentResults.length > 0 && (
+                                      <CommandGroup>
+                                      {componentResults.map((s) => (
+                                          <CommandItem
+                                              key={s.id}
+                                              value={s.name}
+                                              onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                              onSelect={() => {
+                                                  const alreadyAdded = recipeFields.some(f => f.productId === s.id);
+                                                  if (!alreadyAdded) {
+                                                      appendRecipe({
+                                                          productId: s.id,
+                                                          productName: s.name,
+                                                          quantity: 1
+                                                      });
+                                                  }
+                                                  setComponentSearch('');
+                                              }}
+                                          >
+                                              {s.name}
+                                          </CommandItem>
+                                      ))}
+                                      </CommandGroup>
+                                  )}
+                                  {!isLoadingComponents && (!componentResults || componentResults.length === 0) && componentSearch.length > 1 && <CommandEmpty>No components found.</CommandEmpty>}
+                              </CommandList>
+                          )}
+                      </Command>
+                  </div>
+                )}
+                
                 <div className="pt-4 border-t space-y-4">
                     {displayProduct.children && displayProduct.children.length > 0 && (
                         <div className="space-y-3 mb-6">
