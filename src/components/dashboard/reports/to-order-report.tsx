@@ -15,7 +15,7 @@ type Product = {
     name: string;
     sku: string;
     quantityOnHand: number;
-    supplierPricing?: { supplierName: string }[];
+    supplierPricing?: { supplierName: string, supplierCode?: string }[];
     category?: string;
     description?: string;
     images?: string[];
@@ -73,10 +73,10 @@ export function ToOrderReport() {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>SKU</TableHead>
-                            <TableHead>Product Name</TableHead>
-                            <TableHead className="text-center">Needed Qty</TableHead>
-                            <TableHead className="text-center w-32">Actual Qty Bought</TableHead>
+                            <TableHead className="py-2">Supplier Code</TableHead>
+                            <TableHead className="py-2">Product Name</TableHead>
+                            <TableHead className="text-center py-2">Needed Qty</TableHead>
+                            <TableHead className="text-center w-32 py-2">Actual Qty Bought</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -93,15 +93,25 @@ export function ToOrderReport() {
                                 className="cursor-pointer hover:bg-muted/50 transition-colors"
                                 onClick={() => setSelectedProduct(p)}
                             >
-                                <TableCell className="font-mono text-xs">{p.sku}</TableCell>
-                                <TableCell className="font-medium">{p.name}</TableCell>
-                                <TableCell className="text-center">
-                                    <Badge variant="destructive" className="text-sm px-2">
+                                <TableCell className="font-mono text-xs py-1.5">
+                                    {(() => {
+                                        if (!p.supplierPricing) return '';
+                                        if (selectedSupplier !== 'all') {
+                                            const sp = p.supplierPricing.find(s => s.supplierName === selectedSupplier);
+                                            if (sp?.supplierCode) return sp.supplierCode;
+                                        }
+                                        const firstSp = p.supplierPricing.find(s => s.supplierCode);
+                                        return firstSp?.supplierCode || '';
+                                    })()}
+                                </TableCell>
+                                <TableCell className="font-medium py-1.5 text-sm">{p.name}</TableCell>
+                                <TableCell className="text-center py-1.5">
+                                    <Badge variant="destructive" className="text-xs px-1.5 py-0">
                                         {Math.abs(p.quantityOnHand)}
                                     </Badge>
                                 </TableCell>
-                                <TableCell className="text-center">
-                                    <div className="w-16 h-6 border-b border-black mx-auto"></div>
+                                <TableCell className="text-center py-1.5">
+                                    <div className="w-16 h-4 border-b border-black mx-auto"></div>
                                 </TableCell>
                             </TableRow>
                         ))}
