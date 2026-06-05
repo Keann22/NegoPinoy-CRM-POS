@@ -428,15 +428,32 @@ export function OrderDialog(props: OrderDialogProps) {
         }
       }
 
-      // 2. Fetch products to get current stock and unit cost
+      // 2. Fetch products to get current stock, unit cost, and assembly recipes
       const productIds = values.orderItems.map(item => item.productId);
       const { data: products, error: productsError } = await supabase
         .from('products')
-        .select('id, stock_level, initial_unit_cost, name')
+        .select('id, stock_level, initial_unit_cost, name, assembly_recipe')
         .in('id', productIds);
 
       if (productsError) throw productsError;
       const productDataMap = new Map(products.map(p => [p.id, p]));
+
+      // 2.5 Fetch components if any product is a bundle
+      const componentIds = new Set<string>();
+      products.forEach(p => {
+        if (p.assembly_recipe && Array.isArray(p.assembly_recipe)) {
+          p.assembly_recipe.forEach((comp: any) => componentIds.add(comp.productId));
+        }
+      });
+      const componentDataMap = new Map();
+      if (componentIds.size > 0) {
+        const { data: components, error: compError } = await supabase
+          .from('products')
+          .select('id, stock_level, initial_unit_cost, name')
+          .in('id', Array.from(componentIds));
+        if (compError) throw compError;
+        components.forEach(c => componentDataMap.set(c.id, c));
+      }
 
       // 3. Update products, insert order items and inventory movements
       for (const item of values.orderItems) {
@@ -445,21 +462,75 @@ export function OrderDialog(props: OrderDialogProps) {
           throw new Error(`Product "${item.productName}" not found.`);
         }
 
-        const unitCost = product.initial_unit_cost || 0;
         const isOldOrder = values.orderDate < new Date('2026-06-01T00:00:00+08:00');
+        let unitCost = product.initial_unit_cost || 0;
 
-        if (!isOldOrder) {
-          const newStockLevel = (product.stock_level || 0) - item.quantity;
-          // Update product stock level
-          const { error: updateError } = await supabase
-            .from('products')
-            .update({ stock_level: newStockLevel })
-            .eq('id', item.productId);
+        if (product.assembly_recipe && Array.isArray(product.assembly_recipe) && product.assembly_recipe.length > 0) {
+          // Dynamic Bundling logic
+          unitCost = 0;
+          for (const comp of product.assembly_recipe) {
+             const compData = componentDataMap.get(comp.productId);
+             if (!compData) throw new Error(`Component "${comp.productName}" not found for bundle "${product.name}".`);
+             
+             // Calculate cost sum
+             unitCost += (compData.initial_unit_cost || 0) * comp.quantity;
 
-          if (updateError) throw updateError;
+             if (!isOldOrder) {
+               // Update component stock level
+               const newStockLevel = (compData.stock_level || 0) - (item.quantity * comp.quantity);
+               const { error: updateError } = await supabase
+                 .from('products')
+                 .update({ stock_level: newStockLevel })
+                 .eq('id', comp.productId);
+               if (updateError) throw updateError;
+               
+               // Update componentMap so multiple bundles using the same component deduct properly in memory
+               compData.stock_level = newStockLevel;
+
+               // Insert movement for component
+               const { error: movementError } = await supabase
+                .from('inventory_movements')
+                .insert({
+                  product_id: comp.productId,
+                  quantity_change: -(item.quantity * comp.quantity),
+                  movement_type: 'sale',
+                  timestamp: new Date().toISOString(),
+                  reason: `Order ${newOrderId} (Bundle: ${product.name})`,
+                  unit_cost: compData.initial_unit_cost || 0
+                });
+               if (movementError) throw movementError;
+             }
+          }
+        } else {
+          // Standard logic
+          if (!isOldOrder) {
+            const newStockLevel = (product.stock_level || 0) - item.quantity;
+            // Update product stock level
+            const { error: updateError } = await supabase
+              .from('products')
+              .update({ stock_level: newStockLevel })
+              .eq('id', item.productId);
+
+            if (updateError) throw updateError;
+            product.stock_level = newStockLevel;
+
+            // Create inventory movement
+            const { error: movementError } = await supabase
+              .from('inventory_movements')
+              .insert({
+                product_id: item.productId,
+                quantity_change: -item.quantity,
+                movement_type: 'sale',
+                timestamp: new Date().toISOString(),
+                reason: `Order ${newOrderId}`,
+                unit_cost: unitCost
+              });
+
+            if (movementError) throw movementError;
+          }
         }
 
-        // Insert order item
+        // Insert order item (represents the Bundle, using the sum cost if it's a bundle)
         const { error: orderItemError } = await supabase
           .from('order_items')
           .insert({
@@ -474,22 +545,6 @@ export function OrderDialog(props: OrderDialogProps) {
           });
 
         if (orderItemError) throw orderItemError;
-
-        if (!isOldOrder) {
-          // Create inventory movement
-          const { error: movementError } = await supabase
-            .from('inventory_movements')
-            .insert({
-              product_id: item.productId,
-              quantity_change: -item.quantity,
-              movement_type: 'sale',
-              timestamp: new Date().toISOString(),
-              reason: `Order ${newOrderId}`,
-              unit_cost: unitCost
-            });
-
-          if (movementError) throw movementError;
-        }
       }
 
       // 4. Log payment if amountPaid > 0
@@ -582,20 +637,43 @@ export function OrderDialog(props: OrderDialogProps) {
       // 1. REVERT OLD INVENTORY
       const wasOldOrder = new Date(order.orderDate) < new Date('2026-06-01T00:00:00+08:00');
       if (!wasOldOrder) {
-        for (const oldItem of initialOrderItems) {
-          const { data: product } = await supabase.from('products').select('stock_level').eq('id', oldItem.productId).single();
-          if (product) {
-            const newStock = (product.stock_level || 0) + oldItem.quantity;
-            await supabase.from('products').update({ stock_level: newStock }).eq('id', oldItem.productId);
+        const oldProductIds = initialOrderItems.map(item => item.productId);
+        const { data: oldProducts } = await supabase.from('products').select('id, stock_level, assembly_recipe').in('id', oldProductIds);
+        const oldProductMap = new Map((oldProducts || []).map(p => [p.id, p]));
 
-            await supabase.from('inventory_movements').insert({
-              product_id: oldItem.productId,
-              quantity_change: oldItem.quantity,
-              movement_type: 'adjustment',
-              timestamp: new Date().toISOString(),
-              reason: `Order Edit Reversal for ${order.id}`,
-              unit_cost: oldItem.costPriceAtSale
-            });
+        for (const oldItem of initialOrderItems) {
+          const product = oldProductMap.get(oldItem.productId);
+          if (product) {
+            if (product.assembly_recipe && Array.isArray(product.assembly_recipe) && product.assembly_recipe.length > 0) {
+              for (const comp of product.assembly_recipe) {
+                const { data: compData } = await supabase.from('products').select('stock_level, initial_unit_cost').eq('id', comp.productId).single();
+                if (compData) {
+                  const revertQty = oldItem.quantity * comp.quantity;
+                  const newStock = (compData.stock_level || 0) + revertQty;
+                  await supabase.from('products').update({ stock_level: newStock }).eq('id', comp.productId);
+                  await supabase.from('inventory_movements').insert({
+                    product_id: comp.productId,
+                    quantity_change: revertQty,
+                    movement_type: 'adjustment',
+                    timestamp: new Date().toISOString(),
+                    reason: `Order Edit Reversal for ${order.id} (Bundle: ${oldItem.productName})`,
+                    unit_cost: compData.initial_unit_cost || 0
+                  });
+                }
+              }
+            } else {
+              const newStock = (product.stock_level || 0) + oldItem.quantity;
+              await supabase.from('products').update({ stock_level: newStock }).eq('id', oldItem.productId);
+
+              await supabase.from('inventory_movements').insert({
+                product_id: oldItem.productId,
+                quantity_change: oldItem.quantity,
+                movement_type: 'adjustment',
+                timestamp: new Date().toISOString(),
+                reason: `Order Edit Reversal for ${order.id}`,
+                unit_cost: oldItem.costPriceAtSale
+              });
+            }
           }
         }
       }
@@ -604,19 +682,65 @@ export function OrderDialog(props: OrderDialogProps) {
 
       // 2. APPLY NEW INVENTORY
       const productIds = values.orderItems.map(item => item.productId);
-      const { data: products } = await supabase.from('products').select('id, stock_level, initial_unit_cost, name').in('id', productIds);
+      const { data: products } = await supabase.from('products').select('id, stock_level, initial_unit_cost, name, assembly_recipe').in('id', productIds);
       const productDataMap = new Map((products || []).map(p => [p.id, p]));
+
+      // 2.5 Fetch components
+      const componentIds = new Set<string>();
+      (products || []).forEach(p => {
+        if (p.assembly_recipe && Array.isArray(p.assembly_recipe)) {
+          p.assembly_recipe.forEach((comp: any) => componentIds.add(comp.productId));
+        }
+      });
+      const componentDataMap = new Map();
+      if (componentIds.size > 0) {
+        const { data: components } = await supabase.from('products').select('id, stock_level, initial_unit_cost, name').in('id', Array.from(componentIds));
+        (components || []).forEach(c => componentDataMap.set(c.id, c));
+      }
 
       for (const item of values.orderItems) {
         const product = productDataMap.get(item.productId);
         if (!product) throw new Error(`Product "${item.productName}" not found.`);
 
-        const unitCost = product.initial_unit_cost || 0;
         const isOldOrder = values.orderDate < new Date('2026-06-01T00:00:00+08:00');
+        let unitCost = product.initial_unit_cost || 0;
 
-        if (!isOldOrder) {
-          const newStockLevel = (product.stock_level || 0) - item.quantity;
-          await supabase.from('products').update({ stock_level: newStockLevel }).eq('id', item.productId);
+        if (product.assembly_recipe && Array.isArray(product.assembly_recipe) && product.assembly_recipe.length > 0) {
+           unitCost = 0;
+           for (const comp of product.assembly_recipe) {
+             const compData = componentDataMap.get(comp.productId);
+             if (!compData) throw new Error(`Component "${comp.productName}" not found for bundle "${product.name}".`);
+             unitCost += (compData.initial_unit_cost || 0) * comp.quantity;
+
+             if (!isOldOrder) {
+               const newStockLevel = (compData.stock_level || 0) - (item.quantity * comp.quantity);
+               await supabase.from('products').update({ stock_level: newStockLevel }).eq('id', comp.productId);
+               compData.stock_level = newStockLevel;
+
+               await supabase.from('inventory_movements').insert({
+                 product_id: comp.productId,
+                 quantity_change: -(item.quantity * comp.quantity),
+                 movement_type: 'sale',
+                 timestamp: new Date().toISOString(),
+                 reason: `Order Edited ${order.id} (Bundle: ${product.name})`,
+                 unit_cost: compData.initial_unit_cost || 0
+               });
+             }
+           }
+        } else {
+           if (!isOldOrder) {
+             const newStockLevel = (product.stock_level || 0) - item.quantity;
+             await supabase.from('products').update({ stock_level: newStockLevel }).eq('id', item.productId);
+             product.stock_level = newStockLevel;
+             await supabase.from('inventory_movements').insert({
+               product_id: item.productId,
+               quantity_change: -item.quantity,
+               movement_type: 'sale',
+               timestamp: new Date().toISOString(),
+               reason: `Order Edited ${order.id}`,
+               unit_cost: unitCost
+             });
+           }
         }
 
         await supabase.from('order_items').insert({
@@ -629,17 +753,6 @@ export function OrderDialog(props: OrderDialogProps) {
           selling_price_at_sale: item.sellingPriceAtSale,
           discount: item.discount || 0
         });
-
-        if (!isOldOrder) {
-          await supabase.from('inventory_movements').insert({
-            product_id: item.productId,
-            quantity_change: -item.quantity,
-            movement_type: 'sale',
-            timestamp: new Date().toISOString(),
-            reason: `Order Edited ${order.id}`,
-            unit_cost: unitCost
-          });
-        }
       }
 
       // 3. UPDATE ORDER

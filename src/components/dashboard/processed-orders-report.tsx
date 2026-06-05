@@ -43,7 +43,7 @@ type Order = {
   customerId: string;
   orderDate: string; // ISO string
   totalAmount: number;
-  orderStatus: 'Pending Payment' | 'Processing' | 'Shipped' | 'Completed' | 'Cancelled';
+  orderStatus: 'Pending Payment' | 'Processing' | 'Packed' | 'Shipped' | 'Completed' | 'Cancelled';
   paymentType: 'Full Payment' | 'Lay-away' | 'Installment';
 };
 

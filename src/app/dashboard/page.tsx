@@ -30,7 +30,7 @@ type Order = {
   id: string;
   totalAmount: number;
   balanceDue: number;
-  orderStatus: 'Pending Payment' | 'Processing' | 'Shipped' | 'Completed' | 'Cancelled' | 'Returned';
+  orderStatus: 'Pending Payment' | 'Processing' | 'Packed' | 'Shipped' | 'Completed' | 'Cancelled' | 'Returned';
 };
 
 type OrderItem = {

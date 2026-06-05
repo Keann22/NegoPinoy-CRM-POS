@@ -47,7 +47,7 @@ type Order = {
   totalAmount: number;
   orderDate: string; // ISO string
   salesPersonId: string;
-  orderStatus: 'Pending Payment' | 'Processing' | 'Shipped' | 'Completed' | 'Cancelled';
+  orderStatus: 'Pending Payment' | 'Processing' | 'Packed' | 'Shipped' | 'Completed' | 'Cancelled';
 };
 
 // Matches a subset of the Firestore document structure for a user

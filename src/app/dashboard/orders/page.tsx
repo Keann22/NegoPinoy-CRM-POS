@@ -73,7 +73,7 @@ export type Order = {
   totalAmount: number;
   amountPaid: number;
   balanceDue: number;
-  orderStatus: 'Pending Payment' | 'Processing' | 'Shipped' | 'Completed' | 'Cancelled' | 'Returned' | 'Payment Received (COD)';
+  orderStatus: 'Pending Payment' | 'Processing' | 'Packed' | 'Shipped' | 'Completed' | 'Cancelled' | 'Returned' | 'Payment Received (COD)';
   paymentType: 'Full Payment' | 'Lay-away' | 'Installment' | 'COD' | 'Pending';
   installmentMonths?: number;
   monthlyPayment?: number;
@@ -112,7 +112,7 @@ const getStatusVariant = (status: Order['orderStatus']) => {
   }
 }
 
-const statuses: Order['orderStatus'][] = ['Pending Payment', 'Processing', 'Shipped', 'Completed', 'Payment Received (COD)', 'Returned', 'Cancelled'];
+const statuses: Order['orderStatus'][] = ['Pending Payment', 'Processing', 'Packed', 'Shipped', 'Completed', 'Payment Received (COD)', 'Returned', 'Cancelled'];
 
 export default function OrdersPage() {
   const router = useRouter();
