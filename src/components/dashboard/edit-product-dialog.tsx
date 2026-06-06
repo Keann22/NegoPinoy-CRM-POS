@@ -140,7 +140,6 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Ed
     } else if (!open) {
       form.reset();
       setSupplierSearch('');
-      setComponentSearch('');
     }
   }, [product, open, form, supabase, isManagement]);
   

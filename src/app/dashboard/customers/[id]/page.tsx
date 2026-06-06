@@ -11,6 +11,8 @@ import { LogPaymentDialog } from '@/components/dashboard/log-payment-dialog';
 import { format } from 'date-fns';
 import { type Order } from '@/app/dashboard/orders/page';
 import { Badge } from '@/components/ui/badge';
+import { AddCustomerDialog } from '@/components/dashboard/add-customer-dialog';
+import { Pencil } from 'lucide-react';
 
 type Customer = {
   id: string;
@@ -19,6 +21,12 @@ type Customer = {
   email: string;
   mobileNumber?: string;
   addressLine?: string;
+  region?: string;
+  province?: string;
+  city?: string;
+  barangay?: string;
+  postalCode?: string;
+  streetAddress?: string;
   sukiTier?: string;
   facebookProfileLink?: string;
 };
@@ -54,6 +62,7 @@ export default function CustomerDetailPage() {
   const router = useRouter();
 
   const [logPaymentOrder, setLogPaymentOrder] = useState<Order | null>(null);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   
   // Fetch customer
   const customerRef = useMemo(() => (supabase && customerId ? doc(supabase, 'customers', customerId) : null), [supabase, customerId]);
@@ -119,7 +128,21 @@ export default function CustomerDetailPage() {
               <div className="flex flex-col gap-1 mt-2 mb-4 text-sm text-muted-foreground">
                 {customer.email && <div className="flex items-center gap-2"><span>✉️</span> {customer.email}</div>}
                 {customer.mobileNumber && <div className="flex items-center gap-2"><span>📱</span> {customer.mobileNumber}</div>}
-                {customer.addressLine && <div className="flex items-center gap-2"><span>📍</span> {customer.addressLine}</div>}
+                
+                {/* Address Display */}
+                {customer.region || customer.province ? (
+                  <div className="flex items-start gap-2">
+                    <span>📍</span> 
+                    <div>
+                      <div>{customer.streetAddress && `${customer.streetAddress}, `}{customer.barangay}</div>
+                      <div>{customer.city}, {customer.province}</div>
+                      <div className="text-xs opacity-75">{customer.region} {customer.postalCode}</div>
+                    </div>
+                  </div>
+                ) : customer.addressLine ? (
+                  <div className="flex items-center gap-2"><span>📍</span> {customer.addressLine}</div>
+                ) : null}
+                
                 {customer.facebookProfileLink && (
                   <div className="flex items-center gap-2">
                     <svg className="w-4 h-4 text-[#1877F2]" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 8 19">
@@ -131,12 +154,26 @@ export default function CustomerDetailPage() {
                   </div>
                 )}
               </div>
-              <CardDescription className="text-base">
+              <CardDescription className="text-base mt-2">
                 Total Outstanding Balance: <span className="font-bold text-destructive">₱{totalBalanceOwed.toFixed(2)}</span>
               </CardDescription>
             </div>
+            <div className="self-start">
+              <Button variant="outline" size="sm" onClick={() => setEditingCustomer(customer)}>
+                <Pencil className="h-4 w-4 mr-2" /> Edit
+              </Button>
+            </div>
           </CardHeader>
         </Card>
+        
+        {editingCustomer && (
+          <AddCustomerDialog
+            open={!!editingCustomer}
+            onOpenChange={(open) => !open && setEditingCustomer(null)}
+            customerToEdit={editingCustomer}
+            onSuccess={() => setEditingCustomer(null)}
+          />
+        )}
         
         {/* Outstanding Balances Section */}
         <Card>

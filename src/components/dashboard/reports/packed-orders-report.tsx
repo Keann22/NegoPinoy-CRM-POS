@@ -5,10 +5,11 @@ import { useSupabase } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Printer } from 'lucide-react';
-import { format, formatDistanceToNow, differenceInDays } from 'date-fns';
+import { Loader2, Printer, Download } from 'lucide-react';
+import { format, differenceInDays } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import * as xlsx from 'xlsx';
 
 type PackedOrder = {
   id: string;
@@ -20,6 +21,13 @@ type PackedOrder = {
   width: number | null;
   height: number | null;
   weight: number | null;
+  customer: any;
+  items: any[];
+  paymentMethod: string;
+  trackingNumber: string | null;
+  amountPaid: number;
+  totalAmount: number;
+  isDownpaymentCOD: boolean;
 };
 
 export function PackedOrdersReport() {
@@ -42,7 +50,27 @@ export function PackedOrdersReport() {
             package_width,
             package_height,
             package_weight,
-            customers!inner(full_name)
+            payment_method,
+            tracking_number,
+            amount_paid,
+            total_amount,
+            customers (
+              full_name,
+              mobile_number,
+              region,
+              province,
+              city,
+              barangay,
+              postal_code,
+              street_address,
+              address_line
+            ),
+            order_items (
+              product_name,
+              quantity,
+              selling_price_at_sale,
+              discount
+            )
           `)
           .eq('status', 'Packed')
           .order('order_date', { ascending: true });
@@ -61,6 +89,13 @@ export function PackedOrdersReport() {
             width: item.package_width,
             height: item.package_height,
             weight: item.package_weight,
+            customer: item.customers,
+            items: item.order_items || [],
+            paymentMethod: item.payment_method || 'COD',
+            trackingNumber: item.tracking_number,
+            amountPaid: item.amount_paid || 0,
+            totalAmount: item.total_amount || 0,
+            isDownpaymentCOD: false // Not directly fetched, assuming if COD and amountPaid < totalAmount it's COD
           };
         });
 
@@ -79,6 +114,59 @@ export function PackedOrdersReport() {
     window.print();
   };
 
+  const handleExportExcel = () => {
+    const exportData: any[] = [];
+
+    orders.forEach(order => {
+      // Create a row for each item in the order
+      if (order.items.length === 0) {
+        order.items = [{ product_name: 'Item', quantity: 1, selling_price_at_sale: order.totalAmount, discount: 0 }];
+      }
+
+      const isCOD = order.paymentMethod === 'COD' || order.amountPaid < order.totalAmount;
+      const codAmount = isCOD ? (order.totalAmount - order.amountPaid) : 0;
+      
+      const detailedAddress = order.customer?.street_address 
+        ? order.customer.street_address 
+        : order.customer?.address_line || 'N/A';
+
+      order.items.forEach((item, index) => {
+        exportData.push({
+          'Order Number': order.orderId,
+          '*Recipient Name': order.customer?.full_name || 'Unknown',
+          '*Recipient Phone': order.customer?.mobile_number || '00000000000',
+          '*Detailed Address': detailedAddress,
+          'Region': order.customer?.region || '',
+          'Province': order.customer?.province || '',
+          'Town/City': order.customer?.city || '',
+          'Barangay': order.customer?.barangay || '',
+          'Postal Code': order.customer?.postal_code || '',
+          '*Item Name': item.product_name,
+          '*Item Type': 'General',
+          'Item Quantity': item.quantity,
+          'Item Price': item.selling_price_at_sale,
+          '*Parcel Weight (KG)': order.weight || 1,
+          '*Parcel Length (CM)': order.length || 10,
+          '*Parcel Width (CM)': order.width || 10,
+          '*Parcel Height (CM)': order.height || 10,
+          'Customer Reference No.': '',
+          '*Payment Method': isCOD ? 'COD' : 'Non-COD',
+          'Delivery Instruction': '',
+          '*COD Collection (Y/N)': isCOD ? 'Y' : 'N',
+          'COD Amount': index === 0 ? codAmount : 0, // only charge COD on the first row of multi-item order to avoid duplication
+          '*Parcel Value (PHP)': order.totalAmount
+        });
+      });
+    });
+
+    const worksheet = xlsx.utils.json_to_sheet(exportData);
+    const workbook = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(workbook, worksheet, "Order Sheet");
+    
+    // Add dummy sheets to match the template if needed, but Order Sheet is the main one
+    xlsx.writeFile(workbook, `Packed_Orders_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`);
+  };
+
   return (
     <Card className="print:shadow-none print:border-none">
       <CardHeader className="print:hidden">
@@ -90,9 +178,14 @@ export function PackedOrdersReport() {
               <br />Useful for courier bulk uploads.
             </CardDescription>
           </div>
-          <Button variant="outline" size="sm" onClick={handlePrint}>
-            <Printer className="mr-2 h-4 w-4" /> Print Report
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleExportExcel} disabled={loading || orders.length === 0}>
+              <Download className="mr-2 h-4 w-4" /> Export to Excel
+            </Button>
+            <Button variant="outline" size="sm" onClick={handlePrint}>
+              <Printer className="mr-2 h-4 w-4" /> Print Report
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>

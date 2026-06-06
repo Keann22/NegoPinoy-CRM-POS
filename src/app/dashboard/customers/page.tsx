@@ -38,6 +38,7 @@ export default function CustomersPage() {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [customers, setCustomers] = useState<any[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<any | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -110,6 +111,19 @@ export default function CustomersPage() {
             <AddCustomerDialog onSuccess={() => setDebouncedQuery(debouncedQuery + ' ')} />
         </div>
       </CardHeader>
+      
+      {editingCustomer && (
+        <AddCustomerDialog
+          open={!!editingCustomer}
+          onOpenChange={(open) => !open && setEditingCustomer(null)}
+          customerToEdit={editingCustomer}
+          onSuccess={() => {
+            setEditingCustomer(null);
+            setDebouncedQuery(debouncedQuery + ' ');
+          }}
+        />
+      )}
+
       <CardContent>
         <Table>
           <TableHeader>
@@ -184,7 +198,7 @@ export default function CustomersPage() {
                       <DropdownMenuItem onClick={() => router.push(`/dashboard/customers/${cust.id}`)}>
                         View Account
                       </DropdownMenuItem>
-                      <DropdownMenuItem>Edit</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setEditingCustomer(cust)}>Edit</DropdownMenuItem>
                       <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10">
                         Delete
                       </DropdownMenuItem>
