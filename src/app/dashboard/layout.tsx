@@ -16,6 +16,7 @@ import {
   Menu,
   MessageCircle,
   Package,
+  PackageCheck,
   Repeat,
   Upload,
   Bot,
@@ -76,6 +77,12 @@ export default function DashboardLayout({
     }
 
     links.push({ href: '/dashboard/orders', label: 'Orders', icon: ShoppingCart });
+    
+    if (isManagement || isSales || isInventory) {
+      links.push({ href: '/dashboard/packed-orders', label: 'Packed Orders', icon: PackageCheck });
+      links.push({ href: '/dashboard/for-shipping', label: 'For Shipping', icon: Truck });
+    }
+
     links.push({ href: '/dashboard/products', label: 'Products', icon: Package });
     links.push({ href: '/dashboard/pack', label: 'Packer App', icon: Package });
     

@@ -73,7 +73,7 @@ export type Order = {
   totalAmount: number;
   amountPaid: number;
   balanceDue: number;
-  orderStatus: 'Pending Payment' | 'Processing' | 'Packed' | 'Shipped' | 'Completed' | 'Cancelled' | 'Returned' | 'Payment Received (COD)';
+  orderStatus: 'Pending Payment' | 'Processing' | 'Packed' | 'For Shipping' | 'Shipped' | 'Completed' | 'Cancelled' | 'Returned' | 'Payment Received (COD)';
   paymentType: 'Full Payment' | 'Lay-away' | 'Installment' | 'COD' | 'Pending';
   installmentMonths?: number;
   monthlyPayment?: number;
@@ -101,6 +101,10 @@ const getStatusVariant = (status: Order['orderStatus']) => {
     case 'Completed':
     case 'Payment Received (COD)':
       return 'outline';
+    case 'Packed':
+      return 'secondary';
+    case 'For Shipping':
+      return 'outline';
     case 'Processing':
       return 'secondary';
     case 'Cancelled':
@@ -112,7 +116,7 @@ const getStatusVariant = (status: Order['orderStatus']) => {
   }
 }
 
-const statuses: Order['orderStatus'][] = ['Pending Payment', 'Processing', 'Packed', 'Shipped', 'Completed', 'Payment Received (COD)', 'Returned', 'Cancelled'];
+const statuses: Order['orderStatus'][] = ['Pending Payment', 'Processing', 'Packed', 'For Shipping', 'Shipped', 'Completed', 'Payment Received (COD)', 'Returned', 'Cancelled'];
 
 export default function OrdersPage() {
   const router = useRouter();
@@ -138,7 +142,7 @@ export default function OrdersPage() {
   const ordersQuery = useMemo(
     () => {
         if (!user) return null;
-        if (userProfile && !userProfile.roles.some(r => ['Admin', 'Owner'].includes(r))) {
+        if (userProfile && !userProfile.roles.some(r => ['Admin', 'Owner', 'Inventory'].includes(r))) {
             return query(collection('orders' as any), where('sales_person_id', '==', userProfile.id), orderBy('orderDate', 'desc'));
         }
         return query(collection('orders' as any), orderBy('orderDate', 'desc'));
