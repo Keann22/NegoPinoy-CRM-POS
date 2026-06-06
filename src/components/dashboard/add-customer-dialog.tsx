@@ -83,29 +83,63 @@ export function AddCustomerDialog(props: AddCustomerDialogProps) {
           }
           if (props.customerToEdit) {
               const cust = props.customerToEdit;
-              const parts = (cust.full_name || '').trim().split(' ');
-              firstName = parts[0] || '';
-              lastName = parts.slice(1).join(' ') || '';
+              // Handle both camelCase and snake_case formats from different parent components
+              firstName = cust.firstName || cust.first_name || '';
+              lastName = cust.lastName || cust.last_name || '';
               
-              let regionCode = cust.region || "";
-              if (cust.region) {
-                  // Find region code by name
-                  const entry = Object.entries(addressData).find(([_, data]) => data.region_name === cust.region);
-                  if (entry) regionCode = entry[0];
+              if (!firstName && !lastName) {
+                  const parts = (cust.full_name || '').trim().split(' ');
+                  firstName = parts[0] || '';
+                  lastName = parts.slice(1).join(' ') || '';
+              }
+              
+              const rawRegion = cust.region || "";
+              const rawProvince = cust.province || "";
+              const rawCity = cust.city || "";
+              const rawBarangay = cust.barangay || "";
+              
+              let regionCode = "";
+              if (rawRegion) {
+                  // Check if it's already a valid code
+                  if (addressData[rawRegion]) {
+                      regionCode = rawRegion;
+                  } else {
+                      // Find region code by name
+                      const entry = Object.entries(addressData).find(([_, data]) => data.region_name === rawRegion);
+                      if (entry) regionCode = entry[0];
+                  }
+              }
+              
+              let validProvince = "";
+              if (regionCode && rawProvince && addressData[regionCode]?.province_list?.[rawProvince]) {
+                  validProvince = rawProvince;
+              }
+              
+              let validCity = "";
+              if (regionCode && validProvince && rawCity && addressData[regionCode]?.province_list?.[validProvince]?.municipality_list?.[rawCity]) {
+                  validCity = rawCity;
+              }
+              
+              let validBarangay = "";
+              if (regionCode && validProvince && validCity && rawBarangay) {
+                  const barangays = addressData[regionCode].province_list[validProvince].municipality_list[validCity].barangay_list;
+                  if (barangays && barangays.includes(rawBarangay)) {
+                      validBarangay = rawBarangay;
+                  }
               }
 
               form.reset({
                   firstName: firstName,
                   lastName: lastName,
                   email: cust.email || "",
-                  phoneNumber: cust.mobile_number || "",
-                  facebookProfileLink: cust.facebook_profile_link || "",
+                  phoneNumber: cust.mobileNumber || cust.mobile_number || "",
+                  facebookProfileLink: cust.facebookProfileLink || cust.facebook_profile_link || "",
                   region: regionCode,
-                  province: cust.province || "",
-                  city: cust.city || "",
-                  barangay: cust.barangay || "",
-                  postalCode: cust.postal_code || "",
-                  streetAddress: cust.street_address || "",
+                  province: validProvince,
+                  city: validCity,
+                  barangay: validBarangay,
+                  postalCode: cust.postalCode || cust.postal_code || "",
+                  streetAddress: cust.streetAddress || cust.street_address || "",
               });
           } else {
               form.reset({
