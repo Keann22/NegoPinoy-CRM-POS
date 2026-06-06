@@ -68,9 +68,9 @@ export function AddCustomerDialog(props: AddCustomerDialogProps) {
   const selectedCity = form.watch("city");
 
   const regionOptions = Object.entries(addressData).map(([code, data]) => ({ value: code, label: data.region_name }));
-  const provinceOptions = selectedRegion && addressData[selectedRegion] ? Object.entries(addressData[selectedRegion].province_list).map(([name]) => ({ value: name, label: name })) : [];
-  const cityOptions = selectedRegion && selectedProvince && addressData[selectedRegion].province_list[selectedProvince] ? Object.entries(addressData[selectedRegion].province_list[selectedProvince].municipality_list).map(([name]) => ({ value: name, label: name })) : [];
-  const barangayOptions = selectedRegion && selectedProvince && selectedCity && addressData[selectedRegion].province_list[selectedProvince].municipality_list[selectedCity] ? addressData[selectedRegion].province_list[selectedProvince].municipality_list[selectedCity].barangay_list.map((name: string) => ({ value: name, label: name })) : [];
+  const provinceOptions = selectedRegion && addressData[selectedRegion]?.province_list ? Object.entries(addressData[selectedRegion].province_list).map(([name]) => ({ value: name, label: name })) : [];
+  const cityOptions = selectedRegion && selectedProvince && addressData[selectedRegion]?.province_list?.[selectedProvince]?.municipality_list ? Object.entries(addressData[selectedRegion].province_list[selectedProvince].municipality_list).map(([name]) => ({ value: name, label: name })) : [];
+  const barangayOptions = selectedRegion && selectedProvince && selectedCity && addressData[selectedRegion]?.province_list?.[selectedProvince]?.municipality_list?.[selectedCity]?.barangay_list ? addressData[selectedRegion].province_list[selectedProvince].municipality_list[selectedCity].barangay_list.map((name: string) => ({ value: name, label: name })) : [];
 
   useEffect(() => {
       if (open) {
