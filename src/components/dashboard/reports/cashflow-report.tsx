@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReportDateFilter } from './report-date-filter';
 import { Separator } from '@/components/ui/separator';
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 
 type Payment = {
     amount: number;
@@ -110,9 +111,73 @@ export function CashFlowReport() {
                     </div>
                 ) : (
                     <div className="max-w-md mx-auto mt-4">
-                        <ReportItem label="Total Cash In" value={reportData.cashIn} />
-                        <ReportItem label="Total Cash Out" value={-reportData.cashOut} />
-                        <Separator />
+                        <Accordion type="single" collapsible className="w-full">
+                            <AccordionItem value="cash-in">
+                                <AccordionTrigger className="hover:no-underline py-3">
+                                    <div className="flex justify-between w-full pr-4 text-sm font-normal">
+                                        <span className="text-muted-foreground">Total Cash In (Payments Received)</span>
+                                        <span>₱{reportData.cashIn.toFixed(2)}</span>
+                                    </div>
+                                </AccordionTrigger>
+                                <AccordionContent>
+                                    <div className="space-y-2 pl-4">
+                                        {(!payments || payments.length === 0) ? (
+                                            <p className="text-sm text-muted-foreground">No payments received for this period.</p>
+                                        ) : (
+                                            payments.map((payment, i) => (
+                                                <div key={i} className="flex justify-between text-sm">
+                                                    <span className="text-muted-foreground">{new Date(payment.paymentDate).toLocaleDateString()}</span>
+                                                    <span>₱{payment.amount.toFixed(2)}</span>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </AccordionContent>
+                            </AccordionItem>
+                            <AccordionItem value="cash-out">
+                                <AccordionTrigger className="hover:no-underline py-3">
+                                    <div className="flex justify-between w-full pr-4 text-sm font-normal">
+                                        <span className="text-muted-foreground">Total Cash Out (Expenses)</span>
+                                        <span className="text-destructive">₱{reportData.cashOut.toFixed(2)}</span>
+                                    </div>
+                                </AccordionTrigger>
+                                <AccordionContent>
+                                    <div className="space-y-4 pl-4">
+                                        <div>
+                                            <h4 className="text-sm font-medium mb-2">Expenses</h4>
+                                            {(!expenses || expenses.length === 0) ? (
+                                                <p className="text-sm text-muted-foreground">No expenses for this period.</p>
+                                            ) : (
+                                                <div className="space-y-2">
+                                                    {expenses.map((expense, i) => (
+                                                        <div key={i} className="flex justify-between text-sm">
+                                                            <span className="text-muted-foreground">{new Date(expense.expenseDate).toLocaleDateString()}</span>
+                                                            <span className="text-destructive">₱{expense.amount.toFixed(2)}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <h4 className="text-sm font-medium mb-2">Refunds</h4>
+                                            {(!refunds || refunds.length === 0) ? (
+                                                <p className="text-sm text-muted-foreground">No refunds for this period.</p>
+                                            ) : (
+                                                <div className="space-y-2">
+                                                    {refunds.map((refund, i) => (
+                                                        <div key={i} className="flex justify-between text-sm">
+                                                            <span className="text-muted-foreground">{new Date(refund.refundDate).toLocaleDateString()}</span>
+                                                            <span className="text-destructive">₱{refund.amount.toFixed(2)}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </AccordionContent>
+                            </AccordionItem>
+                        </Accordion>
+                        <Separator className="my-2" />
                         <ReportItem label="Net Cash Flow" value={reportData.netCash} isBold isNegative={reportData.netCash < 0} />
                     </div>
                 )}

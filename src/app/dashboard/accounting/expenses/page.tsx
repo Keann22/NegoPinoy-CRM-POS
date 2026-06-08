@@ -21,6 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { AddExpenseDialog } from '@/components/dashboard/accounting/add-expense-dialog';
 import { PostRecurringExpensesButton } from '@/components/dashboard/accounting/post-recurring-expenses-button';
 import { useUserProfile } from '@/hooks/useUserProfile';
@@ -74,6 +75,16 @@ export default function ExpensesPage() {
     return filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
   }, [filteredExpenses]);
 
+  const expensesByCategory = useMemo(() => {
+    if (!filteredExpenses) return null;
+    return filteredExpenses.reduce((acc, exp) => {
+        if (!acc[exp.category]) acc[exp.category] = { total: 0, items: [] };
+        acc[exp.category].total += exp.amount;
+        acc[exp.category].items.push(exp);
+        return acc;
+    }, {} as Record<string, { total: number, items: any[] }>);
+  }, [filteredExpenses]);
+
   if (userProfile && !isManagement) {
     return (
         <Card className="m-6 border-destructive/20 bg-destructive/5">
@@ -103,41 +114,63 @@ export default function ExpensesPage() {
         <div className="mb-4">
           <ReportDateFilter date={date} setDate={setDate} />
         </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Date</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead className="text-right">Amount</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading && Array.from({ length: 5 }).map((_, i) => (
-                 <TableRow key={i}>
-                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-48" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
-                 </TableRow>
-            ))}
-            {filteredExpenses && filteredExpenses.map((expense) => (
-              <TableRow key={expense.id}>
-                <TableCell>{format(new Date(expense.expenseDate), 'MMM d, yyyy')}</TableCell>
-                <TableCell className="font-medium">{expense.description || 'N/A'}</TableCell>
-                <TableCell>{expense.category}</TableCell>
-                <TableCell className="text-right">₱{expense.amount.toFixed(2)}</TableCell>
+        {isLoading ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Category</TableHead>
+                <TableHead className="text-right">Total Amount</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        {!isLoading && (!filteredExpenses || filteredExpenses.length === 0) && (
+            </TableHeader>
+            <TableBody>
+              {Array.from({ length: 5 }).map((_, i) => (
+                   <TableRow key={i}>
+                      <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
+                   </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : !filteredExpenses || filteredExpenses.length === 0 ? (
             <div className="flex flex-col items-center justify-center text-center border-2 border-dashed rounded-lg p-12 mt-4">
                 <p className="text-lg font-semibold">No expenses found</p>
                 <p className="text-muted-foreground mt-2">
                     Click "Add Expense" to get started.
                 </p>
             </div>
+        ) : (
+            <Accordion type="multiple" className="w-full border rounded-md">
+              {expensesByCategory && Object.entries(expensesByCategory).map(([category, data], i) => (
+                  <AccordionItem value={`cat-${i}`} key={category} className="last:border-b-0">
+                    <AccordionTrigger className="hover:no-underline px-4 py-3 bg-muted/30">
+                      <div className="flex justify-between w-full font-semibold pr-4">
+                        <span>{category}</span>
+                        <span className="text-destructive">₱{data.total.toFixed(2)}</span>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-2 px-2">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[150px]">Date</TableHead>
+                            <TableHead>Description</TableHead>
+                            <TableHead className="text-right">Amount</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {data.items.map((expense) => (
+                            <TableRow key={expense.id}>
+                              <TableCell>{format(new Date(expense.expenseDate), 'MMM d, yyyy')}</TableCell>
+                              <TableCell className="font-medium">{expense.description || 'N/A'}</TableCell>
+                              <TableCell className="text-right">₱{expense.amount.toFixed(2)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </AccordionContent>
+                  </AccordionItem>
+              ))}
+            </Accordion>
         )}
       </CardContent>
       {filteredExpenses && filteredExpenses.length > 0 && (
