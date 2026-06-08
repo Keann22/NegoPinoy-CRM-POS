@@ -31,30 +31,51 @@ Output ONLY a JSON object in this exact format, with no markdown formatting or b
   "streetAddress": "Building, House No, Street name"
 }`;
 
-  try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.1,
-        }
-      })
-    });
+  let parsed = null;
+  let success = false;
+  let attempts = 0;
 
-    const data = await response.json();
-    if (data.error) {
-      console.error("Gemini API Error:", data.error.message);
-      return null;
+  while (!success && attempts < 3) {
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.1,
+          }
+        })
+      });
+
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error.message);
+      }
+      
+      let text = data.candidates[0].content.parts[0].text;
+      text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      parsed = JSON.parse(text);
+      success = true;
+    } catch (apiError) {
+      attempts++;
+      console.error(`Gemini API Error (Attempt ${attempts}):`, apiError.message);
+      if (apiError.message.includes('Quota exceeded') || apiError.message.includes('429')) {
+        console.log("⏳ Rate limit hit! Sleeping for 65 seconds to let the quota reset...");
+        await new Promise(resolve => setTimeout(resolve, 65000));
+      } else {
+        console.log("⏳ Other API error. Waiting 5 seconds before retry...");
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
     }
-    let text = data.candidates[0].content.parts[0].text;
-    text = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(text);
-  } catch (error) {
-    console.error(`Failed to parse address: ${addressLine}`, error);
+  }
+
+  if (!success || !parsed) {
+    console.log("⚠️ Skipped due to repeated parsing or API errors.");
     return null;
   }
+  
+  return parsed;
 }
 
 async function migrateAddresses() {

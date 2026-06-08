@@ -27,6 +27,7 @@ type PendingMovement = {
     description?: string;
     images?: string[];
     supplier_pricing?: any[];
+    initial_unit_cost?: number;
   };
 };
 
@@ -63,7 +64,7 @@ export default function PendingCostsPage() {
             timestamp,
             reason,
             supplier_name,
-            products!inner(name, description, images, supplier_pricing)
+            products!inner(name, description, images, supplier_pricing, initial_unit_cost)
           `)
           .eq('unit_cost', 0)
           .eq('movement_type', 'RESTOCK')
@@ -87,8 +88,15 @@ export default function PendingCostsPage() {
         const initialSuppliers: Record<string, string> = {};
         const initialQuantities: Record<string, number> = {};
         data?.forEach((m: any) => {
-          initialCosts[m.id] = '';
-          initialSuppliers[m.id] = m.supplier_name || '';
+          let pastCost = m.products.initial_unit_cost || '';
+          let pastSupplier = '';
+          if (m.products.supplier_pricing && m.products.supplier_pricing.length > 0) {
+              pastSupplier = m.products.supplier_pricing[0].supplierName || '';
+              if (!pastCost) pastCost = m.products.supplier_pricing[0].unitCost || '';
+          }
+          
+          initialCosts[m.id] = pastCost ? pastCost.toString() : '';
+          initialSuppliers[m.id] = m.supplier_name || pastSupplier;
           initialQuantities[m.id] = m.quantity_change;
         });
         setCosts(initialCosts);
@@ -349,6 +357,9 @@ export default function PendingCostsPage() {
                         onChange={(e) => setCosts({ ...costs, [m.id]: e.target.value })}
                         className="h-8 text-sm"
                       />
+                      {m.products.initial_unit_cost > 0 && (
+                          <div className="text-[10px] text-muted-foreground mt-1">Last: ₱{m.products.initial_unit_cost}</div>
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
