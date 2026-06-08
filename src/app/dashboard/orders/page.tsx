@@ -59,7 +59,7 @@ import {
   where
 } from '@/firebase';
 import { Progress } from '@/components/ui/progress';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useUserProfile } from '@/hooks/useUserProfile';
 
 
@@ -120,6 +120,7 @@ const statuses: Order['orderStatus'][] = ['Pending Payment', 'Processing', 'Pack
 
 export default function OrdersPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [logPaymentOrder, setLogPaymentOrder] = useState<Order | null>(null);
   const [codPaymentOrder, setCodPaymentOrder] = useState<Order | null>(null);
   const [editPaymentOrder, setEditPaymentOrder] = useState<Order | null>(null);
@@ -129,7 +130,7 @@ export default function OrdersPage() {
   const [date, setDate] = useState<DateRange | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(searchParams?.get('search') || '');
   const { toast } = useToast();
   const supabase = useSupabase();
   const { user } = useUser();

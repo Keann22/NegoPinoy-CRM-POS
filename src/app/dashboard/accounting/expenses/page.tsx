@@ -5,6 +5,7 @@ import { useCollection, useSupabase, useUser, collection, query, orderBy } from 
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { DateRange } from 'react-day-picker';
+import Link from 'next/link';
 import {
   Card,
   CardContent,
@@ -34,6 +35,26 @@ type Expense = {
   amount: number;
   category: string;
   description?: string;
+};
+
+const renderDescription = (desc?: string) => {
+    if (!desc) return 'N/A';
+    
+    // Split by `#` followed by 5+ alphanumeric chars
+    const parts = desc.split(/(#[a-zA-Z0-9]{5,})/gi);
+    
+    return parts.map((part, index) => {
+        const match = part.match(/^#([a-zA-Z0-9]{5,})$/i);
+        if (match) {
+            const shortId = match[1];
+            return (
+                <Link key={index} href={`/dashboard/orders?search=${shortId}`} className="text-primary hover:underline font-semibold">
+                    {part}
+                </Link>
+            );
+        }
+        return <span key={index}>{part}</span>;
+    });
 };
 
 export default function ExpensesPage() {
@@ -160,8 +181,8 @@ export default function ExpensesPage() {
                         <TableBody>
                           {data.items.map((expense) => (
                             <TableRow key={expense.id}>
-                              <TableCell>{format(new Date(expense.expenseDate), 'MMM d, yyyy')}</TableCell>
-                              <TableCell className="font-medium">{expense.description || 'N/A'}</TableCell>
+                              <TableCell className="w-[150px]">{format(new Date(expense.expenseDate), 'MMM d, yyyy')}</TableCell>
+                              <TableCell className="font-medium">{renderDescription(expense.description)}</TableCell>
                               <TableCell className="text-right">₱{expense.amount.toFixed(2)}</TableCell>
                             </TableRow>
                           ))}
