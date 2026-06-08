@@ -9,7 +9,8 @@ import { useSupabase } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { MarkShippedDialog } from '@/components/dashboard/mark-shipped-dialog';
-import * as xlsx from 'xlsx';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 
 type ShippingOrder = {
   id: string;
@@ -26,6 +27,7 @@ type ShippingOrder = {
   length: number | null;
   width: number | null;
   height: number | null;
+  deliveryInstructions: string | null;
 };
 
 export default function ForShippingPage() {
@@ -53,6 +55,7 @@ export default function ForShippingPage() {
           shipping_payment_type,
           shipping_amount,
           shipping_address,
+          delivery_instructions,
           order_items (
             product_name,
             quantity,
@@ -80,6 +83,7 @@ export default function ForShippingPage() {
         length: item.package_length,
         width: item.package_width,
         height: item.package_height,
+        deliveryInstructions: item.delivery_instructions,
       }));
 
       setOrders(formatted);
@@ -94,51 +98,97 @@ export default function ForShippingPage() {
     fetchForShippingOrders();
   }, [supabase]);
 
-  const handleExportExcel = () => {
-    const exportData: any[] = [];
+  const mapToSPXAddress = (region: string, province: string, city: string, barangay: string) => {
+    let spxRegion = region;
+    let spxProvince = province;
+    
+    const r = (region || '').toUpperCase();
+    const p = (province || '').toUpperCase();
+    
+    if (r.includes('NCR') || r.includes('NATIONAL CAPITAL')) {
+        spxRegion = 'Metro Manila';
+        spxProvince = 'Metro Manila';
+    } else if (r.includes('CAR') || r.includes('REGION I') || r.includes('REGION II') || r.includes('REGION III') || r.includes('ILOCOS') || r.includes('CAGAYAN') || r.includes('CENTRAL LUZON')) {
+        spxRegion = 'North Luzon';
+    } else if (r.includes('REGION IV') || r.includes('REGION V') || r.includes('CALABARZON') || r.includes('MIMAROPA') || r.includes('BICOL') || p.includes('PALAWAN')) {
+        spxRegion = 'South Luzon';
+    } else if (r.includes('REGION VI') || r.includes('REGION VII') || r.includes('REGION VIII') || r.includes('WESTERN VISAYAS') || r.includes('CENTRAL VISAYAS') || r.includes('EASTERN VISAYAS')) {
+        spxRegion = 'Visayas';
+    } else if (r.includes('REGION IX') || r.includes('REGION X') || r.includes('REGION XI') || r.includes('REGION XII') || r.includes('REGION XIII') || r.includes('BARMM') || r.includes('MINDANAO')) {
+        spxRegion = 'Mindanao';
+    }
+    
+    return { spxRegion, spxProvince, spxCity: city, spxBarangay: barangay };
+  };
 
-    orders.forEach(order => {
-      const items = order.items.length > 0 ? order.items : [{ product_name: 'Item', quantity: 1, selling_price_at_sale: order.totalAmount, discount: 0 }];
+  const handleExportExcel = async () => {
+    if (orders.length === 0) return;
+    
+    try {
+      setLoading(true);
       
-      const isCOD = order.paymentType.toLowerCase().includes('cod');
-      const codAmount = isCOD ? (order.totalAmount + order.shippingAmount) : 0;
+      const response = await fetch('/mass_order_creation_template_ph_multi_item_V2.xlsx');
+      const arrayBuffer = await response.arrayBuffer();
       
-      const addr = order.shippingAddress || {};
-      const detailedAddress = addr.address_line || addr.street_address || 'N/A';
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(arrayBuffer);
+      
+      const worksheet = workbook.worksheets[0];
 
-      items.forEach((item: any, index: number) => {
-        exportData.push({
-          'Order Number': order.orderId,
-          '*Recipient Name': order.shippingName,
-          '*Recipient Phone': order.shippingPhone,
-          '*Detailed Address': detailedAddress,
-          'Region': addr.region || '',
-          'Province': addr.province || '',
-          'Town/City': addr.city || '',
-          'Barangay': addr.barangay || '',
-          'Postal Code': addr.postal_code || '',
-          '*Item Name': item.product_name,
-          '*Item Type': 'General',
-          'Item Quantity': item.quantity,
-          'Item Price': item.selling_price_at_sale,
-          '*Parcel Weight (KG)': order.weight || 1,
-          '*Parcel Length (CM)': order.length || 10,
-          '*Parcel Width (CM)': order.width || 10,
-          '*Parcel Height (CM)': order.height || 10,
-          'Customer Reference No.': '',
-          '*Payment Method': isCOD ? 'COD' : 'Non-COD',
-          'Delivery Instruction': '',
-          '*COD Collection (Y/N)': isCOD ? 'Y' : 'N',
-          'COD Amount': index === 0 ? codAmount : 0, 
-          '*Parcel Value (PHP)': order.totalAmount
+      let currentRow = 2; // Start appending at row 2
+
+      orders.forEach(order => {
+        const items = order.items.length > 0 ? order.items : [{ product_name: 'Item', quantity: 1, selling_price_at_sale: order.totalAmount, discount: 0 }];
+        
+        const isCOD = order.paymentType.toLowerCase().includes('cod');
+        const codAmount = isCOD ? (order.totalAmount + order.shippingAmount) : 0;
+        
+        const addr = order.shippingAddress || {};
+        const detailedAddress = addr.address_line || addr.street_address || 'N/A';
+        
+        const { spxRegion, spxProvince, spxCity, spxBarangay } = mapToSPXAddress(addr.region || '', addr.province || '', addr.city || '', addr.barangay || '');
+
+        items.forEach((item: any, index: number) => {
+          const rowData = [
+            order.orderId, // *Order Number
+            order.shippingName, // *Recipient Name
+            order.shippingPhone, // *Recipient Phone
+            detailedAddress, // *Detailed Address
+            spxRegion, // Region
+            spxProvince, // Province
+            spxCity, // Town/City
+            spxBarangay, // Barangay
+            addr.postal_code || '0000', // Postal Code
+            item.product_name, // *Item Name
+            'General merchandise', // *Item Type
+            item.quantity, // Item Quantity
+            item.selling_price_at_sale, // Item Price
+            order.weight || 1, // *Parcel Weight (KG)
+            order.length || 10, // *Parcel Length (CM)
+            order.width || 10, // *Parcel Width (CM)
+            order.height || 10, // *Parcel Height (CM)
+            `ORDER #${order.orderId}`, // Customer Reference No.
+            'Sender Pay', // *Payment Method
+            order.deliveryInstructions || '', // Delivery Instruction
+            isCOD ? 'Y' : 'N', // *COD Collection (Y/N)
+            index === 0 ? codAmount : 0, // COD Amount
+            order.totalAmount // *Parcel Value (PHP)
+          ];
+          
+          worksheet.insertRow(currentRow, rowData);
+          currentRow++;
         });
       });
-    });
 
-    const worksheet = xlsx.utils.json_to_sheet(exportData);
-    const workbook = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(workbook, worksheet, "Order Sheet");
-    xlsx.writeFile(workbook, `For_Shipping_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`);
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, `For_Shipping_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`);
+      
+    } catch (error) {
+      console.error("Failed to generate Excel file:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
