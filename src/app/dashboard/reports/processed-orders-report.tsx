@@ -430,39 +430,43 @@ export function ProcessedOrdersReport() {
                             {printOrders.map((order, idx, arr) => (
                     <div key={order.id} className="mb-4 break-inside-avoid">
                         <div className="border-2 border-black flex flex-col">
-                            {/* Header Section */}
-                            <div className="flex border-b-2 border-black items-center">
-                                <div className="flex-1 p-2 border-r-2 border-black">
-                                    <div className="font-bold">Negosyanteng Pinoy PH</div>
-                                    <div className="text-xs">http://facebook.com/NegoPinoyPH</div>
+                            <div className="flex border-b-2 border-black">
+                                <div className="flex-1 flex flex-col border-r-2 border-black">
+                                    {/* Header Section */}
+                                    <div className="flex border-b-2 border-black items-center">
+                                        <div className="flex-1 p-2 border-r-2 border-black">
+                                            <div className="font-bold">Negosyanteng Pinoy PH</div>
+                                            <div className="text-xs">http://facebook.com/NegoPinoyPH</div>
+                                        </div>
+                                        <div className="flex-1 p-2 text-xs">
+                                            <div className="font-bold text-base">Order #{order.id.substring(0, 7).toUpperCase()}</div>
+                                            <div>Created At: {order.orderDate && isValid(new Date(order.orderDate)) ? format(new Date(order.orderDate), 'MM/dd/yyyy') : '—'}</div>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Recipient Section */}
+                                    <div className="flex flex-col p-2">
+                                        <div className="flex">
+                                            <span className="mr-1">Recipient:</span>
+                                            <div className="flex-1">
+                                                <div className="font-bold">{order.customerName}</div>
+                                            </div>
+                                        </div>
+                                        {order.customerMobile && (
+                                            <div className="text-xs mt-1">
+                                                <span className="font-semibold">Contact: </span>{order.customerMobile}
+                                            </div>
+                                        )}
+                                        {order.customerAddress && (
+                                            <div className="text-xs">
+                                                <span className="font-semibold">Address: </span>{order.customerAddress}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                                <div className="flex-1 p-2 text-xs border-r-2 border-black">
-                                    <div className="font-bold text-base">Order #{order.id.substring(0, 7).toUpperCase()}</div>
-                                    <div>Created At: {order.orderDate && isValid(new Date(order.orderDate)) ? format(new Date(order.orderDate), 'MM/dd/yyyy') : '—'}</div>
-                                </div>
-                                <div className="p-2 flex justify-center items-center">
+                                <div className="p-2 flex justify-center items-center w-[166px]">
                                     <QRCodeCanvas value={order.id} size={150} />
                                 </div>
-                            </div>
-                            
-                            {/* Recipient Section */}
-                            <div className="flex flex-col p-2 border-b-2 border-black">
-                                <div className="flex">
-                                    <span className="mr-1">Recipient:</span>
-                                    <div className="flex-1">
-                                        <div className="font-bold">{order.customerName}</div>
-                                    </div>
-                                </div>
-                                {order.customerMobile && (
-                                    <div className="text-xs mt-1">
-                                        <span className="font-semibold">Contact: </span>{order.customerMobile}
-                                    </div>
-                                )}
-                                {order.customerAddress && (
-                                    <div className="text-xs">
-                                        <span className="font-semibold">Address: </span>{order.customerAddress}
-                                    </div>
-                                )}
                             </div>
                             
                             {/* Items Table */}
