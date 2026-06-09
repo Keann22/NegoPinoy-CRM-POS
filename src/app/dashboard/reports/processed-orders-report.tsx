@@ -441,7 +441,7 @@ export function ProcessedOrdersReport() {
                                     <div>Created At: {order.orderDate && isValid(new Date(order.orderDate)) ? format(new Date(order.orderDate), 'MM/dd/yyyy') : '—'}</div>
                                 </div>
                                 <div className="p-2 flex justify-center items-center">
-                                    <QRCodeCanvas value={order.id} size={50} />
+                                    <QRCodeCanvas value={order.id} size={150} />
                                 </div>
                             </div>
                             
