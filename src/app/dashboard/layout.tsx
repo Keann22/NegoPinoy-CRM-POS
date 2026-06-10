@@ -81,6 +81,7 @@ export default function DashboardLayout({
     if (isManagement || isSales || isInventory) {
       links.push({ href: '/dashboard/packed-orders', label: 'Packed Orders', icon: PackageCheck });
       links.push({ href: '/dashboard/for-shipping', label: 'For Shipping', icon: Truck });
+      links.push({ href: '/dashboard/for-pick-up', label: 'For Pick-up', icon: PackageCheck });
     }
 
     links.push({ href: '/dashboard/products', label: 'Products', icon: Package });

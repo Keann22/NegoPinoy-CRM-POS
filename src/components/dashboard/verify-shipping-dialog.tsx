@@ -39,6 +39,8 @@ export function VerifyShippingDialog({ order, open, onOpenChange, onSuccess }: V
   const [paymentType, setPaymentType] = useState('sf only');
   const [shippingAmount, setShippingAmount] = useState('0');
   const [saveAsSecondary, setSaveAsSecondary] = useState(false);
+  const [deliveryInstructions, setDeliveryInstructions] = useState('Kuya wag nyo po sabihin na galing Shopee! Sabihin nyo po galing ng Negosyanteng Pinoy. Thankyou po! :)');
+
 
   const regionOptions = Object.entries(addressData).map(([code, data]) => ({ value: code, label: data.region_name }));
   const provinceOptions = region && addressData[region]?.province_list ? Object.entries(addressData[region].province_list).map(([name]) => ({ value: name, label: name })) : [];
@@ -90,6 +92,7 @@ export function VerifyShippingDialog({ order, open, onOpenChange, onSuccess }: V
       setPaymentType('sf only');
       setShippingAmount('0');
       setSaveAsSecondary(false);
+      setDeliveryInstructions('Kuya wag nyo po sabihin na galing Shopee! Sabihin nyo po galing ng Negosyanteng Pinoy. Thankyou po! :)');
     }
   }, [open, order, supabase]);
 
@@ -127,7 +130,8 @@ export function VerifyShippingDialog({ order, open, onOpenChange, onSuccess }: V
           shipping_phone: shippingPhone,
           shipping_payment_type: paymentType,
           shipping_amount: parseFloat(shippingAmount) || 0,
-          shipping_address: shippingAddressJson
+          shipping_address: shippingAddressJson,
+          delivery_instructions: deliveryInstructions
         })
         .eq('id', order.id);
 
@@ -248,6 +252,15 @@ export function VerifyShippingDialog({ order, open, onOpenChange, onSuccess }: V
             <div className="space-y-2">
               <Label>Shipping Amount (₱)</Label>
               <Input type="number" value={shippingAmount} onChange={e => setShippingAmount(e.target.value)} />
+            </div>
+
+            <div className="space-y-2 col-span-2 mt-2">
+              <Label>Delivery Instructions (For Courier)</Label>
+              <Input 
+                value={deliveryInstructions} 
+                onChange={e => setDeliveryInstructions(e.target.value)} 
+                placeholder="Optional delivery instructions..."
+              />
             </div>
 
             <div className="flex items-center space-x-2 col-span-2 mt-4 bg-muted/50 p-3 rounded-md">

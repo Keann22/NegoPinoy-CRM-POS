@@ -11,10 +11,11 @@ import { type Order } from '@/app/dashboard/orders/page';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Share2, Edit, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Share2, Edit, CheckCircle, FileText } from 'lucide-react';
 import { ShareReceiptDialog } from '@/components/dashboard/share-receipt-dialog';
 import { EditOrderDialog } from '@/components/dashboard/order-dialog';
 import { MarkShippedDialog } from '@/components/dashboard/mark-shipped-dialog';
+import { WaybillSummaryDialog } from '@/components/dashboard/waybill-summary-dialog';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { Truck } from 'lucide-react';
 
@@ -57,6 +58,8 @@ const getStatusVariant = (status: Order['orderStatus']) => {
       case 'Shipped':
       case 'Completed':
         return 'outline';
+      case 'For Pick-up':
+        return 'outline';
       case 'Processing':
         return 'secondary';
       case 'Cancelled':
@@ -94,6 +97,20 @@ export default function OrderDetailPage() {
   const [isMarkShippedOpen, setIsMarkShippedOpen] = useState(false);
 
   const { userProfile } = useUserProfile();
+
+  const [courierFee, setCourierFee] = useState<number>(0);
+  const [isWaybillOpen, setIsWaybillOpen] = useState(false);
+  useEffect(() => {
+    if (!supabase || !orderId) return;
+    supabase.from('expenses')
+      .select('amount')
+      .ilike('description', `%${orderId.substring(0,7).toUpperCase()}%`)
+      .then(({data}) => {
+         if (data && data.length > 0) {
+            setCourierFee(data.reduce((sum, d) => sum + d.amount, 0));
+         }
+      });
+  }, [supabase, orderId]);
 
   useEffect(() => {
     if (!allOrderItems || allOrderItems.length === 0 || !supabase) return;
@@ -213,6 +230,12 @@ export default function OrderDetailPage() {
                     <Button variant="outline" size="sm" onClick={() => setIsEditOpen(true)}>
                         <Edit className="mr-2 h-4 w-4" />
                         Edit Order
+                    </Button>
+                )}
+                {(order.orderStatus === 'For Pick-up' || order.orderStatus === 'Shipped' || order.orderStatus === 'Completed') && order.spx_sync_data && (
+                    <Button variant="outline" size="sm" onClick={() => setIsWaybillOpen(true)}>
+                        <FileText className="mr-2 h-4 w-4" />
+                        View Waybill
                     </Button>
                 )}
                 <Button variant="outline" size="sm" onClick={() => setIsShareReceiptOpen(true)}>
@@ -359,6 +382,33 @@ export default function OrderDetailPage() {
                     <span className="text-muted-foreground">Amount Paid</span>
                     <span>₱{order.amountPaid.toFixed(2)}</span>
                 </div>
+                {courierFee > 0 && (() => {
+                    const netRemittance = order.amountPaid - courierFee;
+                    const difference = netRemittance - order.totalAmount;
+                    
+                    return (
+                        <div className="bg-muted/30 p-2 rounded-md mt-1 mb-2">
+                          <div className="flex justify-between text-muted-foreground text-xs">
+                              <span>COD Collected</span>
+                              <span>₱{order.amountPaid.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-destructive text-xs">
+                              <span>Courier Fee</span>
+                              <span>- ₱{courierFee.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-primary text-xs font-semibold mt-1 pt-1 border-t">
+                              <span>Net Remittance</span>
+                              <span>₱{netRemittance.toFixed(2)}</span>
+                          </div>
+                          {difference !== 0 && (
+                              <div className={`flex justify-between text-xs font-semibold mt-1 pt-1 border-t ${difference > 0 ? 'text-emerald-600' : 'text-destructive'}`}>
+                                  <span>{difference > 0 ? 'Additional Shipping Profit' : 'Shipping Loss / Extra Fee'}</span>
+                                  <span>{difference > 0 ? '+' : '-'} ₱{Math.abs(difference).toFixed(2)}</span>
+                              </div>
+                          )}
+                        </div>
+                    );
+                })()}
                  <div className="flex justify-between font-semibold text-base">
                     <span>Balance Due</span>
                     <span>₱{order.balanceDue.toFixed(2)}</span>
@@ -394,6 +444,13 @@ export default function OrderDetailPage() {
             onOpenChange={setIsEditOpen} 
             order={order} 
             orderItems={orderItems} 
+        />
+      )}
+      {order && (
+        <WaybillSummaryDialog
+            open={isWaybillOpen}
+            onOpenChange={setIsWaybillOpen}
+            order={order}
         />
       )}
     </div>

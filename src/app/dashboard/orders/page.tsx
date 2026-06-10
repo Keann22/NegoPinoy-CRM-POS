@@ -49,6 +49,7 @@ import { CompleteCodPaymentDialog } from '@/components/dashboard/complete-cod-pa
 import { EditPaymentTermsDialog } from '@/components/dashboard/edit-payment-terms-dialog';
 import { SetDueDateDialog } from '@/components/dashboard/set-due-date-dialog';
 import { MarkShippedDialog } from '@/components/dashboard/mark-shipped-dialog';
+import { WaybillSummaryDialog } from '@/components/dashboard/waybill-summary-dialog';
 import { 
   useCollection, 
   useUser, 
@@ -73,13 +74,14 @@ export type Order = {
   totalAmount: number;
   amountPaid: number;
   balanceDue: number;
-  orderStatus: 'Pending Payment' | 'Processing' | 'Packed' | 'For Shipping' | 'Shipped' | 'Completed' | 'Cancelled' | 'Returned' | 'Payment Received (COD)';
+  orderStatus: 'Pending Payment' | 'Processing' | 'Packed' | 'For Shipping' | 'For Pick-up' | 'Shipped' | 'Completed' | 'Cancelled' | 'Returned' | 'Payment Received (COD)';
   paymentType: 'Full Payment' | 'Lay-away' | 'Installment' | 'COD' | 'Pending';
   installmentMonths?: number;
   monthlyPayment?: number;
   insurance_fee?: number;
   tracking_number?: string;
   salesPersonName?: string;
+  spx_sync_data?: any;
 };
 
 type Customer = {
@@ -104,6 +106,7 @@ const getStatusVariant = (status: Order['orderStatus']) => {
     case 'Packed':
       return 'secondary';
     case 'For Shipping':
+    case 'For Pick-up':
       return 'outline';
     case 'Processing':
       return 'secondary';
@@ -116,7 +119,7 @@ const getStatusVariant = (status: Order['orderStatus']) => {
   }
 }
 
-const statuses: Order['orderStatus'][] = ['Pending Payment', 'Processing', 'Packed', 'For Shipping', 'Shipped', 'Completed', 'Payment Received (COD)', 'Returned', 'Cancelled'];
+const statuses: Order['orderStatus'][] = ['Pending Payment', 'Processing', 'Packed', 'For Shipping', 'For Pick-up', 'Shipped', 'Completed', 'Payment Received (COD)', 'Returned', 'Cancelled'];
 
 export default function OrdersPage() {
   const router = useRouter();
@@ -126,6 +129,7 @@ export default function OrdersPage() {
   const [editPaymentOrder, setEditPaymentOrder] = useState<Order | null>(null);
   const [dueDateOrder, setDueDateOrder] = useState<Order | null>(null);
   const [markShippedOrder, setMarkShippedOrder] = useState<Order | null>(null);
+  const [viewWaybillOrder, setViewWaybillOrder] = useState<Order | null>(null);
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [date, setDate] = useState<DateRange | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -488,6 +492,11 @@ export default function OrdersPage() {
                           <DropdownMenuItem onClick={() => router.push(`/dashboard/orders/${order.id}`)}>
                             View Details
                           </DropdownMenuItem>
+                          {(order.orderStatus === 'For Pick-up' || order.orderStatus === 'Shipped' || order.orderStatus === 'Completed') && order.spx_sync_data && (
+                            <DropdownMenuItem onClick={() => setViewWaybillOrder(order)}>
+                              View Waybill
+                            </DropdownMenuItem>
+                          )}
                           
                           {(() => {
                             const isCompletedOrShipped = order.orderStatus === 'Completed' || order.orderStatus === 'Shipped';
@@ -619,6 +628,15 @@ export default function OrdersPage() {
                 refetch();
                 setMarkShippedOrder(null);
             }}
+        />
+      )}
+      {viewWaybillOrder && (
+        <WaybillSummaryDialog
+            open={!!viewWaybillOrder}
+            onOpenChange={(isOpen) => {
+                if (!isOpen) setViewWaybillOrder(null);
+            }}
+            order={viewWaybillOrder}
         />
       )}
     </>

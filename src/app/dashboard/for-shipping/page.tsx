@@ -1,16 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Download, Truck } from 'lucide-react';
+import { Download, Truck, Upload } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import { useSupabase } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { MarkShippedDialog } from '@/components/dashboard/mark-shipped-dialog';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
+import * as XLSX from 'xlsx';
 
 type ShippingOrder = {
   id: string;
@@ -21,6 +23,7 @@ type ShippingOrder = {
   shippingAmount: number;
   paymentType: string;
   totalAmount: number;
+  amountPaid: number;
   items: any[];
   shippingAddress: any;
   weight: number | null;
@@ -50,6 +53,7 @@ export default function ForShippingPage() {
           package_height,
           package_weight,
           total_amount,
+          amount_paid,
           shipping_name,
           shipping_phone,
           shipping_payment_type,
@@ -77,6 +81,7 @@ export default function ForShippingPage() {
         shippingAmount: item.shipping_amount || 0,
         paymentType: item.shipping_payment_type || '',
         totalAmount: item.total_amount || 0,
+        amountPaid: item.amount_paid || 0,
         items: item.order_items || [],
         shippingAddress: item.shipping_address || {},
         weight: item.package_weight,
@@ -94,9 +99,88 @@ export default function ForShippingPage() {
     }
   };
 
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     fetchForShippingOrders();
   }, [supabase]);
+
+  const handleSPXUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !supabase) return;
+    
+    setLoading(true);
+    try {
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(await file.arrayBuffer());
+      const worksheet = workbook.worksheets[0];
+      const updatePromises: any[] = [];
+      
+      worksheet.eachRow((row, rowNumber) => {
+          if (rowNumber === 1 || rowNumber === 2) return; // skip headers
+          
+          const trackingNo = row.getCell(1).value?.toString() || '';
+          const rawCustRef = row.getCell(3).value?.toString() || ''; 
+          const pickupTime = row.getCell(10).value?.toString() || '';
+          const paymentRole = row.getCell(32).value?.toString() || '';
+          const codAmount = parseFloat(row.getCell(38).value?.toString() || '0');
+          const estShippingFee = parseFloat(row.getCell(42).value?.toString() || '0');
+          
+          const orderIdMatch = rawCustRef.match(/ORDER\s*#?\s*([A-Za-z0-9-]+)/i);
+          if (orderIdMatch && orderIdMatch[1]) {
+              const orderIdPrefix = orderIdMatch[1].toLowerCase();
+              
+              updatePromises.push(async () => {
+                   const { data: matchedOrders } = await supabase.from('orders').select('id').ilike('id', `${orderIdPrefix}%`).limit(1);
+                   if (matchedOrders && matchedOrders.length > 0) {
+                       const fullId = matchedOrders[0].id;
+                       await supabase.from('orders').update({
+                           status: 'For Pick-up',
+                           tracking_number: trackingNo,
+                           spx_sync_data: {
+                               scheduled_pickup_time: pickupTime,
+                               estimated_shipping_fee: estShippingFee,
+                               cod_amount: codAmount,
+                               payment_role: paymentRole,
+                               service_type: 'Standard Service',
+                               collect_type: 'Pickup',
+                               payment_type: 'Pay by Cycle'
+                           }
+                       }).eq('id', fullId);
+                   }
+              });
+          }
+      });
+      
+      // Execute sequentially to avoid rate limits
+      for (const updateFn of updatePromises) {
+          await updateFn();
+      }
+      
+      toast({ title: 'Upload Successful', description: `Synced ${updatePromises.length} orders to SPX tracking and moved to For Pick-up.` });
+      fetchForShippingOrders();
+    } catch (err: any) {
+      console.error(err);
+      toast({ variant: 'destructive', title: 'Upload Failed', description: err.message || 'Failed to process SPX file.' });
+    } finally {
+      setLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const fixMetroManilaCity = (city: string) => {
+      let c = city.trim();
+      if (c.toUpperCase() === 'CITY OF MANILA') return 'Manila';
+      if (c.toUpperCase().startsWith('CITY OF ')) {
+          c = c.substring(8).trim() + ' City';
+      }
+      return c.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+  };
+  
+  const formatBarangay = (brgy: string) => {
+      return brgy.trim().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+  };
 
   const mapToSPXAddress = (region: string, province: string, city: string, barangay: string) => {
     let spxRegion = region;
@@ -118,7 +202,7 @@ export default function ForShippingPage() {
         spxRegion = 'Mindanao';
     }
     
-    return { spxRegion, spxProvince, spxCity: city, spxBarangay: barangay };
+    return { spxRegion, spxProvince, spxCity: fixMetroManilaCity(city || ''), spxBarangay: formatBarangay(barangay || '') };
   };
 
   const handleExportExcel = async () => {
@@ -127,21 +211,23 @@ export default function ForShippingPage() {
     try {
       setLoading(true);
       
-      const response = await fetch('/mass_order_creation_template_ph_multi_item_V2.xlsx');
-      const arrayBuffer = await response.arrayBuffer();
-      
-      const workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.load(arrayBuffer);
-      
-      const worksheet = workbook.worksheets[0];
+      const headers = [
+        '*Order Number', '*Recipient Name', '*Recipient Phone', '*Detailed Address',
+        'Region', 'Province', 'Town/City', 'Barangay', 'Postal Code',
+        '*Item Name', '*Item Type', 'Item Quantity', 'Item Price',
+        '*Parcel Weight (KG)', '*Parcel Length (CM)', '*Parcel Width (CM)', '*Parcel Height (CM)',
+        'Customer Reference No.', '*Payment Method', 'Delivery Instruction',
+        '*COD Collection (Y/N)', 'COD Amount', '*Parcel Value (PHP)'
+      ];
 
-      let currentRow = 2; // Start appending at row 2
+      const rows: any[][] = [headers];
 
       orders.forEach(order => {
         const items = order.items.length > 0 ? order.items : [{ product_name: 'Item', quantity: 1, selling_price_at_sale: order.totalAmount, discount: 0 }];
         
-        const isCOD = order.paymentType.toLowerCase().includes('cod');
-        const codAmount = isCOD ? (order.totalAmount + order.shippingAmount) : 0;
+        const balanceDue = order.totalAmount - order.amountPaid;
+        const codAmount = balanceDue > 0 ? balanceDue + order.shippingAmount : 0;
+        const isCOD = codAmount > 0;
         
         const addr = order.shippingAddress || {};
         const detailedAddress = addr.address_line || addr.street_address || 'N/A';
@@ -149,6 +235,8 @@ export default function ForShippingPage() {
         const { spxRegion, spxProvince, spxCity, spxBarangay } = mapToSPXAddress(addr.region || '', addr.province || '', addr.city || '', addr.barangay || '');
 
         items.forEach((item: any, index: number) => {
+          const price = (item.selling_price_at_sale || 0) - (item.discount || 0);
+
           const rowData = [
             order.orderId, // *Order Number
             order.shippingName, // *Recipient Name
@@ -162,7 +250,7 @@ export default function ForShippingPage() {
             item.product_name, // *Item Name
             'General merchandise', // *Item Type
             item.quantity, // Item Quantity
-            item.selling_price_at_sale, // Item Price
+            price, // Item Price
             order.weight || 1, // *Parcel Weight (KG)
             order.length || 10, // *Parcel Length (CM)
             order.width || 10, // *Parcel Width (CM)
@@ -175,13 +263,16 @@ export default function ForShippingPage() {
             order.totalAmount // *Parcel Value (PHP)
           ];
           
-          worksheet.insertRow(currentRow, rowData);
-          currentRow++;
+          rows.push(rowData);
         });
       });
 
-      const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+      
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       saveAs(blob, `For_Shipping_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`);
       
     } catch (error) {
@@ -203,6 +294,16 @@ export default function ForShippingPage() {
               </CardDescription>
             </div>
             <div className="flex gap-2">
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleSPXUpload} 
+                accept=".xlsx, .xls" 
+                className="hidden" 
+              />
+              <Button onClick={() => fileInputRef.current?.click()} disabled={loading} variant="outline" className="border-primary text-primary hover:bg-primary/10">
+                <Upload className="mr-2 h-4 w-4" /> Sync SPX File
+              </Button>
               <Button onClick={handleExportExcel} disabled={loading || orders.length === 0} className="bg-emerald-600 hover:bg-emerald-700">
                 <Download className="mr-2 h-4 w-4" /> Download Courier Format
               </Button>
