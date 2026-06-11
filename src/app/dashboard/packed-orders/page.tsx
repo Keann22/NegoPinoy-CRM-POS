@@ -12,6 +12,7 @@ import { useSupabase } from '@/firebase';
 import { useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, differenceInDays } from 'date-fns';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { VerifyShippingDialog } from '@/components/dashboard/verify-shipping-dialog';
 import { NotForShippingDialog } from '@/components/dashboard/not-for-shipping-dialog';
 import { Order } from '@/app/dashboard/orders/page';
@@ -24,6 +25,7 @@ type PackedOrder = Order & {
 export default function PackedOrdersPage() {
   const supabase = useSupabase();
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterSalesPerson, setFilterSalesPerson] = useState<string>('All');
   
   const [verifyOrder, setVerifyOrder] = useState<Order | null>(null);
   const [notForShippingOrder, setNotForShippingOrder] = useState<Order | null>(null);
@@ -61,6 +63,7 @@ export default function PackedOrdersPage() {
           paymentDetails: o.payment_details,
           notes: o.notes,
           salesRepId: o.sales_rep_id,
+          salesPersonName: o.sales_person_name,
           not_for_shipping_reason: o.not_for_shipping_reason,
           boxes_config: o.boxes_config,
         })));
@@ -109,12 +112,18 @@ export default function PackedOrdersPage() {
       );
     }
 
+    if (filterSalesPerson !== 'All') {
+      filtered = filtered.filter((o: any) => o.salesPersonName === filterSalesPerson);
+    }
+
     return filtered.map(order => ({
       ...order,
       customerName: customerMap.get(order.customerId) || 'Unknown Customer',
       daysPacked: differenceInDays(new Date(), new Date(order.orderDate))
     }));
-  }, [rawOrders, customerMap, searchQuery]);
+  }, [rawOrders, customerMap, searchQuery, filterSalesPerson]);
+
+  const uniqueSalesPersons = Array.from(new Set(rawOrders.map((o: any) => o.salesPersonName).filter(Boolean))).sort() as string[];
 
   // Split into Ready and Waiting
   const readyOrders = formattedOrders.filter(o => !(o as any).not_for_shipping_reason);
@@ -126,6 +135,7 @@ export default function PackedOrdersPage() {
         <TableRow>
           <TableHead>Order ID</TableHead>
           <TableHead>Customer</TableHead>
+          <TableHead>Sales Rep</TableHead>
           <TableHead>Packed Date</TableHead>
           {isWaitingTab && <TableHead>Reason</TableHead>}
           <TableHead className="text-right">Actions</TableHead>
@@ -137,13 +147,14 @@ export default function PackedOrdersPage() {
             <TableCell><Skeleton className="h-4 w-24" /></TableCell>
             <TableCell><Skeleton className="h-4 w-32" /></TableCell>
             <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
             {isWaitingTab && <TableCell><Skeleton className="h-4 w-48" /></TableCell>}
             <TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
           </TableRow>
         ))}
         {!isLoading && ordersToRender.length === 0 && (
           <TableRow>
-            <TableCell colSpan={isWaitingTab ? 5 : 4} className="text-center py-12 text-muted-foreground">
+            <TableCell colSpan={isWaitingTab ? 6 : 5} className="text-center py-12 text-muted-foreground">
               No orders found in this category.
             </TableCell>
           </TableRow>
@@ -152,6 +163,7 @@ export default function PackedOrdersPage() {
           <TableRow key={order.id}>
             <TableCell className="font-mono text-sm">{order.id.split('-')[0].toUpperCase()}</TableCell>
             <TableCell className="font-medium">{order.customerName}</TableCell>
+            <TableCell className="text-muted-foreground text-sm">{(order as any).salesPersonName || '-'}</TableCell>
             <TableCell>
               <div className="flex flex-col">
                 <span>{format(new Date(order.orderDate), 'MMM d, yyyy')}</span>
@@ -206,6 +218,17 @@ export default function PackedOrdersPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
+            <Select value={filterSalesPerson} onValueChange={setFilterSalesPerson}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by Sales" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All Sales Reps</SelectItem>
+                {uniqueSalesPersons.map(sp => (
+                  <SelectItem key={sp} value={sp}>{sp}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <Tabs defaultValue="ready" className="w-full">
