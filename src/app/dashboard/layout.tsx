@@ -47,6 +47,7 @@ import {
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Logo } from '@/components/logo';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { NotificationBell } from '@/components/dashboard/notification-bell';
 
 export default function DashboardLayout({
   children,
@@ -258,10 +259,7 @@ export default function DashboardLayout({
                 <Logo className="h-6 w-6" />
                 <span className="font-headline">NegosyantengPinoy.Ph</span>
               </Link>
-              <Button variant="outline" size="icon" className="ml-auto h-8 w-8 bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground">
-                <Bell className="h-4 w-4" />
-              <span className="sr-only">Toggle notifications</span>
-            </Button>
+              <NotificationBell />
           </div>
           <div className="flex-1 overflow-y-auto">
             <nav className="grid items-start px-2 text-sm font-medium lg:px-4 pb-4">

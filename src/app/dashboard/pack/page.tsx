@@ -92,7 +92,7 @@ export default function PackerApp() {
     try {
       const { data, error } = await supabase
         .from('orders')
-        .select('id, status, customer_id, customers(full_name), order_items(id, product_name, quantity)')
+        .select('id, status, customer_id, sales_person_name, customers(full_name), order_items(id, product_name, quantity)')
         .eq('id', orderId)
         .single();
         
@@ -267,6 +267,15 @@ export default function PackerApp() {
         .eq('id', scannedOrderId);
 
       if (error) throw error;
+
+      if (orderDetails?.sales_person_name) {
+        await supabase.from('notifications').insert({
+          sales_person_name: orderDetails.sales_person_name,
+          title: 'Order Packed',
+          message: `Order #${scannedOrderId.substring(0, 7).toUpperCase()} for ${orderDetails.customers?.full_name || 'Unknown'} has been packed and is ready for verification.`,
+          link: '/dashboard/packed-orders'
+        });
+      }
 
       toast({
         title: 'Success!',
