@@ -118,51 +118,77 @@ export default function ForShippingPage() {
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(await file.arrayBuffer());
       const worksheet = workbook.worksheets[0];
-      const updatePromises: any[] = [];
+      
+      const orderUpdates: Record<string, {
+         tracking_numbers: string[],
+         cod_amount: number,
+         estimated_shipping_fee: number,
+         scheduled_pickup_time: string,
+         payment_role: string,
+      }> = {};
       
       worksheet.eachRow((row, rowNumber) => {
-          if (rowNumber === 1 || rowNumber === 2) return; // skip headers
-          
           const trackingNo = row.getCell(1).value?.toString() || '';
+          // Skip header rows
+          if (trackingNo.toLowerCase().includes('tracking number') || trackingNo === '' || trackingNo.toLowerCase().includes('order number')) {
+              return;
+          }
+          
           const rawCustRef = row.getCell(3).value?.toString() || ''; 
           const pickupTime = row.getCell(10).value?.toString() || '';
           const paymentRole = row.getCell(32).value?.toString() || '';
-          const codAmount = parseFloat(row.getCell(38).value?.toString() || '0');
-          const estShippingFee = parseFloat(row.getCell(42).value?.toString() || '0');
+          const codAmount = parseFloat(row.getCell(38).value?.toString() || '0') || 0;
+          const estShippingFee = parseFloat(row.getCell(42).value?.toString() || '0') || 0;
           
           const orderIdMatch = rawCustRef.match(/ORDER\s*#?\s*([A-Za-z0-9-]+)/i);
           if (orderIdMatch && orderIdMatch[1]) {
               const rawPrefix = orderIdMatch[1].toLowerCase();
               const orderIdPrefix = rawPrefix.replace(/-b\d+$/i, '');
               
-              updatePromises.push(async () => {
-                   const { data: matchedOrders } = await supabase.from('orders').select('id').ilike('id', `${orderIdPrefix}%`).limit(1);
-                   if (matchedOrders && matchedOrders.length > 0) {
-                       const fullId = matchedOrders[0].id;
-                       await supabase.from('orders').update({
-                           status: 'For Pick-up',
-                           tracking_number: trackingNo,
-                           spx_sync_data: {
-                               scheduled_pickup_time: pickupTime,
-                               estimated_shipping_fee: estShippingFee,
-                               cod_amount: codAmount,
-                               payment_role: paymentRole,
-                               service_type: 'Standard Service',
-                               collect_type: 'Pickup',
-                               payment_type: 'Pay by Cycle'
-                           }
-                       }).eq('id', fullId);
-                   }
-              });
+              const matchingOrder = orders.find(o => o.id.toLowerCase().startsWith(orderIdPrefix));
+              if (matchingOrder) {
+                  const fullId = matchingOrder.id;
+                  if (!orderUpdates[fullId]) {
+                      orderUpdates[fullId] = {
+                          tracking_numbers: [],
+                          cod_amount: 0,
+                          estimated_shipping_fee: 0,
+                          scheduled_pickup_time: pickupTime,
+                          payment_role: paymentRole
+                      };
+                  }
+                  
+                  if (trackingNo && !orderUpdates[fullId].tracking_numbers.includes(trackingNo)) {
+                      orderUpdates[fullId].tracking_numbers.push(trackingNo);
+                  }
+                  orderUpdates[fullId].cod_amount += codAmount;
+                  orderUpdates[fullId].estimated_shipping_fee += estShippingFee;
+              }
           }
+      });
+      
+      const updatePromises = Object.entries(orderUpdates).map(async ([fullId, data]) => {
+          return supabase.from('orders').update({
+               status: 'For Pick-up',
+               tracking_number: data.tracking_numbers.join(', '),
+               spx_sync_data: {
+                   scheduled_pickup_time: data.scheduled_pickup_time,
+                   estimated_shipping_fee: data.estimated_shipping_fee,
+                   cod_amount: data.cod_amount,
+                   payment_role: data.payment_role,
+                   service_type: 'Standard Service',
+                   collect_type: 'Pickup',
+                   payment_type: 'Pay by Cycle'
+               }
+           }).eq('id', fullId);
       });
       
       // Execute sequentially to avoid rate limits
       for (const updateFn of updatePromises) {
-          await updateFn();
+          await updateFn;
       }
       
-      toast({ title: 'Upload Successful', description: `Synced ${updatePromises.length} orders to SPX tracking and moved to For Pick-up.` });
+      toast({ title: 'Upload Successful', description: `Synced ${Object.keys(orderUpdates).length} orders to SPX tracking and moved to For Pick-up.` });
       fetchForShippingOrders();
     } catch (err: any) {
       console.error(err);
