@@ -284,13 +284,23 @@ export function VerifyShippingDialog({ order, open, onOpenChange, onSuccess }: V
                 <Label className="text-base font-semibold">Amount to Collect for Items (Multi-Box)</Label>
                 <p className="text-xs text-muted-foreground mb-2">Assign how much COD should be collected per box.</p>
                 {order.boxes_config.map((box: any) => (
-                   <div key={box.id} className="flex items-center gap-3">
-                      <Label className="w-24 text-sm">{box.name}: ₱</Label>
-                      <Input 
-                        type="number" 
-                        value={boxCodAmounts[box.id] || ''} 
-                        onChange={e => setBoxCodAmounts({...boxCodAmounts, [box.id]: e.target.value})} 
-                      />
+                   <div key={box.id} className="flex flex-col gap-2 bg-white p-3 rounded border">
+                      <div className="flex items-center gap-3">
+                        <Label className="w-24 text-sm font-semibold">{box.name}: ₱</Label>
+                        <Input 
+                          type="number" 
+                          value={boxCodAmounts[box.id] || ''} 
+                          onChange={e => setBoxCodAmounts({...boxCodAmounts, [box.id]: e.target.value})} 
+                        />
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                         <span className="font-semibold block mb-1">Contents:</span>
+                         <ul className="list-disc pl-4">
+                            {box.items && box.items.length > 0 ? box.items.map((item: any, idx: number) => (
+                               <li key={idx}>{item.quantity}x {item.product_name}</li>
+                            )) : <li>Empty box</li>}
+                         </ul>
+                      </div>
                    </div>
                 ))}
               </div>
