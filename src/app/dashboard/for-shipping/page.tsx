@@ -139,12 +139,12 @@ export default function ForShippingPage() {
           if (!foundHeaders) {
               row.eachCell((cell, colNumber) => {
                   const val = cell.value?.toString().toLowerCase().trim() || '';
-                  if (val === 'tracking number' || val === 'tracking no.') trackingCol = colNumber;
-                  else if (val.includes('customer reference') || val === 'order number') refCol = colNumber;
-                  else if (val.includes('pickup time')) pickupTimeCol = colNumber;
-                  else if (val.includes('payment role')) paymentRoleCol = colNumber;
-                  else if (val.includes('cod amount')) codAmountCol = colNumber;
-                  else if (val.includes('shipping fee') || val.includes('est. shipping')) estShippingFeeCol = colNumber;
+                  if (trackingCol === -1 && (val === 'tracking number' || val === 'tracking no.')) trackingCol = colNumber;
+                  else if (refCol === -1 && (val.includes('customer reference') || val === 'order number')) refCol = colNumber;
+                  else if (pickupTimeCol === 10 && val.includes('pickup time')) pickupTimeCol = colNumber;
+                  else if (paymentRoleCol === 32 && val.includes('payment role')) paymentRoleCol = colNumber;
+                  else if (codAmountCol === 38 && val.includes('cod amount')) codAmountCol = colNumber;
+                  else if (estShippingFeeCol === 42 && (val === 'estimated shipping fee' || val === 'est. shipping fee' || val.includes('est. shipping'))) estShippingFeeCol = colNumber;
               });
               
               if (trackingCol !== -1 && refCol !== -1) {
