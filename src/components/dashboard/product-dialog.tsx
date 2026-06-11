@@ -148,7 +148,7 @@ export function ProductDialog(props: ProductDialogProps) {
   const [componentResults, setComponentResults] = useState<{ id: string; name: string }[]>([]);
   const [isLoadingComponents, setIsLoadingComponents] = useState(false);
   useEffect(() => {
-    if (!supabase || !user || !isManagement || componentSearch.length < 1) { setComponentResults([]); return; }
+    if (!supabase || !user || componentSearch.length < 1) { setComponentResults([]); return; }
     const handler = setTimeout(async () => {
       setIsLoadingComponents(true);
       const t = componentSearch.charAt(0).toUpperCase() + componentSearch.slice(1);
@@ -157,7 +157,7 @@ export function ProductDialog(props: ProductDialogProps) {
       setIsLoadingComponents(false);
     }, 250);
     return () => clearTimeout(handler);
-  }, [supabase, user, isManagement, componentSearch]);
+  }, [supabase, user, componentSearch]);
 
   // ── Form ─────────────────────────────────────────────────────────────────
 
@@ -452,7 +452,7 @@ export function ProductDialog(props: ProductDialogProps) {
               )}
 
               {/* Assembly Recipe (edit only, management only) */}
-              {isEdit && isManagement && (
+              {isEdit && (
                 <div className="space-y-4 rounded-lg border p-4">
                   <FormLabel className="text-base">Assembly Recipe (Bundling)</FormLabel>
                   <DialogDescription>If this product is a bundle, add the individual component products here.</DialogDescription>
