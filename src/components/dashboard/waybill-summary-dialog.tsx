@@ -80,7 +80,7 @@ export function WaybillSummaryDialog({ open, onOpenChange, order }: WaybillSumma
                         </div>
                         <div className="grid grid-cols-[130px_1fr] items-center text-gray-600">
                             <span className="text-right pr-4">COD Amount :</span>
-                            <span className="font-semibold text-gray-900">₱{spx.cod_amount !== undefined ? spx.cod_amount : (order.amountPaid || order.totalAmount || 0)}</span>
+                            <span className="font-semibold text-gray-900">₱{(spx.cod_amount !== undefined ? Number(spx.cod_amount) : Number(order.amountPaid || order.totalAmount || 0)) + Number(spx.estimated_shipping_fee || 0)}</span>
                         </div>
                     </div>
                 </div>
