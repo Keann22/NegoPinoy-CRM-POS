@@ -25,12 +25,14 @@ export function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   const fetchNotifications = useCallback(async () => {
-    if (!supabase || !userProfile?.full_name) return;
+    if (!supabase || !userProfile?.firstName) return;
+
+    const fullName = `${userProfile.firstName} ${userProfile.lastName}`.trim();
 
     const { data, error } = await supabase
       .from('notifications')
       .select('*')
-      .eq('sales_person_name', userProfile.full_name)
+      .eq('sales_person_name', fullName)
       .order('created_at', { ascending: false })
       .limit(20);
 
@@ -55,7 +57,9 @@ export function NotificationBell() {
   }, []);
 
   useEffect(() => {
-    if (!supabase || !userProfile?.full_name) return;
+    if (!supabase || !userProfile?.firstName) return;
+
+    const fullName = `${userProfile.firstName} ${userProfile.lastName}`.trim();
 
     const channel = supabase
       .channel('notifications-channel')
@@ -65,7 +69,7 @@ export function NotificationBell() {
           event: 'INSERT',
           schema: 'public',
           table: 'notifications',
-          filter: `sales_person_name=eq.${userProfile.full_name}`,
+          filter: `sales_person_name=eq.${fullName}`,
         },
         (payload) => {
           const newNotif = payload.new;
@@ -111,7 +115,9 @@ export function NotificationBell() {
   };
 
   const markAllAsRead = async () => {
-    if (!supabase || !userProfile?.full_name) return;
+    if (!supabase || !userProfile?.firstName) return;
+
+    const fullName = `${userProfile.firstName} ${userProfile.lastName}`.trim();
 
     // Optimistic update
     setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
@@ -120,7 +126,7 @@ export function NotificationBell() {
     await supabase
       .from('notifications')
       .update({ is_read: true })
-      .eq('sales_person_name', userProfile.full_name)
+      .eq('sales_person_name', fullName)
       .eq('is_read', false);
   };
 
