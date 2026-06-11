@@ -127,22 +127,56 @@ export default function ForShippingPage() {
          payment_role: string,
       }> = {};
       
+      let trackingCol = -1;
+      let refCol = -1;
+      let pickupTimeCol = 10;
+      let paymentRoleCol = 32;
+      let codAmountCol = 38;
+      let estShippingFeeCol = 42;
+      let foundHeaders = false;
+
       worksheet.eachRow((row, rowNumber) => {
-          const trackingNo = row.getCell(1).value?.toString() || '';
-          // Skip header rows
-          if (trackingNo.toLowerCase().includes('tracking number') || trackingNo === '' || trackingNo.toLowerCase().includes('order number')) {
-              return;
+          if (!foundHeaders) {
+              row.eachCell((cell, colNumber) => {
+                  const val = cell.value?.toString().toLowerCase().trim() || '';
+                  if (val === 'tracking number' || val === 'tracking no.') trackingCol = colNumber;
+                  else if (val.includes('customer reference') || val === 'order number') refCol = colNumber;
+                  else if (val.includes('pickup time')) pickupTimeCol = colNumber;
+                  else if (val.includes('payment role')) paymentRoleCol = colNumber;
+                  else if (val.includes('cod amount')) codAmountCol = colNumber;
+                  else if (val.includes('shipping fee') || val.includes('est. shipping')) estShippingFeeCol = colNumber;
+              });
+              
+              if (trackingCol !== -1 && refCol !== -1) {
+                  foundHeaders = true;
+              }
+              return; // skip header row
           }
           
-          const rawCustRef = row.getCell(3).value?.toString() || ''; 
-          const pickupTime = row.getCell(10).value?.toString() || '';
-          const paymentRole = row.getCell(32).value?.toString() || '';
-          const codAmount = parseFloat(row.getCell(38).value?.toString() || '0') || 0;
-          const estShippingFee = parseFloat(row.getCell(42).value?.toString() || '0') || 0;
+          if (!foundHeaders) return; // skip pre-header rows
           
+          // Use default column 1 if dynamic fails, though it shouldn't
+          const tCol = trackingCol !== -1 ? trackingCol : 1;
+          const rCol = refCol !== -1 ? refCol : 3;
+          
+          const trackingNo = row.getCell(tCol).value?.toString().trim() || '';
+          if (!trackingNo || trackingNo.toLowerCase().includes('tracking number')) return;
+          
+          const rawCustRef = row.getCell(rCol).value?.toString().trim() || ''; 
+          const pickupTime = row.getCell(pickupTimeCol).value?.toString() || '';
+          const paymentRole = row.getCell(paymentRoleCol).value?.toString() || '';
+          const codAmount = parseFloat(row.getCell(codAmountCol).value?.toString() || '0') || 0;
+          const estShippingFee = parseFloat(row.getCell(estShippingFeeCol).value?.toString() || '0') || 0;
+          
+          let rawPrefix = '';
           const orderIdMatch = rawCustRef.match(/ORDER\s*#?\s*([A-Za-z0-9-]+)/i);
           if (orderIdMatch && orderIdMatch[1]) {
-              const rawPrefix = orderIdMatch[1].toLowerCase();
+              rawPrefix = orderIdMatch[1].toLowerCase();
+          } else if (rawCustRef.match(/^[a-f0-9]{8}(?:-b\d+)?$/i)) {
+              rawPrefix = rawCustRef.toLowerCase();
+          }
+          
+          if (rawPrefix) {
               const orderIdPrefix = rawPrefix.replace(/-b\d+$/i, '');
               
               const matchingOrder = orders.find(o => o.id.toLowerCase().startsWith(orderIdPrefix));
@@ -166,6 +200,13 @@ export default function ForShippingPage() {
               }
           }
       });
+      
+      if (!foundHeaders && Object.keys(orderUpdates).length === 0) {
+         toast({ variant: 'destructive', title: 'Invalid File Format', description: 'Could not find Tracking Number and Customer Reference columns in the Excel file. Please ensure you uploaded the correct SPX file.' });
+         setLoading(false);
+         if (fileInputRef.current) fileInputRef.current.value = '';
+         return;
+      }
       
       const updatePromises = Object.entries(orderUpdates).map(async ([fullId, data]) => {
           return supabase.from('orders').update({

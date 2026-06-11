@@ -29,6 +29,7 @@ type Customer = {
   streetAddress?: string;
   sukiTier?: string;
   facebookProfileLink?: string;
+  storeCredit?: number;
 };
 
 type Payment = {
@@ -157,6 +158,11 @@ export default function CustomerDetailPage() {
               <CardDescription className="text-base mt-2">
                 Total Outstanding Balance: <span className="font-bold text-destructive">₱{totalBalanceOwed.toFixed(2)}</span>
               </CardDescription>
+              {customer.storeCredit && customer.storeCredit > 0 ? (
+                <CardDescription className="text-base mt-1 text-green-600 font-semibold">
+                  Store Credit (Overpayment): ₱{customer.storeCredit.toFixed(2)}
+                </CardDescription>
+              ) : null}
             </div>
             <div className="self-start">
               <Button variant="outline" size="sm" onClick={() => setEditingCustomer(customer)}>
