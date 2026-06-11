@@ -148,12 +148,10 @@ export default function PendingCostsPage() {
       
       if (moveError) throw moveError;
 
-      // Update product stock if quantity changed
+      // Update product stock if quantity changed using atomic RPC
       if (qtyDifference !== 0) {
-        const { data: prodData } = await supabase.from('products').select('stock_level').eq('id', movement.product_id).single();
-        if (prodData) {
-            await supabase.from('products').update({ stock_level: (prodData.stock_level || 0) + qtyDifference }).eq('id', movement.product_id);
-        }
+        const { error: updateErr } = await supabase.rpc('increment_stock', { p_product_id: movement.product_id, qty: qtyDifference });
+        if (updateErr) throw updateErr;
       }
 
       // 2. Update the product's initial_unit_cost and supplier_pricing
@@ -214,10 +212,7 @@ export default function PendingCostsPage() {
 
     setDeletingId(movement.id);
     try {
-        const { data: prodData, error: prodErr } = await supabase.from('products').select('stock_level').eq('id', movement.product_id).single();
-        if (prodErr) throw prodErr;
-        
-        const { error: updateErr } = await supabase.from('products').update({ stock_level: Math.max(0, (prodData.stock_level || 0) - movement.quantity_change) }).eq('id', movement.product_id);
+        const { error: updateErr } = await supabase.rpc('increment_stock', { p_product_id: movement.product_id, qty: -movement.quantity_change });
         if (updateErr) throw updateErr;
 
         const { error: delErr } = await supabase.from('inventory_movements').delete().eq('id', movement.id);

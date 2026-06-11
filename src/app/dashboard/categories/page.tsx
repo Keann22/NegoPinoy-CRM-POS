@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useCollection, useSupabase, useUser } from '@/firebase';
+import { useState, useMemo, useEffect } from 'react';
+import { useSupabase, useUser } from '@/firebase';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,9 +35,24 @@ export default function CategoriesPage() {
     const isInventory = useMemo(() => userProfile?.roles?.some(r => String(r).toLowerCase() === 'inventory'), [userProfile]);
     const canManageCategories = isManagement || isInventory;
 
-    const { data: categories, isLoading, refetch } = useCollection<Category>(
-        supabase && user ? { path: 'categories', constraints: [{ type: 'orderBy', field: 'name' }] } : null
-    );
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [refetchTrigger, setRefetchTrigger] = useState(0);
+    const refetch = () => setRefetchTrigger(n => n + 1);
+
+    useEffect(() => {
+      if (!supabase || !user) return;
+      const fetch = async () => {
+        setIsLoading(true);
+        try {
+          const { data, error } = await supabase.from('categories').select('*').order('name');
+          if (error) throw error;
+          setCategories(data || []);
+        } catch (err) { console.error('Categories fetch error:', err); }
+        finally { setIsLoading(false); }
+      };
+      fetch();
+    }, [supabase, user, refetchTrigger]);
 
     const filteredCategories = useMemo(() => {
         if (!categories) return [];

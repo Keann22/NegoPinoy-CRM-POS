@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useCollection, useSupabase, useUser, collection } from '@/firebase';
+import { useState, useMemo, useEffect } from 'react';
+import { useSupabase, useUser } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -25,8 +25,35 @@ export function ToOrderReport() {
     const supabase = useSupabase();
     const { user } = useUser();
 
-    const productsQuery = useMemo(() => (supabase && user ? collection(supabase, 'products') : null), [supabase, user]);
-    const { data: products, isLoading } = useCollection<Product>(productsQuery);
+    const [products, setProducts] = useState<Product[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+      if (!supabase || !user) return;
+      const fetch = async () => {
+        setIsLoading(true);
+        try {
+          const { data, error } = await supabase
+            .from('products')
+            .select('id, name, sku, stock_level, supplier_pricing, category, description, images')
+            .lt('stock_level', 0)
+            .order('stock_level', { ascending: true });
+          if (error) throw error;
+          setProducts((data || []).map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            sku: p.sku,
+            quantityOnHand: p.stock_level ?? 0,
+            supplierPricing: p.supplier_pricing,
+            category: p.category,
+            description: p.description,
+            images: p.images,
+          })));
+        } catch (err) { console.error('to-order-report fetch error:', err); }
+        finally { setIsLoading(false); }
+      };
+      fetch();
+    }, [supabase, user]);
 
     const [selectedSupplier, setSelectedSupplier] = useState<string>('all');
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);

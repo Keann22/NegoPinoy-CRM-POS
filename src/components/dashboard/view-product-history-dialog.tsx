@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -17,7 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useCollection, useSupabase, useUser, collection, query, where } from '@/firebase';
+import { useSupabase, useUser } from '@/firebase';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -62,24 +62,36 @@ export function ViewProductHistoryDialog({ product, open, onOpenChange }: ViewPr
 
   const displayProduct = product || localProduct;
 
-  // Optimized query: No orderBy to avoid missing index errors. 
-  // We sort the results in memory instead.
-  const movementsQuery = useMemo(() => {
-    if (!supabase || !user || !displayProduct) return null;
-    return query(
-      collection(supabase, 'inventoryMovements'),
-      where('productId', '==', displayProduct.id)
-    );
-  }, [supabase, user, displayProduct]);
+  const [movements, setMovements] = useState<InventoryMovement[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const { data: rawMovements, isLoading } = useCollection<InventoryMovement>(movementsQuery);
-
-  const movements = useMemo(() => {
-    if (!rawMovements) return [];
-    return [...rawMovements].sort((a, b) => 
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    );
-  }, [rawMovements]);
+  useEffect(() => {
+    if (!supabase || !user || !displayProduct || !open) return;
+    const fetchMovements = async () => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('inventory_movements')
+          .select('*')
+          .eq('product_id', displayProduct.id)
+          .order('timestamp', { ascending: false });
+        if (error) throw error;
+        setMovements((data || []).map((m: any) => ({
+          id: m.id,
+          productId: m.product_id,
+          quantityChange: m.quantity_change,
+          movementType: m.movement_type,
+          timestamp: m.timestamp,
+          reason: m.reason,
+        })));
+      } catch (err) {
+        console.error('Inventory movement fetch error:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchMovements();
+  }, [supabase, user, displayProduct, open]);
 
   if (!displayProduct) {
     return null;

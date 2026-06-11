@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useCollection, useUser, useSupabase, collection, query, where, orderBy } from '@/firebase';
+import { useEffect, useState } from 'react';
+import { useSupabase, useUser } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -17,18 +17,29 @@ interface NeedsProcurementListProps {
 export function NeedsProcurementList({ onAddProduct }: NeedsProcurementListProps) {
   const supabase = useSupabase();
   const { user } = useUser();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const negativeStockQuery = useMemo(() => {
-    if (!supabase || !user) return null;
-    // Query products where stock_level < 0
-    return query(
-      collection(supabase, 'products'),
-      where('stock_level', '<', 0),
-      orderBy('stock_level', 'asc') // Most negative first
-    );
+  useEffect(() => {
+    if (!supabase || !user) return;
+    const fetch = async () => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .select('id, name, stock_level, variant_name')
+          .lt('stock_level', 0)
+          .order('stock_level', { ascending: true });
+        if (error) throw error;
+        setProducts(data || []);
+      } catch (err) {
+        console.error('NeedsProcurementList fetch error:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetch();
   }, [supabase, user]);
-
-  const { data: products, isLoading } = useCollection<Product>(negativeStockQuery);
 
   return (
     <Card className="h-full flex flex-col border-destructive/20 shadow-sm printable-area">
@@ -36,7 +47,7 @@ export function NeedsProcurementList({ onAddProduct }: NeedsProcurementListProps
         <CardTitle className="text-lg font-headline flex items-center justify-between">
           <div className="flex items-center gap-2">
             To Procure List
-            {products && products.length > 0 && (
+            {products.length > 0 && (
               <Badge variant="destructive">{products.length} Items</Badge>
             )}
           </div>
@@ -53,7 +64,7 @@ export function NeedsProcurementList({ onAddProduct }: NeedsProcurementListProps
           <div className="flex justify-center items-center h-32">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
-        ) : !products || products.length === 0 ? (
+        ) : products.length === 0 ? (
           <div className="flex flex-col justify-center items-center h-32 p-6 text-center text-muted-foreground">
             <p className="font-medium text-foreground">All caught up!</p>
             <p className="text-sm">No products currently have negative stock.</p>
@@ -62,28 +73,28 @@ export function NeedsProcurementList({ onAddProduct }: NeedsProcurementListProps
           <ScrollArea className="h-[400px] md:h-full">
             <div className="divide-y">
               {products.map((product) => {
-                  const displayName = product.variant_name ? `${product.name} - ${product.variant_name}` : product.name;
-                  return (
-                    <div key={product.id} className="p-4 flex items-center justify-between hover:bg-muted/50 transition-colors">
-                      <div className="flex-1 min-w-0 pr-4">
-                        <p className="font-medium truncate text-sm" title={displayName}>
-                          {displayName}
-                        </p>
-                        <p className="text-sm text-destructive font-semibold mt-1">
-                          Available to Sell: {product.stock_level}
-                        </p>
-                      </div>
-                      <Button 
-                        size="sm" 
-                        variant="secondary"
-                        onClick={() => onAddProduct({ id: product.id, name: displayName })}
-                        className="shrink-0"
-                      >
-                        <PlusCircle className="h-4 w-4 mr-2" />
-                        Add
-                      </Button>
+                const displayName = product.variant_name ? `${product.name} - ${product.variant_name}` : product.name;
+                return (
+                  <div key={product.id} className="p-4 flex items-center justify-between hover:bg-muted/50 transition-colors">
+                    <div className="flex-1 min-w-0 pr-4">
+                      <p className="font-medium truncate text-sm" title={displayName}>
+                        {displayName}
+                      </p>
+                      <p className="text-sm text-destructive font-semibold mt-1">
+                        Available to Sell: {product.stock_level}
+                      </p>
                     </div>
-                  );
+                    <Button 
+                      size="sm" 
+                      variant="secondary"
+                      onClick={() => onAddProduct({ id: product.id, name: displayName })}
+                      className="shrink-0"
+                    >
+                      <PlusCircle className="h-4 w-4 mr-2" />
+                      Add
+                    </Button>
+                  </div>
+                );
               })}
             </div>
           </ScrollArea>

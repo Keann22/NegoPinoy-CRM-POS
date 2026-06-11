@@ -123,8 +123,6 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Ed
 
 
 
-
-
   const form = useForm<EditProductFormValues>({
     resolver: zodResolver(editProductSchema),
     defaultValues: {
@@ -148,8 +146,6 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Ed
       control: form.control,
       name: "assemblyRecipe"
   });
-
-
 
   useEffect(() => {
     if (product && open) {

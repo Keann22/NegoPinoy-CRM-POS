@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useCollection, useSupabase, useUser, collection, query, orderBy } from '@/firebase';
+import { useMemo, useEffect, useState } from 'react';
+import { useSupabase, useUser } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Card,
@@ -37,12 +37,31 @@ export default function RecurringExpensesPage() {
 
   const isManagement = useMemo(() => userProfile?.roles.some(r => ['Admin', 'Owner'].includes(r)), [userProfile]);
 
-  // CRITICAL: Strict role check before query
-  const recurringExpensesQuery = useMemo(
-    () => (supabase && user && isManagement ? query(collection(supabase, 'recurring_expenses'), orderBy('day_of_month', 'asc')) : null),
-    [supabase, user, isManagement]
-  );
-  const { data: recurringExpenses, isLoading } = useCollection<RecurringExpense>(recurringExpensesQuery);
+  const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!supabase || !user || !isManagement) return;
+    const fetch = async () => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('recurring_expenses')
+          .select('*')
+          .order('day_of_month', { ascending: true });
+        if (error) throw error;
+        setRecurringExpenses((data || []).map((e: any) => ({
+          id: e.id,
+          name: e.name,
+          amount: e.amount,
+          category: e.category,
+          dayOfMonth: e.day_of_month,
+        })));
+      } catch (err) { console.error('Recurring expenses fetch error:', err); }
+      finally { setIsLoading(false); }
+    };
+    fetch();
+  }, [supabase, user, isManagement]);
 
   if (userProfile && !isManagement) {
     return (

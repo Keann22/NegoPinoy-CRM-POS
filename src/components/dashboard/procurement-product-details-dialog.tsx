@@ -2,8 +2,8 @@
 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { useSupabase, useUser, useCollection } from "@/firebase";
-import { useState, useMemo, useEffect } from "react";
+import { useSupabase, useUser } from "@/firebase";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";

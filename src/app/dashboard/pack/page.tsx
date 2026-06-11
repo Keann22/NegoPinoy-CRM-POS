@@ -8,7 +8,23 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Package, ScanLine, X, Check } from 'lucide-react';
+import { Loader2, Package, ScanLine, X, Check, Plus, Trash2 } from 'lucide-react';
+
+type OrderItem = {
+  id: string;
+  product_name: string;
+  quantity: number;
+};
+
+type BoxData = {
+  id: string;
+  name: string;
+  length: string;
+  width: string;
+  height: string;
+  weight: string;
+  items: Record<string, number>; // itemId -> qty in this box
+};
 
 export default function PackerApp() {
   const supabase = useSupabase();
@@ -17,22 +33,17 @@ export default function PackerApp() {
   const [scanning, setScanning] = useState(false);
   const [scannedOrderId, setScannedOrderId] = useState<string | null>(null);
   const [orderDetails, setOrderDetails] = useState<any>(null);
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Form State
-  const [length, setLength] = useState('');
-  const [width, setWidth] = useState('');
-  const [height, setHeight] = useState('');
-  const [weight, setWeight] = useState('');
+  const [boxes, setBoxes] = useState<BoxData[]>([]);
 
   const startScanner = async () => {
     setScanning(true);
     setScannedOrderId(null);
     setOrderDetails(null);
-    setLength('');
-    setWidth('');
-    setHeight('');
-    setWeight('');
+    setOrderItems([]);
+    setBoxes([]);
 
     const { Html5QrcodeScanner } = await import('html5-qrcode');
 
@@ -81,7 +92,7 @@ export default function PackerApp() {
     try {
       const { data, error } = await supabase
         .from('orders')
-        .select('id, status, customer_id, customers(full_name)')
+        .select('id, status, customer_id, customers(full_name), order_items(id, product_name, quantity)')
         .eq('id', orderId)
         .single();
         
@@ -94,6 +105,26 @@ export default function PackerApp() {
       }
 
       setOrderDetails(data);
+      const items = data.order_items || [];
+      setOrderItems(items);
+
+      // Initialize Box 1
+      const initialItems: Record<string, number> = {};
+      items.forEach((item: any) => {
+        initialItems[item.id] = item.quantity;
+      });
+
+      setBoxes([
+        {
+          id: 'box-1',
+          name: 'Box 1',
+          length: '',
+          width: '',
+          height: '',
+          weight: '',
+          items: initialItems
+        }
+      ]);
 
       if (data.status === 'Packed') {
         toast({ title: 'Already Packed', description: 'This order is already marked as packed.', variant: 'default' });
@@ -108,20 +139,130 @@ export default function PackerApp() {
     }
   };
 
+  const handleAddBox = () => {
+    const newBoxId = `box-${boxes.length + 1}`;
+    setBoxes([...boxes, {
+      id: newBoxId,
+      name: `Box ${boxes.length + 1}`,
+      length: '', width: '', height: '', weight: '',
+      items: {}
+    }]);
+  };
+
+  const handleRemoveBox = (boxId: string) => {
+    if (boxes.length <= 1) return;
+    // Move items from removed box back to box 1
+    const boxToRemove = boxes.find(b => b.id === boxId);
+    const newBoxes = boxes.filter(b => b.id !== boxId);
+    
+    if (boxToRemove) {
+      Object.entries(boxToRemove.items).forEach(([itemId, qty]) => {
+        if (qty > 0) {
+          newBoxes[0].items[itemId] = (newBoxes[0].items[itemId] || 0) + qty;
+        }
+      });
+    }
+    setBoxes(newBoxes);
+  };
+
+  const handleItemQtyChange = (boxId: string, itemId: string, newQty: number) => {
+    // Prevent negative quantities
+    if (newQty < 0) return;
+
+    // Find the total quantity required for this item
+    const itemTotal = orderItems.find(i => i.id === itemId)?.quantity || 0;
+
+    // Calculate how much is currently assigned to OTHER boxes
+    let qtyInOtherBoxes = 0;
+    boxes.forEach(b => {
+      if (b.id !== boxId) {
+        qtyInOtherBoxes += (b.items[itemId] || 0);
+      }
+    });
+
+    // The new quantity cannot exceed what's remaining
+    const maxAllowed = itemTotal - qtyInOtherBoxes;
+    const finalQty = Math.min(newQty, maxAllowed);
+
+    setBoxes(boxes.map(b => {
+      if (b.id === boxId) {
+        return {
+          ...b,
+          items: {
+            ...b.items,
+            [itemId]: finalQty
+          }
+        };
+      }
+      return b;
+    }));
+  };
+
+  const handleBoxDimensionChange = (boxId: string, field: 'length' | 'width' | 'height' | 'weight', value: string) => {
+    setBoxes(boxes.map(b => {
+      if (b.id === boxId) {
+        return { ...b, [field]: value };
+      }
+      return b;
+    }));
+  };
+
   const handlePackOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supabase || !scannedOrderId) return;
+    
+    // Validate that ALL items are fully assigned to boxes
+    for (const item of orderItems) {
+      let assignedQty = 0;
+      boxes.forEach(b => {
+        assignedQty += (b.items[item.id] || 0);
+      });
+      if (assignedQty !== item.quantity) {
+        toast({ variant: 'destructive', title: 'Items unassigned', description: `You have not assigned all quantities of ${item.product_name} into a box.` });
+        return;
+      }
+    }
+
+    // Validate that all boxes have dimensions and weight
+    for (const box of boxes) {
+      if (!box.length || !box.width || !box.height || !box.weight) {
+        toast({ variant: 'destructive', title: 'Missing dimensions', description: `Please fill in all dimensions and weight for ${box.name}.` });
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
+      // Build boxes_config JSON
+      const boxesConfig = boxes.map(b => {
+        const assignedItems = orderItems.map(oi => ({
+          id: oi.id,
+          product_name: oi.product_name,
+          quantity: b.items[oi.id] || 0
+        })).filter(oi => oi.quantity > 0);
+
+        return {
+          id: b.id,
+          name: b.name,
+          length: Number(b.length),
+          width: Number(b.width),
+          height: Number(b.height),
+          weight: Number(b.weight),
+          items: assignedItems
+        };
+      });
+
       const { error } = await supabase
         .from('orders')
         .update({
           status: 'Packed',
-          package_length: Number(length) || null,
-          package_width: Number(width) || null,
-          package_height: Number(height) || null,
-          package_weight: Number(weight) || null,
+          boxes_config: boxesConfig,
+          // We can leave package_* null or set to first box for legacy support
+          package_length: Number(boxes[0].length) || null,
+          package_width: Number(boxes[0].width) || null,
+          package_height: Number(boxes[0].height) || null,
+          package_weight: Number(boxes[0].weight) || null,
         })
         .eq('id', scannedOrderId);
 
@@ -135,10 +276,7 @@ export default function PackerApp() {
 
       setScannedOrderId(null);
       setOrderDetails(null);
-      setLength('');
-      setWidth('');
-      setHeight('');
-      setWeight('');
+      setBoxes([]);
 
     } catch (err) {
       console.error(err);
@@ -149,7 +287,7 @@ export default function PackerApp() {
   };
 
   return (
-    <div className="flex flex-col h-full max-w-md mx-auto p-4 space-y-4">
+    <div className="flex flex-col h-full max-w-2xl mx-auto p-4 space-y-4">
       <div className="text-center mb-4">
         <h1 className="text-2xl font-bold font-headline flex items-center justify-center gap-2">
           <Package className="h-6 w-6 text-primary" />
@@ -159,7 +297,7 @@ export default function PackerApp() {
       </div>
 
       {!scanning && !scannedOrderId && (
-        <Card className="shadow-md border-primary/20">
+        <Card className="shadow-md border-primary/20 max-w-md mx-auto w-full">
           <CardContent className="flex flex-col items-center justify-center p-8 space-y-4">
             <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center">
               <ScanLine className="h-12 w-12 text-primary" />
@@ -172,7 +310,7 @@ export default function PackerApp() {
       )}
 
       {scanning && (
-        <Card>
+        <Card className="max-w-md mx-auto w-full">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
             <CardTitle>Scanning...</CardTitle>
             <Button variant="ghost" size="icon" onClick={stopScanner}><X className="h-4 w-4" /></Button>
@@ -191,7 +329,7 @@ export default function PackerApp() {
       )}
 
       {scannedOrderId && orderDetails && (
-        <Card className="border-primary/50 shadow-lg">
+        <Card className="border-primary/50 shadow-lg w-full">
           <CardHeader className="bg-primary/5 pb-4">
             <CardTitle className="flex justify-between items-center">
               <span>Order #{scannedOrderId.substring(0, 7).toUpperCase()}</span>
@@ -204,35 +342,106 @@ export default function PackerApp() {
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-6">
-            <form onSubmit={handlePackOrder} className="space-y-4">
+            <form onSubmit={handlePackOrder} className="space-y-6">
               
-              <div className="bg-muted/50 p-4 rounded-lg space-y-3 mb-6">
-                <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">Package Dimensions (cm)</h3>
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="space-y-1">
-                    <Label htmlFor="length">Length</Label>
-                    <Input id="length" type="number" step="0.1" value={length} onChange={e => setLength(e.target.value)} placeholder="0" required />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="width">Width</Label>
-                    <Input id="width" type="number" step="0.1" value={width} onChange={e => setWidth(e.target.value)} placeholder="0" required />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="height">Height</Label>
-                    <Input id="height" type="number" step="0.1" value={height} onChange={e => setHeight(e.target.value)} placeholder="0" required />
-                  </div>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center border-b pb-2">
+                  <h3 className="font-semibold text-lg text-slate-800">Box Configuration</h3>
+                  <Button type="button" variant="outline" size="sm" onClick={handleAddBox}>
+                    <Plus className="h-4 w-4 mr-1" /> Add Box
+                  </Button>
                 </div>
+
+                {/* Items Allocation Table */}
+                <div className="border rounded-md overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50 border-b">
+                      <tr>
+                        <th className="text-left p-3 font-medium text-muted-foreground w-1/3">Item Name</th>
+                        <th className="text-center p-3 font-medium text-muted-foreground w-16">Total</th>
+                        {boxes.map(box => (
+                          <th key={box.id} className="text-center p-3 font-medium text-muted-foreground">
+                            {box.name}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {orderItems.map(item => {
+                        let assignedQty = 0;
+                        boxes.forEach(b => { assignedQty += (b.items[item.id] || 0); });
+                        const isFullyAssigned = assignedQty === item.quantity;
+
+                        return (
+                          <tr key={item.id} className="border-b last:border-0">
+                            <td className="p-3">
+                              <span className="font-medium text-slate-800">{item.product_name}</span>
+                            </td>
+                            <td className="p-3 text-center">
+                              <span className={`font-bold ${isFullyAssigned ? 'text-emerald-600' : 'text-red-500'}`}>
+                                {assignedQty}/{item.quantity}
+                              </span>
+                            </td>
+                            {boxes.map(box => (
+                              <td key={box.id} className="p-2 text-center">
+                                <Input 
+                                  type="number" 
+                                  min="0"
+                                  className="w-16 h-8 text-center mx-auto"
+                                  value={box.items[item.id] || 0}
+                                  onChange={(e) => handleItemQtyChange(box.id, item.id, parseInt(e.target.value) || 0)}
+                                />
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Box Dimensions Inputs */}
+                <div className="space-y-4 mt-6">
+                  {boxes.map((box, index) => (
+                    <div key={box.id} className="bg-slate-50 border p-4 rounded-lg relative">
+                      {boxes.length > 1 && (
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="icon" 
+                          className="absolute right-2 top-2 text-red-500 hover:bg-red-50 hover:text-red-600"
+                          onClick={() => handleRemoveBox(box.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                      
+                      <h4 className="font-bold text-slate-700 mb-3">{box.name} Dimensions & Weight</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Length (cm)</Label>
+                          <Input type="number" step="0.1" value={box.length} onChange={e => handleBoxDimensionChange(box.id, 'length', e.target.value)} required />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Width (cm)</Label>
+                          <Input type="number" step="0.1" value={box.width} onChange={e => handleBoxDimensionChange(box.id, 'width', e.target.value)} required />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Height (cm)</Label>
+                          <Input type="number" step="0.1" value={box.height} onChange={e => handleBoxDimensionChange(box.id, 'height', e.target.value)} required />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Weight (kg)</Label>
+                          <Input type="number" step="0.01" value={box.weight} onChange={e => handleBoxDimensionChange(box.id, 'weight', e.target.value)} required />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
               </div>
 
-              <div className="bg-muted/50 p-4 rounded-lg space-y-3">
-                <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">Package Weight</h3>
-                <div className="space-y-1">
-                  <Label htmlFor="weight">Actual Weight (kg)</Label>
-                  <Input id="weight" type="number" step="0.01" value={weight} onChange={e => setWeight(e.target.value)} placeholder="0.00" required />
-                </div>
-              </div>
-
-              <div className="pt-4 flex gap-3">
+              <div className="pt-4 flex gap-3 border-t mt-6">
                 <Button type="button" variant="outline" className="flex-1" onClick={() => setScannedOrderId(null)}>
                   Cancel
                 </Button>

@@ -38,8 +38,11 @@ export function VerifyShippingDialog({ order, open, onOpenChange, onSuccess }: V
   
   const [paymentType, setPaymentType] = useState('sf only');
   const [shippingAmount, setShippingAmount] = useState('0');
+  const [balanceDue, setBalanceDue] = useState('0');
+  const [boxCodAmounts, setBoxCodAmounts] = useState<Record<string, string>>({});
   const [saveAsSecondary, setSaveAsSecondary] = useState(false);
   const [deliveryInstructions, setDeliveryInstructions] = useState('Kuya wag nyo po sabihin na galing Shopee! Sabihin nyo po galing ng Negosyanteng Pinoy. Thankyou po! :)');
+  const isMultiBox = !!(order?.boxes_config && Array.isArray(order.boxes_config) && order.boxes_config.length > 1);
 
 
   const regionOptions = Object.entries(addressData).map(([code, data]) => ({ value: code, label: data.region_name }));
@@ -91,6 +94,16 @@ export function VerifyShippingDialog({ order, open, onOpenChange, onSuccess }: V
       });
       setPaymentType('sf only');
       setShippingAmount('0');
+      setBalanceDue(order.balanceDue?.toString() || '0');
+      if (order.boxes_config && Array.isArray(order.boxes_config) && order.boxes_config.length > 1) {
+          const amounts: Record<string, string> = {};
+          order.boxes_config.forEach((b: any, index: number) => {
+              amounts[b.id] = b.cod_amount?.toString() || (index === 0 ? (order.balanceDue?.toString() || '0') : '0');
+          });
+          setBoxCodAmounts(amounts);
+      } else {
+          setBoxCodAmounts({});
+      }
       setSaveAsSecondary(false);
       setDeliveryInstructions('Kuya wag nyo po sabihin na galing Shopee! Sabihin nyo po galing ng Negosyanteng Pinoy. Thankyou po! :)');
     }
@@ -119,10 +132,7 @@ export function VerifyShippingDialog({ order, open, onOpenChange, onSuccess }: V
         address_line: addressLine
       };
 
-      // 1. Update Order
-      const { error: orderError } = await supabase
-        .from('orders')
-        .update({
+      const updateData: any = {
           status: 'For Shipping',
           shipping_verified: true,
           not_for_shipping_reason: null,
@@ -130,9 +140,24 @@ export function VerifyShippingDialog({ order, open, onOpenChange, onSuccess }: V
           shipping_phone: shippingPhone,
           shipping_payment_type: paymentType,
           shipping_amount: parseFloat(shippingAmount) || 0,
+          balance_due: parseFloat(balanceDue) || 0,
           shipping_address: shippingAddressJson,
           delivery_instructions: deliveryInstructions
-        })
+      };
+
+      if (isMultiBox) {
+         const newBoxesConfig = order.boxes_config.map((b: any) => ({
+            ...b,
+            cod_amount: parseFloat(boxCodAmounts[b.id] || '0') || 0
+         }));
+         updateData.boxes_config = newBoxesConfig;
+         updateData.balance_due = newBoxesConfig.reduce((acc: number, b: any) => acc + b.cod_amount, 0);
+      }
+
+      // 1. Update Order
+      const { error: orderError } = await supabase
+        .from('orders')
+        .update(updateData)
         .eq('id', order.id);
 
       if (orderError) throw orderError;
@@ -253,6 +278,29 @@ export function VerifyShippingDialog({ order, open, onOpenChange, onSuccess }: V
               <Label>Shipping Amount (₱)</Label>
               <Input type="number" value={shippingAmount} onChange={e => setShippingAmount(e.target.value)} />
             </div>
+            
+            {isMultiBox ? (
+              <div className="space-y-3 col-span-2 border p-3 rounded-md bg-slate-50">
+                <Label className="text-base font-semibold">Amount to Collect for Items (Multi-Box)</Label>
+                <p className="text-xs text-muted-foreground mb-2">Assign how much COD should be collected per box.</p>
+                {order.boxes_config.map((box: any) => (
+                   <div key={box.id} className="flex items-center gap-3">
+                      <Label className="w-24 text-sm">{box.name}: ₱</Label>
+                      <Input 
+                        type="number" 
+                        value={boxCodAmounts[box.id] || ''} 
+                        onChange={e => setBoxCodAmounts({...boxCodAmounts, [box.id]: e.target.value})} 
+                      />
+                   </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-2 col-span-2">
+                <Label>Amount to Collect for Items (Balance Due) (₱)</Label>
+                <Input type="number" value={balanceDue} onChange={e => setBalanceDue(e.target.value)} />
+                <p className="text-xs text-muted-foreground">The Courier will collect this amount + shipping fee (if applicable).</p>
+              </div>
+            )}
 
             <div className="space-y-2 col-span-2 mt-2">
               <Label>Delivery Instructions (For Courier)</Label>

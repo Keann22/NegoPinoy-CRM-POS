@@ -2,20 +2,33 @@
 
 import React, { useState } from 'react';
 import { RefreshCw, MessageCircle, User, Brain, Clock, Bot } from 'lucide-react';
-import { useCollection } from '@/firebase';
+import { useEffect } from 'react';
+import { useSupabase } from '@/firebase';
 
 export default function ChatHistoryPage() {
   const [selectedCustomerPsid, setSelectedCustomerPsid] = useState<string | null>(null);
   
-  const chatQuery = React.useMemo(() => ({
-    path: 'conversation_logs',
-    constraints: [
-      { type: 'orderBy', field: 'created_at', direction: 'desc' },
-      { type: 'limit', value: 2500 }
-    ]
-  }), []);
+  const supabase = useSupabase();
+  const [chatLogs, setChatLogs] = useState<any[]>([]);
+  const [loadingChats, setLoadingChats] = useState(true);
 
-  const { data: chatLogs, isLoading: loadingChats } = useCollection<any>(chatQuery);
+  useEffect(() => {
+    if (!supabase) return;
+    const fetch = async () => {
+      setLoadingChats(true);
+      try {
+        const { data, error } = await supabase
+          .from('conversation_logs')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(2500);
+        if (error) throw error;
+        setChatLogs(data || []);
+      } catch (err) { console.error('chat fetch error:', err); }
+      finally { setLoadingChats(false); }
+    };
+    fetch();
+  }, [supabase]);
 
   const chatSidebarItems = React.useMemo(() => {
     if (!chatLogs || !Array.isArray(chatLogs)) return [];

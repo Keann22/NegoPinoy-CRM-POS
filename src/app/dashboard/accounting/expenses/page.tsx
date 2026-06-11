@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { useCollection, useSupabase, useUser, collection, query, orderBy } from '@/firebase';
+import { useMemo, useState, useEffect } from 'react';
+import { useSupabase, useUser } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { DateRange } from 'react-day-picker';
@@ -69,12 +69,31 @@ export default function ExpensesPage() {
 
   const isManagement = useMemo(() => userProfile?.roles.some(r => ['Admin', 'Owner'].includes(r)), [userProfile]);
 
-  // CRITICAL: Strict role check before query
-  const expensesQuery = useMemo(
-    () => (supabase && user && isManagement ? query(collection(supabase, 'expenses'), orderBy('expenseDate', 'desc')) : null),
-    [supabase, user, isManagement]
-  );
-  const { data: expenses, isLoading } = useCollection<Omit<Expense, 'id'>>(expensesQuery);
+  const [expenses, setExpenses] = useState<Omit<Expense, 'id'>[] | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!supabase || !user || !isManagement) return;
+    const fetch = async () => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('expenses')
+          .select('*')
+          .order('expense_date', { ascending: false });
+        if (error) throw error;
+        setExpenses((data || []).map((e: any) => ({
+          id: e.id,
+          expenseDate: e.expense_date,
+          amount: e.amount,
+          category: e.category,
+          description: e.description,
+        })));
+      } catch (err) { console.error('Expenses fetch error:', err); }
+      finally { setIsLoading(false); }
+    };
+    fetch();
+  }, [supabase, user, isManagement]);
 
   const filteredExpenses = useMemo(() => {
       if (!expenses) return null;

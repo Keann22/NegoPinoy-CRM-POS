@@ -3,15 +3,28 @@
 import React, { useState } from 'react';
 import { RefreshCw, CheckCircle, Database, Trash2, User, Bot } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { useCollection } from '@/firebase';
+import { useEffect } from 'react';
 
 export default function ApprovalQueuePage() {
   const [processingId, setProcessingId] = useState<string | null>(null);
   
-  // Using our compatibility layer to fetch pending_faqs
-  const { data: pendingFaqs, isLoading: loading } = useCollection<any>('pending_faqs');
-
   const supabase = createClient();
+  const [pendingFaqs, setPendingFaqs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refetchTrigger, setRefetchTrigger] = useState(0);
+
+  useEffect(() => {
+    const fetch = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase.from('pending_faqs').select('*');
+        if (error) throw error;
+        setPendingFaqs(data || []);
+      } catch (err) { console.error('fetch error:', err); }
+      finally { setLoading(false); }
+    };
+    fetch();
+  }, [supabase, refetchTrigger]);
 
   const handleVerify = async (question: string, answer: string, id: string) => {
     setProcessingId(id);
@@ -26,7 +39,7 @@ export default function ApprovalQueuePage() {
       if (!response.ok) throw new Error('Failed to verify FAQ');
 
       // The backend should handle deletion, or we can optimistic delete here
-      // The useCollection should refresh automatically because of realtime (or we force a refetch)
+      setRefetchTrigger(n => n + 1);
     } catch (error) {
       console.error('Verification failed:', error);
       alert('Action failed. Please try again.');

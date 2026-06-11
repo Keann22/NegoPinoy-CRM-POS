@@ -24,7 +24,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AddProductDialog } from '@/components/dashboard/add-product-dialog';
+import { AddProductDialog } from '@/components/dashboard/product-dialog';
 import { useRoleCheck } from '@/hooks/useRoleCheck';
 
 // Zod schemas
@@ -285,17 +285,12 @@ export default function ScanReceiptPage() {
             
             // 3. Update products and create inventory movements
             for (const item of values.items) {
-                const currentProduct = productDataMap.get(item.productId)!;
-                const newStockLevel = (currentProduct.stock_level || 0) + item.quantity;
-
-                // Update product stock level
-                const { error: updateError } = await supabase
-                    .from('products')
-                    .update({
-                        stock_level: newStockLevel,
-                        initial_unit_cost: item.unitCost
-                    })
-                    .eq('id', item.productId);
+                // Update product stock level using atomic RPC
+                const { error: updateError } = await supabase.rpc('increment_stock', {
+                    p_product_id: item.productId,
+                    qty: item.quantity,
+                    new_unit_cost: item.unitCost
+                });
                 
                 if (updateError) throw updateError;
 

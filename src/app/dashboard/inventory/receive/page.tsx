@@ -4,7 +4,8 @@ import { useState, useMemo } from 'react';
 import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useCollection, useUser, useSupabase, collection, query, orderBy, where, limit } from '@/firebase';
+import { useUser, useSupabase } from '@/firebase';
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -40,22 +41,35 @@ function ProductSearch({ onProductSelect }: { onProductSelect: (product: Product
   const supabase = useSupabase();
   const { user } = useUser();
 
-  const productsQuery = useMemo(
-    () => {
-      if (!supabase || !user || search.length < 2) return null;
-      // Simple capitalization for search term
-      const searchTermCapitalized = search.charAt(0).toUpperCase() + search.slice(1);
-      return query(
-        collection(supabase, 'products'),
-        orderBy('name'),
-        where('name', '>=', searchTermCapitalized),
-        where('name', '<=', searchTermCapitalized + '\uf8ff'),
-        limit(10)
-      );
-    },
-    [supabase, user, search]
-  );
-  const { data: productResults, isLoading: isLoadingProducts } = useCollection<Product>(productsQuery);
+  const [productResults, setProductResults] = useState<Product[]>([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+
+  useEffect(() => {
+    if (!supabase || !user || search.length < 2) {
+      setProductResults([]);
+      return;
+    }
+    const handler = setTimeout(async () => {
+      setIsLoadingProducts(true);
+      try {
+        const searchTermCapitalized = search.charAt(0).toUpperCase() + search.slice(1);
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .gte('name', searchTermCapitalized)
+          .lte('name', searchTermCapitalized + '\uf8ff')
+          .order('name')
+          .limit(10);
+        if (error) throw error;
+        setProductResults(data || []);
+      } catch (err) {
+        console.error('Search error:', err);
+      } finally {
+        setIsLoadingProducts(false);
+      }
+    }, 250);
+    return () => clearTimeout(handler);
+  }, [supabase, user, search]);
   
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -173,17 +187,12 @@ export default function BulkReceivePage() {
       
       // 3. Update products and create inventory movements
       for (const item of values.items) {
-        const currentProduct = productDataMap.get(item.productId)!;
-        const newStockLevel = (currentProduct.stock_level || 0) + item.quantity;
-
-        // Update product stock level
-        const { error: updateError } = await supabase
-          .from('products')
-          .update({
-            stock_level: newStockLevel,
-            initial_unit_cost: item.unitCost // Update unit cost to the latest
-          })
-          .eq('id', item.productId);
+        // Update product stock level using atomic RPC
+        const { error: updateError } = await supabase.rpc('increment_stock', {
+            p_product_id: item.productId,
+            qty: item.quantity,
+            new_unit_cost: item.unitCost
+        });
         
         if (updateError) throw updateError;
 

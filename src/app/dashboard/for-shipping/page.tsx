@@ -31,6 +31,7 @@ type ShippingOrder = {
   width: number | null;
   height: number | null;
   deliveryInstructions: string | null;
+  boxesConfig: any;
 };
 
 export default function ForShippingPage() {
@@ -52,6 +53,7 @@ export default function ForShippingPage() {
           package_width,
           package_height,
           package_weight,
+          boxes_config,
           total_amount,
           amount_paid,
           shipping_name,
@@ -89,6 +91,7 @@ export default function ForShippingPage() {
         width: item.package_width,
         height: item.package_height,
         deliveryInstructions: item.delivery_instructions,
+        boxesConfig: item.boxes_config,
       }));
 
       setOrders(formatted);
@@ -129,7 +132,8 @@ export default function ForShippingPage() {
           
           const orderIdMatch = rawCustRef.match(/ORDER\s*#?\s*([A-Za-z0-9-]+)/i);
           if (orderIdMatch && orderIdMatch[1]) {
-              const orderIdPrefix = orderIdMatch[1].toLowerCase();
+              const rawPrefix = orderIdMatch[1].toLowerCase();
+              const orderIdPrefix = rawPrefix.replace(/-b\d+$/i, '');
               
               updatePromises.push(async () => {
                    const { data: matchedOrders } = await supabase.from('orders').select('id').ilike('id', `${orderIdPrefix}%`).limit(1);
@@ -234,37 +238,74 @@ export default function ForShippingPage() {
         
         const { spxRegion, spxProvince, spxCity, spxBarangay } = mapToSPXAddress(addr.region || '', addr.province || '', addr.city || '', addr.barangay || '');
 
-        items.forEach((item: any, index: number) => {
-          const price = (item.selling_price_at_sale || 0) - (item.discount || 0);
+        if (order.boxesConfig && Array.isArray(order.boxesConfig) && order.boxesConfig.length > 1) {
+            order.boxesConfig.forEach((box: any, index: number) => {
+                const itemNames = (box.items || []).map((i: any) => `${i.quantity}x ${i.product_name}`).join(', ');
+                const totalQuantity = (box.items || []).reduce((acc: number, i: any) => acc + (Number(i.quantity) || 1), 0);
+                const consolidatedName = itemNames.length > 100 ? itemNames.substring(0, 97) + '...' : itemNames;
+                const codAmount = box.cod_amount || 0;
+                
+                const rowData = [
+                  `${order.orderId}-B${index + 1}`, // *Order Number
+                  order.shippingName, // *Recipient Name
+                  order.shippingPhone, // *Recipient Phone
+                  detailedAddress, // *Detailed Address
+                  spxRegion, // Region
+                  spxProvince, // Province
+                  spxCity, // Town/City
+                  spxBarangay, // Barangay
+                  addr.postal_code || '0000', // Postal Code
+                  consolidatedName || 'Assorted Items', // *Item Name
+                  'General merchandise', // *Item Type
+                  totalQuantity, // Item Quantity
+                  order.totalAmount, // Item Price
+                  box.weight || 1, // *Parcel Weight (KG)
+                  box.length || 10, // *Parcel Length (CM)
+                  box.width || 10, // *Parcel Width (CM)
+                  box.height || 10, // *Parcel Height (CM)
+                  `ORDER #${order.orderId}-B${index + 1}`, // Customer Reference No.
+                  'Sender Pay', // *Payment Method
+                  order.deliveryInstructions || '', // Delivery Instruction
+                  codAmount > 0 ? 'Y' : 'N', // *COD Collection (Y/N)
+                  codAmount, // COD Amount
+                  order.totalAmount // *Parcel Value (PHP)
+                ];
+                rows.push(rowData);
+            });
+        } else {
+            // Consolidate items into one row
+            const itemNames = items.map((i: any) => `${i.quantity}x ${i.product_name}`).join(', ');
+            const totalQuantity = items.reduce((acc: number, i: any) => acc + (Number(i.quantity) || 1), 0);
+            const consolidatedName = itemNames.length > 100 ? itemNames.substring(0, 97) + '...' : itemNames;
 
-          const rowData = [
-            order.orderId, // *Order Number
-            order.shippingName, // *Recipient Name
-            order.shippingPhone, // *Recipient Phone
-            detailedAddress, // *Detailed Address
-            spxRegion, // Region
-            spxProvince, // Province
-            spxCity, // Town/City
-            spxBarangay, // Barangay
-            addr.postal_code || '0000', // Postal Code
-            item.product_name, // *Item Name
-            'General merchandise', // *Item Type
-            item.quantity, // Item Quantity
-            price, // Item Price
-            order.weight || 1, // *Parcel Weight (KG)
-            order.length || 10, // *Parcel Length (CM)
-            order.width || 10, // *Parcel Width (CM)
-            order.height || 10, // *Parcel Height (CM)
-            `ORDER #${order.orderId}`, // Customer Reference No.
-            'Sender Pay', // *Payment Method
-            order.deliveryInstructions || '', // Delivery Instruction
-            isCOD ? 'Y' : 'N', // *COD Collection (Y/N)
-            index === 0 ? codAmount : 0, // COD Amount
-            order.totalAmount // *Parcel Value (PHP)
-          ];
-          
-          rows.push(rowData);
-        });
+            const rowData = [
+              order.orderId, // *Order Number
+              order.shippingName, // *Recipient Name
+              order.shippingPhone, // *Recipient Phone
+              detailedAddress, // *Detailed Address
+              spxRegion, // Region
+              spxProvince, // Province
+              spxCity, // Town/City
+              spxBarangay, // Barangay
+              addr.postal_code || '0000', // Postal Code
+              consolidatedName, // *Item Name
+              'General merchandise', // *Item Type
+              totalQuantity, // Item Quantity
+              order.totalAmount, // Item Price
+              order.weight || 1, // *Parcel Weight (KG)
+              order.length || 10, // *Parcel Length (CM)
+              order.width || 10, // *Parcel Width (CM)
+              order.height || 10, // *Parcel Height (CM)
+              `ORDER #${order.orderId}`, // Customer Reference No.
+              'Sender Pay', // *Payment Method
+              order.deliveryInstructions || '', // Delivery Instruction
+              isCOD ? 'Y' : 'N', // *COD Collection (Y/N)
+              codAmount, // COD Amount
+              order.totalAmount // *Parcel Value (PHP)
+            ];
+            
+            rows.push(rowData);
+        }
       });
 
       const ws = XLSX.utils.aoa_to_sheet(rows);

@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CheckCircle2, XCircle, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { useCollection, useSupabase, collection, query, orderBy, where } from '@/firebase';
+import { useSupabase } from '@/firebase';
+import { useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, differenceInDays } from 'date-fns';
 import { VerifyShippingDialog } from '@/components/dashboard/verify-shipping-dialog';
@@ -27,11 +28,47 @@ export default function PackedOrdersPage() {
   const [verifyOrder, setVerifyOrder] = useState<Order | null>(null);
   const [notForShippingOrder, setNotForShippingOrder] = useState<Order | null>(null);
 
-  // Fetch all packed orders
-  const ordersQuery = useMemo(() => {
-    return query(collection('orders' as any), where('status', '==', 'Packed'), orderBy('orderDate', 'desc'));
-  }, []);
-  const { data: rawOrders, isLoading: isLoadingOrders, refetch: refetchOrders } = useCollection<Order>(ordersQuery);
+  const [rawOrders, setRawOrders] = useState<Order[]>([]);
+  const [isLoadingOrders, setIsLoadingOrders] = useState(true);
+  const [refetchTrigger, setRefetchTrigger] = useState(0);
+  const refetchOrders = () => setRefetchTrigger(n => n + 1);
+
+  useEffect(() => {
+    if (!supabase) return;
+    const fetch = async () => {
+      setIsLoadingOrders(true);
+      try {
+        const { data, error } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('status', 'Packed')
+          .order('order_date', { ascending: false });
+        if (error) throw error;
+        setRawOrders((data || []).map((o: any) => ({
+          id: o.id,
+          customerId: o.customer_id,
+          orderDate: o.order_date,
+          status: o.status,
+          totalAmount: o.total_amount,
+          discountAmount: o.discount_amount,
+          paymentMethod: o.payment_method,
+          courierName: o.courier_name,
+          shippingFee: o.shipping_fee,
+          deliveryAddress: o.delivery_address,
+          contactNumber: o.contact_number,
+          trackingNumber: o.tracking_number,
+          proofOfPayment: o.proof_of_payment,
+          paymentDetails: o.payment_details,
+          notes: o.notes,
+          salesRepId: o.sales_rep_id,
+          not_for_shipping_reason: o.not_for_shipping_reason,
+          boxes_config: o.boxes_config,
+        })));
+      } catch (err) { console.error('Packed orders fetch error:', err); }
+      finally { setIsLoadingOrders(false); }
+    };
+    fetch();
+  }, [supabase, refetchTrigger]);
 
   const [customerMap, setCustomerMap] = useState<Map<string, string>>(new Map());
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);

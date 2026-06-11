@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useCollection, useUser, useSupabase, collection, query, orderBy, where, limit } from '@/firebase';
+import { useSupabase, useUser } from '@/firebase';
+import { useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -43,44 +44,70 @@ export default function InventoryHistoryPage() {
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [selectedMovement, setSelectedMovement] = useState<InventoryMovement | null>(null);
 
-  const movementsQuery = useMemo(() => {
-    let constraints: any[] = [
-      where('movement_type', '!=', 'sale'),
-      orderBy('timestamp', 'desc'),
-    ];
+  const [movements, setMovements] = useState<InventoryMovement[]>([]);
+  const [isLoadingMovements, setIsLoadingMovements] = useState(true);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
 
-    let fromTime: Date | undefined;
-    let toTime: Date | undefined;
+  useEffect(() => {
+    if (!supabase) return;
+    const fetchMovements = async () => {
+      setIsLoadingMovements(true);
+      try {
+        let q = supabase
+          .from('inventory_movements')
+          .select('*')
+          .neq('movement_type', 'sale')
+          .order('timestamp', { ascending: false })
+          .limit(500);
 
-    if (dateFilter === 'today') {
-        const d = new Date();
-        fromTime = startOfDay(d);
-        toTime = endOfDay(d);
-    } else if (dateFilter === 'yesterday') {
-        const d = subDays(new Date(), 1);
-        fromTime = startOfDay(d);
-        toTime = endOfDay(d);
-    } else if (dateFilter === 'custom' && date?.from) {
-        fromTime = startOfDay(date.from);
-        toTime = date.to ? endOfDay(date.to) : endOfDay(date.from);
-    }
+        let fromTime: Date | undefined;
+        let toTime: Date | undefined;
 
-    if (fromTime) {
-        constraints.push(where('timestamp', '>=', fromTime.toISOString()));
-    }
-    if (toTime) {
-        constraints.push(where('timestamp', '<=', toTime.toISOString()));
-    }
-    
-    constraints.push(limit(500));
+        if (dateFilter === 'today') {
+            const d = new Date();
+            fromTime = startOfDay(d);
+            toTime = endOfDay(d);
+        } else if (dateFilter === 'yesterday') {
+            const d = subDays(new Date(), 1);
+            fromTime = startOfDay(d);
+            toTime = endOfDay(d);
+        } else if (dateFilter === 'custom' && date?.from) {
+            fromTime = startOfDay(date.from);
+            toTime = date.to ? endOfDay(date.to) : endOfDay(date.from);
+        }
 
-    return query('inventory_movements', ...constraints);
-  }, [dateFilter, date]);
-  
-  const productsQuery = { path: 'products' };
+        if (fromTime) q = q.gte('timestamp', fromTime.toISOString());
+        if (toTime) q = q.lte('timestamp', toTime.toISOString());
 
-  const { data: movements, isLoading: isLoadingMovements } = useCollection<InventoryMovement>(movementsQuery);
-  const { data: products, isLoading: isLoadingProducts } = useCollection<Product>(productsQuery);
+        const { data, error } = await q;
+        if (error) throw error;
+        setMovements(data || []);
+      } catch (err) {
+        console.error('Error fetching movements:', err);
+      } finally {
+        setIsLoadingMovements(false);
+      }
+    };
+    fetchMovements();
+  }, [supabase, dateFilter, date]);
+
+  useEffect(() => {
+    if (!supabase) return;
+    const fetchProducts = async () => {
+      setIsLoadingProducts(true);
+      try {
+        const { data, error } = await supabase.from('products').select('id, name, sku');
+        if (error) throw error;
+        setProducts(data || []);
+      } catch (err) {
+        console.error('Error fetching products:', err);
+      } finally {
+        setIsLoadingProducts(false);
+      }
+    };
+    fetchProducts();
+  }, [supabase]);
 
   const productMap = useMemo(() => {
     if (!products) return new Map<string, string>();

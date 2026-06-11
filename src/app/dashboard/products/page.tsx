@@ -27,8 +27,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useCollection, useUser, useSupabase } from '@/firebase';
-import { AddProductDialog } from '@/components/dashboard/add-product-dialog';
+import { useUser, useSupabase } from '@/firebase';
+import { AddProductDialog } from '@/components/dashboard/product-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BulkUploadProductsDialog } from '@/components/dashboard/bulk-upload-products-dialog';
 import { ReservedStockDialog } from '@/components/dashboard/reserved-stock-dialog';
@@ -47,7 +47,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { EditProductDialog } from '@/components/dashboard/edit-product-dialog';
+import { EditProductDialog } from '@/components/dashboard/product-dialog';
 import { ViewProductHistoryDialog } from '@/components/dashboard/view-product-history-dialog';
 import { ViewProductDetailsDialog } from '@/components/dashboard/view-product-details-dialog';
 import { useUserProfile } from '@/hooks/useUserProfile';
@@ -145,12 +145,38 @@ export default function ProductsPage() {
 
   const isManagement = useMemo(() => userProfile?.roles?.some(r => ['Admin', 'Owner'].includes(r)), [userProfile]);
 
-  const productsQuery = useMemo(
-    () => (supabase && user ? 'products' : null),
-    [supabase, user]
-  );
+  const [products, setProducts] = useState<Product[] | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [refetchTrigger, setRefetchTrigger] = useState(0);
+  const refetch = () => setRefetchTrigger(n => n + 1);
 
-  const { data: products, isLoading, refetch } = useCollection<Product>(productsQuery);
+  useEffect(() => {
+    if (!supabase || !user) return;
+    const fetchProducts = async () => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .order('name', { ascending: true });
+        if (error) throw error;
+        setProducts((data || []).map((p: any) => ({
+          ...p,
+          categoryId: p.category,
+          sellingPrice: p.selling_price,
+          quantityOnHand: p.stock_level ?? 0,
+          parentId: p.parent_id,
+          variantName: p.variant_name,
+          installment_price: p.installment_price,
+        })));
+      } catch (err) {
+        console.error('Error fetching products:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchProducts();
+  }, [supabase, user, refetchTrigger]);
 
   const rawFormattedProducts: FormattedProduct[] = useMemo(() => {
     if (!products) return [];

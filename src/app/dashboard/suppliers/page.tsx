@@ -18,11 +18,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useCollection, useUser, useSupabase, collection } from '@/firebase';
+import { useSupabase, useUser } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AddSupplierDialog } from '@/components/dashboard/add-supplier-dialog';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { ViewSupplierHistoryDialog } from '@/components/dashboard/view-supplier-history-dialog';
 import { ViewSupplierProductsDialog } from '@/components/dashboard/view-supplier-products-dialog';
 import { useUserProfile } from '@/hooks/useUserProfile';
@@ -48,12 +48,27 @@ export default function SuppliersPage() {
 
   const isManagement = useMemo(() => userProfile?.roles.some(r => ['Admin', 'Owner'].includes(r)), [userProfile]);
 
-  // CRITICAL: Strict role check before query
-  const suppliersQuery = useMemo(
-    () => (supabase && user && isManagement ? collection(supabase, 'suppliers') : null),
-    [supabase, user, isManagement]
-  );
-  const { data: suppliers, isLoading } = useCollection<Supplier>(suppliersQuery);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!supabase || !user || !isManagement) return;
+    const fetchSuppliers = async () => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase.from('suppliers').select('*').order('name');
+        if (error) throw error;
+        setSuppliers((data || []).map((s: any) => ({
+          ...s,
+          contactPerson: s.contact_person,
+          phoneNumber: s.phone_number,
+          facebookProfileLink: s.facebook_profile_link,
+        })));
+      } catch (err) { console.error('Suppliers fetch error:', err); }
+      finally { setIsLoading(false); }
+    };
+    fetchSuppliers();
+  }, [supabase, user, isManagement]);
 
   if (userProfile && !isManagement) {
     return (

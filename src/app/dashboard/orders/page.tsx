@@ -51,14 +51,10 @@ import { SetDueDateDialog } from '@/components/dashboard/set-due-date-dialog';
 import { MarkShippedDialog } from '@/components/dashboard/mark-shipped-dialog';
 import { WaybillSummaryDialog } from '@/components/dashboard/waybill-summary-dialog';
 import { 
-  useCollection, 
   useUser, 
   useSupabase,
-  collection,
-  query,
-  orderBy,
-  where
 } from '@/firebase';
+
 import { Progress } from '@/components/ui/progress';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useUserProfile } from '@/hooks/useUserProfile';
@@ -82,6 +78,7 @@ export type Order = {
   tracking_number?: string;
   salesPersonName?: string;
   spx_sync_data?: any;
+  boxes_config?: any;
 };
 
 type Customer = {
@@ -144,17 +141,47 @@ export default function OrdersPage() {
   const canCreateOrder = useMemo(() => userProfile?.roles.some(r => ['Sales', 'Admin', 'Owner'].includes(r)), [userProfile]);
   const isAdminOrOwner = useMemo(() => userProfile?.roles.some(r => ['Admin', 'Owner'].includes(r)), [userProfile]);
 
-  const ordersQuery = useMemo(
-    () => {
-        if (!user) return null;
-        if (userProfile && !userProfile.roles.some(r => ['Admin', 'Owner', 'Inventory'].includes(r))) {
-            return query(collection('orders' as any), where('sales_person_id', '==', userProfile.id), orderBy('orderDate', 'desc'));
-        }
-        return query(collection('orders' as any), orderBy('orderDate', 'desc'));
-    },
-    [user, userProfile]
-  );
-  const { data: orders, isLoading: isLoadingOrders, refetch } = useCollection<Order>(ordersQuery);
+  const [orders, setOrders] = useState<Order[] | null>(null);
+  const [isLoadingOrders, setIsLoadingOrders] = useState(true);
+  const [refetchTrigger, setRefetchTrigger] = useState(0);
+  const refetch = () => setRefetchTrigger(n => n + 1);
+
+  useEffect(() => {
+    if (!supabase || !user || !userProfile) return;
+    const fetchOrders = async () => {
+      setIsLoadingOrders(true);
+      try {
+        const isSalesOnly = !userProfile.roles.some((r: string) => ['Admin', 'Owner', 'Inventory'].includes(r));
+        let q = supabase
+          .from('orders')
+          .select('*')
+          .order('order_date', { ascending: false });
+        if (isSalesOnly) q = q.eq('sales_person_id', userProfile.id);
+        const { data, error } = await q;
+        if (error) throw error;
+        // Map snake_case DB columns to the Order type
+        setOrders((data || []).map((o: any) => ({
+          ...o,
+          customerId: o.customer_id,
+          orderDate: o.order_date,
+          totalAmount: o.total_amount,
+          amountPaid: o.amount_paid,
+          balanceDue: o.balance_due,
+          orderStatus: o.status,
+          paymentType: o.payment_method,
+          installmentMonths: o.installment_months,
+          monthlyPayment: o.monthly_payment,
+          salesPersonName: o.sales_person_name,
+          totalDiscount: o.total_discount,
+        })));
+      } catch (err) {
+        console.error('Error fetching orders:', err);
+      } finally {
+        setIsLoadingOrders(false);
+      }
+    };
+    fetchOrders();
+  }, [supabase, user, userProfile, refetchTrigger]);
 
   const [customerMap, setCustomerMap] = useState<Map<string, string>>(new Map());
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
@@ -168,7 +195,6 @@ export default function OrdersPage() {
         const customerIds = Array.from(new Set(orders.map(o => o.customerId)));
         const map = new Map<string, string>();
         
-        // Fetch only the customers we need for the current orders to avoid 1000 row limits
         const { data, error } = await supabase
           .from('customers')
           .select('id, full_name')
@@ -193,6 +219,8 @@ export default function OrdersPage() {
   }, [orders, supabase]);
   
   const isLoading = isLoadingOrders || isLoadingCustomers;
+
+
 
 
   const formattedOrders: FormattedOrder[] = useMemo(() => {

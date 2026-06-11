@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { useSupabase, useUser, useCollection } from '@/firebase';
+import { useSupabase, useUser } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,21 +38,35 @@ export default function AssembleKitPage() {
     const [loading, setLoading] = useState(false);
     const [componentDetails, setComponentDetails] = useState<Record<string, ComponentDetails>>({});
 
-    const productSearchQuery = useMemo(() => {
-        if (!supabase || !user || productSearch.length < 1) return null;
-        const searchTermCapitalized = productSearch.charAt(0).toUpperCase() + productSearch.slice(1);
-        return {
-            path: 'products',
-            constraints: [
-                { type: 'orderBy', field: 'name' },
-                { type: 'where', field: 'name', op: '>=', value: searchTermCapitalized },
-                { type: 'where', field: 'name', op: '<=', value: searchTermCapitalized + '\uf8ff' },
-                { type: 'limit', value: 10 }
-            ]
-        };
-    }, [user, productSearch, supabase]);
+    const [searchResults, setSearchResults] = useState<ProductWithRecipe[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
 
-    const { data: searchResults, isLoading: isSearching } = useCollection<ProductWithRecipe>(productSearchQuery);
+    useEffect(() => {
+        if (!supabase || !user || productSearch.length < 1) {
+            setSearchResults([]);
+            return;
+        }
+        const handler = setTimeout(async () => {
+            setIsSearching(true);
+            try {
+                const searchTermCapitalized = productSearch.charAt(0).toUpperCase() + productSearch.slice(1);
+                const { data, error } = await supabase
+                    .from('products')
+                    .select('id, name, stock_level, initial_unit_cost, assembly_recipe')
+                    .gte('name', searchTermCapitalized)
+                    .lte('name', searchTermCapitalized + '\uf8ff')
+                    .order('name')
+                    .limit(10);
+                if (error) throw error;
+                setSearchResults(data || []);
+            } catch (err) {
+                console.error('Assemble product search error:', err);
+            } finally {
+                setIsSearching(false);
+            }
+        }, 250);
+        return () => clearTimeout(handler);
+    }, [supabase, user, productSearch]);
 
     // Fetch component details when a product with a recipe is selected
     useEffect(() => {
@@ -111,13 +125,10 @@ export default function AssembleKitPage() {
             for (const item of recipe) {
                 const comp = componentDetails[item.productId];
                 const requiredQty = item.quantity * qty;
-                const newStock = (comp.stock_level || 0) - requiredQty;
-                
                 totalUnitCost += (comp.initial_unit_cost || 0) * item.quantity;
-
                 componentUpdates.push({
                     id: comp.id,
-                    stock_level: newStock
+                    qty_change: -requiredQty
                 });
 
                 componentMovements.push({
@@ -130,9 +141,12 @@ export default function AssembleKitPage() {
                 });
             }
 
-            // Execute component stock updates
+            // Execute component stock updates using atomic RPC
             for (const update of componentUpdates) {
-                const { error } = await supabase.from('products').update({ stock_level: update.stock_level }).eq('id', update.id);
+                const { error } = await supabase.rpc('increment_stock', {
+                    p_product_id: update.id,
+                    qty: update.qty_change
+                });
                 if (error) throw error;
             }
 
@@ -140,15 +154,12 @@ export default function AssembleKitPage() {
             const { error: moveErr } = await supabase.from('inventory_movements').insert(componentMovements);
             if (moveErr) throw moveErr;
 
-            // Update Target Product
-            const newTargetStock = (selectedProduct.stock_level || 0) + qty;
-            const { error: targetUpdateErr } = await supabase
-                .from('products')
-                .update({ 
-                    stock_level: newTargetStock,
-                    initial_unit_cost: totalUnitCost // Update the cost based on components
-                })
-                .eq('id', selectedProduct.id);
+            // Update Target Product using atomic RPC
+            const { error: targetUpdateErr } = await supabase.rpc('increment_stock', {
+                p_product_id: selectedProduct.id,
+                qty: qty,
+                new_unit_cost: totalUnitCost
+            });
                 
             if (targetUpdateErr) throw targetUpdateErr;
 

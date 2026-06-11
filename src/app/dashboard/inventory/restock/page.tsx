@@ -4,7 +4,8 @@ import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useCollection, useUser, useSupabase, collection, query, where, orderBy, limit } from '@/firebase';
+import { useUser, useSupabase } from '@/firebase';
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -42,21 +43,35 @@ export default function RestockPage() {
   const { toast } = useToast();
   const { isManagement } = useRoleCheck();
 
-  const productsQuery = useMemo(
-    () => {
-      if (!supabase || !user || productSearch.length < 2) return null;
-      const searchTermCapitalized = productSearch.charAt(0).toUpperCase() + productSearch.slice(1);
-      return query(
-        collection(supabase, 'products'),
-        orderBy('name'),
-        where('name', '>=', searchTermCapitalized),
-        where('name', '<=', searchTermCapitalized + '\uf8ff'),
-        limit(10)
-      );
-    },
-    [supabase, user, productSearch]
-  );
-  const { data: productResults, isLoading: isLoadingProducts } = useCollection<Product>(productsQuery);
+  const [productResults, setProductResults] = useState<Product[]>([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+
+  useEffect(() => {
+    if (!supabase || !user || productSearch.length < 2) {
+      setProductResults([]);
+      return;
+    }
+    const handler = setTimeout(async () => {
+      setIsLoadingProducts(true);
+      try {
+        const searchTermCapitalized = productSearch.charAt(0).toUpperCase() + productSearch.slice(1);
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .gte('name', searchTermCapitalized)
+          .lte('name', searchTermCapitalized + '\uf8ff')
+          .order('name')
+          .limit(10);
+        if (error) throw error;
+        setProductResults(data || []);
+      } catch (err) {
+        console.error('Search error:', err);
+      } finally {
+        setIsLoadingProducts(false);
+      }
+    }, 250);
+    return () => clearTimeout(handler);
+  }, [supabase, user, productSearch]);
 
   const form = useForm<RestockFormValues>({
     resolver: zodResolver(restockSchema),
@@ -88,16 +103,12 @@ export default function RestockPage() {
         throw new Error("Product not found. It may have been deleted.");
       }
 
-      const newStockLevel = (productData.stock_level || 0) + values.quantity;
-
-      // 2. Update product stock and unit cost
-      const { error: updateError } = await supabase
-        .from('products')
-        .update({
-          stock_level: newStockLevel,
-          initial_unit_cost: values.unitCost
-        })
-        .eq('id', values.productId);
+      // 2. Update product stock and unit cost using atomic RPC
+      const { error: updateError } = await supabase.rpc('increment_stock', {
+        p_product_id: values.productId,
+        qty: values.quantity,
+        new_unit_cost: values.unitCost
+      });
 
       if (updateError) throw updateError;
 

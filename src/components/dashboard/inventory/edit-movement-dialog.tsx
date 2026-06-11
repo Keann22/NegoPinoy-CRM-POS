@@ -78,23 +78,21 @@ export function EditMovementDialog({ open, onOpenChange, movement, onSuccess }: 
       const newCostTotal = (values.quantity_change * values.unit_cost);
       const costDiff = newCostTotal - oldCostTotal;
 
-      // 2. Fetch current product to update stock level
+      // 2. Fetch current product for name
       const { data: productData, error: productError } = await supabase
         .from('products')
-        .select('id, stock_level, name')
+        .select('id, name')
         .eq('id', movement.product_id)
         .single();
 
       if (productError || !productData) throw new Error("Could not fetch product details.");
 
-      const newStockLevel = (productData.stock_level || 0) + quantityDiff;
-
-      // 3. Update the product
+      // 3. Update the product stock level using atomic RPC
       if (quantityDiff !== 0) {
-        const { error: updateProductError } = await supabase
-          .from('products')
-          .update({ stock_level: newStockLevel })
-          .eq('id', movement.product_id);
+        const { error: updateProductError } = await supabase.rpc('increment_stock', {
+          p_product_id: movement.product_id,
+          qty: quantityDiff
+        });
         if (updateProductError) throw updateProductError;
       }
 

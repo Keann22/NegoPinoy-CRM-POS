@@ -1,6 +1,6 @@
 'use client';
-import { useState, useMemo } from 'react';
-import { useSupabase, useCollection, useUser } from '@/firebase';
+import { useState, useEffect, useCallback } from 'react';
+import { useSupabase, useUser } from '@/firebase';
 
 export type SupplierResult = { 
   id: string; 
@@ -9,39 +9,45 @@ export type SupplierResult = {
 };
 
 /**
- * Extracts the supplier search logic from add-product-dialog.
- * Uses the useMemo + useCollection pattern (reactive query)
- * rather than a manual debounced fetch, matching how the original
- * component queries the suppliers table.
+ * Supplier search hook — migrated to direct Supabase debounced fetch.
  */
 export function useSupplierSearch() {
   const supabase = useSupabase();
   const { user } = useUser();
   
   const [searchTerm, setSearchTerm] = useState('');
+  const [results, setResults] = useState<SupplierResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
-  const suppliersQuery = useMemo(
-    () => {
-      if (!supabase || !user || searchTerm.length < 1) return null;
-      const searchTermCapitalized = searchTerm.charAt(0).toUpperCase() + searchTerm.slice(1);
-      return {
-        path: 'suppliers',
-        constraints: [
-          { type: 'orderBy', field: 'name' },
-          { type: 'where', field: 'name', op: '>=', value: searchTermCapitalized },
-          { type: 'where', field: 'name', op: '<=', value: searchTermCapitalized + '\uf8ff' },
-          { type: 'limit', value: 10 }
-        ]
-      };
-    },
-    [user, searchTerm]
-  );
+  useEffect(() => {
+    if (!supabase || !user || searchTerm.length < 1) {
+      setResults([]);
+      return;
+    }
+    const handler = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const t = searchTerm.charAt(0).toUpperCase() + searchTerm.slice(1);
+        const { data, error } = await supabase
+          .from('suppliers')
+          .select('id, name')
+          .gte('name', t)
+          .lte('name', t + '\uf8ff')
+          .order('name')
+          .limit(10);
+        if (error) throw error;
+        setResults(data || []);
+      } catch (err) {
+        console.error('Supplier search error:', err);
+        setResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 250);
+    return () => clearTimeout(handler);
+  }, [supabase, user, searchTerm]);
 
-  const { data: results, isLoading: isSearching } = useCollection<SupplierResult>(suppliersQuery);
+  const reset = useCallback(() => setSearchTerm(''), []);
 
-  const reset = () => {
-    setSearchTerm('');
-  };
-
-  return { searchTerm, setSearchTerm, results: results || [], isSearching, reset };
+  return { searchTerm, setSearchTerm, results, isSearching, reset };
 }

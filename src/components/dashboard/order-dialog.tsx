@@ -21,9 +21,11 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { format } from "date-fns";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { AddCustomerDialog } from "./add-customer-dialog";
-import { AddProductDialog } from "./add-product-dialog";
+import { AddProductDialog } from "./product-dialog";
 import { useRouter } from "next/navigation";
 import { orderSchema, type OrderFormValues, type Customer, type Product } from "@/lib/schemas/order";
+import { OrderLeftPanel } from "./orders/OrderLeftPanel";
+import { OrderItemsPanel } from "./orders/OrderItemsPanel";
 
 // ---------------------------------------------------------------------------
 // Props – discriminated union to support both "create" and "edit" modes
@@ -477,15 +479,15 @@ export function OrderDialog(props: OrderDialogProps) {
 
              if (!isOldOrder) {
                // Update component stock level
-               const newStockLevel = (compData.stock_level || 0) - (item.quantity * comp.quantity);
-               const { error: updateError } = await supabase
-                 .from('products')
-                 .update({ stock_level: newStockLevel })
-                 .eq('id', comp.productId);
+               const { error: updateError } = await supabase.rpc('increment_stock', {
+                 p_product_id: comp.productId,
+                 qty: -(item.quantity * comp.quantity)
+               });
                if (updateError) throw updateError;
                
                // Update componentMap so multiple bundles using the same component deduct properly in memory
-               compData.stock_level = newStockLevel;
+               // (no longer strictly needed for DB, but good for local consistency if used later)
+               compData.stock_level = (compData.stock_level || 0) - (item.quantity * comp.quantity);
 
                // Insert movement for component
                const { error: movementError } = await supabase
@@ -504,15 +506,14 @@ export function OrderDialog(props: OrderDialogProps) {
         } else {
           // Standard logic
           if (!isOldOrder) {
-            const newStockLevel = (product.stock_level || 0) - item.quantity;
-            // Update product stock level
-            const { error: updateError } = await supabase
-              .from('products')
-              .update({ stock_level: newStockLevel })
-              .eq('id', item.productId);
+            // Update product stock level using atomic RPC
+            const { error: updateError } = await supabase.rpc('increment_stock', {
+              p_product_id: item.productId,
+              qty: -item.quantity
+            });
 
             if (updateError) throw updateError;
-            product.stock_level = newStockLevel;
+            product.stock_level = (product.stock_level || 0) - item.quantity;
 
             // Create inventory movement
             const { error: movementError } = await supabase
@@ -649,8 +650,7 @@ export function OrderDialog(props: OrderDialogProps) {
                 const { data: compData } = await supabase.from('products').select('stock_level, initial_unit_cost').eq('id', comp.productId).single();
                 if (compData) {
                   const revertQty = oldItem.quantity * comp.quantity;
-                  const newStock = (compData.stock_level || 0) + revertQty;
-                  await supabase.from('products').update({ stock_level: newStock }).eq('id', comp.productId);
+                  await supabase.rpc('increment_stock', { p_product_id: comp.productId, qty: revertQty });
                   await supabase.from('inventory_movements').insert({
                     product_id: comp.productId,
                     quantity_change: revertQty,
@@ -662,8 +662,7 @@ export function OrderDialog(props: OrderDialogProps) {
                 }
               }
             } else {
-              const newStock = (product.stock_level || 0) + oldItem.quantity;
-              await supabase.from('products').update({ stock_level: newStock }).eq('id', oldItem.productId);
+              await supabase.rpc('increment_stock', { p_product_id: oldItem.productId, qty: oldItem.quantity });
 
               await supabase.from('inventory_movements').insert({
                 product_id: oldItem.productId,
@@ -713,9 +712,8 @@ export function OrderDialog(props: OrderDialogProps) {
              unitCost += (compData.initial_unit_cost || 0) * comp.quantity;
 
              if (!isOldOrder) {
-               const newStockLevel = (compData.stock_level || 0) - (item.quantity * comp.quantity);
-               await supabase.from('products').update({ stock_level: newStockLevel }).eq('id', comp.productId);
-               compData.stock_level = newStockLevel;
+               await supabase.rpc('increment_stock', { p_product_id: comp.productId, qty: -(item.quantity * comp.quantity) });
+               compData.stock_level = (compData.stock_level || 0) - (item.quantity * comp.quantity);
 
                await supabase.from('inventory_movements').insert({
                  product_id: comp.productId,
@@ -729,9 +727,8 @@ export function OrderDialog(props: OrderDialogProps) {
            }
         } else {
            if (!isOldOrder) {
-             const newStockLevel = (product.stock_level || 0) - item.quantity;
-             await supabase.from('products').update({ stock_level: newStockLevel }).eq('id', item.productId);
-             product.stock_level = newStockLevel;
+             await supabase.rpc('increment_stock', { p_product_id: item.productId, qty: -item.quantity });
+             product.stock_level = (product.stock_level || 0) - item.quantity;
              await supabase.from('inventory_movements').insert({
                product_id: item.productId,
                quantity_change: -item.quantity,
@@ -846,475 +843,97 @@ export function OrderDialog(props: OrderDialogProps) {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <div className="grid gap-4 py-4 px-1 md:grid-cols-3 md:gap-8">
-                {/* ===================== LEFT COLUMN ===================== */}
-                <div className="md:col-span-1 space-y-4">
-                  {/* Customer selector */}
-                  <FormField
-                    control={form.control}
-                    name="customerId"
-                    render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                            <FormLabel>Customer</FormLabel>
-                            {selectedCustomer ? (
-                                <div className="flex items-center justify-between rounded-md border border-input bg-background p-2 text-sm h-10">
-                                    <p>{selectedCustomer.firstName} {selectedCustomer.lastName}</p>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => {
-                                            setSelectedCustomer(null);
-                                            form.setValue('customerId', '');
-                                        }}
-                                    >
-                                        Change
-                                    </Button>
-                                </div>
-                            ) : (
-                                <Command className="rounded-lg border">
-                                    <CommandInput
-                                        placeholder="Search customers by first name..."
-                                        value={customerSearch}
-                                        onValueChange={setCustomerSearch}
-                                    />
-                                    {customerSearch.length > 0 && (
-                                        <CommandList>
-                                            {isSearchingCustomers && <CommandItem disabled>Searching...</CommandItem>}
-                                            {customerResults.length > 0 && (
-                                                <CommandGroup>
-                                                {customerResults.map((c) => (
-                                                    <CommandItem
-                                                        key={c.id}
-                                                        value={`${c.firstName} ${c.lastName}`}
-                                                        onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                                                        onSelect={() => {
-                                                            form.setValue("customerId", c.id)
-                                                            setSelectedCustomer(c);
-                                                            setCustomerSearch('');
-                                                            setCustomerResults([]);
-                                                        }}
-                                                    >
-                                                        {c.firstName} {c.lastName}
-                                                    </CommandItem>
-                                                ))}
-                                                </CommandGroup>
-                                            )}
-                                            {customerSearch.length > 0 && !isSearchingCustomers && (
-                                                <CommandGroup>
-                                                    <CommandItem
-                                                        value={customerSearch + " add_new"}
-                                                        onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                                                        onSelect={() => setAddCustomerOpen(true)}
-                                                        className="text-primary font-medium cursor-pointer"
-                                                    >
-                                                        <PlusCircle className="mr-2 h-4 w-4" /> Add new customer &quot;{customerSearch}&quot;
-                                                    </CommandItem>
-                                                </CommandGroup>
-                                            )}
-                                            {!isSearchingCustomers && customerResults.length === 0 && customerSearch.length > 1 && <CommandEmpty>No customers found.</CommandEmpty>}
-                                        </CommandList>
-                                    )}
-                                </Command>
-                            )}
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                    />
-                    {/* Order date */}
-                    <FormField
-                        control={form.control}
-                        name="orderDate"
-                        render={({ field }) => (
-                            <FormItem className="flex flex-col">
-                            <FormLabel>Order Date</FormLabel>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                <FormControl>
-                                    <Button
-                                    variant={"outline"}
-                                    className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
-                                    >
-                                    {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                    </Button>
-                                </FormControl>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
-                                </PopoverContent>
-                            </Popover>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    {/* Payment type */}
-                    <FormField
-                      control={form.control}
-                      name="paymentType"
-                      render={({ field }) => (
-                        <FormItem className="space-y-3">
-                          <FormLabel>Payment Type</FormLabel>
-                          <FormControl>
-                            <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex flex-col space-y-1">
-                              <FormItem className="flex items-center space-x-3 space-y-0">
-                                <FormControl><RadioGroupItem value="Full Payment" /></FormControl>
-                                <FormLabel className="font-normal">Full Payment</FormLabel>
-                              </FormItem>
-                              <FormItem className="flex items-center space-x-3 space-y-0">
-                                <FormControl><RadioGroupItem value="Lay-away" /></FormControl>
-                                <FormLabel className="font-normal">Lay-away (Hulugan)</FormLabel>
-                              </FormItem>
-                              <FormItem className="flex items-center space-x-3 space-y-0">
-                                <FormControl><RadioGroupItem value="Installment" /></FormControl>
-                                <FormLabel className="font-normal">Installment</FormLabel>
-                              </FormItem>
-                              <FormItem className="flex items-center space-x-3 space-y-0">
-                                <FormControl><RadioGroupItem value="COD" /></FormControl>
-                                <FormLabel className="font-normal">Cash on Delivery (COD)</FormLabel>
-                              </FormItem>
-                              <FormItem className="flex items-center space-x-3 space-y-0">
-                                <FormControl><RadioGroupItem value="Pending" /></FormControl>
-                                <FormLabel className="font-normal">Pending / Undecided</FormLabel>
-                              </FormItem>
-                            </RadioGroup>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    {/* Installment fields */}
-                    {form.watch('paymentType') === 'Installment' && (
-                        <div className="grid grid-cols-2 gap-4">
-                            <FormField
-                                control={form.control}
-                                name="installmentMonths"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Installment Months</FormLabel>
-                                        <FormControl>
-                                            <Input type="number" placeholder="e.g., 3" {...field} value={field.value ?? ''} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="monthlyPayment"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Monthly Payment (₱)</FormLabel>
-                                        <FormControl>
-                                            <Input type="number" step="0.01" placeholder="0.00" {...field} value={field.value ?? ''} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        </div>
-                    )}
-                    {/* First-timer installment checkbox */}
-                    {form.watch('paymentType') === 'Installment' && (
-                        <div className="flex items-start space-x-3 rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-3">
-                            <FormField
-                                control={form.control}
-                                name="isInstallmentFirstTimer"
-                                render={({ field }) => (
-                                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                                        <FormControl>
-                                            <Checkbox
-                                                checked={field.value}
-                                                onCheckedChange={field.onChange}
-                                            />
-                                        </FormControl>
-                                        <div className="space-y-1 leading-none">
-                                            <FormLabel className="text-amber-800 dark:text-amber-300 font-semibold">First-time installment customer</FormLabel>
-                                            <p className="text-xs text-amber-700 dark:text-amber-400">Check this to apply the higher installment prices to eligible products when adding them below. Products without an installment price set will use the regular cash price.</p>
-                                        </div>
-                                    </FormItem>
-                                )}
-                            />
-                        </div>
-                    )}
-                    {/* Downpayment + COD checkbox */}
-                    {form.watch("paymentType") !== "Full Payment" && form.watch("paymentType") !== "COD" && form.watch("paymentType") !== "Pending" && (
-                        <div className="space-y-4">
-                            <FormField
-                                control={form.control}
-                                name="amountPaid"
-                                render={({ field }) => (
-                                    <FormItem>
-                                    <FormLabel>Downpayment (₱)</FormLabel>
-                                    <FormControl><Input type="number" step="0.01" placeholder="0.00" disabled={isEditing} {...field} /></FormControl>
-                                    {isEditing && (
-                                        <p className="text-xs text-muted-foreground mt-1">Amount Paid is managed through the Payment History log after order creation.</p>
-                                    )}
-                                    <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+              <OrderLeftPanel
+                control={form.control}
+                watch={form.watch}
+                setValue={form.setValue}
+                isEditing={isEditing}
+                selectedCustomer={selectedCustomer}
+                onClearCustomer={() => {
+                  setSelectedCustomer(null);
+                  form.setValue('customerId', '');
+                }}
+                customerSearch={customerSearch}
+                onCustomerSearchChange={setCustomerSearch}
+                customerResults={customerResults}
+                isSearchingCustomers={isSearchingCustomers}
+                onCustomerSelect={(c) => {
+                  form.setValue('customerId', c.id);
+                  setSelectedCustomer(c);
+                  setCustomerSearch('');
+                  setCustomerResults([]);
+                }}
+                onAddCustomerClick={() => setAddCustomerOpen(true)}
+                totalAmount={totalAmount}
+                overpaymentApplied={overpaymentApplied}
+              />
+              <OrderItemsPanel
+                control={form.control}
+                watch={form.watch}
+                fields={fields}
+                remove={remove}
+                formStateErrors={form.formState.errors}
+                isEditing={isEditing}
+                subtotal={subtotal}
+                totalDiscount={totalDiscount}
+                insuranceFee={insuranceFee}
+                totalAmount={totalAmount}
+                overpaymentApplied={overpaymentApplied}
+                selectedCustomerStoreCredit={selectedCustomer?.store_credit}
+                productSearch={productSearch}
+                onProductSearchChange={setProductSearch}
+                productResults={productResults}
+                isSearchingProducts={isSearchingProducts}
+                onProductSelect={async (p) => {
+                  const { data: variants } = await supabase
+                    .from('products')
+                    .select('id, name, variant_name, stock_level, selling_price, initial_unit_cost, stock_batches(*)')
+                    .eq('parent_id', p.id);
 
-                            <FormField
-                                control={form.control}
-                                name="isDownpaymentCOD"
-                                render={({ field }) => (
-                                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                                        <FormControl>
-                                            <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                                        </FormControl>
-                                        <div className="space-y-1 leading-none">
-                                            <FormLabel>Downpayment is Pending (To Be Collected)</FormLabel>
-                                            <p className="text-xs text-muted-foreground">Check this if you are waiting for the customer to send the payment or if it will be collected on delivery.</p>
-                                        </div>
-                                    </FormItem>
-                                )}
-                            />
-                        </div>
-                    )}
-                    {/* Proof of payment */}
-                    {((form.watch("paymentType") === "Full Payment") || (form.watch("amountPaid") !== undefined && form.watch("amountPaid")! > 0 && !form.watch("isDownpaymentCOD"))) && (
-                        <FormField
-                            control={form.control}
-                            name="proofOfPayment"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Proof of Payment <span className="text-destructive">*</span></FormLabel>
-                                    <FormControl>
-                                        <FileUpload
-                                            value={field.value}
-                                            onChange={field.onChange}
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                    )}
-                </div>
+                  if (variants && variants.length > 0) {
+                    setVariantSelectionProduct(p);
+                    setVariantSelectionOptions(variants);
+                    return;
+                  }
 
-                {/* ===================== RIGHT COLUMN ===================== */}
-                <div className="md:col-span-2 space-y-4">
-                    {/* Order items table */}
-                    <div>
-                        <FormLabel>Order Items</FormLabel>
-                        <div className="space-y-2 mt-2 rounded-lg border">
-                           <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 p-2 font-medium text-muted-foreground text-sm">
-                                <span>Product</span>
-                                <span className="text-right">Qty</span>
-                                <span className="text-right">Price</span>
-                                <span className="text-right">Discount</span>
-                                <span className="sr-only">Remove</span>
-                           </div>
-                           {fields.map((field, index) => (
-                             <div key={field.id} className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 items-center px-2 pb-2">
-                                <p className="flex-1 text-sm font-medium truncate pr-2">{field.productName}</p>
-                                <FormField control={form.control} name={`orderItems.${index}.quantity`} render={({ field }) => (<FormItem><FormControl><Input type="number" className="h-8 w-20 text-right" {...field} /></FormControl></FormItem>)} />
-                                <FormField control={form.control} name={`orderItems.${index}.sellingPriceAtSale`} render={({ field }) => (<FormItem><FormControl><Input type="number" step="0.01" className="h-8 w-24 text-right" {...field} /></FormControl></FormItem>)} />
-                                <FormField control={form.control} name={`orderItems.${index}.discount`} render={({ field }) => (<FormItem><FormControl><Input type="number" step="0.01" className="h-8 w-24 text-right" placeholder="0.00" {...field} onChange={e => field.onChange(e.target.value === '' ? 0 : e.target.value)} value={field.value ?? 0} /></FormControl><FormMessage /></FormItem>)} />
-                                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => remove(index)}><Trash2 className="h-4 w-4" /></Button>
-                             </div>
-                           ))}
-                           {fields.length === 0 && <p className="text-sm text-center text-muted-foreground py-8">No items added to order.</p>}
-                        </div>
-                        <FormMessage>{form.formState.errors.orderItems?.message || form.formState.errors.orderItems?.root?.message}</FormMessage>
-                    </div>
+                  const isAlreadyAdded = fields.some(item => item.productId === p.id);
+                  if (isAlreadyAdded) {
+                    toast({ variant: "default", title: "Product already in order", description: `${p.name} is already in this order. You can adjust the quantity above.` });
+                    setProductSearch('');
+                    setProductResults([]);
+                    return;
+                  }
 
-                    {/* Product search */}
-                    <Command className="rounded-lg border">
-                        <CommandInput
-                            placeholder="Search to add products..."
-                            value={productSearch}
-                            onValueChange={setProductSearch}
-                        />
-                        {productSearch.length > 0 && (
-                            <CommandList>
-                                {isSearchingProducts && <CommandItem disabled>Searching...</CommandItem>}
-                                {productResults.length > 0 && (
-                                    <CommandGroup>
-                                    {productResults.map((p) => (
-                                    <CommandItem
-                                        value={p.name}
-                                        key={p.id}
-                                        onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                                        onSelect={async () => {
-                                            const { data: variants } = await supabase
-                                                .from('products')
-                                                .select('id, name, variant_name, stock_level, selling_price, initial_unit_cost, stock_batches(*)')
-                                                .eq('parent_id', p.id);
+                  const productToAdd = productResults.find(prod => prod.id === p.id);
+                  if (productToAdd) {
+                    const costPriceAtSale = productToAdd.stockBatches?.length > 0 ? productToAdd.stockBatches[0].unitCost : 0;
+                    const isInstallmentFirstTimer = form.getValues('isInstallmentFirstTimer');
+                    const paymentType = form.getValues('paymentType');
+                    const useInstallmentPrice = paymentType === 'Installment' && isInstallmentFirstTimer && productToAdd.installment_price && productToAdd.installment_price > 0;
 
-                                            if (variants && variants.length > 0) {
-                                                setVariantSelectionProduct(p);
-                                                setVariantSelectionOptions(variants);
-                                                return;
-                                            }
+                    if (paymentType === 'Installment' && !productToAdd.installment_price) {
+                      toast({ variant: 'default', title: 'Not eligible for installment', description: `This product has no installment price set.` });
+                    }
 
-                                            const isAlreadyAdded = fields.some(item => item.productId === p.id);
-                                            if (isAlreadyAdded) {
-                                                toast({
-                                                    variant: "default",
-                                                    title: "Product already in order",
-                                                    description: `${p.name} is already in this order. You can adjust the quantity above.`,
-                                                });
-                                                setProductSearch('');
-                                                setProductResults([]);
-                                                return;
-                                            }
-
-                                            const productToAdd = productResults.find(prod => prod.id === p.id);
-                                            if (productToAdd) {
-                                                const costPriceAtSale = productToAdd.stockBatches?.length > 0
-                                                    ? productToAdd.stockBatches[0].unitCost
-                                                    : 0;
-
-                                                const isInstallmentFirstTimer = form.getValues('isInstallmentFirstTimer');
-                                                const paymentType = form.getValues('paymentType');
-                                                const useInstallmentPrice = 
-                                                    paymentType === 'Installment' &&
-                                                    isInstallmentFirstTimer &&
-                                                    productToAdd.installment_price &&
-                                                    productToAdd.installment_price > 0;
-
-                                                const bundleTotal = fields.reduce((sum, item) => sum + (item.sellingPriceAtSale * item.quantity), 0) + productToAdd.sellingPrice;
-                                                if (paymentType === 'Installment' && bundleTotal < 700 && (!productToAdd.installment_price)) {
-                                                    toast({ variant: 'default', title: 'Not eligible for installment', description: `This product is under ₱700 and has no installment price set.` });
-                                                }
-
-                                                append({
-                                                    productId: productToAdd.id,
-                                                    productName: productToAdd.name,
-                                                    quantity: 1,
-                                                    costPriceAtSale: costPriceAtSale,
-                                                    sellingPriceAtSale: useInstallmentPrice ? productToAdd.installment_price : productToAdd.sellingPrice,
-                                                    discount: 0
-                                                });
-                                                // Cache prices for re-pricing when first-timer checkbox changes
-                                                setProductPriceCache(prev => ({
-                                                    ...prev,
-                                                    [productToAdd.id]: {
-                                                        cashPrice: productToAdd.sellingPrice,
-                                                        installmentPrice: productToAdd.installment_price ?? null,
-                                                    }
-                                                }));
-                                            }
-                                            setProductSearch('');
-                                            setProductResults([]);
-                                        }}
-                                    >
-                                    <div className="flex justify-between w-full">
-                                        <span>{p.name}</span>
-                                        <span className="text-xs text-muted-foreground">Stock: {p.quantityOnHand}</span>
-                                    </div>
-                                    </CommandItem>
-                                    ))}
-                                    </CommandGroup>
-                                )}
-                                {productSearch.length > 0 && !isSearchingProducts && (
-                                    <CommandGroup>
-                                        <CommandItem
-                                            value={productSearch + " add_new"}
-                                            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                                            onSelect={() => setAddProductOpen(true)}
-                                            className="text-primary font-medium cursor-pointer"
-                                        >
-                                            <PlusCircle className="mr-2 h-4 w-4" /> Add new product &quot;{productSearch}&quot;
-                                        </CommandItem>
-                                    </CommandGroup>
-                                )}
-                                {!isSearchingProducts && productResults.length === 0 && productSearch.length > 1 && <CommandEmpty>No products found.</CommandEmpty>}
-                            </CommandList>
-                        )}
-                    </Command>
-
-                    {/* Totals summary */}
-                    <div className="pt-4 space-y-2 text-right">
-                        <div className="flex justify-between"><p className="text-muted-foreground">Subtotal</p><p>₱{subtotal.toFixed(2)}</p></div>
-                        <div className="flex justify-between text-destructive"><p className="text-destructive">Discount</p><p>- ₱{totalDiscount.toFixed(2)}</p></div>
-                        {includeInsurance && <div className="flex justify-between text-muted-foreground"><p>Insurance Fee (1%)</p><p>+ ₱{insuranceFee.toFixed(2)}</p></div>}
-                        {/* Overpayment line — create mode only */}
-                        {!isEditing && overpaymentApplied > 0 && <div className="flex justify-between text-green-600"><p>Overpayment Applied</p><p>- ₱{overpaymentApplied.toFixed(2)}</p></div>}
-                        <div className="flex justify-between font-bold text-lg"><p>Total</p><p>₱{totalAmount.toFixed(2)}</p></div>
-                    </div>
-
-                    {/* Apply overpayment — create mode only, when customer has store credit */}
-                    {!isEditing && (selectedCustomer?.store_credit ?? 0) > 0 && (
-                        <FormField
-                            control={form.control}
-                            name="applyOverpayment"
-                            render={({ field }) => (
-                                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 border-green-500/30 bg-green-500/5">
-                                    <FormControl>
-                                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                                    </FormControl>
-                                    <div className="space-y-1 leading-none">
-                                        <FormLabel className="text-green-700">Apply Overpayment Balance (₱{(selectedCustomer?.store_credit ?? 0).toFixed(2)})</FormLabel>
-                                        <p className="text-xs text-muted-foreground">Use the customer&apos;s existing balance to reduce the total.</p>
-                                    </div>
-                                </FormItem>
-                            )}
-                        />
-                    )}
-
-                    {/* Insurance toggle — available to all users */}
-                    <FormField
-                        control={form.control}
-                        name="includeInsurance"
-                        render={({ field }) => (
-                            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                                <FormControl>
-                                    <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                                </FormControl>
-                                <div className="space-y-1 leading-none">
-                                    <FormLabel>Include 1% Shipping Insurance</FormLabel>
-                                    <p className="text-xs text-muted-foreground">You can optionally remove the insurance fee for this order.</p>
-                                </div>
-                            </FormItem>
-                        )}
-                    />
-
-                    {/* Tracking Number */}
-                    <FormField
-                        control={form.control}
-                        name="trackingNumber"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Tracking Number</FormLabel>
-                                <FormControl>
-                                    <Input
-                                        placeholder="Enter tracking number if shipped"
-                                        {...field}
-                                        value={field.value ?? ''}
-                                    />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-
-                    {/* Notes */}
-                    <FormField
-                        control={form.control}
-                        name="shippingDetails"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Notes / Remarks</FormLabel>
-                                <FormControl>
-                                    <Textarea
-                                        placeholder="Add any notes about this order, e.g. delivery instructions, special requests..."
-                                        className="resize-none"
-                                        rows={3}
-                                        {...field}
-                                        value={field.value ?? ''}
-                                    />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                </div>
+                    append({
+                      productId: productToAdd.id,
+                      productName: productToAdd.name,
+                      quantity: 1,
+                      costPriceAtSale: costPriceAtSale,
+                      sellingPriceAtSale: useInstallmentPrice ? productToAdd.installment_price : productToAdd.sellingPrice,
+                      discount: 0
+                    });
+                    setProductPriceCache(prev => ({ ...prev, [productToAdd.id]: { cashPrice: productToAdd.sellingPrice, installmentPrice: productToAdd.installment_price ?? null } }));
+                  }
+                  setProductSearch('');
+                  setProductResults([]);
+                }}
+                onAddProductClick={() => setAddProductOpen(true)}
+              />
             </div>
             <DialogFooter className="pt-8">
-                <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>Cancel</Button>
-                <Button type="submit">{isEditing ? 'Save Changes' : 'Create Order'}</Button>
+              <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>Cancel</Button>
+              <Button type="submit">{isEditing ? 'Save Changes' : 'Create Order'}</Button>
             </DialogFooter>
           </form>
         </Form>
@@ -1324,10 +943,10 @@ export function OrderDialog(props: OrderDialogProps) {
         onOpenChange={setAddCustomerOpen}
         initialName={customerSearch}
         onSuccess={(customer) => {
-            form.setValue("customerId", customer.id);
-            setSelectedCustomer({ id: customer.id, firstName: customer.firstName, lastName: customer.lastName });
-            setCustomerSearch('');
-            setCustomerResults([]);
+          form.setValue("customerId", customer.id);
+          setSelectedCustomer({ id: customer.id, firstName: customer.firstName, lastName: customer.lastName });
+          setCustomerSearch('');
+          setCustomerResults([]);
         }}
       />
       <AddProductDialog
@@ -1335,60 +954,46 @@ export function OrderDialog(props: OrderDialogProps) {
         onOpenChange={setAddProductOpen}
         initialValues={{ name: productSearch }}
         onProductAdded={(p) => {
-            setProductSearch(p.name);
+          setProductSearch(p.name);
         }}
       />
     </Dialog>
       <Dialog open={!!variantSelectionProduct} onOpenChange={(open) => !open && setVariantSelectionProduct(null)}>
         <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-                <DialogTitle>Select Variant for {variantSelectionProduct?.name}</DialogTitle>
-                <DialogDescription>Choose a variant to add to the order.</DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-2 py-4">
-                {variantSelectionOptions.map((v) => (
-                    <Button 
-                        key={v.id} 
-                        variant="outline" 
-                        className="justify-between h-auto py-3"
-                        onClick={() => {
-                            const isAlreadyAdded = fields.some(item => item.productId === v.id);
-                            if (isAlreadyAdded) {
-                                toast({
-                                    variant: "default",
-                                    title: "Variant already in order",
-                                    description: `${v.variant_name} is already in this order. You can adjust the quantity above.`,
-                                });
-                            } else {
-                                const costPriceAtSale = v.stock_batches?.length > 0
-                                    ? v.stock_batches[0].unitCost
-                                    : (v.initial_unit_cost || 0);
-
-                                append({
-                                    productId: v.id,
-                                    productName: v.name,
-                                    quantity: 1,
-                                    costPriceAtSale: costPriceAtSale,
-                                    sellingPriceAtSale: v.selling_price,
-                                    discount: 0
-                                });
-                            }
-                            setVariantSelectionProduct(null);
-                            setProductSearch('');
-                            setProductResults([]);
-                        }}
-                    >
-                        <span>{v.variant_name || v.name}</span>
-                        <div className="flex gap-4">
-                            <span className="text-muted-foreground text-sm font-normal">Stock: {v.stock_level}</span>
-                            <span>₱{(v.selling_price || 0).toFixed(2)}</span>
-                        </div>
-                    </Button>
-                ))}
-            </div>
-            <DialogFooter>
-                <Button variant="ghost" onClick={() => setVariantSelectionProduct(null)}>Cancel</Button>
-            </DialogFooter>
+          <DialogHeader>
+            <DialogTitle>Select Variant for {variantSelectionProduct?.name}</DialogTitle>
+            <DialogDescription>Choose a variant to add to the order.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2 py-4">
+            {variantSelectionOptions.map((v) => (
+              <Button
+                key={v.id}
+                variant="outline"
+                className="justify-between h-auto py-3"
+                onClick={() => {
+                  const isAlreadyAdded = fields.some(item => item.productId === v.id);
+                  if (isAlreadyAdded) {
+                    toast({ variant: "default", title: "Variant already in order", description: `${v.variant_name} is already in this order. You can adjust the quantity above.` });
+                  } else {
+                    const costPriceAtSale = v.stock_batches?.length > 0 ? v.stock_batches[0].unitCost : (v.initial_unit_cost || 0);
+                    append({ productId: v.id, productName: v.name, quantity: 1, costPriceAtSale, sellingPriceAtSale: v.selling_price, discount: 0 });
+                  }
+                  setVariantSelectionProduct(null);
+                  setProductSearch('');
+                  setProductResults([]);
+                }}
+              >
+                <span>{v.variant_name || v.name}</span>
+                <div className="flex gap-4">
+                  <span className="text-muted-foreground text-sm font-normal">Stock: {v.stock_level}</span>
+                  <span>₱{(v.selling_price || 0).toFixed(2)}</span>
+                </div>
+              </Button>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setVariantSelectionProduct(null)}>Cancel</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
