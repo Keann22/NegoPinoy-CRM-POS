@@ -266,7 +266,7 @@ export default function OrderDetailPage() {
             {order.paymentType === 'Installment' && (
                 <div className="text-sm text-muted-foreground mt-1">
                     <p>{order.installmentMonths} months</p>
-                    {order.monthlyPayment && (
+                    {order.monthlyPayment != null && (
                         <p>₱{order.monthlyPayment.toFixed(2)} / month</p>
                     )}
                 </div>
@@ -301,9 +301,9 @@ export default function OrderDetailPage() {
                   <TableCell className="font-medium">{item.productName}</TableCell>
                   <TableCell className="text-muted-foreground text-sm">{item.shelfLocation || '-'}</TableCell>
                   <TableCell className="text-center">{item.quantity}</TableCell>
-                  <TableCell className="text-right">₱{item.sellingPriceAtSale.toFixed(2)}</TableCell>
+                  <TableCell className="text-right">₱{(item.sellingPriceAtSale || 0).toFixed(2)}</TableCell>
                   <TableCell className="text-right text-destructive">- ₱{(item.discount || 0).toFixed(2)}</TableCell>
-                  <TableCell className="text-right font-medium">₱{((item.sellingPriceAtSale - (item.discount || 0)) * item.quantity).toFixed(2)}</TableCell>
+                  <TableCell className="text-right font-medium">₱{(((item.sellingPriceAtSale || 0) - (item.discount || 0)) * (item.quantity || 1)).toFixed(2)}</TableCell>
                 </TableRow>
               )) : (
                 <TableRow><TableCell colSpan={6} className="h-24 text-center">No items found for this order.</TableCell></TableRow>
@@ -340,7 +340,7 @@ export default function OrderDetailPage() {
                                     )}
                                 </TableCell>
                                 <TableCell>{p.paymentMethod}</TableCell>
-                                <TableCell className="text-right font-medium">₱{p.amount.toFixed(2)}</TableCell>
+                                <TableCell className="text-right font-medium">₱{(p.amount || 0).toFixed(2)}</TableCell>
                             </TableRow>
                         )) : (
                             <TableRow><TableCell colSpan={3} className="h-24 text-center">No payments logged yet.</TableCell></TableRow>
@@ -355,7 +355,7 @@ export default function OrderDetailPage() {
             <CardContent className="space-y-3 text-sm">
                 <div className="flex justify-between">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <span>₱{order.subtotal.toFixed(2)}</span>
+                    <span>₱{(order.subtotal || 0).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                     <span className="text-muted-foreground">Discount</span>
@@ -367,30 +367,30 @@ export default function OrderDetailPage() {
                         <span>+ ₱{order.insurance_fee.toFixed(2)}</span>
                     </div>
                 ) : null}
-                {order.paymentType === 'Installment' && order.totalAmount > (order.subtotal - (order.totalDiscount || 0) + (order.insurance_fee || 0)) && (
+                {order.paymentType === 'Installment' && order.totalAmount > ((order.subtotal || 0) - (order.totalDiscount || 0) + (order.insurance_fee || 0)) && (
                     <div className="flex justify-between">
                         <span className="text-muted-foreground">System Adjustment</span>
-                        <span className="text-muted-foreground">+ ₱{(order.totalAmount - (order.subtotal - (order.totalDiscount || 0) + (order.insurance_fee || 0))).toFixed(2)}</span>
+                        <span className="text-muted-foreground">+ ₱{(order.totalAmount - ((order.subtotal || 0) - (order.totalDiscount || 0) + (order.insurance_fee || 0))).toFixed(2)}</span>
                     </div>
                 )}
                 <Separator />
                 <div className="flex justify-between font-bold text-base">
                     <span>Total</span>
-                    <span>₱{order.totalAmount.toFixed(2)}</span>
+                    <span>₱{(order.totalAmount || 0).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                     <span className="text-muted-foreground">Amount Paid</span>
-                    <span>₱{order.amountPaid.toFixed(2)}</span>
+                    <span>₱{(order.amountPaid || 0).toFixed(2)}</span>
                 </div>
                 {courierFee > 0 && (() => {
-                    const netRemittance = order.amountPaid - courierFee;
-                    const difference = netRemittance - order.totalAmount;
+                    const netRemittance = (order.amountPaid || 0) - courierFee;
+                    const difference = netRemittance - (order.totalAmount || 0);
                     
                     return (
                         <div className="bg-muted/30 p-2 rounded-md mt-1 mb-2">
                           <div className="flex justify-between text-muted-foreground text-xs">
                               <span>COD Collected</span>
-                              <span>₱{order.amountPaid.toFixed(2)}</span>
+                              <span>₱{(order.amountPaid || 0).toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between text-destructive text-xs">
                               <span>Courier Fee</span>
@@ -411,7 +411,7 @@ export default function OrderDetailPage() {
                 })()}
                  <div className="flex justify-between font-semibold text-base">
                     <span>Balance Due</span>
-                    <span>₱{order.balanceDue.toFixed(2)}</span>
+                    <span>₱{(order.balanceDue || 0).toFixed(2)}</span>
                 </div>
             </CardContent>
         </Card>
