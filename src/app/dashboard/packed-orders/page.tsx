@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CheckCircle2, XCircle, Search } from 'lucide-react';
+import { CheckCircle2, XCircle, Search, RotateCcw } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useSupabase } from '@/firebase';
 import { useEffect } from 'react';
@@ -15,6 +15,7 @@ import { format, differenceInDays } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { VerifyShippingDialog } from '@/components/dashboard/verify-shipping-dialog';
 import { NotForShippingDialog } from '@/components/dashboard/not-for-shipping-dialog';
+import { RevertPendingDialog } from '@/components/dashboard/revert-pending-dialog';
 import { Order } from '@/app/dashboard/orders/page';
 
 type PackedOrder = Order & {
@@ -29,6 +30,7 @@ export default function PackedOrdersPage() {
   
   const [verifyOrder, setVerifyOrder] = useState<Order | null>(null);
   const [notForShippingOrder, setNotForShippingOrder] = useState<Order | null>(null);
+  const [revertOrder, setRevertOrder] = useState<Order | null>(null);
 
   const [rawOrders, setRawOrders] = useState<Order[]>([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
@@ -179,6 +181,9 @@ export default function PackedOrdersPage() {
             )}
             <TableCell className="text-right">
               <div className="flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => setRevertOrder(order)} title="Revert to Pending">
+                  <RotateCcw className="h-4 w-4 mr-1" /> Revert
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => setNotForShippingOrder(order)} className="text-destructive hover:text-destructive hover:bg-destructive/10" title="Not for shipping">
                   <XCircle className="h-4 w-4 mr-1" /> Delay
                 </Button>
@@ -261,6 +266,12 @@ export default function PackedOrdersPage() {
         open={!!notForShippingOrder} 
         onOpenChange={(open) => !open && setNotForShippingOrder(null)} 
         onSuccess={refetchOrders} 
+      />
+      <RevertPendingDialog
+        order={revertOrder}
+        open={!!revertOrder}
+        onOpenChange={(open) => !open && setRevertOrder(null)}
+        onSuccess={refetchOrders}
       />
     </>
   );

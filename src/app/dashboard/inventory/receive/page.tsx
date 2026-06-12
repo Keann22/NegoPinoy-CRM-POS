@@ -112,6 +112,7 @@ function ProductSearch({ onProductSelect }: { onProductSelect: (product: Product
 }
 
 import { NeedsProcurementList } from '@/components/dashboard/needs-procurement-list';
+import { PendingPurchases } from '@/components/dashboard/pending-purchases';
 
 export default function BulkReceivePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -235,6 +236,10 @@ export default function BulkReceivePage() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div className="lg:col-span-2">
+        <PendingPurchases onReceiveComplete={() => {
+          // You could optionally refresh some other state here if needed
+        }} />
+
         <Card>
       <CardHeader>
         <CardTitle className="font-headline">Bulk Inventory Receiving</CardTitle>

@@ -1,6 +1,6 @@
 'use client';
 
-import { MoreHorizontal, Calendar as CalendarIcon, FilterX, Search } from 'lucide-react';
+import { MoreHorizontal, Calendar as CalendarIcon, FilterX, Search, Upload } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -140,6 +140,7 @@ export default function OrdersPage() {
   const isInventoryOnly = useMemo(() => userProfile?.roles.includes('Inventory') && !userProfile?.roles.includes('Sales') && !userProfile?.roles.includes('Admin') && !userProfile?.roles.includes('Owner'), [userProfile]);
   const canCreateOrder = useMemo(() => userProfile?.roles.some(r => ['Sales', 'Admin', 'Owner'].includes(r)), [userProfile]);
   const isAdminOrOwner = useMemo(() => userProfile?.roles.some(r => ['Admin', 'Owner'].includes(r)), [userProfile]);
+  const canSyncCourier = useMemo(() => userProfile?.roles?.some(r => ['Admin', 'Owner', 'Inventory'].includes(r)), [userProfile]);
 
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
@@ -344,7 +345,15 @@ export default function OrdersPage() {
               View and manage customer sales orders.
             </CardDescription>
           </div>
-          {canCreateOrder && <AddOrderDialog onOrderAdded={refetch} />}
+          <div className="flex items-center gap-2">
+              {canSyncCourier && (
+                  <Button variant="outline" onClick={() => router.push('/dashboard/orders/courier-sync')}>
+                      <Upload className="mr-2 h-4 w-4" />
+                      Courier Sync
+                  </Button>
+              )}
+              {canCreateOrder && <AddOrderDialog onOrderAdded={refetch} />}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap items-center gap-4 mb-6">

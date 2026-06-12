@@ -1,0 +1,5463 @@
+{
+  "allDbProducts": [
+    {
+      "id": "4253b2ef-bfc6-4b43-8afd-d9e9f2ebce54",
+      "name": "RUBBERIZED MANTEL",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "7a5f1783-a721-4c27-a9b7-f150c661999a",
+      "name": "Kyowa Juice Extractor KW-4210 10.L",
+      "stock_level": -5,
+      "variant_name": null
+    },
+    {
+      "id": "84db474c-391b-44b7-9f3d-7365a7cbe8fc",
+      "name": "JBL Dual Use Wired and Wireless Microphone",
+      "stock_level": -4,
+      "variant_name": null
+    },
+    {
+      "id": "db913411-82e1-4287-864e-b4b4cb1deb88",
+      "name": "POLAND KAMILLE COOKWARE SET",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "8c5735d7-6e28-4703-acca-4e2d6af01ac9",
+      "name": "OROCAN ICE BOX COOLER",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "3c851d06-502a-48f5-98c1-51800495e817",
+      "name": "Hand Mixer",
+      "stock_level": 3,
+      "variant_name": null
+    },
+    {
+      "id": "22d6a5fd-3707-4a16-8565-1cfe5f3bced2",
+      "name": "Hilee High Borosilicate Glass",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "45cd7a68-f8a7-42bd-9920-ec371ecdc141",
+      "name": "OROCAN ICE BOX COOLER - 30L",
+      "stock_level": 0,
+      "variant_name": "30L"
+    },
+    {
+      "id": "03245c4c-ba46-4e05-ac77-71a4dee15f7b",
+      "name": "Cyx1 Stainless Frying Strainer Wood handle - 32cm ",
+      "stock_level": 0,
+      "variant_name": "32cm "
+    },
+    {
+      "id": "e1b2254a-7901-4d83-b2eb-742356abe891",
+      "name": "Wired Dynamic Microphone",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "64e32c3f-5bf0-4c59-985d-04954633866f",
+      "name": "Stainless Steamer/Casserole with Wide Glass Cover",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "1be6c1d4-c1d8-4cf8-9636-dceb3750fafe",
+      "name": "Survival whistle (green)",
+      "stock_level": 10,
+      "variant_name": null
+    },
+    {
+      "id": "7b128571-0b1a-48d5-9ca9-47cfce9694a4",
+      "name": "RECTANGLE SHAPED 6PCS SET",
+      "stock_level": 10,
+      "variant_name": null
+    },
+    {
+      "id": "b2f9bb50-e37f-4556-8150-f4a956ec9d5c",
+      "name": "Kaisa Villa Food Processor",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "45b1e814-958f-45b8-9ced-70cee6ba7a43",
+      "name": "Vichelena 8pcs Casserole Cookware Set",
+      "stock_level": 8,
+      "variant_name": null
+    },
+    {
+      "id": "aed2dcf2-43f1-4bdb-8dde-113e12f99229",
+      "name": "Oil Drainer Tray",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "b0110c39-caa5-409a-8c67-57967e4b2841",
+      "name": "Oil Drainer Base",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "62a196dc-0277-496b-a1d5-72ce17d702d3",
+      "name": "12pc/1dozen Green Melamine Plates",
+      "stock_level": 1,
+      "variant_name": null
+    },
+    {
+      "id": "3b387406-6a0a-489e-8fee-d8fec87096c0",
+      "name": "Speedy manual Food Chopper",
+      "stock_level": 2,
+      "variant_name": null
+    },
+    {
+      "id": "838f632a-69d1-465e-bef4-bb3e129989c4",
+      "name": "OROCAN ICE BOX COOLER - 5L",
+      "stock_level": 0,
+      "variant_name": "5L"
+    },
+    {
+      "id": "c1d866d2-f767-4a78-88ba-d14e8ba45bfe",
+      "name": "Luncheon meat slicer",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "6ac37408-2c16-48d5-9b5c-97b474f6850a",
+      "name": "stainless baunan ",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "af60355a-7648-425d-9363-ec61fc9b31e2",
+      "name": "PANG KARINDERYA SET1",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "53d57cbf-38c4-4fc1-9146-3522b6fe62e3",
+      "name": "Condiments Rack BIG SIZE 50cm",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "aeb77ccf-009f-48aa-99cf-2d17cc97f735",
+      "name": "18L Kaisa Villa Air fryer Oven",
+      "stock_level": 0,
+      "variant_name": "Standard"
+    },
+    {
+      "id": "207fb360-e9b1-4805-9353-0ce2a477b383",
+      "name": "Stainless Micro Pressure Cooker Pot",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "1e2be88a-feae-4e57-baaf-d4e5c7591423",
+      "name": "Ladder Foldable - 4layer",
+      "stock_level": 0,
+      "variant_name": "4layer"
+    },
+    {
+      "id": "f24c11ac-d653-485c-b11c-0302846dd109",
+      "name": "OROCAN ICE BOX COOLER - 65L",
+      "stock_level": 0,
+      "variant_name": "65L"
+    },
+    {
+      "id": "8637df5d-e5ce-46d9-9fa0-a7bb337ba134",
+      "name": "BOTA FOR KIDS - SIZE 33",
+      "stock_level": -2,
+      "variant_name": "SIZE 33"
+    },
+    {
+      "id": "273909e7-023d-4821-bcb1-46aa2ef46006",
+      "name": "CYP3 mixing bowls - SET-SALE",
+      "stock_level": -1,
+      "variant_name": "SET-SALE"
+    },
+    {
+      "id": "4f1daf1a-6129-4653-bacf-fa14e2186b8c",
+      "name": "HIGH PRESSURE WATER GUN HOSE  - 25 meters",
+      "stock_level": 0,
+      "variant_name": "25 meters"
+    },
+    {
+      "id": "b03c2ca8-efcc-40fe-b0a4-e4f7976119b1",
+      "name": "Cyx1 Stainless Frying Strainer Wood handle - 26cm ",
+      "stock_level": 0,
+      "variant_name": "26cm "
+    },
+    {
+      "id": "e6e672e3-a12b-49e1-9501-209f1f84ea09",
+      "name": "OROCAN ICE BOX COOLER - 8L",
+      "stock_level": 0,
+      "variant_name": "8L"
+    },
+    {
+      "id": "1732a136-3c38-4ec0-8deb-44ebdba0f345",
+      "name": "vichelena 8pcs casserole set",
+      "stock_level": -11,
+      "variant_name": "Standard"
+    },
+    {
+      "id": "a3f300da-317c-498b-8023-7c59440f3c4a",
+      "name": "stainless baunan city girl",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "3dc7a05f-cd38-4850-b06f-6db42adaeecc",
+      "name": "DEEP STOCK POTS WITH TAKIP STAINLESS - 35cm",
+      "stock_level": 1,
+      "variant_name": "35cm"
+    },
+    {
+      "id": "987c485d-91b9-4de5-bb9f-e525b8e66f05",
+      "name": "Stainless Micro Pressure Cooker Pot - 24cm (4liters)",
+      "stock_level": 0,
+      "variant_name": "24cm (4liters)"
+    },
+    {
+      "id": "81ca7010-8c86-459a-8eb5-8e754c8954df",
+      "name": "Ladder Foldable - 3layer",
+      "stock_level": 0,
+      "variant_name": "3layer"
+    },
+    {
+      "id": "d08421d7-8075-4898-a30f-35330186e9c1",
+      "name": "Cover Full Glass - CYG2 26cm",
+      "stock_level": 3,
+      "variant_name": null
+    },
+    {
+      "id": "4a5d7faa-3d3b-45cb-a52b-d81ad3f47236",
+      "name": "BEST WAY STEEL PRO swimming pool - 3meters",
+      "stock_level": 0,
+      "variant_name": "3meters"
+    },
+    {
+      "id": "7ea2a64a-2d1b-418d-bbbe-6242e3dd27b4",
+      "name": "KAISA VILLA NonStick Pans - 3in1 egg pan",
+      "stock_level": 0,
+      "variant_name": "3in1 egg pan"
+    },
+    {
+      "id": "ba999541-e037-4577-871a-c1356299570a",
+      "name": "Sunshade Net - Sunshade Net 2mx4m",
+      "stock_level": 0,
+      "variant_name": "Sunshade Net 2mx4m"
+    },
+    {
+      "id": "d70b17c7-ce75-49d8-9bfc-e90445a4c0c6",
+      "name": "Big Size Stainless Steel Wok Double Ear - 38cm without cover",
+      "stock_level": -1,
+      "variant_name": "38cm without cover"
+    },
+    {
+      "id": "28499406-3c39-4460-9ce5-612d7b8440be",
+      "name": "Vichelena 8pcs Casserole set installment",
+      "stock_level": -5,
+      "variant_name": "Installment"
+    },
+    {
+      "id": "e82d9711-ccea-43fc-a583-477f21471f48",
+      "name": "EUROCHEF Measuring cups set w/ spoon - Pink",
+      "stock_level": -1,
+      "variant_name": "Pink"
+    },
+    {
+      "id": "b86f78c0-2bf5-490a-9adf-7aafac40741f",
+      "name": "2in1 Kitchen mat",
+      "stock_level": 2,
+      "variant_name": null
+    },
+    {
+      "id": "f0a9580f-44f4-428c-b66e-ba676d9194b6",
+      "name": "Isla Victoria's 10ml Perfume",
+      "stock_level": -10,
+      "variant_name": null
+    },
+    {
+      "id": "26a656b6-29cc-4d96-9e0f-cc7ce4c16476",
+      "name": "OROCAN ICE BOX COOLER - 15L",
+      "stock_level": 0,
+      "variant_name": "15L"
+    },
+    {
+      "id": "b6b7e216-f20f-43b6-9441-0c9f91dba978",
+      "name": "KAISA VILLA NonStick Pans - 4in1 egg pan",
+      "stock_level": -1,
+      "variant_name": "4in1 egg pan"
+    },
+    {
+      "id": "f2adc94e-945a-44ec-972a-f7c773121bd8",
+      "name": "Big Size Stainless Steel Wok Double Ear - 36cm",
+      "stock_level": 3,
+      "variant_name": null
+    },
+    {
+      "id": "802e2098-aec2-4173-95c1-222214e0b7d8",
+      "name": "Big Size Stainless Steel Wok Double Ear - 34cm",
+      "stock_level": 5,
+      "variant_name": null
+    },
+    {
+      "id": "34268ecf-1f06-4eab-842e-82e225378953",
+      "name": "Big Size Stainless Steel Wok Double Ear - 32cm",
+      "stock_level": 5,
+      "variant_name": null
+    },
+    {
+      "id": "847253f8-da17-42ae-83fd-c3c2de84447f",
+      "name": "OROCAN ICE BOX COOLER - 45L",
+      "stock_level": 0,
+      "variant_name": "45L"
+    },
+    {
+      "id": "3acb48b1-9a00-45ed-839c-73a486108f62",
+      "name": "Xiaomi Induction Cooker Global",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "9615bd8f-01ae-4896-9129-902d1b1a0e27",
+      "name": "Seasoning Rack Only",
+      "stock_level": 1,
+      "variant_name": null
+    },
+    {
+      "id": "27e0f4b4-075e-4ff9-b673-d503b48b0aea",
+      "name": "Clean Club Rotating Cutlery Keeper green",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "75fad01a-34a2-429e-abc9-b060d3576e3d",
+      "name": "Stainless Strainers with Handle (Ha109)",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "2e354dcd-1172-440a-9fe1-7fd63014e6da",
+      "name": "1 Reclining Chair",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "df8568d1-01b7-4206-a866-eef905bdc18f",
+      "name": "Kniyea VC Toner",
+      "stock_level": -2,
+      "variant_name": null
+    },
+    {
+      "id": "d331ec58-e725-4fc1-81be-23f79ea60d78",
+      "name": "KAISA VILLA NonStick Pans - Omelette pan",
+      "stock_level": 0,
+      "variant_name": "Omelette pan"
+    },
+    {
+      "id": "d1d8d02a-878b-40b9-910b-4cc39be541c3",
+      "name": "FROSTY JUG",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "97cec088-5a19-4417-b961-68718cd78eb7",
+      "name": "Stainless Strainers with Handle (Ha109) - 22cm ",
+      "stock_level": 0,
+      "variant_name": "22cm "
+    },
+    {
+      "id": "a8b296e0-2f1e-47ee-8c58-bfb1eb4dc948",
+      "name": "CYP3 mixing bowls - 20CM-SALE WITH COVER",
+      "stock_level": 0,
+      "variant_name": "20CM-SALE WITH COVER"
+    },
+    {
+      "id": "925b4d32-52ff-48d3-8a1e-043456dcf8ba",
+      "name": "Stainless Micro Pressure Cooker Pot - 26cm (5liters)",
+      "stock_level": 0,
+      "variant_name": "26cm (5liters)"
+    },
+    {
+      "id": "6b6e1f5d-535b-4ace-9982-0c3cf27f65ee",
+      "name": "16cm nonstick egg and pancake frying pan",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "c045ab7a-6613-4c05-857f-c9415baeb172",
+      "name": "11pcs Condiments Set/Condiments set ALL WHITE (PVC rack)",
+      "stock_level": -2,
+      "variant_name": null
+    },
+    {
+      "id": "c2d79c9f-120d-4e3f-8955-6599349d36fb",
+      "name": "FROSTY JUG - FROSTYJUG-4L",
+      "stock_level": 0,
+      "variant_name": "FROSTYJUG-4L"
+    },
+    {
+      "id": "9e0c9bf4-e51c-4db2-8492-61772658d76b",
+      "name": "Steam iron with Ironing board",
+      "stock_level": -4,
+      "variant_name": null
+    },
+    {
+      "id": "ebce5b42-bc69-4392-8026-dc8075800d24",
+      "name": "Cyt1 Stainless Basins - 20cm",
+      "stock_level": 0,
+      "variant_name": "20cm"
+    },
+    {
+      "id": "e42cca7b-260c-4917-accd-68e6602b48c9",
+      "name": "Cyt1 Stainless Basins",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "ed17cc2f-f6be-4326-b44a-59baf79b8dd0",
+      "name": "Cyt1 Stainless Basins - 22cm ",
+      "stock_level": 0,
+      "variant_name": "22cm "
+    },
+    {
+      "id": "9ee374fc-94d7-4294-bd83-7f8a020522ad",
+      "name": "KUKU Lithium Extra Battery",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "333a8cc4-80b8-4322-9e58-2412e5804a5f",
+      "name": "Stainless Tongs (NEW) - Small ",
+      "stock_level": 1,
+      "variant_name": "Small "
+    },
+    {
+      "id": "17a1f3d0-20ba-4866-a9d2-4c103b747a1f",
+      "name": "Waterproof Tape - 5m",
+      "stock_level": -2,
+      "variant_name": "5m"
+    },
+    {
+      "id": "26580da6-e3a2-45a1-bfcf-836b217c85c1",
+      "name": "800ml Vacuum Bottle HOT AND COLD ",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "f837b537-985d-4d88-a7bb-afb221f54d3d",
+      "name": "OROCAN JUMBO JUG",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "b7d77adf-de95-439c-ac60-a788f472cedb",
+      "name": "FROSTY JUG - FROSTYJUG-8L",
+      "stock_level": 0,
+      "variant_name": "FROSTYJUG-8L"
+    },
+    {
+      "id": "0a89ff13-e4d9-4b52-a847-ed2eda603d79",
+      "name": "Cyt1 Stainless Basins - 36cm ",
+      "stock_level": 2,
+      "variant_name": "36cm "
+    },
+    {
+      "id": "d514b7e7-8a33-4d0b-9a0a-6f32aeec4f39",
+      "name": "Cyt1 Stainless Basins - 24cm ",
+      "stock_level": 0,
+      "variant_name": "24cm "
+    },
+    {
+      "id": "1fc9ae0f-8957-4e50-a116-6f4da23b912c",
+      "name": "STANDARD Juice Blender 1.5L SJB1.5LA",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "1645ab9e-f08d-4fcb-b440-bd7144a6fcf0",
+      "name": "CYG 2 Glass Cover (FULL GLASS) - CYG 2 Glass Cover (FULL GLASS) 30CM",
+      "stock_level": 15,
+      "variant_name": "CYG 2 Glass Cover (FULL GLASS) 30CM"
+    },
+    {
+      "id": "f15d3cba-304f-4fca-b599-b8fc9d19a3a5",
+      "name": "LED Work Light➕ 100800mah.jpg",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "c4a981d5-7cd2-402b-9697-720a57f29f0c",
+      "name": "OROCAN JUMBO JUG - 8L",
+      "stock_level": -1,
+      "variant_name": "8L"
+    },
+    {
+      "id": "b5a7ecf5-cc96-4960-b464-10b5cff5edc4",
+      "name": "KUKU Lithium Extra Battery - 50400MAH Small",
+      "stock_level": -1,
+      "variant_name": "50400MAH Small"
+    },
+    {
+      "id": "a05eb6e1-644e-4bf8-bc5c-5949e4d37fd3",
+      "name": "922 Titanium Raincoat Rubberized - Gray",
+      "stock_level": 0,
+      "variant_name": "Gray"
+    },
+    {
+      "id": "5b0b1ff7-1de9-48d6-a0b9-19f9514f933f",
+      "name": "Tixx Wet and Dry Vacuum 15L",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "b646414f-8995-4b29-abc0-bf983d1b9560",
+      "name": " HOT AND COLD INSULATED JUGS 8liters - SILVER",
+      "stock_level": -1,
+      "variant_name": "SILVER"
+    },
+    {
+      "id": "ce116fa2-fb39-4d07-b347-3ae0636ff4c4",
+      "name": "Glow in the Dark Blanket",
+      "stock_level": -4,
+      "variant_name": null
+    },
+    {
+      "id": "03f50ee6-8433-4499-b8f8-504dab1d6228",
+      "name": "304 Stainless Steel 2.0L Vacuum Thermos Coffee",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "fb1542dc-0ab9-4fa7-9968-1de7a33832bb",
+      "name": "KUKU Lithium Extra Battery - 75600MAH Medium",
+      "stock_level": 0,
+      "variant_name": "75600MAH Medium"
+    },
+    {
+      "id": "c83d9260-3510-45b8-9d44-46b36c0c1a73",
+      "name": "6layer Foldable Shoe Rack (White)",
+      "stock_level": -2,
+      "variant_name": null
+    },
+    {
+      "id": "983e0495-52ad-4290-b189-e06f8f195b88",
+      "name": "1pc Fan + 2pcs Baterya set",
+      "stock_level": 1,
+      "variant_name": null
+    },
+    {
+      "id": "35b3db1e-f960-4873-85de-a9d267011699",
+      "name": "HK Bag 12”",
+      "stock_level": -2,
+      "variant_name": null
+    },
+    {
+      "id": "22e20058-3816-46af-91ff-2f6c15699f7e",
+      "name": "Multifunctional NonStick cookware",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "cc80ab3b-2282-4307-8da0-ea2db1640f53",
+      "name": "POLAND KAMILLE COOKWARE SET (K2)",
+      "stock_level": 0,
+      "variant_name": "K2"
+    },
+    {
+      "id": "20aa9132-cfb1-440b-85fc-f82ea8688e16",
+      "name": "Cleanways All-purpose cleaner",
+      "stock_level": -3,
+      "variant_name": null
+    },
+    {
+      "id": "ac3b361b-c23c-4b45-812d-432ba5693e7e",
+      "name": "CY4 Slotted Strainers wood handle",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "01e1f366-a42c-4bfb-baee-97dc48d38c67",
+      "name": "Mini nonstick pan",
+      "stock_level": 2,
+      "variant_name": null
+    },
+    {
+      "id": "c0499603-6577-419d-a3cb-5411f91111c4",
+      "name": "OROCAN JUMBO JUG - 12L",
+      "stock_level": -1,
+      "variant_name": "12L"
+    },
+    {
+      "id": "9d7363d5-003a-4ca6-bb61-acb7bea269ab",
+      "name": "KUKU Lithium Extra Battery - 100800MAH Large",
+      "stock_level": 0,
+      "variant_name": "100800MAH Large"
+    },
+    {
+      "id": "3a5ab20f-f8b6-4dbe-b073-1554f8454a84",
+      "name": "Cyt1 Stainless Basins - 32cm ",
+      "stock_level": 0,
+      "variant_name": "32cm "
+    },
+    {
+      "id": "fc70eeed-ef81-4896-b9db-46f16c1d7da6",
+      "name": "CYP3 mixing bowls - 22CM-SALE WITH COVER",
+      "stock_level": 0,
+      "variant_name": "22CM-SALE WITH COVER"
+    },
+    {
+      "id": "1fdda789-82d3-47e5-bfea-ac2efeb9906c",
+      "name": "For Chef's Wok - 38 cm",
+      "stock_level": 0,
+      "variant_name": "38 cm"
+    },
+    {
+      "id": "22acc1fd-ab03-42c2-b6e2-29ff0af1b0ec",
+      "name": "CY4 Slotted Strainers wood handle - 22cm",
+      "stock_level": 0,
+      "variant_name": "22cm"
+    },
+    {
+      "id": "eb4e22f2-28d5-4253-b951-27d68ecd2bfb",
+      "name": "stainless baunan  - Girl",
+      "stock_level": -1,
+      "variant_name": "Girl"
+    },
+    {
+      "id": "94edb6f3-3bb6-43df-9612-63da56b62027",
+      "name": "HOT AND COLD INSULATED JUGS 8liters",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "eec67f3f-4993-4271-a5f6-a42fbb0882d7",
+      "name": "ELECTRIC MOSQUITO KILLER WITH SCENT - 2pcs refill",
+      "stock_level": -1,
+      "variant_name": "2pcs refill"
+    },
+    {
+      "id": "6e633cb1-bb01-4a50-8cbc-871ca23a5325",
+      "name": "ELECTRIC MOSQUITO KILLER WITH SCENT",
+      "stock_level": -5,
+      "variant_name": null
+    },
+    {
+      "id": "79612867-bc63-4844-8868-94c8cec988ba",
+      "name": "Cyt1 Stainless Basins - 28cm ",
+      "stock_level": 5,
+      "variant_name": "28cm "
+    },
+    {
+      "id": "1ce4090a-72fc-43c1-8843-19f3bdf188f6",
+      "name": "2 Layers Dish Rack",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "26ce7e3d-b805-4377-8e4b-57bd68be83e5",
+      "name": "Micromatic Rice Cooker BIG PANG CARENDERIA - MRC20 - 3.6L- 20 CUPS",
+      "stock_level": 0,
+      "variant_name": "MRC20 - 3.6L- 20 CUPS"
+    },
+    {
+      "id": "8718b533-7bdd-409b-9d57-2b69db128a57",
+      "name": "TiXX  Air cooler  - 55L",
+      "stock_level": 4200,
+      "variant_name": "55L"
+    },
+    {
+      "id": "06fe5104-e782-4b6a-9fe9-3d092780d9b7",
+      "name": "55S Makapal Stainless Steel 12pcs Spoon and 12pcs Fork Set",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "5d87a296-c216-4290-891e-e936599c353a",
+      "name": "CYP3 mixing bowls - 26CM-SALE WITH COVER",
+      "stock_level": -5,
+      "variant_name": "26CM-SALE WITH COVER"
+    },
+    {
+      "id": "ac1cae04-67e1-47b7-aa95-3c3782ed475b",
+      "name": "CY4 Slotted Strainers wood handle - 26cm",
+      "stock_level": -1,
+      "variant_name": "26cm"
+    },
+    {
+      "id": "c216e015-1f5c-474e-a5d3-c2d0542f70ce",
+      "name": "FROSTY JUG - FROSTYJUG-25L",
+      "stock_level": 0,
+      "variant_name": "FROSTYJUG-25L"
+    },
+    {
+      "id": "ad014a40-b943-4475-8769-9bc013ab9eba",
+      "name": "11pcs Kaisa Villa Kitchen Knife Set",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "e76f0c80-2810-460f-a5fc-d41cbcf43be4",
+      "name": "9” floral Melamine (12pcs)",
+      "stock_level": -10,
+      "variant_name": null
+    },
+    {
+      "id": "001376ea-dbb8-49df-aafa-2c3986014d03",
+      "name": "Stainless Steamer/Casserole with Wide Glass Cover 34CM - Installment-Cash basis",
+      "stock_level": -1,
+      "variant_name": "Installment-Cash basis"
+    },
+    {
+      "id": "acd5db0b-1e90-40e8-831b-e4a16dd3f9c0",
+      "name": "CY4 Slotted Strainers wood handle - 28cm",
+      "stock_level": -1,
+      "variant_name": "28cm"
+    },
+    {
+      "id": "d34b1291-172a-4a21-b3d3-304a2a69abbb",
+      "name": "CYP3 mixing bowls",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "9eb4ddf2-e5bc-46fb-be2e-08aa16bca4c3",
+      "name": "Migas Cookware Set - LILAC",
+      "stock_level": -1,
+      "variant_name": "LILAC"
+    },
+    {
+      "id": "5c312cc6-af54-4f28-80c9-b6b6d8a21e17",
+      "name": "Chaffing Dish",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "3f0d4a44-81c8-4ef6-b7a0-06f1f6ffc927",
+      "name": "KAISA VILLA BLENDER",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "c8b618ff-6fee-4ab9-81db-7a8fb7c567e0",
+      "name": "KAISA VILLA BLENDER - Black",
+      "stock_level": 0,
+      "variant_name": "Black"
+    },
+    {
+      "id": "9e58564a-4c78-4c8f-aca8-7a0e0c225882",
+      "name": "4 SET Stock Pot",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "4239a742-77cc-437e-ac74-1ec50cd3472a",
+      "name": "DEEP STOCK POTS WITH TAKIP STAINLESS",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "0a088354-1850-4b30-a62c-6fbd4bb6332b",
+      "name": "TiXX  Air cooler - 55L",
+      "stock_level": 0,
+      "variant_name": "55L"
+    },
+    {
+      "id": "435e58b0-5637-4a77-8e0c-794ecfdeddbc",
+      "name": "RECTANGLE SHAPED RS2 6PCS SET",
+      "stock_level": -2,
+      "variant_name": "RS2"
+    },
+    {
+      "id": "e4acbcd6-6c9c-4e25-bbb1-d4ca3e0566d0",
+      "name": "Micromatic Rice Cooker BIG PANG CARENDERIA - MRC22 - 3.9L- 22 CUPS",
+      "stock_level": 0,
+      "variant_name": "MRC22 - 3.9L- 22 CUPS"
+    },
+    {
+      "id": "d67f55cd-76fc-413b-b5b9-8ff2070628a5",
+      "name": "AGILA 3LAYER STEAMER - 45cm",
+      "stock_level": 0,
+      "variant_name": "45cm"
+    },
+    {
+      "id": "9dbddb28-3bf7-41b8-b32f-9c8504b4713f",
+      "name": "CYG 1 Lid Cover (HALF STAINLESS MID GLASS) - CYG 1 Lid Cover (HALF STAINLESS MID GLASS)S32CM",
+      "stock_level": 0,
+      "variant_name": "CYG 1 Lid Cover (HALF STAINLESS MID GLASS)S32CM"
+    },
+    {
+      "id": "2f53ca59-eb2f-4259-848d-ef73dad29716",
+      "name": "DEEP STOCK POTS WITH TAKIP STAINLESS - 40cm",
+      "stock_level": 1,
+      "variant_name": "40cm"
+    },
+    {
+      "id": "39fdbd77-652d-418a-a00a-e126b7059c64",
+      "name": "Stainless Steel Wok with Takip ",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "1363d04b-533f-4143-bd9b-c0eed95dc144",
+      "name": "Big Size Stainless Steel Wok Double Ear - 50cm - w/o cover",
+      "stock_level": -1,
+      "variant_name": "w/o cover"
+    },
+    {
+      "id": "e63f5a63-5f4a-469f-9ae9-40f41a674907",
+      "name": "VACUUM FILTER - 15pcs",
+      "stock_level": 0,
+      "variant_name": "15pcs"
+    },
+    {
+      "id": "b7c13a6f-0093-4c77-872d-f5c15223fda4",
+      "name": "Chaffing Dish - Single",
+      "stock_level": -2,
+      "variant_name": "Single"
+    },
+    {
+      "id": "6fbbaa73-054c-41c3-b5d7-a768e6b6cde6",
+      "name": "80pcs Hair Clip Set ",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "7cd10604-4613-4bdc-9c04-6b7e9a73d297",
+      "name": "AGILA 3LAYER STEAMER",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "3729a294-0d71-46e4-8ed3-c8e59a7c4c9d",
+      "name": "Stainless set (soup and syanse)",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "97522fc7-ed84-41d6-a152-713fce9bcb61",
+      "name": "CY4 Slotted Strainers wood handle - 30cm",
+      "stock_level": -1,
+      "variant_name": "30cm"
+    },
+    {
+      "id": "7dc26dc1-931f-4819-88fe-d6afeeabaf42",
+      "name": "CYX17-10 Sandok&Syanse ",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "abb4472d-7fcb-48f0-9c61-37acd31114d5",
+      "name": "CY4 Slotted Strainers wood handle - 24cm",
+      "stock_level": 0,
+      "variant_name": "24cm"
+    },
+    {
+      "id": "5815fbc4-7f83-454e-9dc7-f1df1e954d59",
+      "name": "For Chef's Wok - 40 cm",
+      "stock_level": -5,
+      "variant_name": "40 cm"
+    },
+    {
+      "id": "3fc035e4-da8b-4225-b8e7-ca6d1dda28e1",
+      "name": "CERAMIC NONSTICK KNIFE SET ",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "d7307f56-8eda-4ab5-a55c-f5f0dfd7bc7a",
+      "name": "Stainless Strainers with Handle Ha109",
+      "stock_level": 0,
+      "variant_name": "Base Item"
+    },
+    {
+      "id": "ba4bdaba-094b-420a-9060-d70342cf7088",
+      "name": "Mini Fan Black",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "d2cda2f1-886d-4514-9b07-ecffd2bbfd38",
+      "name": "Chaffing Dish - Double",
+      "stock_level": -4,
+      "variant_name": "Double"
+    },
+    {
+      "id": "843b9808-9016-43a4-89ed-011ff0143494",
+      "name": "Automatic camping tent",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "1948b093-1336-4293-882c-61c20ab35827",
+      "name": "Stainless Strainers with Handle Ha109 30cm",
+      "stock_level": -5,
+      "variant_name": "30cm"
+    },
+    {
+      "id": "3be7f416-88f9-4a49-b39d-d5795b227469",
+      "name": "Kaisa Villa 5L Food Processor - BLACK",
+      "stock_level": -3,
+      "variant_name": "BLACK"
+    },
+    {
+      "id": "11f28b1b-840e-4d47-9e8d-441a64bfa13e",
+      "name": "Kaisa Villa 5L Food Processor - Green",
+      "stock_level": 0,
+      "variant_name": "5L"
+    },
+    {
+      "id": "9651c544-4ddf-4ad4-8f20-0fba42498358",
+      "name": "BOTA FOR KIDS - SIZE 33 - 33(Girl)",
+      "stock_level": 0,
+      "variant_name": "33(Girl)"
+    },
+    {
+      "id": "917497d9-bdc8-4303-b0c3-ba75dd74efd0",
+      "name": "AGILA 3LAYER STEAMER - 30cm",
+      "stock_level": 0,
+      "variant_name": "30cm"
+    },
+    {
+      "id": "40c4010f-f717-446d-9668-cd033c814995",
+      "name": "Hilee 2100ml High Borosilicate Glass",
+      "stock_level": 0,
+      "variant_name": "2100ml"
+    },
+    {
+      "id": "d715a454-76a4-46d9-a033-c118b5b84dca",
+      "name": "Nss Power Station With Solar Panel 150watts",
+      "stock_level": -3,
+      "variant_name": null
+    },
+    {
+      "id": "7fbe3ad8-557e-4236-8122-7a1e9e342ea5",
+      "name": "Cleaning gun",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "67df7dd7-5fea-4be1-a9d2-66b59e4fcb49",
+      "name": "Korean Pot Deep Fryer and Steamer",
+      "stock_level": -2,
+      "variant_name": null
+    },
+    {
+      "id": "d3b99632-ba92-4d8d-bd39-966dd5161168",
+      "name": "CYX17-10 Sandok&Syanse  - sandok only",
+      "stock_level": 0,
+      "variant_name": "sandok only"
+    },
+    {
+      "id": "c6c97031-7206-4c59-bd3b-178ccf500898",
+      "name": "Mosquito killer repellent Mosquito Coil Set",
+      "stock_level": 6,
+      "variant_name": null
+    },
+    {
+      "id": "6184a76e-04a7-4dc4-88b6-b33d1f825aac",
+      "name": "Stainless Steel Fish Scaler Remover",
+      "stock_level": 3,
+      "variant_name": null
+    },
+    {
+      "id": "a745d73e-98da-478e-be4f-65e55eb167db",
+      "name": "AGILA 3LAYER STEAMER - 34cm",
+      "stock_level": 0,
+      "variant_name": "34cm"
+    },
+    {
+      "id": "d906969e-cf2c-4e3c-9011-488da934261e",
+      "name": "9” MELAMINE PLATE 12 PCS",
+      "stock_level": -2,
+      "variant_name": null
+    },
+    {
+      "id": "9a54c13a-b0c5-4822-bcaf-ce5d1dce29e7",
+      "name": "Kaisa Villa Silicon Spatula (big laddles) - Black",
+      "stock_level": -1,
+      "variant_name": "Black"
+    },
+    {
+      "id": "40b8ba62-a7ff-478d-8c90-5cd53193ab3e",
+      "name": "STOCK POTS (thick version) SET SHALLOW ",
+      "stock_level": -1,
+      "variant_name": "SET"
+    },
+    {
+      "id": "8af83f21-21e6-4026-b4c1-3fc34f3de27e",
+      "name": "DEEP STOCK POTS WITH TAKIP STAINLESS - 20cm",
+      "stock_level": 1,
+      "variant_name": "20cm"
+    },
+    {
+      "id": "40b7d2da-10fd-4f80-92b2-39fc94a2eae3",
+      "name": "HOT AND COLD INSULATED JUGS 8liters - SILVER",
+      "stock_level": 1,
+      "variant_name": "SILVER"
+    },
+    {
+      "id": "20a8c227-bd30-47a5-8189-f5b3e563c603",
+      "name": "STAINLESSRICEBARREL25KG",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "7bf0c4f1-aabb-4584-a8c9-14c7a92f0533",
+      "name": "40cm  4layer rack",
+      "stock_level": -2,
+      "variant_name": null
+    },
+    {
+      "id": "782975cc-92df-4044-9c6c-001670389f42",
+      "name": "CYX17-10 Sandok&Syanse  - Syanse only",
+      "stock_level": 0,
+      "variant_name": "Syanse only"
+    },
+    {
+      "id": "35328d1d-5165-4d35-93fe-75fb2afbc673",
+      "name": "Stainless Strainers with Handle Ha109 26cm",
+      "stock_level": 2,
+      "variant_name": "26cm"
+    },
+    {
+      "id": "0678d17c-0fbe-48fa-9330-ff4f94bdebea",
+      "name": "AGILA 3LAYER STEAMER - 41cm",
+      "stock_level": -1,
+      "variant_name": "41cm"
+    },
+    {
+      "id": "b114f5ed-4e61-4d51-ab10-10c263197f32",
+      "name": "Oil drainer combo Large size",
+      "stock_level": -8,
+      "variant_name": "Large size"
+    },
+    {
+      "id": "78afc1c5-9497-4598-8978-a04c94c44964",
+      "name": "UFO Solar Light",
+      "stock_level": -2,
+      "variant_name": null
+    },
+    {
+      "id": "37491a10-4ab8-4912-9d50-d616fe38d18f",
+      "name": "Flexible Rubber Coating (450ml) Waterproof Spray Sealant Flexible Rubber Coating",
+      "stock_level": 4,
+      "variant_name": null
+    },
+    {
+      "id": "94fad1eb-aa47-466c-9de2-8f543b9069f8",
+      "name": "Thick Reflective Strip Waterproof Raincoat Set",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "2b3b1ac1-3f6c-4b7d-b10c-53bed968219b",
+      "name": "Stainless thermal jar/Milktea barrels",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "c1191ce5-91b6-494c-888c-8562dc69ea06",
+      "name": "Oil drainer combo",
+      "stock_level": 0,
+      "variant_name": "Standard"
+    },
+    {
+      "id": "abad1eb1-738d-415d-8af0-062dc77f6b9f",
+      "name": "POLAND KAMILLE COOKWARE SET (K3)",
+      "stock_level": -3,
+      "variant_name": "K3"
+    },
+    {
+      "id": "207346ee-4f16-40be-84ea-6afa1595fdee",
+      "name": "BOTA FOR KIDS - SIZE 33 - 33(Boy)",
+      "stock_level": 0,
+      "variant_name": "33(Boy)"
+    },
+    {
+      "id": "1ea9f442-14f7-442c-98a8-e4c28f5a7138",
+      "name": "DEEP STOCK POTS WITH TAKIP STAINLESS - 25cm",
+      "stock_level": 0,
+      "variant_name": "25cm"
+    },
+    {
+      "id": "788feb00-3ba5-4115-aa88-b12117b26c6f",
+      "name": "Pressure cooker 3 valve",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "a57a37ec-7dc4-4c5c-b9c7-02aa791e0095",
+      "name": "Eaton Opal Plates Set Microwave SAFE",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "37bb6d27-b370-401e-a591-2bc4b765fd4c",
+      "name": "Stainless thermal jar/Milktea barrels - 10L",
+      "stock_level": 0,
+      "variant_name": "10L"
+    },
+    {
+      "id": "2ae5e12b-7db3-43a0-99cb-ddc9247d566d",
+      "name": "pitcher stainless 80oz",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "ba38431c-da96-4025-ac9f-08bb9e5ad65d",
+      "name": "Big Size Stainless Steel Wok Double Ear - 43cm without cover",
+      "stock_level": -1,
+      "variant_name": "43cm without cover"
+    },
+    {
+      "id": "51b22fbb-2f33-4f91-b30d-be19028ac5cf",
+      "name": "DEEP STOCK POTS WITH TAKIP STAINLESS - 30cm",
+      "stock_level": -1,
+      "variant_name": "30cm"
+    },
+    {
+      "id": "ea5ae826-a009-43c8-aea1-c9e4e61a2e3e",
+      "name": "RECTANGLE SHAPED RS4 6PCS SET",
+      "stock_level": -1,
+      "variant_name": "RS4"
+    },
+    {
+      "id": "a83c8e6e-01a9-41bc-a757-2081ac8751bb",
+      "name": "Stainless Pangkayod",
+      "stock_level": -5,
+      "variant_name": null
+    },
+    {
+      "id": "be734e38-b561-4434-b0f3-b7d9ed3bfa9c",
+      "name": "922 Titanium Raincoat Rubberized - Green",
+      "stock_level": 1,
+      "variant_name": "Green"
+    },
+    {
+      "id": "71b7dc05-27fa-4a8e-9f86-94925e166582",
+      "name": "CYP3 mixing bowls - 16cm-SALE WITH COVER",
+      "stock_level": -1,
+      "variant_name": "16cm-SALE WITH COVER"
+    },
+    {
+      "id": "08ff3aea-0226-454d-ab8d-e20553b87db9",
+      "name": "Mixing bowl (HA083-batya) - 30cm",
+      "stock_level": 20,
+      "variant_name": "30cm"
+    },
+    {
+      "id": "efd9d6d9-6a48-46bb-a3eb-4569e50e2a7a",
+      "name": "Mixing bowl (HA083-batya) - 28cm-with cover",
+      "stock_level": -3,
+      "variant_name": "28cm-with cover"
+    },
+    {
+      "id": "35060b9c-5f01-4ac8-aa11-1a478735ecb0",
+      "name": "Stainless Steamer/Casserole with Wide Glass Cover-36cm",
+      "stock_level": 13,
+      "variant_name": "36cm"
+    },
+    {
+      "id": "ad89404b-3dbd-42b0-a646-6a06814e2d39",
+      "name": "RECTANGLE SHAPED RS5 6PCS SET",
+      "stock_level": -1,
+      "variant_name": "RS5"
+    },
+    {
+      "id": "b7a64dd2-4f2f-4a2c-9170-ca3a996929fe",
+      "name": "Opal Bowl Sets (MICROWAVE SAFE)",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "6fe1b6d1-e280-420f-90e8-4fc8110940f6",
+      "name": "CYP3 mixing bowls - 16cm-SALE",
+      "stock_level": 4,
+      "variant_name": "16cm-SALE"
+    },
+    {
+      "id": "564bf1ff-2d44-43e0-b52e-917e0d7c8822",
+      "name": "Stainless gas stand",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "65c6c44e-b623-47d4-98f9-34599a398a90",
+      "name": "Zudaifu Eczema and Skin cream (ointment)",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "151947b7-eb47-4a63-a6c4-be676c56cd06",
+      "name": "Cyt1 Stainless Basins - 30cm ",
+      "stock_level": 5,
+      "variant_name": "30cm "
+    },
+    {
+      "id": "b338f10a-4be6-4594-9d2f-416d0d8d4af5",
+      "name": "Mixing bowl (HA083-batya) - 28cm",
+      "stock_level": 21,
+      "variant_name": "28cm"
+    },
+    {
+      "id": "9bd68638-e323-4d79-b8e0-9864e92ce163",
+      "name": "Mixing bowl (HA083-batya) - set-with cover",
+      "stock_level": -14,
+      "variant_name": "set-with cover"
+    },
+    {
+      "id": "919e32c5-ffba-46f5-b7a1-370a0be7f21d",
+      "name": "For Chef's Wok - 36 cm",
+      "stock_level": -2,
+      "variant_name": "36 cm"
+    },
+    {
+      "id": "21fee78f-b4ae-4bc0-92b2-ebc5bbffd0ec",
+      "name": "2in1 burger grill w /fryer - 12x20 ",
+      "stock_level": 1,
+      "variant_name": "12x20 "
+    },
+    {
+      "id": "2dad0bd6-1e31-4102-9759-d3d57794000c",
+      "name": "Cake Turntable",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "efb1e038-7ca6-413c-bd44-5514294fd846",
+      "name": "ALL DAY VACUUM BOTTLE 1.6L",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "9ccadf2c-26ef-4c03-9e79-9300beb7c1ae",
+      "name": "ALL DAY VACUUM BOTTLE 1.6L - White",
+      "stock_level": 0,
+      "variant_name": "White"
+    },
+    {
+      "id": "0977a76a-371b-458b-adb9-30dacd909932",
+      "name": "Ladder Foldable",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "c75004c1-6f9c-487b-8af8-c54a76099a17",
+      "name": "Big Size Stainless Steel Wok Double Ear - 50cm",
+      "stock_level": -1,
+      "variant_name": "50cm"
+    },
+    {
+      "id": "47f96826-4e82-4d54-99cd-b3fcebe2373e",
+      "name": "CYP3 mixing bowls - 24CM-SALE",
+      "stock_level": -4,
+      "variant_name": "24CM-SALE"
+    },
+    {
+      "id": "983f1740-8ac6-4075-8d35-c3a614aa9cf4",
+      "name": "DEEP STOCK POTS WITH TAKIP STAINLESS - 50cm",
+      "stock_level": 0,
+      "variant_name": "50cm"
+    },
+    {
+      "id": "e568c4da-05a5-4d19-a037-2b8b9361ce5a",
+      "name": "Mixing bowl (HA083-batya) - 32cm-with cover",
+      "stock_level": -18,
+      "variant_name": "32cm-with cover"
+    },
+    {
+      "id": "4032bd0c-4c71-4398-b092-00e808e20216",
+      "name": "ALL DAY VACUUM BOTTLE 1.6L - Black",
+      "stock_level": -2,
+      "variant_name": "Black"
+    },
+    {
+      "id": "92bb2d63-14d8-42c3-9d5a-b5d8531c2cf7",
+      "name": "Mixing bowl (HA083-batya)",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "830afc0e-0a4b-42d4-9fdf-4031a92d6303",
+      "name": "CYP3 mixing bowls - 16",
+      "stock_level": -2,
+      "variant_name": "16"
+    },
+    {
+      "id": "0f14eac9-6d5d-4b32-b10d-e074c4428652",
+      "name": "For Chef's Wok - 34 cm",
+      "stock_level": -2,
+      "variant_name": "34 cm"
+    },
+    {
+      "id": "3b9cdb04-1644-4065-9988-e60c6c4f2f8e",
+      "name": "For Chef's Wok",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "527b1769-fc08-403a-b633-e8eff2bb6bc0",
+      "name": "3in1 bag set",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "08a45a84-02af-488e-b0f0-fcf41ab38ec2",
+      "name": "Big Size Stainless Steel Wok Double Ear",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "2f39e00f-fcc1-4c04-aabc-42d54db6b652",
+      "name": "HILEE FOOD STORAGE - HILEE FOOD STORAGE 1040ML",
+      "stock_level": 0,
+      "variant_name": "HILEE FOOD STORAGE 1040ML"
+    },
+    {
+      "id": "7c120bf2-132c-44a7-beaf-c24e009daf74",
+      "name": "CYP3 mixing bowls - 18CM-SALE",
+      "stock_level": 4,
+      "variant_name": "18CM-SALE"
+    },
+    {
+      "id": "eb1725cf-ee21-44bc-8eda-83c6239904ad",
+      "name": "Simplus 5L Stand Mixer",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "7d6f5f84-dfa6-4082-b570-9744dc220440",
+      "name": "CYP3 mixing bowls - 18CM-SALE WITH COVER",
+      "stock_level": 0,
+      "variant_name": "18CM-SALE WITH COVER"
+    },
+    {
+      "id": "556793dc-be7e-49f7-a1ac-c5ad4c9c04af",
+      "name": "Manicure set",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "cdad9d30-619e-42cf-9446-90596d3f199d",
+      "name": "Manicure set - 7in1",
+      "stock_level": -1,
+      "variant_name": "7in1"
+    },
+    {
+      "id": "8811db91-9574-4586-8b6b-ec6360c29a20",
+      "name": "Cyt1 Stainless Basins - 26cm ",
+      "stock_level": 0,
+      "variant_name": "26cm "
+    },
+    {
+      "id": "68903034-6f12-4945-af9a-d8c77417b912",
+      "name": "CYP3 mixing bowls - SET-SALE WITH COVER",
+      "stock_level": 0,
+      "variant_name": "SET-SALE WITH COVER"
+    },
+    {
+      "id": "d40114b5-8c76-4d58-8590-f5414cb93b0e",
+      "name": "Big Size Stainless Steel Wok Double Ear - 43cm",
+      "stock_level": -5,
+      "variant_name": "43cm"
+    },
+    {
+      "id": "33434686-e3df-4d6b-82f6-3e6cdbb89ba0",
+      "name": " HOT AND COLD INSULATED JUGS 8liters",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "81e2741c-f59e-4c78-a52e-b21e318035ce",
+      "name": "Deerma Vacuum Cleaner",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "1b82b247-c6be-4e1f-9358-9602d6982da0",
+      "name": "CYP3 mixing bowls - 20CM-SALE",
+      "stock_level": 3,
+      "variant_name": "20CM-SALE"
+    },
+    {
+      "id": "a5fcf9c2-db2f-4227-93ad-9377e1f34f71",
+      "name": "Whole Cloves 50grams",
+      "stock_level": 3,
+      "variant_name": null
+    },
+    {
+      "id": "be839a95-62b1-4a42-a5b2-631d2f06f571",
+      "name": "vichelena 8pcs casserole set - installment cash basis",
+      "stock_level": -1,
+      "variant_name": "installment cash basis"
+    },
+    {
+      "id": "9f1b1561-5b6a-40a6-9720-bfb0e7d40322",
+      "name": "Pink Capsule Cutter - Multi-Functional Food Chopper & Blender",
+      "stock_level": 0,
+      "variant_name": "Multi-Functional Food Chopper & Blender"
+    },
+    {
+      "id": "41440c0d-d06e-4456-adfb-b2dab3eaea57",
+      "name": "stainless baunan  - Boy",
+      "stock_level": -2,
+      "variant_name": "Boy"
+    },
+    {
+      "id": "ec1463f8-ebf1-4839-88cf-1a0c25090d5c",
+      "name": "Coffee Cup Thumbler 890ml",
+      "stock_level": 1,
+      "variant_name": null
+    },
+    {
+      "id": "882cc49d-0227-4dd1-832a-a0d8aef74e10",
+      "name": "CERAMIC NONSTICK KNIFE SET  - RED HA111",
+      "stock_level": 0,
+      "variant_name": "RED HA111"
+    },
+    {
+      "id": "9bd5ef75-326a-4d59-87e8-12dc8e204e5b",
+      "name": "HILEE FOOD STORAGE",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "6d77ea4b-4a9d-4c94-845f-90ab92c1b253",
+      "name": "HILEE FOOD STORAGE - HILEE FOOD STORAGE 800ML",
+      "stock_level": 0,
+      "variant_name": "HILEE FOOD STORAGE 800ML"
+    },
+    {
+      "id": "660c446f-76a0-45b0-b5f6-dfe14a270e81",
+      "name": "Cyt1 Stainless Basins - 34cm ",
+      "stock_level": 5,
+      "variant_name": "34cm "
+    },
+    {
+      "id": "4884079c-8cac-4b4d-bbb3-98696d86dc20",
+      "name": "HILEE FOOD STORAGE - HILEE FOOD STORAGE 680ML",
+      "stock_level": 0,
+      "variant_name": "HILEE FOOD STORAGE 680ML"
+    },
+    {
+      "id": "98aeb7c9-2c49-4acb-9cac-7bc9498fef74",
+      "name": "INSULATED PITCHER (1.8L)",
+      "stock_level": 1,
+      "variant_name": null
+    },
+    {
+      "id": "69c9889e-43c9-4001-bcf4-6b3c460f755d",
+      "name": "Hilee 1500ml High Borosilicate Glass",
+      "stock_level": 0,
+      "variant_name": "1500ml"
+    },
+    {
+      "id": "e9abf916-a139-4333-97a3-137fd39b0e0e",
+      "name": "Kaisa Villa 7pcs Kitchen Knife Set",
+      "stock_level": -3,
+      "variant_name": null
+    },
+    {
+      "id": "ee6b2d23-d2f0-46b7-8856-5fa93c23906f",
+      "name": "Cover Full Glass - CYG2 28cm",
+      "stock_level": 9,
+      "variant_name": "Mixing bowl (HA083-batya) COVER ONLY -FULL GLASS 28CM"
+    },
+    {
+      "id": "c5c268de-36f7-4181-9d74-c1d4c7f3e08f",
+      "name": "BIG SIZE Meat grinder stainless 5L ",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "ee13fd26-c194-4a2e-8da0-314a45b90dc1",
+      "name": "FROSTY JUG - FROSTYJUG-12L",
+      "stock_level": 1,
+      "variant_name": "FROSTYJUG-12L"
+    },
+    {
+      "id": "9a8b5b66-e6f3-4cd8-94be-cd9b004039bb",
+      "name": "Big Size Stainless Steel Wok Double Ear - 60cm",
+      "stock_level": -2,
+      "variant_name": "60cm"
+    },
+    {
+      "id": "e4953437-996d-4eed-b793-fcb4b3377b39",
+      "name": "Sandok/Syanse (Pang Kawa)",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "15501d95-3eb1-41bd-92ad-bf54bb3aadd5",
+      "name": "Pangkawa (wooden handle) - Sandok XL",
+      "stock_level": -2,
+      "variant_name": "Sandok XL"
+    },
+    {
+      "id": "fa35ac5a-113e-4509-81da-c260cb35c2fe",
+      "name": "22liters Orocan Cantina",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "5d1132a8-3d6d-42ca-921a-e40bbe7415ab",
+      "name": "HIGH PRESSURE WATER GUN HOSE ",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "8119f37c-f612-49fa-a5eb-63b1254700ae",
+      "name": "COSOVA MATTRESS - Queen",
+      "stock_level": 0,
+      "variant_name": "Queen"
+    },
+    {
+      "id": "41ed5785-6d16-4a80-baff-78a41cd0ebef",
+      "name": "Pressure cooker 3 valve - 6L-SALE",
+      "stock_level": 0,
+      "variant_name": "6L-SALE"
+    },
+    {
+      "id": "c9369397-f99e-4dcf-b50c-ed9626ffa63d",
+      "name": "Cyx1 Stainless Frying Strainer Wood handle - 28cm ",
+      "stock_level": 0,
+      "variant_name": "28cm "
+    },
+    {
+      "id": "87090c89-35ae-4a75-b71d-4bdc70f879a5",
+      "name": "900ml tumbler Insulated Mug - Black",
+      "stock_level": -1,
+      "variant_name": "Black"
+    },
+    {
+      "id": "a1715605-533b-4c03-9c20-3f8b01296600",
+      "name": "EUROCHEF Measuring cups set w/ spoon - Blue",
+      "stock_level": 0,
+      "variant_name": "Blue"
+    },
+    {
+      "id": "d0a45892-aa80-4d9d-8281-2c511e4af1b9",
+      "name": "STOCK POTS (thick version) SHALLOW - 30CM",
+      "stock_level": -3,
+      "variant_name": "30CM"
+    },
+    {
+      "id": "69c6596c-8880-4529-aa7a-31bed1d5c94b",
+      "name": "Micromatic Rice Cooker BIG PANG CARENDERIA",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "7fb2c874-ca37-46fb-a0d0-6909db388c08",
+      "name": "DEEP STOCK POTS WITH TAKIP STAINLESS - 45cm",
+      "stock_level": 1,
+      "variant_name": "45cm"
+    },
+    {
+      "id": "6ecbc908-c8e3-45ed-858c-a4ab5f3b77a9",
+      "name": "AESTHETIC EGG BASKET",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "2c58a974-5428-4d02-8584-6228727e495f",
+      "name": "Micromatic Rice Cooker",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "94af4143-0ca2-4c49-beb2-253232153a98",
+      "name": "22liters Orocan Cantina - Blue",
+      "stock_level": 0,
+      "variant_name": "Blue"
+    },
+    {
+      "id": "7b3377f4-3fac-4e00-9502-9ccc6640c761",
+      "name": "Wireless Microphone Universal",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "63775c7f-8520-432a-9df4-ac929102b74f",
+      "name": "Stainless rice barrel - 8kg ",
+      "stock_level": -3,
+      "variant_name": "8kg "
+    },
+    {
+      "id": "b3a2c78d-f59c-4539-9ea9-8cd9d7e246c8",
+      "name": "Micromatic Rice Cooker - MRC (2.2L) 15cups",
+      "stock_level": 0,
+      "variant_name": "MRC (2.2L) 15cups"
+    },
+    {
+      "id": "5cf93800-9f26-4166-9a1b-93023b31f59a",
+      "name": "Micromatic Rice Cooker - MRC (0.6L) 3cups",
+      "stock_level": 0,
+      "variant_name": "MRC (0.6L) 3cups"
+    },
+    {
+      "id": "39624af2-a148-4fac-af15-8218e40b67dd",
+      "name": "Stainless rice barrel",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "35b8a818-7b4e-48d2-9280-9f379d9064f4",
+      "name": "Whistling Kettle (Stainless)",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "fa3a0fc8-614b-4369-bccd-94af6af682b2",
+      "name": "Stainless Steel Wok with Takip",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "ce990b1d-1b96-479b-9191-7d43fce7818b",
+      "name": "Micromatic Rice Cooker - MRC (2.8L) 18cups ",
+      "stock_level": 0,
+      "variant_name": "MRC (2.8L) 18cups "
+    },
+    {
+      "id": "a26b4f51-640b-4cea-a374-63a7c7b81ecb",
+      "name": "HIGH PRESSURE WATER GUN HOSE  - 20 meters",
+      "stock_level": 0,
+      "variant_name": "20 meters"
+    },
+    {
+      "id": "ed309eee-7a71-42da-b4f0-25c207f5f716",
+      "name": "STOCK POTS (thick version) SHALLOW - 35CM",
+      "stock_level": -2,
+      "variant_name": "35CM"
+    },
+    {
+      "id": "2fe846ca-56bb-4b22-af4c-fd667edee5f6",
+      "name": "18L Kaisa Villa Air fryer Oven - INSTALLMENT",
+      "stock_level": 0,
+      "variant_name": "INSTALLMENT"
+    },
+    {
+      "id": "cb1c41b6-0017-4e4a-8c74-1521b0084dfb",
+      "name": "STOCK POTS (thick version) SHALLOW - 45",
+      "stock_level": 0,
+      "variant_name": "45"
+    },
+    {
+      "id": "0408d5d3-c9b8-43d8-823b-22553330374f",
+      "name": "DEEP STOCK POTS WITH TAKIP STAINLESS - SET",
+      "stock_level": 0,
+      "variant_name": "SET"
+    },
+    {
+      "id": "cab9a33c-9fdf-4fe2-9e3d-4d79367aa07a",
+      "name": "COSOVA MATTRESS",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "bafb16fb-9612-45df-9fbe-1134b9ade823",
+      "name": "Micromatic Rice Cooker - MRC (1L) 5cups ",
+      "stock_level": 0,
+      "variant_name": "MRC (1L) 5cups "
+    },
+    {
+      "id": "080222e6-99e1-4d97-93ee-f88e16628cd9",
+      "name": "Heavy Duty Ice Crusher",
+      "stock_level": 3,
+      "variant_name": null
+    },
+    {
+      "id": "37b4d305-46ed-4a3b-aa82-0ec086629abc",
+      "name": "COSOVA MATTRESS - Semi Single",
+      "stock_level": 0,
+      "variant_name": "Semi Single"
+    },
+    {
+      "id": "ef2ef2f8-7bb3-4a91-aeae-24c8f7293474",
+      "name": "Stainless baso 6pcs",
+      "stock_level": 12,
+      "variant_name": null
+    },
+    {
+      "id": "af6cff58-4531-490d-b1c9-d964fa45d7b3",
+      "name": "TiXX  Air cooler - 50L",
+      "stock_level": -1,
+      "variant_name": "50L"
+    },
+    {
+      "id": "e1a86dad-5613-41f3-ab32-d7433d7a1d2d",
+      "name": "Cyt1 Stainless Basins - Set",
+      "stock_level": -1,
+      "variant_name": "Set"
+    },
+    {
+      "id": "5d935b72-7cdb-4f6b-8b11-199f55355411",
+      "name": "EUROCHEF Measuring cups set w/ spoon - Green",
+      "stock_level": -1,
+      "variant_name": "Green"
+    },
+    {
+      "id": "4f517c03-df93-4044-8c4e-401deeba680a",
+      "name": "900ml tumbler Insulated Mug - Blue",
+      "stock_level": 2,
+      "variant_name": "Blue"
+    },
+    {
+      "id": "8f9283d0-a1c0-4655-a92c-59aeab73769e",
+      "name": "Micromatic Rice Cooker - MRC (1.5L) 8cups ",
+      "stock_level": 0,
+      "variant_name": "MRC (1.5L) 8cups "
+    },
+    {
+      "id": "f19c45fd-aafd-4bf3-9041-963091506d3c",
+      "name": "HILEE OVAL CASSEROLE",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "52ed1c99-4f02-441e-bb30-252127f7ce77",
+      "name": "COSOVA MATTRESS - Single ",
+      "stock_level": 0,
+      "variant_name": "Single "
+    },
+    {
+      "id": "2c920857-f14e-4fc0-a9b7-33846a11bdc2",
+      "name": "STOCK POTS (thick version) SHALLOW - 40CM",
+      "stock_level": 0,
+      "variant_name": "40CM"
+    },
+    {
+      "id": "135adc0b-6a11-4a65-9bd7-7a030e7c8287",
+      "name": "COSOVA MATTRESS - King ",
+      "stock_level": 0,
+      "variant_name": "King "
+    },
+    {
+      "id": "d361dbb0-59d1-4847-8b7b-d3acef12563d",
+      "name": "STOCK POTS (thick version) SHALLOW",
+      "stock_level": 0,
+      "variant_name": "Base Item"
+    },
+    {
+      "id": "5bc1d16c-0e57-4133-8e13-05bae4bd48a8",
+      "name": "COSOVA MATTRESS - Queen Large",
+      "stock_level": 0,
+      "variant_name": "Queen Large"
+    },
+    {
+      "id": "75b08ec8-585e-45c4-a884-85b4bb73c40d",
+      "name": "Micromatic Rice Cooker - MRC (1.8L) 10cups",
+      "stock_level": -4,
+      "variant_name": "MRC (1.8L) 10cups"
+    },
+    {
+      "id": "18af2e8a-b6cc-4645-8412-4f5062c1e707",
+      "name": "COSOVA MATTRESS - Semi Double",
+      "stock_level": 0,
+      "variant_name": "Semi Double"
+    },
+    {
+      "id": "b1ba25ed-3b55-48c0-a046-db217be46882",
+      "name": "Hilton Pillow 2pcs",
+      "stock_level": 4,
+      "variant_name": null
+    },
+    {
+      "id": "bcde600a-46f1-48d0-ac65-3a50a7b218e0",
+      "name": "Mixing bowl (HA083-batya) - 30cm-with cover",
+      "stock_level": -7,
+      "variant_name": "30cm-with cover"
+    },
+    {
+      "id": "9f559f7d-8c38-49e7-9440-3c9995b0f4c1",
+      "name": "Mixing bowl (HA083-batya) - 32cm",
+      "stock_level": 30,
+      "variant_name": "32cm"
+    },
+    {
+      "id": "130895d3-975a-478c-a095-11b6674d072f",
+      "name": "VACUUM FILTER - 5pcs",
+      "stock_level": -1,
+      "variant_name": "5pcs"
+    },
+    {
+      "id": "36d5f5b2-34f6-484c-8d4c-a8f40af460de",
+      "name": "ROUND MOP WITH SEPARATION",
+      "stock_level": 1,
+      "variant_name": null
+    },
+    {
+      "id": "fdc171aa-982d-497b-ac2e-bf2afe7e04e8",
+      "name": "Large Shoe Bag 10pcs (dust proof)",
+      "stock_level": -2,
+      "variant_name": null
+    },
+    {
+      "id": "1cbe08e6-750f-4c8c-8990-172124ad9434",
+      "name": "Cover Full Glass - CYG2 30cm",
+      "stock_level": 9,
+      "variant_name": "Mixing bowl (HA083-batya) COVER ONLY -FULL GLASS 30CM"
+    },
+    {
+      "id": "b08cabde-8ccc-4e99-8152-6cd4504bceeb",
+      "name": "Chef's Gallery Stainless Steel Frying Pan",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "ab10a0ab-2eb7-4f69-b171-ad700e8c547b",
+      "name": "Zoeey 2in1 Fan",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "12da8577-7f76-4688-b374-beb3d4ceeeba",
+      "name": "Rice laddles ",
+      "stock_level": -3,
+      "variant_name": null
+    },
+    {
+      "id": "617ee8d5-1c97-4b0e-ab13-9cf68ad625cd",
+      "name": "BOTA FOR KIDS - SIZE 32 (Girls)",
+      "stock_level": 0,
+      "variant_name": "SIZE 32 (Girls)"
+    },
+    {
+      "id": "9e94a4bc-0289-4445-8d72-f1485f3b8ff5",
+      "name": "Cover Full Glass - CYG2",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "858ad02d-3a2a-41a8-b252-68d7c6b74c34",
+      "name": "COSOVA MATTRESS - Double",
+      "stock_level": 0,
+      "variant_name": "Double"
+    },
+    {
+      "id": "e46b0281-fe0e-4391-a9e1-6ab9b087ff99",
+      "name": "32 pcs 𝑺𝑶𝑺𝒀𝑨𝑳𝑰𝑵 𝑷𝑳𝑨𝑻𝑬 𝑺𝑬𝑻",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "3fa2369c-93cd-4415-8e5a-745f1e98ec63",
+      "name": "Chef's Gallery Stainless Steel Frying Pan - 26CM",
+      "stock_level": -2,
+      "variant_name": "26CM"
+    },
+    {
+      "id": "77dfe923-5962-49f8-8757-f073a5c50e8e",
+      "name": "Pangkawa Large",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "d4c6982e-f1bc-4921-a15f-a6c1031c3a2d",
+      "name": "Stainless thermal jar/Milktea barrels - 12L",
+      "stock_level": -2,
+      "variant_name": "12L"
+    },
+    {
+      "id": "e8ba5828-ec02-44b7-a07b-14bd383f1cb5",
+      "name": "Sandok/Syanse (Pang Kawa) - Big-Sandok",
+      "stock_level": -1,
+      "variant_name": "Big-Sandok"
+    },
+    {
+      "id": "afb91a8a-5b5e-4675-98b3-fa708956824a",
+      "name": "Migas Cookware Set - Rosegold",
+      "stock_level": -1,
+      "variant_name": "Rosegold"
+    },
+    {
+      "id": "88a6c458-237d-47d0-989c-bd637f4f7f6e",
+      "name": "Stainless Kitchen Tool Set",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "13f5901f-fab5-4e0d-b48a-cffab1c568aa",
+      "name": "TiXX  Air cooler - 45L",
+      "stock_level": -1,
+      "variant_name": "45L"
+    },
+    {
+      "id": "f254abd8-4731-4894-baa8-d4853493476d",
+      "name": "Chef's Gallery Stainless Steel Frying Pan - 28CM",
+      "stock_level": 0,
+      "variant_name": "28CM"
+    },
+    {
+      "id": "54db9107-05ae-4652-b53b-c080494a3d41",
+      "name": "Kaisa Villa Cookware SEt.",
+      "stock_level": 5,
+      "variant_name": null
+    },
+    {
+      "id": "cfd86b00-3926-4411-ae58-72712d9e230b",
+      "name": "BOTA FOR KIDS",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "ff0a4663-e135-4b66-8c81-bb396302164e",
+      "name": "Xiaomi induction cooker (with pause)",
+      "stock_level": -2,
+      "variant_name": null
+    },
+    {
+      "id": "5e79c935-d90c-49da-8596-61a96128b944",
+      "name": "MICROMATIC FLAT IRON",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "742fe42e-4a7e-4b80-b0f6-84c248b69149",
+      "name": "ALL DAY VACUUM BOTTLE 1.6L - Navy blue",
+      "stock_level": -2,
+      "variant_name": "Navy blue"
+    },
+    {
+      "id": "07c4d928-7f93-46c8-817a-ef2cce233553",
+      "name": "Kaisa 22cm Multicooker",
+      "stock_level": -11,
+      "variant_name": null
+    },
+    {
+      "id": "4dc9df52-1759-4b97-863e-939f982de037",
+      "name": "Tough mama 16\" Stand fan 5leaf blade",
+      "stock_level": -2,
+      "variant_name": null
+    },
+    {
+      "id": "b2688d04-4638-4bee-8117-20832cf4ce23",
+      "name": "Mixing bowl (HA083-batya) - SET",
+      "stock_level": 0,
+      "variant_name": "SET"
+    },
+    {
+      "id": "26421a49-8055-4a20-b3fb-4898bfc4eb6d",
+      "name": "CYG 1 Lid Cover (HALF STAINLESS MID GLASS)",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "8825a4fc-7a8c-44f8-8a54-60d16f39cc37",
+      "name": "3in1 Fridge Organizer",
+      "stock_level": -2,
+      "variant_name": null
+    },
+    {
+      "id": "29542fa3-8d64-4e20-b584-7b4208684907",
+      "name": "Color Coded Chopping Board",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "3523d0a2-a853-42d2-9cc9-fb998786226d",
+      "name": "18L Kaisa Villa Air fryer Oven CASH BASIS",
+      "stock_level": -1,
+      "variant_name": "CASH BASIS"
+    },
+    {
+      "id": "dce4e4db-36c0-40bf-a107-d086837ef229",
+      "name": "40cm BIG size FOOD WARMER",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "b876e95c-6c68-4a3c-9b5e-8ddc972b1d48",
+      "name": "BOTA FOR KIDS - SIZE 32 (Boy)",
+      "stock_level": 0,
+      "variant_name": "SIZE 32 (Boy)"
+    },
+    {
+      "id": "0025526a-b1d3-4841-bf8a-192c461b2937",
+      "name": "Migas Cookware Set",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "e182ffc8-034d-4e37-9559-9cc37146ce3b",
+      "name": "Stainless rice barrel - 55kg",
+      "stock_level": -1,
+      "variant_name": "55kg"
+    },
+    {
+      "id": "8bb05d80-1f98-48a5-8c38-b92e4e15a1bb",
+      "name": "T&T Solar Lamp (30000 watts)",
+      "stock_level": 2,
+      "variant_name": null
+    },
+    {
+      "id": "71585f8f-3a4c-48aa-8d5d-7244287ff7ea",
+      "name": "Stainless Strainers with Handle (Ha109) - 26cm ",
+      "stock_level": -1,
+      "variant_name": "26cm "
+    },
+    {
+      "id": "619c4a75-f384-4060-bdce-c2ab5d0d33b0",
+      "name": "Waterproof Tape",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "e75afab2-5411-4d88-9003-98084d28d5fe",
+      "name": "Buttercase",
+      "stock_level": -3,
+      "variant_name": null
+    },
+    {
+      "id": "02b72535-c315-446c-bce3-ec620e8c162d",
+      "name": "S-ITEM - S6",
+      "stock_level": -1,
+      "variant_name": "S6"
+    },
+    {
+      "id": "d6b9df1e-7579-4658-bfef-fbca080bc8e3",
+      "name": "S-ITEM - S1",
+      "stock_level": -1,
+      "variant_name": "S1"
+    },
+    {
+      "id": "ee983c93-a05a-4461-8fb8-3df0be771114",
+      "name": "CYdS small pan",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "1d8b8c2d-7b13-4194-857d-bb5a6013263f",
+      "name": "CYTB WOODEN CHOPPING BOARD",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "55009543-6031-413b-b49a-af04c15d18e6",
+      "name": "Vichelena 12pcs Cookware Set",
+      "stock_level": 1,
+      "variant_name": null
+    },
+    {
+      "id": "d56f2966-8f93-43e3-b617-61a3ad9e8ea1",
+      "name": "S-ITEM - S2 29cm",
+      "stock_level": -1,
+      "variant_name": "S2 29cm"
+    },
+    {
+      "id": "210d207c-bd7a-49c0-aee6-6728c985e19c",
+      "name": "5in1 Brush w/ Straw Cleaner ",
+      "stock_level": -5,
+      "variant_name": null
+    },
+    {
+      "id": "512f8e1d-47e5-47ce-8f8e-d6a870f7a17a",
+      "name": "Pink Capsule Cutter",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "d680a140-0e46-4917-949d-bbb94ed55975",
+      "name": "900ml tumbler Insulated Mug",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "79a5f711-d049-42ee-acbe-6b61c6fbd17e",
+      "name": "CERAMIC NONSTICK KNIFE SET  - BLACK HA110",
+      "stock_level": 1,
+      "variant_name": "BLACK HA110"
+    },
+    {
+      "id": "6d553f53-395d-4cd8-ad4f-b415ee80b1d6",
+      "name": "Intelligent Inverter with flash light  With 100800MAH battery With charger ",
+      "stock_level": -4,
+      "variant_name": null
+    },
+    {
+      "id": "a85c00ef-28e8-4be5-88a4-5d3ee10d5c3f",
+      "name": "Waterproof Tape - 10m",
+      "stock_level": -3,
+      "variant_name": "10m"
+    },
+    {
+      "id": "a9f15bf0-2e3c-4f3a-9919-16bdaa623fdb",
+      "name": "TiXX  Air cooler ",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "2725d874-a3f1-4a0f-b527-df0d1f1a5ef4",
+      "name": "Stainless Steamer/Casserole with Wide Glass Cover-32cm",
+      "stock_level": 1,
+      "variant_name": "32cm"
+    },
+    {
+      "id": "ef12838d-536c-4db6-8215-925e6e228f60",
+      "name": "S-ITEM - S3 33cm",
+      "stock_level": 0,
+      "variant_name": "S3 33cm"
+    },
+    {
+      "id": "6a206704-6fbc-4cbe-8ef6-52c2ca06eeea",
+      "name": "S-ITEM - S8",
+      "stock_level": -1,
+      "variant_name": "S8"
+    },
+    {
+      "id": "82534a08-a210-46c6-a0e7-5e65ab2b2f26",
+      "name": "S-ITEM - S4 36cm",
+      "stock_level": 0,
+      "variant_name": "S4 36cm"
+    },
+    {
+      "id": "9a45fd66-b10b-4b94-825a-1a817b4219fc",
+      "name": "CYTB WOODEN CHOPPING BOARD - 34cm",
+      "stock_level": 0,
+      "variant_name": "34cm"
+    },
+    {
+      "id": "1c25ef8c-aa86-41bf-99bd-ff0ab589033b",
+      "name": "Coffee Cup 890ml",
+      "stock_level": -3,
+      "variant_name": null
+    },
+    {
+      "id": "f7e90ccb-0122-405f-bc2a-f429565a2dae",
+      "name": "S-ITEM - S9",
+      "stock_level": 0,
+      "variant_name": "S9"
+    },
+    {
+      "id": "0156ae05-1128-49c8-8ddb-a5c8ae524936",
+      "name": "Stainless Steel Wok with Takip - 36cm",
+      "stock_level": 4,
+      "variant_name": "36cm"
+    },
+    {
+      "id": "4c38aaa5-80d9-42e7-bbde-61c8236d1670",
+      "name": "Vichelena 2L Stand Mixer",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "ede77ee9-d0dc-457a-94df-12ab51a9fefe",
+      "name": "Nikkon tough mama 16\" Wall Fan  5leaf",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "3170b5ab-ccba-449a-883e-fff62d5b651b",
+      "name": "Cyx1 Stainless Frying Strainer Wood handle",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "d5e4cbd3-277c-4159-b844-f8227cfa7538",
+      "name": "OVAL SHAPED PLACEMAT",
+      "stock_level": 28,
+      "variant_name": null
+    },
+    {
+      "id": "f04dadbe-66b4-4716-a805-48493a500ecc",
+      "name": "CYTB WOODEN CHOPPING BOARD - 45cm",
+      "stock_level": 0,
+      "variant_name": "45cm"
+    },
+    {
+      "id": "273767f3-a066-477a-8458-6e562782aec5",
+      "name": "S-ITEM - S7",
+      "stock_level": 459,
+      "variant_name": "S7"
+    },
+    {
+      "id": "cc74f35b-ee7e-41f4-b78d-7a2d8c9509df",
+      "name": "Cyx1 Stainless Frying Strainer Wood handle - 20cm ",
+      "stock_level": 0,
+      "variant_name": "20cm "
+    },
+    {
+      "id": "ba3de302-813a-42ef-a598-b548654d0796",
+      "name": "TiXX  Air cooler - 100L",
+      "stock_level": -1,
+      "variant_name": "100L"
+    },
+    {
+      "id": "72180740-8a33-458f-85ae-1cf8f8de7124",
+      "name": "HILEE FOOD STORAGE - HILEE FOOD STORAGE SET",
+      "stock_level": 3,
+      "variant_name": "HILEE FOOD STORAGE SET"
+    },
+    {
+      "id": "49e107dc-1ebb-467e-ab51-6dc12a4e6379",
+      "name": "Unicorn Fleece Blanket",
+      "stock_level": -6,
+      "variant_name": null
+    },
+    {
+      "id": "ddbe4d7b-8423-499b-aaf3-b098850d097c",
+      "name": "Cyx1 Stainless Frying Strainer Wood handle - 30cm ",
+      "stock_level": 0,
+      "variant_name": "30cm "
+    },
+    {
+      "id": "9350986b-c362-4f8b-9081-772b89462894",
+      "name": "CYP3 mixing bowls - 24CM-SALE WITH COVER",
+      "stock_level": 0,
+      "variant_name": "24CM-SALE WITH COVER"
+    },
+    {
+      "id": "6eed23e8-f552-474c-b370-cfd73a06142c",
+      "name": "OVAL SHAPED PLACEMAT - A70018-1",
+      "stock_level": -2,
+      "variant_name": "A70018-1"
+    },
+    {
+      "id": "05a19119-5246-4c44-947b-53f455d7ae69",
+      "name": "Cyx1 Stainless Frying Strainer Wood handle - 22cm ",
+      "stock_level": 0,
+      "variant_name": "22cm "
+    },
+    {
+      "id": "b87ecb3e-870e-4b8e-8e04-adb66fd98a61",
+      "name": "YEELITE 50WATTS (4500LUMES) VOLTA LED LIGHTS",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "b68f981d-d7c2-4e61-90cd-81d99bbc6810",
+      "name": "Cyx1 Stainless Frying Strainer Wood handle - 24cm ",
+      "stock_level": 0,
+      "variant_name": "24cm "
+    },
+    {
+      "id": "83a51e66-5605-41a4-9576-17479eaba28c",
+      "name": "BTS 1908 BRODU speaker With wireless microphones",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "fd06b272-3242-4dfc-92f0-ddf1175ebb22",
+      "name": "TiXX  Air cooler",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "d5487e3e-7795-4143-b577-743598535300",
+      "name": "Micromatic Rice Cooker BIG PANG CARENDERIA - MRC30 - 5.6L- 30 CUPS",
+      "stock_level": 0,
+      "variant_name": "MRC30 - 5.6L- 30 CUPS"
+    },
+    {
+      "id": "9f209e21-a3ac-479a-8216-50e19c6756a2",
+      "name": "Micromatic Rice Cooker BIG PANG CARENDERIA - MRC22 - 3.9L- 22 CUPS",
+      "stock_level": 0,
+      "variant_name": "MRC22 - 3.9L- 22 CUPS"
+    },
+    {
+      "id": "68c81813-0499-4c94-a7a1-31f0e671bbf8",
+      "name": "Micromatic Rice Cooker BIG PANG CARENDERIA - MRC25 - 4.5L- 25 CUPS",
+      "stock_level": -1,
+      "variant_name": "MRC25 - 4.5L- 25 CUPS"
+    },
+    {
+      "id": "8db29530-9a68-4b6f-a48c-5111f5920931",
+      "name": "Silicon Kitchenware set 8piece set ",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "bbcec777-c8c4-4afa-9bd2-d6f81a33348f",
+      "name": "CYX17-10 Sandok&Syanse  - SET sale price",
+      "stock_level": -7,
+      "variant_name": "SET sale price"
+    },
+    {
+      "id": "bac0c830-1492-41bb-b55f-429b08d4a9a3",
+      "name": "CYTB WOODEN CHOPPING BOARD - 30cm",
+      "stock_level": -1,
+      "variant_name": "30cm"
+    },
+    {
+      "id": "e7929643-7ff2-406f-a0b9-6148b98d2c5b",
+      "name": "Stainless Strainers with Handle Ha109 - 30cm ",
+      "stock_level": 2,
+      "variant_name": "30cm "
+    },
+    {
+      "id": "0327e28b-8958-4e81-947b-39b9fa50bb60",
+      "name": "OVAL SHAPED PLACEMAT - OD3",
+      "stock_level": 0,
+      "variant_name": "OD3"
+    },
+    {
+      "id": "006444b5-b9d1-437b-a483-c883242fe7b2",
+      "name": "Stainless rice barrel - 43kg SLIM",
+      "stock_level": -3,
+      "variant_name": "43kg SLIM"
+    },
+    {
+      "id": "1bd9d2ed-a933-4562-bb2e-d0c82049a74d",
+      "name": "CYG 1 Lid Cover (HALF STAINLESS MID GLASS) - CYG 1 Lid Cover (HALF STAINLESS MID GLASS)34CM",
+      "stock_level": 0,
+      "variant_name": "CYG 1 Lid Cover (HALF STAINLESS MID GLASS)34CM"
+    },
+    {
+      "id": "07458a23-7ceb-42ff-8934-eafab1c0e632",
+      "name": "CYG 1 Lid Cover (HALF STAINLESS MID GLASS) - CYG 1 Lid Cover (HALF STAINLESS MID GLASS)38CM",
+      "stock_level": 0,
+      "variant_name": "CYG 1 Lid Cover (HALF STAINLESS MID GLASS)38CM"
+    },
+    {
+      "id": "bf39213b-db3c-4536-9eb9-626deb882eab",
+      "name": "CYG 1 Lid Cover (HALF STAINLESS MID GLASS) - CYG 1 Lid Cover (HALF STAINLESS MID GLASS)40CM",
+      "stock_level": 0,
+      "variant_name": "CYG 1 Lid Cover (HALF STAINLESS MID GLASS)40CM"
+    },
+    {
+      "id": "0fbb88ed-cf4d-4e63-8bd9-2e8c05852609",
+      "name": "CYG 1 Lid Cover (HALF STAINLESS MID GLASS) - CYG 1 Lid Cover (HALF STAINLESS MID GLASS)S44CM",
+      "stock_level": 0,
+      "variant_name": "CYG 1 Lid Cover (HALF STAINLESS MID GLASS)S44CM"
+    },
+    {
+      "id": "48b9f8a9-19c2-4bc2-9615-9cf965126cab",
+      "name": "CYG 1 Lid Cover (HALF STAINLESS MID GLASS) - CYG 1 Lid Cover (HALF STAINLESS MID GLASS)36CM",
+      "stock_level": 0,
+      "variant_name": "CYG 1 Lid Cover (HALF STAINLESS MID GLASS)36CM"
+    },
+    {
+      "id": "d9a8cfe8-9e76-45c7-b0da-061509a2c521",
+      "name": "Stainless Tongs (NEW)",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "09966ba6-6fc7-4fe7-a516-4158757f06bf",
+      "name": "CYG 1 Lid Cover (HALF STAINLESS MID GLASS) - CYG 1 Lid Cover (HALF STAINLESS MID GLASS)42CM",
+      "stock_level": 0,
+      "variant_name": "CYG 1 Lid Cover (HALF STAINLESS MID GLASS)42CM"
+    },
+    {
+      "id": "429dcb7f-9c0c-48d6-93b2-5544cf795f75",
+      "name": "CYG 1 Lid Cover (HALF STAINLESS MID GLASS) - CYG 1 Lid Cover (HALF STAINLESS MID GLASS)46CM",
+      "stock_level": 0,
+      "variant_name": "CYG 1 Lid Cover (HALF STAINLESS MID GLASS)46CM"
+    },
+    {
+      "id": "874d8a1b-92b7-41aa-aa67-43bdd402fffb",
+      "name": "CYG 2 Glass Cover (FULL GLASS)",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "397fbb65-6d49-486c-8e66-07550fdfe507",
+      "name": "CYG 2 Glass Cover (FULL GLASS) - CYG 2 Glass Cover (FULL GLASS) 14CM",
+      "stock_level": 0,
+      "variant_name": "CYG 2 Glass Cover (FULL GLASS) 14CM"
+    },
+    {
+      "id": "c728d474-439b-45e0-aff7-56c1502750a5",
+      "name": "CYG 2 Glass Cover (FULL GLASS) - CYG 2 Glass Cover (FULL GLASS) 16CM",
+      "stock_level": 0,
+      "variant_name": "CYG 2 Glass Cover (FULL GLASS) 16CM"
+    },
+    {
+      "id": "d3386ca1-9b79-454c-9003-e42e74e75303",
+      "name": "Stainless Steel Wok with Takip  - 34cm",
+      "stock_level": -2,
+      "variant_name": "34cm"
+    },
+    {
+      "id": "98cf96ff-d3ff-4629-bb74-e02df2e6232d",
+      "name": "Stainless Tongs (NEW) - Medium",
+      "stock_level": 0,
+      "variant_name": "Medium"
+    },
+    {
+      "id": "8043d0c4-66df-4284-9712-7e9cd1f16adf",
+      "name": "CYdS small pan - CYdS small pan 21cm",
+      "stock_level": 0,
+      "variant_name": "CYdS small pan 21cm"
+    },
+    {
+      "id": "3f8c1e6a-81b9-4b8e-ba9d-94c9b5e46bf4",
+      "name": "CYG 2 Glass Cover (FULL GLASS) - CYG 2 Glass Cover (FULL GLASS) 18CM",
+      "stock_level": 0,
+      "variant_name": "CYG 2 Glass Cover (FULL GLASS) 18CM"
+    },
+    {
+      "id": "3b237522-7a81-4257-8c88-affafa0f3d2d",
+      "name": "CYG 2 Glass Cover (FULL GLASS) - CYG 2 Glass Cover (FULL GLASS) 20CM",
+      "stock_level": 0,
+      "variant_name": "CYG 2 Glass Cover (FULL GLASS) 20CM"
+    },
+    {
+      "id": "6cd4d4c6-2859-4e0a-a28c-6d5cff83e529",
+      "name": "CYG 2 Glass Cover (FULL GLASS) - CYG 2 Glass Cover (FULL GLASS) 32CM",
+      "stock_level": 0,
+      "variant_name": "CYG 2 Glass Cover (FULL GLASS) 32CM"
+    },
+    {
+      "id": "baa98dd3-7f38-454c-85a4-9a1978f62364",
+      "name": "OVAL SHAPED PLACEMAT - OD4",
+      "stock_level": 0,
+      "variant_name": "OD4"
+    },
+    {
+      "id": "07f142aa-9f89-4ac3-be48-164d24e15459",
+      "name": "RECTANGLE SHAPED RS1 6PCS SET",
+      "stock_level": -5,
+      "variant_name": "RS1"
+    },
+    {
+      "id": "ec55b701-a962-4d13-b24a-9a6f9b7ce7b5",
+      "name": "CYG 2 Glass Cover (FULL GLASS) - CYG 2 Glass Cover (FULL GLASS) 22CM",
+      "stock_level": 0,
+      "variant_name": "CYG 2 Glass Cover (FULL GLASS) 22CM"
+    },
+    {
+      "id": "805555a5-b438-4dbc-9867-1bc0cdb77d96",
+      "name": "CYG 2 Glass Cover (FULL GLASS) - CYG 2 Glass Cover (FULL GLASS) 34CM",
+      "stock_level": 0,
+      "variant_name": "CYG 2 Glass Cover (FULL GLASS) 34CM"
+    },
+    {
+      "id": "50fdff26-4d73-4f6c-942c-0b5b9e79e338",
+      "name": "BOTA FOR KIDS - SIZE 32",
+      "stock_level": 0,
+      "variant_name": "SIZE 32"
+    },
+    {
+      "id": "e30e9421-66ed-4376-8a6f-78c170dabcdb",
+      "name": "Stainless Tongs (NEW) - Large",
+      "stock_level": 1,
+      "variant_name": "Large"
+    },
+    {
+      "id": "7dd5337b-c0de-443f-9839-c5c2a78934d1",
+      "name": "CYG 2 Glass Cover (FULL GLASS) - CYG 2 Glass Cover (FULL GLASS) 24CM",
+      "stock_level": 0,
+      "variant_name": "CYG 2 Glass Cover (FULL GLASS) 24CM"
+    },
+    {
+      "id": "754eb527-2dff-4b4b-b4b4-5bfe991ffb13",
+      "name": "922 Titanium Raincoat Rubberized - Blue",
+      "stock_level": 3,
+      "variant_name": "Blue"
+    },
+    {
+      "id": "11c0c239-d605-4c26-8b3f-afc6b71947ab",
+      "name": "BOTA FOR KIDS - SIZE 31",
+      "stock_level": 0,
+      "variant_name": "SIZE 31"
+    },
+    {
+      "id": "f99edaaa-051e-47cf-8466-d03213ff5715",
+      "name": "Stainless Steel Wok with Takip - 32cm",
+      "stock_level": -9,
+      "variant_name": "32cm"
+    },
+    {
+      "id": "0b1c081c-9ef2-4ad0-bc30-7ec75d31c79d",
+      "name": "Oil Drainer with tray",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "a2246a44-5755-4f87-a45d-71757490b5b0",
+      "name": "OVAL SHAPED PLACEMAT - OD5",
+      "stock_level": 0,
+      "variant_name": "OD5"
+    },
+    {
+      "id": "2bf250d6-d842-43b5-a0e6-34f65330aa08",
+      "name": "VIPO Solar Street Light 4000watts",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "4f50ca2b-835b-4ba3-85a9-ec4d33b9cf96",
+      "name": "Stainless rice barrel - 15kg",
+      "stock_level": -1,
+      "variant_name": "15kg"
+    },
+    {
+      "id": "571b3487-45ce-46f7-91bd-ac27947a68cb",
+      "name": "BOTA FOR KIDS - SIZE 34",
+      "stock_level": 0,
+      "variant_name": "SIZE 34"
+    },
+    {
+      "id": "5104e1fa-580a-432b-b66b-df0995778043",
+      "name": "922 Titanium Raincoat Rubberized",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "4d5f924a-5546-44a5-b753-54136890c026",
+      "name": "15M Garden Hose Kit Expandable Water Hose Pipe Watering Spray Gun Set",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "53d89012-5e66-4744-a0f2-4b0a59827f25",
+      "name": "KAISA VILLA BLENDER - Red",
+      "stock_level": -1,
+      "variant_name": "Red"
+    },
+    {
+      "id": "59c7c8b9-ba6c-47d9-92ba-b0481f02b592",
+      "name": "Transparent rain cover cloth",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "5702c2a5-1dbf-4032-af0b-dd28b0cd9fa2",
+      "name": "Transparent rain cover cloth - 2*3M",
+      "stock_level": 0,
+      "variant_name": "2*3M"
+    },
+    {
+      "id": "63c7145a-14a0-4450-a917-9f86e4689715",
+      "name": "BOTA FOR KIDS - SIZE 35",
+      "stock_level": 0,
+      "variant_name": "SIZE 35"
+    },
+    {
+      "id": "70d9bfa5-eda9-480d-a255-3c7c3afe9cd7",
+      "name": "Transparent rain cover cloth - 5*5M",
+      "stock_level": 1250,
+      "variant_name": "5*5M"
+    },
+    {
+      "id": "4400a217-ba4e-403b-8802-87863b7dd140",
+      "name": "Kaisa Villa Granite Cookware Set",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "9c0908ab-8174-42a8-bb56-4c26a9ad80dd",
+      "name": "SOUP LADDLE(makapal) ",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "cda54db1-fda9-48ee-8499-44355bedee94",
+      "name": "CYdS small pan - CYdS small pan 25cm",
+      "stock_level": 0,
+      "variant_name": "CYdS small pan 25cm"
+    },
+    {
+      "id": "c4672ca6-d127-46cb-afa6-df01a16253c3",
+      "name": "Micromatic table top water dispenser MWD-205",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "80ddf266-996f-4cf7-a8b8-3614e962dde0",
+      "name": "LEGO BLOCK STYLE LUNCH BOX (square)",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "b6e17e34-2eb4-4de7-9f01-ab825c6508f1",
+      "name": "RECTANGLE SHAPED RS3 6PCS SET",
+      "stock_level": -1,
+      "variant_name": "RS3"
+    },
+    {
+      "id": "1b8ba8fb-5c8d-43e4-9708-0a1435f7066e",
+      "name": "Kaisa Villa Granite Cookware Set - WHITE",
+      "stock_level": 0,
+      "variant_name": "WHITE"
+    },
+    {
+      "id": "5e54328b-c436-4623-a093-aaa902ef5153",
+      "name": "Transparent rain cover cloth - 4*6M",
+      "stock_level": -1,
+      "variant_name": "4*6M"
+    },
+    {
+      "id": "188f245b-5496-4ccf-a411-46d507a4d9f8",
+      "name": "Micromatic Induction cooker",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "c8673245-42d3-4910-9df2-1974122da47f",
+      "name": "ASTRON TWIN TUB WASHING MACHINE",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "4638f31a-c2ef-4d85-bae6-23319b1fc84d",
+      "name": "Brodu BTS-1935",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "696f30f5-a683-43ff-be69-8f83361bbd9f",
+      "name": "Kaisa Villa Granite Cookware Set - BLACK",
+      "stock_level": -1,
+      "variant_name": "BLACK"
+    },
+    {
+      "id": "f8380d6c-4c0b-4170-96a3-9e2d6ecc0a6c",
+      "name": "Wooden Handle Wok Stainless Steel",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "f66f203e-772e-4663-8b0a-c7e5d236eb62",
+      "name": "Stainless Sandok Haba",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "218ccd88-a366-4f55-9ed9-cded20104742",
+      "name": "CYdS small pan - CYdS small pan 25cm* (longer handle)",
+      "stock_level": 0,
+      "variant_name": "CYdS small pan 25cm* (longer handle)"
+    },
+    {
+      "id": "d5d56b13-5234-468b-af6d-fb0657564068",
+      "name": "8Liters Jug Hot and Cold - Silver",
+      "stock_level": 951,
+      "variant_name": "Silver"
+    },
+    {
+      "id": "8a89f73e-a345-455e-aa14-289bceb122e6",
+      "name": "Sunshade Net",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "37818e7f-129f-40ca-882f-522f9c7758fb",
+      "name": "Stainless Steel Wok with Takip - 36cm",
+      "stock_level": -1,
+      "variant_name": "36cm"
+    },
+    {
+      "id": "ff0d4699-bc96-454c-a461-7fe03cf28da9",
+      "name": "Wooden Handle Wok Stainless Steel - 32CM",
+      "stock_level": -1,
+      "variant_name": "32CM"
+    },
+    {
+      "id": "db228fb4-2a66-4ffc-83d8-3ce274ec7311",
+      "name": "ASTRON INFRARED CERAMIC INDUCTION STOVE",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "ac1d3aee-275a-4216-a977-d4ccdf5dcca2",
+      "name": "Stainless Sandok Haba - 2pcs",
+      "stock_level": -1,
+      "variant_name": "2pcs"
+    },
+    {
+      "id": "640ce833-3daf-47f7-a7bb-5393f8053e10",
+      "name": "Prickly Heat Cooling Powder",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "2daee76d-7ba4-463d-b1dc-78f3e5d60b40",
+      "name": "8Liters Jug Hot and Cold - Black",
+      "stock_level": 0,
+      "variant_name": "Black"
+    },
+    {
+      "id": "16f6057d-61a3-4b4e-9f9d-3f48697d3ec0",
+      "name": "8Liters Jug Hot and Cold - White",
+      "stock_level": -1,
+      "variant_name": "White"
+    },
+    {
+      "id": "2f25dc49-f758-450e-92a6-43ce8794d648",
+      "name": "2in1 burger grill w /fryer - 12x10",
+      "stock_level": 0,
+      "variant_name": "12x10"
+    },
+    {
+      "id": "8e8fa396-7ae7-4403-a98d-2a87a154c95f",
+      "name": "2in1 burger grill w /fryer - 12x12 ",
+      "stock_level": 0,
+      "variant_name": "12x12 "
+    },
+    {
+      "id": "3e02989c-0a37-4617-b92c-099cbb87f9e4",
+      "name": "2in1 burger grill w /fryer - 12x14",
+      "stock_level": 0,
+      "variant_name": "12x14"
+    },
+    {
+      "id": "bdc340d3-ed8f-4573-b9d2-07d2a3d7d874",
+      "name": "2in1 burger grill w /fryer - 12x16 ",
+      "stock_level": 0,
+      "variant_name": "12x16 "
+    },
+    {
+      "id": "59b4b3c1-a360-42e5-9ca3-30ae72029138",
+      "name": "Stainless Sandok Haba - 1pc",
+      "stock_level": 0,
+      "variant_name": "1pc"
+    },
+    {
+      "id": "85b7d9b7-32bb-48b8-813b-29432090ead6",
+      "name": "2in1 burger grill w /fryer - 12x18 ",
+      "stock_level": 0,
+      "variant_name": "12x18 "
+    },
+    {
+      "id": "e1dff3dd-c665-4495-b26d-925c499d284e",
+      "name": "2in1 burger grill w /fryer",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "45aaedb9-7c95-473c-b983-fa1d37cb30f1",
+      "name": "2in1 burger grill w /fryer - 12x10 ",
+      "stock_level": 0,
+      "variant_name": "12x10 "
+    },
+    {
+      "id": "17b158d1-5e99-4b19-92b5-8e56cb8a197a",
+      "name": "2in1 burger grill w /fryer - 12x12",
+      "stock_level": 0,
+      "variant_name": "12x12"
+    },
+    {
+      "id": "9a4ccc97-1d4a-4305-abe0-7d30825061d8",
+      "name": "2in1 burger grill w /fryer - 12x14",
+      "stock_level": 0,
+      "variant_name": "12x14"
+    },
+    {
+      "id": "86ba1ae6-44a9-4175-bf12-1cba9a3b3c86",
+      "name": "2in1 burger grill w /fryer -  12x16",
+      "stock_level": 0,
+      "variant_name": " 12x16"
+    },
+    {
+      "id": "ee565202-7767-478e-9d44-011ebc85a7b8",
+      "name": "2in1 burger grill w /fryer - 12x18",
+      "stock_level": 0,
+      "variant_name": "12x18"
+    },
+    {
+      "id": "5f2ddba9-e44c-4cc2-a8ee-5ec7469f8615",
+      "name": "Pressure cooker 3 valve - 12L-SALE",
+      "stock_level": -1,
+      "variant_name": "12L-SALE"
+    },
+    {
+      "id": "c0eb0835-672c-41fe-a82b-c9e279e86dfc",
+      "name": "OVAL SHAPED PLACEMAT - OD1",
+      "stock_level": -2,
+      "variant_name": "OD1"
+    },
+    {
+      "id": "b67008fb-bce8-481d-99d7-c0c36c5011f5",
+      "name": "Kaisa Villa Silicon Spatula (big laddles)",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "f1088982-7ba4-49fe-9d65-589c49e7a7e0",
+      "name": "Picnic mat",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "50cd4049-f54c-4305-b9ff-087a8ada234f",
+      "name": "2in1 burger grill w /fryer - 12x20 ",
+      "stock_level": -1,
+      "variant_name": "12x20 "
+    },
+    {
+      "id": "71599489-e07f-4a01-acc5-8cad8b0f6452",
+      "name": "Mini Embudo",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "ccf661b5-2dc6-4593-b57c-35b459d207e4",
+      "name": "Mini Embudo",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "21849ba1-3aa8-4d44-8a23-28d588103c42",
+      "name": "Flat honey comb pan",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "82b738a1-049d-44e4-8091-1eb79a6db1da",
+      "name": "Flat honey comb pan - FLAT HONEY COMB PAN 32CM",
+      "stock_level": 0,
+      "variant_name": "FLAT HONEY COMB PAN 32CM"
+    },
+    {
+      "id": "9ea4ed0e-c164-4cfa-9516-634660611a79",
+      "name": "S-ITEM - S5",
+      "stock_level": -1,
+      "variant_name": "S5"
+    },
+    {
+      "id": "31bacdab-543f-4321-91a6-afde96c58f9e",
+      "name": "OVAL SHAPED PLACEMAT - OD2",
+      "stock_level": -1,
+      "variant_name": "OD2"
+    },
+    {
+      "id": "3cbcf4e8-5311-4176-8d29-5302ecf7bf7c",
+      "name": "Foldable Silicon Mini Funnel",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "d06000d2-ae72-4852-bb39-1b970f2ad2ee",
+      "name": "Picnic mat - Green",
+      "stock_level": 0,
+      "variant_name": "Green"
+    },
+    {
+      "id": "f6f401e1-6a27-4256-a54a-7106cc0e17b8",
+      "name": "Manual Grinder",
+      "stock_level": -4,
+      "variant_name": null
+    },
+    {
+      "id": "eb4ba35a-38ef-4376-8b45-7b7c320660b0",
+      "name": "Cover Full Glass - CYG2 32cm",
+      "stock_level": 8,
+      "variant_name": "Mixing bowl (HA083-batya) COVER ONLY -FULL GLASS 32CM"
+    },
+    {
+      "id": "c9c7a418-dc1a-4682-9547-e391a18f4b7b",
+      "name": "Stainless LPG And Pot Holder with WHEELS",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "ad5c7435-b898-4a67-8084-1cabc9d3475f",
+      "name": "Flat honey comb pan - FLAT HONEY COMB PAN 28CM",
+      "stock_level": 0,
+      "variant_name": "FLAT HONEY COMB PAN 28CM"
+    },
+    {
+      "id": "8ac8f2d9-f9b3-443f-827b-f956f40a4940",
+      "name": "Ref Magnetic Clip 4pcs",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "420a34d5-9ee1-461e-a80a-73710e5b60e7",
+      "name": "Pera organizer/ Money keeper with Lock",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "c0323ebd-ef6b-4cec-be46-1b20ad23c50f",
+      "name": "Korean Knitted Bag",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "ea865695-4eee-450d-b28b-ba38a5391bd6",
+      "name": "Oil Drainer with tray - Medium",
+      "stock_level": -13,
+      "variant_name": "Medium"
+    },
+    {
+      "id": "273878c0-a157-4cad-964a-6898b1031937",
+      "name": "Oil Drainer with tray - Large",
+      "stock_level": 2,
+      "variant_name": "Large"
+    },
+    {
+      "id": "bd4534f5-389b-49ec-bdb9-ccbd29cdafdf",
+      "name": "CYP3 mixing bowls - 22CM-SALE",
+      "stock_level": -2,
+      "variant_name": "22CM-SALE"
+    },
+    {
+      "id": "9da04e1d-384b-40d5-b0a4-cab53edce041",
+      "name": "VACUUM FILTER",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "05b38d96-210d-4a91-898b-fbe1d17221c5",
+      "name": "Garden Scissors Cutter",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "f7ccb2a8-0a00-4172-87e0-1b74326422e9",
+      "name": "Stainless Steel Wok with Takip - 36cm",
+      "stock_level": -2,
+      "variant_name": "36cm"
+    },
+    {
+      "id": "311c7fd3-2382-4302-b684-b507ef7a50f1",
+      "name": "3 layer lunch box with lunch bag",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "1d41f08c-7eb9-4591-bd0a-8b2db1424113",
+      "name": "CYdS small pan - CYdS small pan 23cm ",
+      "stock_level": 10,
+      "variant_name": "CYdS small pan 23cm "
+    },
+    {
+      "id": "11f7cea7-06f8-40f2-b37e-201692b18fc2",
+      "name": "Picnic mat - Blue",
+      "stock_level": -1,
+      "variant_name": "Blue"
+    },
+    {
+      "id": "a8d00d43-3a62-40e7-b3fc-07065459dffd",
+      "name": "Sunshade Net - Sunshade Net 3mx5m",
+      "stock_level": 0,
+      "variant_name": "Sunshade Net 3mx5m"
+    },
+    {
+      "id": "b024b618-4815-4dc2-b2e3-5181be977034",
+      "name": "CYG 2 Glass Cover (FULL GLASS) - CYG 2 Glass Cover (FULL GLASS) 26CM",
+      "stock_level": 8,
+      "variant_name": "CYG 2 Glass Cover (FULL GLASS) 26CM"
+    },
+    {
+      "id": "f9c826ab-aad8-4b18-a64d-6a6f9507a3e1",
+      "name": "Picnic mat - Red",
+      "stock_level": 0,
+      "variant_name": "Red"
+    },
+    {
+      "id": "a3abb071-75dc-4433-baab-636422d1c896",
+      "name": "KUKU 100800MAH Inverter+Battery",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "0cbb3251-f5b1-4ee0-9c51-ac73881362c9",
+      "name": "Kaisa Villa Silicon Spatula (big laddles) - Pink",
+      "stock_level": 0,
+      "variant_name": "Pink"
+    },
+    {
+      "id": "83ac2fd7-1261-42de-8721-541ccb684597",
+      "name": "CYG 2 Glass Cover (FULL GLASS) - CYG 2 Glass Cover (FULL GLASS) 28CM",
+      "stock_level": 8,
+      "variant_name": "CYG 2 Glass Cover (FULL GLASS) 28CM"
+    },
+    {
+      "id": "f3d0788e-ab66-4ace-b2e9-a08d9a576400",
+      "name": "Sunshade Net - Sunshade Net 5mx6m",
+      "stock_level": 1,
+      "variant_name": "Sunshade Net 5mx6m"
+    },
+    {
+      "id": "f5dfb243-ce15-4640-94e4-f878af40c773",
+      "name": "SOUP LADDLE(makapal)  - 3PCS",
+      "stock_level": -1,
+      "variant_name": "3PCS"
+    },
+    {
+      "id": "b50b86d7-2c9e-4044-9572-646820632fa0",
+      "name": "Pangkawa XL (full stainless) - Syanse",
+      "stock_level": 1,
+      "variant_name": "Syanse"
+    },
+    {
+      "id": "af6de63c-1c76-4bfb-8326-cf44cc8bc90c",
+      "name": "Stainless Steamer/Casserole with Wide Glass Cover 34CM",
+      "stock_level": 6,
+      "variant_name": "34cm"
+    },
+    {
+      "id": "516021b4-7a64-44e2-a237-6e22c7a654be",
+      "name": "FLAT HONEY COMB PAN - FLAT HONEY COMB PAN 30CM with Takip",
+      "stock_level": -11,
+      "variant_name": "FLAT HONEY COMB PAN 30CM with Takip"
+    },
+    {
+      "id": "6d420e61-9482-4889-8c76-d958ffcbf77b",
+      "name": "3in1 Ceramic Set",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "0922def1-dff2-441a-b781-fced8ccf063c",
+      "name": "Serving spoon 6pcs",
+      "stock_level": 2,
+      "variant_name": null
+    },
+    {
+      "id": "f5e29490-c029-42bd-91fd-f53eea8a7a0d",
+      "name": "CHEESE GRATER",
+      "stock_level": 1,
+      "variant_name": null
+    },
+    {
+      "id": "91ba174d-36a6-471b-a6ab-04caed8764cc",
+      "name": "3in1 Ceramic Set - WHITE",
+      "stock_level": 0,
+      "variant_name": "WHITE"
+    },
+    {
+      "id": "63229d58-ef1b-4136-99a3-413ca28226ec",
+      "name": "Migas Cookware Set - Choco brown",
+      "stock_level": 0,
+      "variant_name": "Choco brown"
+    },
+    {
+      "id": "dd6816f5-41b8-4cc9-bdb8-dfac792c3c21",
+      "name": "3in1 Ceramic Set - BLACK",
+      "stock_level": 1,
+      "variant_name": "BLACK"
+    },
+    {
+      "id": "0460e1c0-316a-4049-bf74-1e579613ff69",
+      "name": "8Liters Jug Hot and Cold",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "6d9ff2f1-e6bf-4e4b-8aa1-eae9fe523158",
+      "name": "Pangkawa XL (full stainless)",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "275fca58-a56b-436f-8f4e-c6a686d0e5b0",
+      "name": "Solar Street Light",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "d2b5003a-09df-4757-956c-bb1b25dc6fd9",
+      "name": "Waterproof High-Tube Rainproof Shoe Covers",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "5981445e-52d8-4f74-893c-4bf8c1405b1f",
+      "name": "Pangkawa XL (full stainless) - Sandok",
+      "stock_level": 2,
+      "variant_name": "Sandok"
+    },
+    {
+      "id": "d265003f-65ab-455c-b670-75ce6cbe1976",
+      "name": "Premium Small Stainless Steel Fine Mesh Strainer & Sieve",
+      "stock_level": 2,
+      "variant_name": null
+    },
+    {
+      "id": "83426a3c-6a22-4f6b-a267-e98b2ec3ed57",
+      "name": "Stainless rice barrel - 25kg",
+      "stock_level": -7,
+      "variant_name": "25kg"
+    },
+    {
+      "id": "2f4b20fc-8c73-4b4e-bb9a-3066d1109cd1",
+      "name": "900ml tumbler Insulated Mug - White",
+      "stock_level": 0,
+      "variant_name": "White"
+    },
+    {
+      "id": "ddf53115-5559-4c11-9d45-f3f008f40c67",
+      "name": "Prickly Heat Cooling Powder - SALE",
+      "stock_level": -2,
+      "variant_name": "SALE"
+    },
+    {
+      "id": "7871f678-203d-46e2-ade1-b2436c2d6c0a",
+      "name": "Big Size Stainless Steel Wok Double Ear - 38cm",
+      "stock_level": 1,
+      "variant_name": "38cm"
+    },
+    {
+      "id": "467febf8-0db9-492a-91bb-2e8d3c0f42f8",
+      "name": "Toilet Cleaner (10pcs)",
+      "stock_level": 5,
+      "variant_name": null
+    },
+    {
+      "id": "9a28de97-63e7-4583-a3b3-e3d1b433999d",
+      "name": "CYP3 mixing bowls - 26CM-SALE",
+      "stock_level": 2,
+      "variant_name": "26CM-SALE"
+    },
+    {
+      "id": "612adc2e-c973-4c6b-b501-fa824e496639",
+      "name": "Pangkawa (wooden handle)",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "5a34589c-ef09-4c71-9ea9-350157a338c0",
+      "name": "Mens boots",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "86df1775-ad24-4ca6-8d06-b840321d8c59",
+      "name": "Soup Laddle (makapal) 3pcs",
+      "stock_level": 2,
+      "variant_name": null
+    },
+    {
+      "id": "4190492c-fe44-430c-b752-1628522d327d",
+      "name": "6layer Acrylic Shoe organizer (black)",
+      "stock_level": -7,
+      "variant_name": null
+    },
+    {
+      "id": "fc898257-aa80-40bf-8c83-5913de98ef64",
+      "name": "Pangkawa (wooden handle) - Syanse XL",
+      "stock_level": 0,
+      "variant_name": "Syanse XL"
+    },
+    {
+      "id": "24e2139b-725b-479c-b431-0aa6b29750ec",
+      "name": "2in1 Blender and Crusher GLASS",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "7d3e382f-f170-47f1-8f90-17d0a4751aaf",
+      "name": "Stainless Strainers with Handle (Ha109) - 30cm ",
+      "stock_level": 2,
+      "variant_name": "30cm "
+    },
+    {
+      "id": "65c340bd-21a1-448a-81a1-98098a4a65a4",
+      "name": "10 pcs stainless steel wood handle BBQ Sticks/Skewers",
+      "stock_level": -3,
+      "variant_name": null
+    },
+    {
+      "id": "9b7ea0cb-e312-4f38-a745-6d819f7a4d39",
+      "name": "LI Baunan",
+      "stock_level": -2,
+      "variant_name": null
+    },
+    {
+      "id": "694b0c35-df7e-455b-9e5a-2f65245a8099",
+      "name": "EUROCHEF Measuring cups set w/ spoon",
+      "stock_level": 1,
+      "variant_name": null
+    },
+    {
+      "id": "c7011ef9-6563-43ec-b85f-2da672a019c1",
+      "name": "Stainless Frying pan",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "39803d5c-ae6e-4b03-8266-43e0935830cc",
+      "name": "Stainless Strainers with Handle (Ha109) - 28cm ",
+      "stock_level": 0,
+      "variant_name": "28cm "
+    },
+    {
+      "id": "55473901-145a-480c-b5b1-004f9b89551b",
+      "name": "Stainless Frying pan - 24cm",
+      "stock_level": 0,
+      "variant_name": "24cm"
+    },
+    {
+      "id": "4d8621a0-0709-4571-bda4-c0238a2a2182",
+      "name": "Fan + Lithium Battery",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "54329515-044c-48af-9d26-4b6627908bd6",
+      "name": "Kaisa Villa Silicon Spatula (big laddles) - Green",
+      "stock_level": 0,
+      "variant_name": "Green"
+    },
+    {
+      "id": "0fb0eb44-d16b-493b-985b-11429d3cd930",
+      "name": "Stainless Frying pan - 28cm",
+      "stock_level": 0,
+      "variant_name": "28cm"
+    },
+    {
+      "id": "60a4a50c-a779-4159-985e-04a7a97cec8e",
+      "name": "S-ITEM",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "34eced6c-ef4e-4abc-b67b-72952ce72d2b",
+      "name": "Sandok/Syanse (Pang Kawa) - XL",
+      "stock_level": 0,
+      "variant_name": "XL"
+    },
+    {
+      "id": "ab22a090-63bb-45bc-a2c1-9e9bde936e70",
+      "name": "CYX17-10",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "61c7978d-6ae3-45c2-a7d9-dc2a7292e8c6",
+      "name": "Stainless Strainers with Handle Ha109 22cm",
+      "stock_level": -2,
+      "variant_name": "22cm"
+    },
+    {
+      "id": "2ff965ef-7694-494e-94c0-b62b37c70f20",
+      "name": "Ladder Foldable - 5layer",
+      "stock_level": 0,
+      "variant_name": "5layer"
+    },
+    {
+      "id": "2ca24731-a5c6-41fe-8fb1-0124e8851ae7",
+      "name": "Ref Stand",
+      "stock_level": -2,
+      "variant_name": null
+    },
+    {
+      "id": "cece4d25-2ba8-4b0e-95ee-780355aad83b",
+      "name": "FLAT HONEY COMB PAN",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "2321412d-248d-460e-a8dc-d465d6162f88",
+      "name": "CYX17-10 - Syanse only",
+      "stock_level": 0,
+      "variant_name": "Syanse only"
+    },
+    {
+      "id": "3c972463-6b06-4499-acf7-9ee79acc5066",
+      "name": "Grout and Gap Cleaner",
+      "stock_level": 2,
+      "variant_name": null
+    },
+    {
+      "id": "796a98ca-7793-4e91-a452-aabdc03b2ba1",
+      "name": "600ml Vacuum",
+      "stock_level": -2,
+      "variant_name": null
+    },
+    {
+      "id": "3f516e0a-101c-4d5b-8dd0-224704b7fce1",
+      "name": "Stainless Frying pan - 26cm",
+      "stock_level": -1,
+      "variant_name": "26cm"
+    },
+    {
+      "id": "32a9688d-3266-4fd4-b0ee-9ed1f217cba3",
+      "name": "Rectangle Shaped Placemat",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "ae3b63ff-4afe-4cbb-a427-fa7c2ba817fc",
+      "name": "Stainless Steel Wok with Takip - 36cm",
+      "stock_level": -3,
+      "variant_name": "36cm"
+    },
+    {
+      "id": "6f3b8057-ac55-4ded-ba8b-9991b9a2efbf",
+      "name": "For Chef's Wok - 32 cm",
+      "stock_level": -1,
+      "variant_name": "32 cm"
+    },
+    {
+      "id": "5222a932-72d4-4888-bff2-7cdee34cf63f",
+      "name": "CYX17-10 - Sandok only",
+      "stock_level": 0,
+      "variant_name": "Sandok only"
+    },
+    {
+      "id": "0a9530fe-101b-4f75-b79f-7ca066b518c9",
+      "name": "NonStick Knife Set",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "493e194e-8c77-4afb-a77c-a1b620e8e20e",
+      "name": "Stanley Tumbler 40 oz - Printed",
+      "stock_level": -1,
+      "variant_name": "Printed"
+    },
+    {
+      "id": "a68b2747-90c5-490d-a1f7-71442e58a49d",
+      "name": "Kaisa Villa Multi-cooker Rice Cooker 5L",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "0623c5c6-8bf1-40be-88d6-1ad40b2bf24a",
+      "name": "VIP SERIES KAISA COOKWARE SET - GOLD SALE",
+      "stock_level": 0,
+      "variant_name": "GOLD SALE"
+    },
+    {
+      "id": "33ae2aa2-4f2c-495c-bdc2-f34abc7bf221",
+      "name": "8in1 Can Opener - sale",
+      "stock_level": 32,
+      "variant_name": null
+    },
+    {
+      "id": "300c3429-c288-4f71-80ce-bd7a8ac57681",
+      "name": "100pcs FOOD COVER",
+      "stock_level": -5,
+      "variant_name": null
+    },
+    {
+      "id": "c4b5bf04-35f2-489e-b805-bc5c1ec7a1c2",
+      "name": "Pressure cooker 3 valve - 8L",
+      "stock_level": -1,
+      "variant_name": "8L"
+    },
+    {
+      "id": "be1a6fd7-4ec5-414b-88d0-c546f9589948",
+      "name": "STOCK POTS (thick version) SHALLOW",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "3e55bc62-df82-443d-86ed-bc8a837b6701",
+      "name": "Mini Bamboo spatula",
+      "stock_level": -7,
+      "variant_name": null
+    },
+    {
+      "id": "74f13bf8-a5a8-4a79-bb33-aa4b7395babb",
+      "name": "22liters Orocan Cantina - Red",
+      "stock_level": 0,
+      "variant_name": "Red"
+    },
+    {
+      "id": "1b70a3e2-ee58-4ca1-b0ff-e11dbb5edc38",
+      "name": "Stainless Steel Wok with Takip - 34cm",
+      "stock_level": -8,
+      "variant_name": "34cm"
+    },
+    {
+      "id": "cc47822a-8cc1-40b3-9a20-59585bb20574",
+      "name": "Oil Drainer Tray - Medium",
+      "stock_level": 17,
+      "variant_name": "Medium"
+    },
+    {
+      "id": "f8cc3748-5f88-4184-ab07-828eed98db4c",
+      "name": "CYX17-10 - Set (sandok and syanse)",
+      "stock_level": -2,
+      "variant_name": "Set (sandok and syanse)"
+    },
+    {
+      "id": "683f49ce-5f9f-4770-8d92-c5e2a5a892cf",
+      "name": "STOCK POTS (thick version) SHALLOW - 30cm",
+      "stock_level": 0,
+      "variant_name": "30cm"
+    },
+    {
+      "id": "93a9adf8-7ca3-45c8-8a18-2e0f3127c229",
+      "name": "STOCK POTS (thick version) SHALLOW - 45cm",
+      "stock_level": 0,
+      "variant_name": "45cm"
+    },
+    {
+      "id": "4c032fc3-18af-4460-9ed5-1da64fc5ae38",
+      "name": "FLAT HONEY COMB PAN - FLAT HONEY COMB PAN - 30CM",
+      "stock_level": 0,
+      "variant_name": "FLAT HONEY COMB PAN - 30CM"
+    },
+    {
+      "id": "a6e03362-88f4-4c22-a192-38d9741d2377",
+      "name": "VIP SERIES KAISA COOKWARE SET - SILVER SALE",
+      "stock_level": 0,
+      "variant_name": "SILVER SALE"
+    },
+    {
+      "id": "7e169d41-07a6-4074-8d31-f1ac20c2978d",
+      "name": "Migas Cookware Set - Green",
+      "stock_level": -1,
+      "variant_name": "Green"
+    },
+    {
+      "id": "3612c45e-23f7-48eb-88af-078e5bd1e0e6",
+      "name": "Stainless Strainers with Handle (Ha109) - 24cm ",
+      "stock_level": 1,
+      "variant_name": "24cm "
+    },
+    {
+      "id": "45d09b0e-0cec-44c0-ba1d-6311e55520aa",
+      "name": "STOCK POTS (thick version) SHALLOW - 35cm",
+      "stock_level": 0,
+      "variant_name": "35cm"
+    },
+    {
+      "id": "4e867aed-5e01-4eca-a6e3-13e53678da29",
+      "name": "12pcs spoon and 12pcs fork (555 makapal)",
+      "stock_level": -5,
+      "variant_name": null
+    },
+    {
+      "id": "ee0d3e18-9898-42fb-80fd-5d1bb6801733",
+      "name": "Flat honey comb pan - FLAT HONEY COMB PAN 30CM",
+      "stock_level": 7,
+      "variant_name": "FLAT HONEY COMB PAN 30CM"
+    },
+    {
+      "id": "8bdf94b3-3420-4e20-bdd7-f5a0d8709db5",
+      "name": "PERSONALIZED TUMBLER 500ML",
+      "stock_level": 1,
+      "variant_name": null
+    },
+    {
+      "id": "7ca903ae-8a5c-4ecb-822a-c523f1f79a86",
+      "name": "HILEE OVAL CASSEROLE - 1.8ml",
+      "stock_level": -3,
+      "variant_name": "1.8ml"
+    },
+    {
+      "id": "1b2e0b78-a8e6-4866-811f-22ab587e4535",
+      "name": "EA Stainless Laddles Wooden handle",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "8143df56-5089-4f87-bcfe-de106d73d0c9",
+      "name": "STOCK POTS (thick version) SHALLOW - 40cm",
+      "stock_level": -1,
+      "variant_name": "40cm"
+    },
+    {
+      "id": "5bac08a4-2e0e-46d1-80fb-2d80bf979373",
+      "name": "Whistling Kettle (Stainless) - 5L",
+      "stock_level": -2,
+      "variant_name": "5L"
+    },
+    {
+      "id": "5bcdff1a-aab0-4d5b-ad65-58e08cacff4e",
+      "name": "VIP SERIES KAISA COOKWARE SET",
+      "stock_level": 2,
+      "variant_name": null
+    },
+    {
+      "id": "6d5b23ba-7fa8-4cd1-967d-30ef79ffb9b7",
+      "name": "NEW Tecno Spark 40C - 4+128gb",
+      "stock_level": 0,
+      "variant_name": "4+128gb"
+    },
+    {
+      "id": "d2a1b685-751b-453f-83a1-bad96e94d27e",
+      "name": "Pangkawa - Syanse large",
+      "stock_level": 3,
+      "variant_name": "Syanse"
+    },
+    {
+      "id": "c83e6907-f44d-4f3d-9d9e-b4b87fccca85",
+      "name": "Oil Drainer Base - Large",
+      "stock_level": 9,
+      "variant_name": "Large"
+    },
+    {
+      "id": "77fb56df-88a3-43f8-9fad-de6887b1b77c",
+      "name": "Isla Victoria Perfume - 85ml (for men)",
+      "stock_level": -2,
+      "variant_name": "85ml (for men)"
+    },
+    {
+      "id": "530ad99a-8461-49e7-8fa4-0e5fa2fa6404",
+      "name": "Isla Victoria Perfume",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "2a9777ab-48b2-4452-93dc-6571e594e769",
+      "name": "Magic Silicon Broom",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "9178d8f7-2507-4a68-9baa-e87b1f0708a8",
+      "name": "NEW Tecno Spark 40C",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "63e67b11-0d54-4b5d-8df1-0ad822225cf2",
+      "name": "Cream Batter Funnel",
+      "stock_level": -2,
+      "variant_name": null
+    },
+    {
+      "id": "048693f6-d2a5-4634-b81d-3f88b563efe4",
+      "name": "12PCS SPOON AND FORK (SILVER)",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "dcea27d9-282e-4655-a349-cbf48d2d0579",
+      "name": "Kaisa Villa 2L Food Processor",
+      "stock_level": 1,
+      "variant_name": "2L"
+    },
+    {
+      "id": "921f6967-9887-43db-8c74-4233c8bc5047",
+      "name": "Pangkawa - Sandok large",
+      "stock_level": 4,
+      "variant_name": "Sandok"
+    },
+    {
+      "id": "04924374-728a-4b48-b9c3-6f148654858a",
+      "name": "6\" Rechargeble solar fan ",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "6debb5fa-4b9e-41eb-a15b-2c82ff4a5b10",
+      "name": "1000ml Aguaflask printed with Magnet",
+      "stock_level": -3,
+      "variant_name": null
+    },
+    {
+      "id": "b25433d5-938e-403b-8c38-85f095f1c0f1",
+      "name": "600ml Vacuum",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "b105f0f4-64f5-42dd-8c36-37ae8398b977",
+      "name": "Egg Tray 2 layers",
+      "stock_level": -2,
+      "variant_name": null
+    },
+    {
+      "id": "23a22943-a614-460a-a406-7a44b974431f",
+      "name": "Hanabishi double burner",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "8a81954a-7030-436e-90e7-f6a3a671f716",
+      "name": "EA Stainless Laddles Wooden handle ",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "f7823ec8-142f-4980-81bd-0dd49106b32b",
+      "name": "Isla Victoria Perfume - 85ml (for women)",
+      "stock_level": -4,
+      "variant_name": "85ml (for women)"
+    },
+    {
+      "id": "782f0bce-ce7c-47be-ae14-f55f4887824b",
+      "name": "CYX25-26 (IKSI) SET",
+      "stock_level": -4,
+      "variant_name": null
+    },
+    {
+      "id": "f37d564a-bb14-43dd-babb-86f2b0705d6c",
+      "name": "EA Stainless Laddles Wooden handle  - SANDOK LARGE ",
+      "stock_level": 1,
+      "variant_name": "SANDOK LARGE "
+    },
+    {
+      "id": "9bcf095a-2c1c-4913-85da-1c5f9f452b7c",
+      "name": "Stainless Steel Wok with Takip - 36cm",
+      "stock_level": -2,
+      "variant_name": "36cm"
+    },
+    {
+      "id": "5035cf80-f865-4bd4-8fe4-7686983f25c6",
+      "name": "Vichelena 6pcs Casserole Set",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "8aed95c5-91b3-409a-82c2-e9909f420969",
+      "name": "Stainless rice barrel - 5kg",
+      "stock_level": -1,
+      "variant_name": "5kg"
+    },
+    {
+      "id": "bcebca28-563a-4a0b-be32-b645009857fa",
+      "name": "CYX20-21 (HABA) SET",
+      "stock_level": -9,
+      "variant_name": null
+    },
+    {
+      "id": "806c7362-cdc8-45f5-adce-0b3d89e1851f",
+      "name": "Stanley Tumbler 40 oz",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "fca855d3-73be-44cb-90cc-cb1cd98aa28f",
+      "name": "OVAL SHAPED PLACEMAT - DD02",
+      "stock_level": -2,
+      "variant_name": "DD02"
+    },
+    {
+      "id": "66bdca40-e461-4d0a-b1c0-17705c720f14",
+      "name": "Vichelena 8pcs (VL8) Casserole Cookware Set",
+      "stock_level": 3,
+      "variant_name": "VL8"
+    },
+    {
+      "id": "5a88e8bd-6e57-4fb4-9439-9a0a1aedfca5",
+      "name": "Waterproof High-Tube Rainproof Shoe Covers - LARGE",
+      "stock_level": 6,
+      "variant_name": "LARGE"
+    },
+    {
+      "id": "f510dce6-86c9-4c6f-afee-c9a7838bdc02",
+      "name": "Pressure cooker 3 valve - 10L-SALE",
+      "stock_level": 1,
+      "variant_name": "10L-SALE"
+    },
+    {
+      "id": "8da080a5-d2bf-46a3-8cb3-563ab349cc15",
+      "name": "EA Stainless Laddles Wooden handle  - SYANSE LARGE",
+      "stock_level": 1,
+      "variant_name": "SYANSE LARGE"
+    },
+    {
+      "id": "9cf27573-350c-45bf-8701-0927990343b5",
+      "name": "BEST WAY STEEL PRO swimming pool",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "073c69f3-a472-41a2-a050-6ad03606f4df",
+      "name": "BEST WAY STEEL PRO swimming pool - 4meters",
+      "stock_level": 0,
+      "variant_name": "4meters"
+    },
+    {
+      "id": "e62efa20-3c92-4c5f-aaf4-e8954f1b4102",
+      "name": "Oil Drainer Tray - Large",
+      "stock_level": 9,
+      "variant_name": "Large"
+    },
+    {
+      "id": "7b10fe64-5894-492d-97a9-8322fecfa099",
+      "name": "LEGO BLOCK STYLE LUNCH BOX (square)",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "c1582619-69f2-402d-a74f-00ea2d859082",
+      "name": "ASTRON ELECTRIC KETTLE 2L (GLASS BODY)",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "999f716f-09f1-4e6d-9e2f-2922eb0fc2cb",
+      "name": "KAISA VILLA NonStick Pans",
+      "stock_level": 0,
+      "variant_name": null
+    },
+    {
+      "id": "8ece10fb-ee70-47ab-841b-099a4a5bd496",
+      "name": "BEST WAY STEEL PRO swimming pool - 2.21meters",
+      "stock_level": 0,
+      "variant_name": "2.21meters"
+    },
+    {
+      "id": "765576ae-aa04-47a3-9124-35a7e109483f",
+      "name": "BEST WAY STEEL PRO swimming pool - 2.59meters",
+      "stock_level": 0,
+      "variant_name": "2.59meters"
+    },
+    {
+      "id": "bedeb550-a862-4d9d-adb3-0a3d964a40f4",
+      "name": "Oil Drainer Base - Medium",
+      "stock_level": 18,
+      "variant_name": "Medium"
+    },
+    {
+      "id": "f7697680-c776-407c-8ccd-0345b137d525",
+      "name": "HILEE OVAL CASSEROLE - 2.8 ml",
+      "stock_level": -4,
+      "variant_name": "2.8 ml"
+    },
+    {
+      "id": "2c17802c-dcd6-438f-906f-762452876028",
+      "name": "CYD2 Knife Set",
+      "stock_level": -1,
+      "variant_name": null
+    },
+    {
+      "id": "2bebf34b-3bdf-4daf-b935-6d2766f8dc13",
+      "name": "Pressure cooker 3 valve - 8L-SALE",
+      "stock_level": -5,
+      "variant_name": "8L-SALE"
+    }
+  ],
+  "mappedItems": [
+    {
+      "id": "item_okbhwagrf",
+      "excelName": "REF STORAGE BIG *mamtess friend order",
+      "matchedDbId": "9bd5ef75-326a-4d59-87e8-12dc8e204e5b",
+      "rating": 0.30434782608695654,
+      "neededQty": 2
+    },
+    {
+      "id": "item_ypy085c67",
+      "excelName": "BOSCA 6IN1 RECHARGEABLE FAN WITH PANEL (33CM)",
+      "matchedDbId": "6e633cb1-bb01-4a50-8cbc-871ca23a5325",
+      "rating": 0.2647058823529412,
+      "neededQty": 1
+    },
+    {
+      "id": "item_jclz0opa3",
+      "excelName": "STAINLESS RICE BARREL 5KG",
+      "matchedDbId": "20a8c227-bd30-47a5-8189-f5b3e563c603",
+      "rating": 0.9302325581395349,
+      "neededQty": 1
+    },
+    {
+      "id": "item_6gmg3hluc",
+      "excelName": "CLEAN CLUB ORGANIZER (GREEN) *new order, nakuha napo yung nilive",
+      "matchedDbId": "8c5735d7-6e28-4703-acca-4e2d6af01ac9",
+      "rating": 0.16901408450704225,
+      "neededQty": 1
+    },
+    {
+      "id": "item_9tdfif83w",
+      "excelName": "PANG KARINDERYA SET",
+      "matchedDbId": "af60355a-7648-425d-9363-ec61fc9b31e2",
+      "rating": 0.9696969696969697,
+      "neededQty": 1
+    },
+    {
+      "id": "item_1x3qw2fsm",
+      "excelName": "STAINLESS WOK ONLY 32CM",
+      "matchedDbId": "20a8c227-bd30-47a5-8189-f5b3e563c603",
+      "rating": 0.3902439024390244,
+      "neededQty": 4
+    },
+    {
+      "id": "item_ipq862kuk",
+      "excelName": "LID COVER ONLY 32CM",
+      "matchedDbId": "300c3429-c288-4f71-80ce-bd7a8ac57681",
+      "rating": 0.3448275862068966,
+      "neededQty": 4
+    },
+    {
+      "id": "item_56yzfpvj9",
+      "excelName": "CYX20-21 SET (HABA)",
+      "matchedDbId": "bcebca28-563a-4a0b-be32-b645009857fa",
+      "rating": 0.875,
+      "neededQty": 7
+    },
+    {
+      "id": "item_bqqe3z45m",
+      "excelName": "RECLINING CHAIR",
+      "matchedDbId": "7b128571-0b1a-48d5-9ca9-47cfce9694a4",
+      "rating": 0.23529411764705882,
+      "neededQty": 1
+    },
+    {
+      "id": "item_9yiba4gj5",
+      "excelName": "STAINLESS WOK ONLY 34CM",
+      "matchedDbId": "20a8c227-bd30-47a5-8189-f5b3e563c603",
+      "rating": 0.3902439024390244,
+      "neededQty": 2
+    },
+    {
+      "id": "item_j1lvopugq",
+      "excelName": "LID COVER ONLY 34CM",
+      "matchedDbId": "300c3429-c288-4f71-80ce-bd7a8ac57681",
+      "rating": 0.3448275862068966,
+      "neededQty": 2
+    },
+    {
+      "id": "item_ag7gtlti1",
+      "excelName": "CYX20-21 SET (IKSI)",
+      "matchedDbId": "782f0bce-ce7c-47be-ae14-f55f4887824b",
+      "rating": 0.6875,
+      "neededQty": 1
+    },
+    {
+      "id": "item_dsxfpmde5",
+      "excelName": "STEAM IRON WITH IRONING BOARD *layaway/paid",
+      "matchedDbId": "db228fb4-2a66-4ffc-83d8-3ce274ec7311",
+      "rating": 0.2535211267605634,
+      "neededQty": 3
+    },
+    {
+      "id": "item_a5em76p5g",
+      "excelName": "STAINLESS WOK ONLY 36CM",
+      "matchedDbId": "20a8c227-bd30-47a5-8189-f5b3e563c603",
+      "rating": 0.3902439024390244,
+      "neededQty": 1
+    },
+    {
+      "id": "item_01kcbjo7v",
+      "excelName": "LID COVER ONLY 36CM",
+      "matchedDbId": "300c3429-c288-4f71-80ce-bd7a8ac57681",
+      "rating": 0.3448275862068966,
+      "neededQty": 5
+    },
+    {
+      "id": "item_srxsd4f3m",
+      "excelName": "STAINLESS RICE BARREL 25KG",
+      "matchedDbId": "20a8c227-bd30-47a5-8189-f5b3e563c603",
+      "rating": 1,
+      "neededQty": 6
+    },
+    {
+      "id": "item_1la7otaxv",
+      "excelName": "CYX26 SYANSE ONLY- (IKSI)",
+      "matchedDbId": "782f0bce-ce7c-47be-ae14-f55f4887824b",
+      "rating": 0.5405405405405406,
+      "neededQty": 5
+    },
+    {
+      "id": "item_11lwbnbz2",
+      "excelName": "STAINLESS THERMAL JAR/MILKTEA BARRELS (12L) *SILVER *layaway/paid",
+      "matchedDbId": "20a8c227-bd30-47a5-8189-f5b3e563c603",
+      "rating": 0.325,
+      "neededQty": 3
+    },
+    {
+      "id": "item_aye052siw",
+      "excelName": "12PCS SPOON AND FORK (SILVER) *new order \"160\"",
+      "matchedDbId": "048693f6-d2a5-4634-b81d-3f88b563efe4",
+      "rating": 0.7741935483870968,
+      "neededQty": 4
+    },
+    {
+      "id": "item_1a8gfopfl",
+      "excelName": "TIXX 100L AIR COOLER *new order/ iba pa po yung kay elcacar hindi na munadaw po ioorder yun",
+      "matchedDbId": "4d5f924a-5546-44a5-b753-54136890c026",
+      "rating": 0.18461538461538463,
+      "neededQty": 1
+    },
+    {
+      "id": "item_vetkh3x4y",
+      "excelName": "3IN1 FRIDGE",
+      "matchedDbId": "af60355a-7648-425d-9363-ec61fc9b31e2",
+      "rating": 0.15384615384615385,
+      "neededQty": 1
+    },
+    {
+      "id": "item_d3i4bh11o",
+      "excelName": "TIXX 50L AIR COOLER *new order",
+      "matchedDbId": "45cd7a68-f8a7-42bd-9920-ec371ecdc141",
+      "rating": 0.26666666666666666,
+      "neededQty": 1
+    },
+    {
+      "id": "item_k8ko6ryo6",
+      "excelName": "STAINLESS WOK ONLY 43CM",
+      "matchedDbId": "20a8c227-bd30-47a5-8189-f5b3e563c603",
+      "rating": 0.3902439024390244,
+      "neededQty": 2
+    },
+    {
+      "id": "item_ezixl1cjj",
+      "excelName": "LID COVER ONLY 42CM",
+      "matchedDbId": "300c3429-c288-4f71-80ce-bd7a8ac57681",
+      "rating": 0.3448275862068966,
+      "neededQty": 2
+    },
+    {
+      "id": "item_o813xgi2g",
+      "excelName": "350ML KIDS VACUUM FLASK 2PCS",
+      "matchedDbId": "9da04e1d-384b-40d5-b0a4-cab53edce041",
+      "rating": 0.35294117647058826,
+      "neededQty": 2
+    },
+    {
+      "id": "item_yols5qh4p",
+      "excelName": "TIXX 45L AIR COOLER *new order",
+      "matchedDbId": "847253f8-da17-42ae-83fd-c3c2de84447f",
+      "rating": 0.3111111111111111,
+      "neededQty": 1
+    },
+    {
+      "id": "item_xuadc7q09",
+      "excelName": "3IN1 BAG SET",
+      "matchedDbId": "bcebca28-563a-4a0b-be32-b645009857fa",
+      "rating": 0.24,
+      "neededQty": 1
+    },
+    {
+      "id": "item_3o6p8pvpz",
+      "excelName": "MIGAS COOKWARE SET (CHOCO'BROWN)",
+      "matchedDbId": "cc80ab3b-2282-4307-8da0-ea2db1640f53",
+      "rating": 0.43636363636363634,
+      "neededQty": 1
+    },
+    {
+      "id": "item_hgwwf2vr8",
+      "excelName": "STAINLESS WOK ONLY 50CM",
+      "matchedDbId": "20a8c227-bd30-47a5-8189-f5b3e563c603",
+      "rating": 0.3902439024390244,
+      "neededQty": 6
+    },
+    {
+      "id": "item_dxlttdx04",
+      "excelName": "LID COVER ONLY 50CM",
+      "matchedDbId": "300c3429-c288-4f71-80ce-bd7a8ac57681",
+      "rating": 0.3448275862068966,
+      "neededQty": 5
+    },
+    {
+      "id": "item_56w0fenkp",
+      "excelName": "BOTA FOR KIDS SIZE 33 COLOR FOR GIRL",
+      "matchedDbId": "8637df5d-e5ce-46d9-9fa0-a7bb337ba134",
+      "rating": 0.6666666666666666,
+      "neededQty": 1
+    },
+    {
+      "id": "item_045ex7e7o",
+      "excelName": "32PCS SOSYALIN PLATE SET",
+      "matchedDbId": "d906969e-cf2c-4e3c-9011-488da934261e",
+      "rating": 0.41025641025641024,
+      "neededQty": 1
+    },
+    {
+      "id": "item_82dd9m0v8",
+      "excelName": "STAINLESS WOK ONLY 60CM",
+      "matchedDbId": "20a8c227-bd30-47a5-8189-f5b3e563c603",
+      "rating": 0.3902439024390244,
+      "neededQty": 1
+    },
+    {
+      "id": "item_lit0vqnzt",
+      "excelName": "LID COVER ONLY 60CM",
+      "matchedDbId": "300c3429-c288-4f71-80ce-bd7a8ac57681",
+      "rating": 0.3448275862068966,
+      "neededQty": 1
+    },
+    {
+      "id": "item_3jl7g19d3",
+      "excelName": "BOTA FOR KIDS SIZE 33 COLOR FOR BOY",
+      "matchedDbId": "8637df5d-e5ce-46d9-9fa0-a7bb337ba134",
+      "rating": 0.6818181818181818,
+      "neededQty": 1
+    },
+    {
+      "id": "item_thr1nlrdj",
+      "excelName": "KAISA VILLA BLENDER RED",
+      "matchedDbId": "3f0d4a44-81c8-4ef6-b7a0-06f1f6ffc927",
+      "rating": 0.9142857142857143,
+      "neededQty": 1
+    },
+    {
+      "id": "item_xwldf66kf",
+      "excelName": "MIXING BOWL BATYA (HA083) \"TAKIP ONLY\" 30CM",
+      "matchedDbId": "51b22fbb-2f33-4f91-b30d-be19028ac5cf",
+      "rating": 0.22535211267605634,
+      "neededQty": 10
+    },
+    {
+      "id": "item_m3z5g6imn",
+      "excelName": "2IN1 GLASS BLENDER",
+      "matchedDbId": "3f0d4a44-81c8-4ef6-b7a0-06f1f6ffc927",
+      "rating": 0.45161290322580644,
+      "neededQty": 1
+    },
+    {
+      "id": "item_nd07a2m9l",
+      "excelName": "MIXING BOWL BATYA (HA083) \"TAKIP ONLY\" 28CM",
+      "matchedDbId": "4239a742-77cc-437e-ac74-1ec50cd3472a",
+      "rating": 0.21212121212121213,
+      "neededQty": 2
+    },
+    {
+      "id": "item_l1babmtec",
+      "excelName": "AESTHETIC EGG BASKET",
+      "matchedDbId": "6ecbc908-c8e3-45ed-858c-a4ab5f3b77a9",
+      "rating": 1,
+      "neededQty": 1
+    },
+    {
+      "id": "item_xmv7j43u8",
+      "excelName": "COLOR CODED CHOPPING BOARD *new order",
+      "matchedDbId": "1d8b8c2d-7b13-4194-857d-bb5a6013263f",
+      "rating": 0.5283018867924528,
+      "neededQty": 2
+    },
+    {
+      "id": "item_dm5ehj0yr",
+      "excelName": "LEDWORK LIGHT +100800MAH BATTERY",
+      "matchedDbId": "b87ecb3e-870e-4b8e-8e04-adb66fd98a61",
+      "rating": 0.30303030303030304,
+      "neededQty": 1
+    },
+    {
+      "id": "item_nvcudjedf",
+      "excelName": "THICK REFLECTIVE STRIP WATERPROOF RAINCOAT SET \"575\"",
+      "matchedDbId": "a6e03362-88f4-4c22-a192-38d9741d2377",
+      "rating": 0.325,
+      "neededQty": 1
+    },
+    {
+      "id": "item_7mlgs8x3u",
+      "excelName": "WIRELESS MICROPHONE UNIVERSAL",
+      "matchedDbId": "5e79c935-d90c-49da-8596-61a96128b944",
+      "rating": 0.27906976744186046,
+      "neededQty": 1
+    },
+    {
+      "id": "item_xz6unou1s",
+      "excelName": "MENS BOOTS SIZE 42 \"495\"",
+      "matchedDbId": "8637df5d-e5ce-46d9-9fa0-a7bb337ba134",
+      "rating": 0.2777777777777778,
+      "neededQty": 1
+    },
+    {
+      "id": "item_7qe2iqdon",
+      "excelName": "18L KAISA VILLA AIR FRYER OVEN",
+      "matchedDbId": "3f0d4a44-81c8-4ef6-b7a0-06f1f6ffc927",
+      "rating": 0.55,
+      "neededQty": 1
+    },
+    {
+      "id": "item_5ebxmvts1",
+      "excelName": "STAINLESS WOK ONLY 40CM",
+      "matchedDbId": "20a8c227-bd30-47a5-8189-f5b3e563c603",
+      "rating": 0.3902439024390244,
+      "neededQty": 1
+    },
+    {
+      "id": "item_84eb8kmi5",
+      "excelName": "BIG SIZE MEAT GRINDER STAINLESS 5L \"800\"",
+      "matchedDbId": "20a8c227-bd30-47a5-8189-f5b3e563c603",
+      "rating": 0.32727272727272727,
+      "neededQty": 1
+    },
+    {
+      "id": "item_k0krlnrsn",
+      "excelName": "TRANSPARENT RAIN COVER CLOTH 4*6M -new order",
+      "matchedDbId": "db228fb4-2a66-4ffc-83d8-3ce274ec7311",
+      "rating": 0.28169014084507044,
+      "neededQty": 1
+    },
+    {
+      "id": "item_ixdv1dj5w",
+      "excelName": "CYX16-10 SYANSE & SANDOK SET",
+      "matchedDbId": "ab22a090-63bb-45bc-a2c1-9e9bde936e70",
+      "rating": 0.3333333333333333,
+      "neededQty": 1
+    },
+    {
+      "id": "item_t4sc74uf6",
+      "excelName": "INTELLIGENT INVERTER WITH FLASHLIGHT WITH 100800MAH BATTERY *new order",
+      "matchedDbId": "b87ecb3e-870e-4b8e-8e04-adb66fd98a61",
+      "rating": 0.2222222222222222,
+      "neededQty": 2
+    },
+    {
+      "id": "item_eh2e3em34",
+      "excelName": "FULL STAINLESS SANDOK XL \"480\"",
+      "matchedDbId": "20a8c227-bd30-47a5-8189-f5b3e563c603",
+      "rating": 0.3404255319148936,
+      "neededQty": 1
+    },
+    {
+      "id": "item_fxszpsyn3",
+      "excelName": "PRESSURE COOKER 3VALVE 8L *layaway/paid po yung isa",
+      "matchedDbId": "5d1132a8-3d6d-42ca-921a-e40bbe7415ab",
+      "rating": 0.24242424242424243,
+      "neededQty": 2
+    },
+    {
+      "id": "item_tkh34l5yk",
+      "excelName": "FULL STAINLESS SYANSE XL \"480\"",
+      "matchedDbId": "20a8c227-bd30-47a5-8189-f5b3e563c603",
+      "rating": 0.3404255319148936,
+      "neededQty": 1
+    },
+    {
+      "id": "item_1i022ggj7",
+      "excelName": "11PCS CONDIMENTS SET ALL WHITE (PVC RACK)",
+      "matchedDbId": "c045ab7a-6613-4c05-857f-c9415baeb172",
+      "rating": 0.2926829268292683,
+      "neededQty": 1
+    },
+    {
+      "id": "item_evft7dszt",
+      "excelName": "CYP3 MIXING BOWL 22CM *new order",
+      "matchedDbId": "bd4534f5-389b-49ec-bdb9-ccbd29cdafdf",
+      "rating": 0.24,
+      "neededQty": 2
+    },
+    {
+      "id": "item_7blylem5e",
+      "excelName": "HANABISHI DOUBLE BURNER",
+      "matchedDbId": "3f0d4a44-81c8-4ef6-b7a0-06f1f6ffc927",
+      "rating": 0.2777777777777778,
+      "neededQty": 1
+    },
+    {
+      "id": "item_npro63uj8",
+      "excelName": "CYP3 MIXING BOWL 26CM *new order",
+      "matchedDbId": "9a28de97-63e7-4583-a3b3-e3d1b433999d",
+      "rating": 0.24,
+      "neededQty": 2
+    },
+    {
+      "id": "item_tvmfbpr3y",
+      "excelName": "MICROMATIC RICE COOKER MRC(1.8L -10CUPS)",
+      "matchedDbId": "5e79c935-d90c-49da-8596-61a96128b944",
+      "rating": 0.34615384615384615,
+      "neededQty": 1
+    },
+    {
+      "id": "item_brj6brjom",
+      "excelName": "CYP3 MIXING BOWL 24CM *new order",
+      "matchedDbId": "47f96826-4e82-4d54-99cd-b3fcebe2373e",
+      "rating": 0.24,
+      "neededQty": 2
+    },
+    {
+      "id": "item_f8t36xdbv",
+      "excelName": "KAISA VILLA FOOD PROCESSOR 5L (GREEN)",
+      "matchedDbId": "3f0d4a44-81c8-4ef6-b7a0-06f1f6ffc927",
+      "rating": 0.425531914893617,
+      "neededQty": 1
+    },
+    {
+      "id": "item_kxvbabhh6",
+      "excelName": "NEW KNIFE HOLDER MOCHA) \"165\" *layaway/paid",
+      "matchedDbId": "882cc49d-0227-4dd1-832a-a0d8aef74e10",
+      "rating": 0.17647058823529413,
+      "neededQty": 1
+    },
+    {
+      "id": "item_50jshhrsv",
+      "excelName": "6LAYER SHOE RACK TRANSPARENT BLACK *meron po isa dito, 2pcs po order",
+      "matchedDbId": "3be7f416-88f9-4a49-b39d-d5795b227469",
+      "rating": 0.20930232558139536,
+      "neededQty": 1
+    },
+    {
+      "id": "item_xxluxzks2",
+      "excelName": "NEW KNIFE HOLDER  (BLUE) \"165\" *layaway/paid",
+      "matchedDbId": "79a5f711-d049-42ee-acbe-6b61c6fbd17e",
+      "rating": 0.17142857142857143,
+      "neededQty": 1
+    },
+    {
+      "id": "item_mhbicty7o",
+      "excelName": "11PCS KAISA VILLA KITCHEN KNIFE SET",
+      "matchedDbId": "3f0d4a44-81c8-4ef6-b7a0-06f1f6ffc927",
+      "rating": 0.4444444444444444,
+      "neededQty": 1
+    },
+    {
+      "id": "item_dsldhtgqd",
+      "excelName": "NEBULIZER",
+      "matchedDbId": "4253b2ef-bfc6-4b43-8afd-d9e9f2ebce54",
+      "rating": 0.2608695652173913,
+      "neededQty": 1
+    },
+    {
+      "id": "item_evyb4syk9",
+      "excelName": "SOLAR STREET LIGHT *layaway/paid",
+      "matchedDbId": "db913411-82e1-4287-864e-b4b4cb1deb88",
+      "rating": 0.19607843137254902,
+      "neededQty": 2
+    },
+    {
+      "id": "item_zjhfuoau3",
+      "excelName": "OIL DRAINER WITH TRAY (LARGE)",
+      "matchedDbId": "6e633cb1-bb01-4a50-8cbc-871ca23a5325",
+      "rating": 0.25925925925925924,
+      "neededQty": 5
+    },
+    {
+      "id": "item_f6xigj95r",
+      "excelName": "HEAVY DUTY SAMPAYAN DOUBLE *layaway/paid",
+      "matchedDbId": "c8b618ff-6fee-4ab9-81db-7a8fb7c567e0",
+      "rating": 0.21052631578947367,
+      "neededQty": 2
+    },
+    {
+      "id": "item_2coha1upa",
+      "excelName": "LI BAUNAN",
+      "matchedDbId": "9b7ea0cb-e312-4f38-a745-6d819f7a4d39",
+      "rating": 0.2857142857142857,
+      "neededQty": 2
+    },
+    {
+      "id": "item_rojmtmawq",
+      "excelName": "OROCAN ICE BOX COOLER 65L *layaway/paid",
+      "matchedDbId": "f24c11ac-d653-485c-b11c-0302846dd109",
+      "rating": 0.7037037037037037,
+      "neededQty": 1
+    },
+    {
+      "id": "item_xxlj2ne87",
+      "excelName": "600ML VACUUM",
+      "matchedDbId": "9da04e1d-384b-40d5-b0a4-cab53edce041",
+      "rating": 0.47619047619047616,
+      "neededQty": 2
+    },
+    {
+      "id": "item_u5bimcvkm",
+      "excelName": "SANDOK/SYANSE (PANGKAWA( BIG-SANDOK \"175\"",
+      "matchedDbId": "af60355a-7648-425d-9363-ec61fc9b31e2",
+      "rating": 0.2962962962962963,
+      "neededQty": 1
+    },
+    {
+      "id": "item_b896e57sr",
+      "excelName": "EGG TRAY 2 LAYERS *napick napo yung nilive",
+      "matchedDbId": "7cd10604-4613-4bdc-9c04-6b7e9a73d297",
+      "rating": 0.19607843137254902,
+      "neededQty": 2
+    },
+    {
+      "id": "item_3gimieuiy",
+      "excelName": "HA109 STAINLESS STRAINER W/ HANDLE 22CM",
+      "matchedDbId": "09966ba6-6fc7-4fe7-a516-4158757f06bf",
+      "rating": 0.3177570093457944,
+      "neededQty": 2
+    },
+    {
+      "id": "item_otuwyjyq5",
+      "excelName": "HA109 STAINLESS STRAINER W/ HANDLE 20CM",
+      "matchedDbId": "bf39213b-db3c-4536-9eb9-626deb882eab",
+      "rating": 0.3177570093457944,
+      "neededQty": 1
+    },
+    {
+      "id": "item_5ztcyrov7",
+      "excelName": "MELAMINE PLATES BROWN 12PCS/SET",
+      "matchedDbId": "d906969e-cf2c-4e3c-9011-488da934261e",
+      "rating": 0.6956521739130435,
+      "neededQty": 2
+    },
+    {
+      "id": "item_826rpc266",
+      "excelName": "MELAMINE FLORAL PLATES BLUE 12PCS/SET",
+      "matchedDbId": "d906969e-cf2c-4e3c-9011-488da934261e",
+      "rating": 0.6274509803921569,
+      "neededQty": 4
+    },
+    {
+      "id": "item_spqr85q7b",
+      "excelName": "GLOW IN THE DARK BLANKET",
+      "matchedDbId": "af60355a-7648-425d-9363-ec61fc9b31e2",
+      "rating": 0.2222222222222222,
+      "neededQty": 2
+    },
+    {
+      "id": "item_ca7d3y63n",
+      "excelName": "OPAL BOWL SET (MICROWAVE SAFE)",
+      "matchedDbId": "b7a64dd2-4f2f-4a2c-9170-ca3a996929fe",
+      "rating": 0.5490196078431373,
+      "neededQty": 1
+    },
+    {
+      "id": "item_fht9k95kp",
+      "excelName": "KOREAN POT DEEP DRYER",
+      "matchedDbId": "af60355a-7648-425d-9363-ec61fc9b31e2",
+      "rating": 0.23529411764705882,
+      "neededQty": 1
+    },
+    {
+      "id": "item_x6fqi98g3",
+      "excelName": "PANGKAYOD STAINLESS",
+      "matchedDbId": "20a8c227-bd30-47a5-8189-f5b3e563c603",
+      "rating": 0.41025641025641024,
+      "neededQty": 2
+    },
+    {
+      "id": "item_r4h674xyh",
+      "excelName": "INSULATED PITCHER 1.8L",
+      "matchedDbId": "98aeb7c9-2c49-4acb-9cac-7bc9498fef74",
+      "rating": 0.9,
+      "neededQty": 1
+    },
+    {
+      "id": "item_82tn4afye",
+      "excelName": "KOREAN KNITTED BAG PURPLE",
+      "matchedDbId": "8c5735d7-6e28-4703-acca-4e2d6af01ac9",
+      "rating": 0.21052631578947367,
+      "neededQty": 1
+    },
+    {
+      "id": "item_rxl5cf9kp",
+      "excelName": "PINIC MAT (BLUE) \"150\"",
+      "matchedDbId": "5e79c935-d90c-49da-8596-61a96128b944",
+      "rating": 0.17142857142857143,
+      "neededQty": 1
+    },
+    {
+      "id": "item_6p531neyj",
+      "excelName": "CY4 SLOTTED STRAINER WOOD HANDLE 30CM",
+      "matchedDbId": "9bd5ef75-326a-4d59-87e8-12dc8e204e5b",
+      "rating": 0.2608695652173913,
+      "neededQty": 1
+    },
+    {
+      "id": "item_xj8d1utbn",
+      "excelName": "HONEY COMB FLAT PAN 30CM WOK ONLY",
+      "matchedDbId": "cece4d25-2ba8-4b0e-95ee-780355aad83b",
+      "rating": 0.6341463414634146,
+      "neededQty": 1
+    },
+    {
+      "id": "item_e8abybg2x",
+      "excelName": "HONEY COMB FLAT PAN 30CM  TAKIP ONLY",
+      "matchedDbId": "cece4d25-2ba8-4b0e-95ee-780355aad83b",
+      "rating": 0.6046511627906976,
+      "neededQty": 2
+    },
+    {
+      "id": "item_lngg62x1q",
+      "excelName": "CYX17-10 SANDOK/SYANSE SET",
+      "matchedDbId": "ab22a090-63bb-45bc-a2c1-9e9bde936e70",
+      "rating": 0.4666666666666667,
+      "neededQty": 3
+    },
+    {
+      "id": "item_68op6y7y1",
+      "excelName": "PANGKAWA (WOODEN HANDLE) SANDOK-XL",
+      "matchedDbId": "af60355a-7648-425d-9363-ec61fc9b31e2",
+      "rating": 0.2978723404255319,
+      "neededQty": 1
+    },
+    {
+      "id": "item_r343ud0i2",
+      "excelName": "1000ML AGUAFLASK PRINTED WITH MAGNET BLUE,BLACK,PURPLE",
+      "matchedDbId": "0408d5d3-c9b8-43d8-823b-22553330374f",
+      "rating": 0.1951219512195122,
+      "neededQty": 3
+    },
+    {
+      "id": "item_tnff4zzh3",
+      "excelName": "10PCS STAINLESS STEEL WOOD HAND BBQ SKEWERS \"75\"",
+      "matchedDbId": "20a8c227-bd30-47a5-8189-f5b3e563c603",
+      "rating": 0.2903225806451613,
+      "neededQty": 3
+    },
+    {
+      "id": "item_fget7zw89",
+      "excelName": "FOLDABLE SILICON MINI FUNNEL *meron napo may-ari yung 2pcs na dumating",
+      "matchedDbId": "188f245b-5496-4ccf-a411-46d507a4d9f8",
+      "rating": 0.1927710843373494,
+      "neededQty": 2
+    },
+    {
+      "id": "item_sfl8i2d1w",
+      "excelName": "CREAM BUTTER FUNNEL",
+      "matchedDbId": "7cd10604-4613-4bdc-9c04-6b7e9a73d297",
+      "rating": 0.24242424242424243,
+      "neededQty": 2
+    },
+    {
+      "id": "item_v5ojotxf6",
+      "excelName": "100PCS FOOD COVER \"50\"",
+      "matchedDbId": "300c3429-c288-4f71-80ce-bd7a8ac57681",
+      "rating": 0.625,
+      "neededQty": 3
+    },
+    {
+      "id": "item_6eo5mgh28",
+      "excelName": "WIRED DYNAMIC MICROPHONE",
+      "matchedDbId": "5e79c935-d90c-49da-8596-61a96128b944",
+      "rating": 0.3684210526315789,
+      "neededQty": 1
+    },
+    {
+      "id": "item_a31ieuclh",
+      "excelName": "JBL DUAL USED WIRED AND WIRELESS MICROPHONE",
+      "matchedDbId": "7b128571-0b1a-48d5-9ca9-47cfce9694a4",
+      "rating": 0.24561403508771928,
+      "neededQty": 1
+    },
+    {
+      "id": "item_7sid3otnz",
+      "excelName": "6\" RECHARGEBLE SOLAR FAN \"975\"",
+      "matchedDbId": "db913411-82e1-4287-864e-b4b4cb1deb88",
+      "rating": 0.3333333333333333,
+      "neededQty": 1
+    },
+    {
+      "id": "item_1vgf3mcnd",
+      "excelName": "900ML INSULATED TUMBLER (BLUE)",
+      "matchedDbId": "8bdf94b3-3420-4e20-bdd7-f5a0d8709db5",
+      "rating": 0.4897959183673469,
+      "neededQty": 1
+    }
+  ],
+  "unmappedNegativeDbItems": [
+    {
+      "dbId": "7a5f1783-a721-4c27-a9b7-f150c661999a",
+      "currentDbStock": -5,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "84db474c-391b-44b7-9f3d-7365a7cbe8fc",
+      "currentDbStock": -4,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "e1b2254a-7901-4d83-b2eb-742356abe891",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "273909e7-023d-4821-bcb1-46aa2ef46006",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "1732a136-3c38-4ec0-8deb-44ebdba0f345",
+      "currentDbStock": -11,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "d70b17c7-ce75-49d8-9bfc-e90445a4c0c6",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "28499406-3c39-4460-9ce5-612d7b8440be",
+      "currentDbStock": -5,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "e82d9711-ccea-43fc-a583-477f21471f48",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "f0a9580f-44f4-428c-b66e-ba676d9194b6",
+      "currentDbStock": -10,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "b6b7e216-f20f-43b6-9441-0c9f91dba978",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "3acb48b1-9a00-45ed-839c-73a486108f62",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "2e354dcd-1172-440a-9fe1-7fd63014e6da",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "df8568d1-01b7-4206-a866-eef905bdc18f",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "6b6e1f5d-535b-4ace-9982-0c3cf27f65ee",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "9e0c9bf4-e51c-4db2-8492-61772658d76b",
+      "currentDbStock": -4,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "17a1f3d0-20ba-4866-a9d2-4c103b747a1f",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "26580da6-e3a2-45a1-bfcf-836b217c85c1",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "1fc9ae0f-8957-4e50-a116-6f4da23b912c",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "f15d3cba-304f-4fca-b599-b8fc9d19a3a5",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "c4a981d5-7cd2-402b-9697-720a57f29f0c",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "b5a7ecf5-cc96-4960-b464-10b5cff5edc4",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "b646414f-8995-4b29-abc0-bf983d1b9560",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "ce116fa2-fb39-4d07-b347-3ae0636ff4c4",
+      "currentDbStock": -4,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "03f50ee6-8433-4499-b8f8-504dab1d6228",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "c83d9260-3510-45b8-9d44-46b36c0c1a73",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "35b3db1e-f960-4873-85de-a9d267011699",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "22e20058-3816-46af-91ff-2f6c15699f7e",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "20aa9132-cfb1-440b-85fc-f82ea8688e16",
+      "currentDbStock": -3,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "c0499603-6577-419d-a3cb-5411f91111c4",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "eb4e22f2-28d5-4253-b951-27d68ecd2bfb",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "eec67f3f-4993-4271-a5f6-a42fbb0882d7",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "1ce4090a-72fc-43c1-8843-19f3bdf188f6",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "06fe5104-e782-4b6a-9fe9-3d092780d9b7",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "5d87a296-c216-4290-891e-e936599c353a",
+      "currentDbStock": -5,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "ac1cae04-67e1-47b7-aa95-3c3782ed475b",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "ad014a40-b943-4475-8769-9bc013ab9eba",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "e76f0c80-2810-460f-a5fc-d41cbcf43be4",
+      "currentDbStock": -10,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "001376ea-dbb8-49df-aafa-2c3986014d03",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "acd5db0b-1e90-40e8-831b-e4a16dd3f9c0",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "9eb4ddf2-e5bc-46fb-be2e-08aa16bca4c3",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "9e58564a-4c78-4c8f-aca8-7a0e0c225882",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "435e58b0-5637-4a77-8e0c-794ecfdeddbc",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "39fdbd77-652d-418a-a00a-e126b7059c64",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "1363d04b-533f-4143-bd9b-c0eed95dc144",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "b7c13a6f-0093-4c77-872d-f5c15223fda4",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "3729a294-0d71-46e4-8ed3-c8e59a7c4c9d",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "97522fc7-ed84-41d6-a152-713fce9bcb61",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "5815fbc4-7f83-454e-9dc7-f1df1e954d59",
+      "currentDbStock": -5,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "d2cda2f1-886d-4514-9b07-ecffd2bbfd38",
+      "currentDbStock": -4,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "1948b093-1336-4293-882c-61c20ab35827",
+      "currentDbStock": -5,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "d715a454-76a4-46d9-a033-c118b5b84dca",
+      "currentDbStock": -3,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "7fbe3ad8-557e-4236-8122-7a1e9e342ea5",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "67df7dd7-5fea-4be1-a9d2-66b59e4fcb49",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "9a54c13a-b0c5-4822-bcaf-ce5d1dce29e7",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "40b8ba62-a7ff-478d-8c90-5cd53193ab3e",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "7bf0c4f1-aabb-4584-a8c9-14c7a92f0533",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "0678d17c-0fbe-48fa-9330-ff4f94bdebea",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "b114f5ed-4e61-4d51-ab10-10c263197f32",
+      "currentDbStock": -8,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "78afc1c5-9497-4598-8978-a04c94c44964",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "94fad1eb-aa47-466c-9de2-8f543b9069f8",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "abad1eb1-738d-415d-8af0-062dc77f6b9f",
+      "currentDbStock": -3,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "a57a37ec-7dc4-4c5c-b9c7-02aa791e0095",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "2ae5e12b-7db3-43a0-99cb-ddc9247d566d",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "ba38431c-da96-4025-ac9f-08bb9e5ad65d",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "ea5ae826-a009-43c8-aea1-c9e4e61a2e3e",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "a83c8e6e-01a9-41bc-a757-2081ac8751bb",
+      "currentDbStock": -5,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "71b7dc05-27fa-4a8e-9f86-94925e166582",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "efd9d6d9-6a48-46bb-a3eb-4569e50e2a7a",
+      "currentDbStock": -3,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "ad89404b-3dbd-42b0-a646-6a06814e2d39",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "564bf1ff-2d44-43e0-b52e-917e0d7c8822",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "65c6c44e-b623-47d4-98f9-34599a398a90",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "9bd68638-e323-4d79-b8e0-9864e92ce163",
+      "currentDbStock": -14,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "919e32c5-ffba-46f5-b7a1-370a0be7f21d",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "c75004c1-6f9c-487b-8af8-c54a76099a17",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "e568c4da-05a5-4d19-a037-2b8b9361ce5a",
+      "currentDbStock": -18,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "4032bd0c-4c71-4398-b092-00e808e20216",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "830afc0e-0a4b-42d4-9fdf-4031a92d6303",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "0f14eac9-6d5d-4b32-b10d-e074c4428652",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "eb1725cf-ee21-44bc-8eda-83c6239904ad",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "cdad9d30-619e-42cf-9446-90596d3f199d",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "d40114b5-8c76-4d58-8590-f5414cb93b0e",
+      "currentDbStock": -5,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "81e2741c-f59e-4c78-a52e-b21e318035ce",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "be839a95-62b1-4a42-a5b2-631d2f06f571",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "41440c0d-d06e-4456-adfb-b2dab3eaea57",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "e9abf916-a139-4333-97a3-137fd39b0e0e",
+      "currentDbStock": -3,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "c5c268de-36f7-4181-9d74-c1d4c7f3e08f",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "9a8b5b66-e6f3-4cd8-94be-cd9b004039bb",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "15501d95-3eb1-41bd-92ad-bf54bb3aadd5",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "87090c89-35ae-4a75-b71d-4bdc70f879a5",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "d0a45892-aa80-4d9d-8281-2c511e4af1b9",
+      "currentDbStock": -3,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "7b3377f4-3fac-4e00-9502-9ccc6640c761",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "63775c7f-8520-432a-9df4-ac929102b74f",
+      "currentDbStock": -3,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "ed309eee-7a71-42da-b4f0-25c207f5f716",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "af6cff58-4531-490d-b1c9-d964fa45d7b3",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "e1a86dad-5613-41f3-ab32-d7433d7a1d2d",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "5d935b72-7cdb-4f6b-8b11-199f55355411",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "75b08ec8-585e-45c4-a884-85b4bb73c40d",
+      "currentDbStock": -4,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "bcde600a-46f1-48d0-ac65-3a50a7b218e0",
+      "currentDbStock": -7,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "130895d3-975a-478c-a095-11b6674d072f",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "fdc171aa-982d-497b-ac2e-bf2afe7e04e8",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "ab10a0ab-2eb7-4f69-b171-ad700e8c547b",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "12da8577-7f76-4688-b374-beb3d4ceeeba",
+      "currentDbStock": -3,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "e46b0281-fe0e-4391-a9e1-6ab9b087ff99",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "3fa2369c-93cd-4415-8e5a-745f1e98ec63",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "d4c6982e-f1bc-4921-a15f-a6c1031c3a2d",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "e8ba5828-ec02-44b7-a07b-14bd383f1cb5",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "afb91a8a-5b5e-4675-98b3-fa708956824a",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "13f5901f-fab5-4e0d-b48a-cffab1c568aa",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "ff0a4663-e135-4b66-8c81-bb396302164e",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "742fe42e-4a7e-4b80-b0f6-84c248b69149",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "07c4d928-7f93-46c8-817a-ef2cce233553",
+      "currentDbStock": -11,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "4dc9df52-1759-4b97-863e-939f982de037",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "8825a4fc-7a8c-44f8-8a54-60d16f39cc37",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "3523d0a2-a853-42d2-9cc9-fb998786226d",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "dce4e4db-36c0-40bf-a107-d086837ef229",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "e182ffc8-034d-4e37-9559-9cc37146ce3b",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "71585f8f-3a4c-48aa-8d5d-7244287ff7ea",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "e75afab2-5411-4d88-9003-98084d28d5fe",
+      "currentDbStock": -3,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "02b72535-c315-446c-bce3-ec620e8c162d",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "d6b9df1e-7579-4658-bfef-fbca080bc8e3",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "d56f2966-8f93-43e3-b617-61a3ad9e8ea1",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "210d207c-bd7a-49c0-aee6-6728c985e19c",
+      "currentDbStock": -5,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "6d553f53-395d-4cd8-ad4f-b415ee80b1d6",
+      "currentDbStock": -4,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "a85c00ef-28e8-4be5-88a4-5d3ee10d5c3f",
+      "currentDbStock": -3,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "6a206704-6fbc-4cbe-8ef6-52c2ca06eeea",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "1c25ef8c-aa86-41bf-99bd-ff0ab589033b",
+      "currentDbStock": -3,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "4c38aaa5-80d9-42e7-bbde-61c8236d1670",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "ede77ee9-d0dc-457a-94df-12ab51a9fefe",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "ba3de302-813a-42ef-a598-b548654d0796",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "49e107dc-1ebb-467e-ab51-6dc12a4e6379",
+      "currentDbStock": -6,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "6eed23e8-f552-474c-b370-cfd73a06142c",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "83a51e66-5605-41a4-9576-17479eaba28c",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "68c81813-0499-4c94-a7a1-31f0e671bbf8",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "8db29530-9a68-4b6f-a48c-5111f5920931",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "bbcec777-c8c4-4afa-9bd2-d6f81a33348f",
+      "currentDbStock": -7,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "bac0c830-1492-41bb-b55f-429b08d4a9a3",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "006444b5-b9d1-437b-a483-c883242fe7b2",
+      "currentDbStock": -3,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "d3386ca1-9b79-454c-9003-e42e74e75303",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "07f142aa-9f89-4ac3-be48-164d24e15459",
+      "currentDbStock": -5,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "f99edaaa-051e-47cf-8466-d03213ff5715",
+      "currentDbStock": -9,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "4f50ca2b-835b-4ba3-85a9-ec4d33b9cf96",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "53d89012-5e66-4744-a0f2-4b0a59827f25",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "80ddf266-996f-4cf7-a8b8-3614e962dde0",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "b6e17e34-2eb4-4de7-9f01-ab825c6508f1",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "5e54328b-c436-4623-a093-aaa902ef5153",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "696f30f5-a683-43ff-be69-8f83361bbd9f",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "37818e7f-129f-40ca-882f-522f9c7758fb",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "ff0d4699-bc96-454c-a461-7fe03cf28da9",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "ac1d3aee-275a-4216-a977-d4ccdf5dcca2",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "16f6057d-61a3-4b4e-9f9d-3f48697d3ec0",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "5f2ddba9-e44c-4cc2-a8ee-5ec7469f8615",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "c0eb0835-672c-41fe-a82b-c9e279e86dfc",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "50cd4049-f54c-4305-b9ff-087a8ada234f",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "ccf661b5-2dc6-4593-b57c-35b459d207e4",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "9ea4ed0e-c164-4cfa-9516-634660611a79",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "31bacdab-543f-4321-91a6-afde96c58f9e",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "3cbcf4e8-5311-4176-8d29-5302ecf7bf7c",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "f6f401e1-6a27-4256-a54a-7106cc0e17b8",
+      "currentDbStock": -4,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "c9c7a418-dc1a-4682-9547-e391a18f4b7b",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "8ac8f2d9-f9b3-443f-827b-f956f40a4940",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "420a34d5-9ee1-461e-a80a-73710e5b60e7",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "c0323ebd-ef6b-4cec-be46-1b20ad23c50f",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "ea865695-4eee-450d-b28b-ba38a5391bd6",
+      "currentDbStock": -13,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "05b38d96-210d-4a91-898b-fbe1d17221c5",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "f7ccb2a8-0a00-4172-87e0-1b74326422e9",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "11f7cea7-06f8-40f2-b37e-201692b18fc2",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "a3abb071-75dc-4433-baab-636422d1c896",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "f5dfb243-ce15-4640-94e4-f878af40c773",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "516021b4-7a64-44e2-a237-6e22c7a654be",
+      "currentDbStock": -11,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "83426a3c-6a22-4f6b-a267-e98b2ec3ed57",
+      "currentDbStock": -7,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "ddf53115-5559-4c11-9d45-f3f008f40c67",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "5a34589c-ef09-4c71-9ea9-350157a338c0",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "4190492c-fe44-430c-b752-1628522d327d",
+      "currentDbStock": -7,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "24e2139b-725b-479c-b431-0aa6b29750ec",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "65c340bd-21a1-448a-81a1-98098a4a65a4",
+      "currentDbStock": -3,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "61c7978d-6ae3-45c2-a7d9-dc2a7292e8c6",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "2ca24731-a5c6-41fe-8fb1-0124e8851ae7",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "796a98ca-7793-4e91-a452-aabdc03b2ba1",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "3f516e0a-101c-4d5b-8dd0-224704b7fce1",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "32a9688d-3266-4fd4-b0ee-9ed1f217cba3",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "ae3b63ff-4afe-4cbb-a427-fa7c2ba817fc",
+      "currentDbStock": -3,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "6f3b8057-ac55-4ded-ba8b-9991b9a2efbf",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "493e194e-8c77-4afb-a77c-a1b620e8e20e",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "a68b2747-90c5-490d-a1f7-71442e58a49d",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "c4b5bf04-35f2-489e-b805-bc5c1ec7a1c2",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "3e55bc62-df82-443d-86ed-bc8a837b6701",
+      "currentDbStock": -7,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "1b70a3e2-ee58-4ca1-b0ff-e11dbb5edc38",
+      "currentDbStock": -8,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "f8cc3748-5f88-4184-ab07-828eed98db4c",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "7e169d41-07a6-4074-8d31-f1ac20c2978d",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "4e867aed-5e01-4eca-a6e3-13e53678da29",
+      "currentDbStock": -5,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "7ca903ae-8a5c-4ecb-822a-c523f1f79a86",
+      "currentDbStock": -3,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "8143df56-5089-4f87-bcfe-de106d73d0c9",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "5bac08a4-2e0e-46d1-80fb-2d80bf979373",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "77fb56df-88a3-43f8-9fad-de6887b1b77c",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "2a9777ab-48b2-4452-93dc-6571e594e769",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "63e67b11-0d54-4b5d-8df1-0ad822225cf2",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "04924374-728a-4b48-b9c3-6f148654858a",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "6debb5fa-4b9e-41eb-a15b-2c82ff4a5b10",
+      "currentDbStock": -3,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "b105f0f4-64f5-42dd-8c36-37ae8398b977",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "23a22943-a614-460a-a406-7a44b974431f",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "f7823ec8-142f-4980-81bd-0dd49106b32b",
+      "currentDbStock": -4,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "9bcf095a-2c1c-4913-85da-1c5f9f452b7c",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "5035cf80-f865-4bd4-8fe4-7686983f25c6",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "8aed95c5-91b3-409a-82c2-e9909f420969",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "fca855d3-73be-44cb-90cc-cb1cd98aa28f",
+      "currentDbStock": -2,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "c1582619-69f2-402d-a74f-00ea2d859082",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "f7697680-c776-407c-8ccd-0345b137d525",
+      "currentDbStock": -4,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "2c17802c-dcd6-438f-906f-762452876028",
+      "currentDbStock": -1,
+      "matchedExcelName": null
+    },
+    {
+      "dbId": "2bebf34b-3bdf-4daf-b935-6d2766f8dc13",
+      "currentDbStock": -5,
+      "matchedExcelName": null
+    }
+  ],
+  "gerardoDeductions": {
+    "2bebf34b-3bdf-4daf-b935-6d2766f8dc13": 1,
+    "9a54c13a-b0c5-4822-bcaf-ce5d1dce29e7": 1,
+    "35060b9c-5f01-4ac8-aa11-1a478735ecb0": 1,
+    "75b08ec8-585e-45c4-a884-85b4bb73c40d": 1,
+    "2c17802c-dcd6-438f-906f-762452876028": 1,
+    "1ce4090a-72fc-43c1-8843-19f3bdf188f6": 1,
+    "006444b5-b9d1-437b-a483-c883242fe7b2": 1
+  }
+}

@@ -425,8 +425,7 @@ export function OrderDialog(props: OrderDialogProps) {
             notes: 'Initial Order Payment'
           });
         if (paymentError) {
-          console.error("Failed to log initial payment", paymentError);
-          // We don't throw here to avoid failing the whole order creation just for the payment log, but it's an edge case
+          throw paymentError;
         }
       }
 
@@ -548,19 +547,7 @@ export function OrderDialog(props: OrderDialogProps) {
         if (orderItemError) throw orderItemError;
       }
 
-      // 4. Log payment if amountPaid > 0
-      if ((values.amountPaid ?? 0) > 0) {
-        const { error: paymentError } = await supabase
-          .from('payments')
-          .insert({
-            order_id: newOrderId,
-            amount: values.amountPaid,
-            payment_date: values.orderDate.toISOString(),
-            payment_method: values.paymentType,
-            notes: 'Initial deposit / full payment'
-          });
-        if (paymentError) throw paymentError;
-      }
+      // (Step 4 payment log removed because it is a duplicate of Step 1.5)
 
       toast({
         title: "Order Created",

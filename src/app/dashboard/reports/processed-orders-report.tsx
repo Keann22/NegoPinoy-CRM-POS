@@ -8,10 +8,11 @@ import {
   format,
   isValid,
 } from 'date-fns';
-import { Calendar as CalendarIcon, Printer, CheckCircle, Check, Undo2 } from 'lucide-react';
+import { Calendar as CalendarIcon, Printer, CheckCircle, Check, Undo2, Search } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Calendar } from '@/components/ui/calendar';
 import {
   Card,
@@ -68,6 +69,7 @@ export function ProcessedOrdersReport() {
   });
   const [activeTab, setActiveTab] = useState<'to-print' | 'printed'>('to-print');
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Clear selection when tab changes
   useEffect(() => {
@@ -75,10 +77,10 @@ export function ProcessedOrdersReport() {
   }, [activeTab]);
 
   const toggleSelectAll = () => {
-      if (selectedOrderIds.size === enrichedOrders.length) {
+      if (selectedOrderIds.size === orders.length) {
           setSelectedOrderIds(new Set());
       } else {
-          setSelectedOrderIds(new Set(enrichedOrders.map(o => o.id)));
+          setSelectedOrderIds(new Set(orders.map(o => o.id)));
       }
   };
 
@@ -150,15 +152,7 @@ export function ProcessedOrdersReport() {
       return withinDate && validStatus && matchesTab;
     });
 
-    // Sort: 1. Unshipped first, 2. Older first
-    return filtered.sort((a, b) => {
-        const aPending = ['Pending Payment', 'Processing'].includes(a.orderStatus) ? 0 : 1;
-        const bPending = ['Pending Payment', 'Processing'].includes(b.orderStatus) ? 0 : 1;
-        
-        if (aPending !== bPending) return aPending - bPending;
-        
-        return new Date(a.orderDate).getTime() - new Date(b.orderDate).getTime();
-    });
+    return filtered;
   }, [allOrders, date, activeTab]);
 
   // Step 3: Enrich filtered orders with customer names and order items
@@ -220,6 +214,16 @@ export function ProcessedOrdersReport() {
           };
         });
 
+        // Sort: 1. Unshipped first, 2. Alphabetical by Customer Name
+        enriched.sort((a, b) => {
+            const aPending = ['Pending Payment', 'Processing'].includes(a.orderStatus) ? 0 : 1;
+            const bPending = ['Pending Payment', 'Processing'].includes(b.orderStatus) ? 0 : 1;
+            
+            if (aPending !== bPending) return aPending - bPending;
+            
+            return (a.customerName || '').localeCompare(b.customerName || '');
+        });
+
         setEnrichedOrders(enriched);
       } catch (err) {
         console.error('Error enriching orders:', err);
@@ -232,7 +236,14 @@ export function ProcessedOrdersReport() {
   }, [filteredOrders, supabase]);
 
   const isLoading = isLoadingOrders || isLoadingDetails;
-  const orders = enrichedOrders;
+  const orders = useMemo(() => {
+    if (!searchTerm) return enrichedOrders;
+    const lower = searchTerm.toLowerCase();
+    return enrichedOrders.filter(o => 
+        o.customerName?.toLowerCase().includes(lower) || 
+        o.id.toLowerCase().includes(lower)
+    );
+  }, [enrichedOrders, searchTerm]);
 
 
 
@@ -284,12 +295,23 @@ export function ProcessedOrdersReport() {
       </CardHeader>
       <CardContent>
         <div className="flex flex-wrap items-center justify-between gap-4 mb-4 print:hidden">
-            <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
-                <TabsList>
-                    <TabsTrigger value="to-print">To Print</TabsTrigger>
-                    <TabsTrigger value="printed">Already Printed</TabsTrigger>
-                </TabsList>
-            </Tabs>
+            <div className="flex items-center flex-wrap gap-4">
+                <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
+                    <TabsList>
+                        <TabsTrigger value="to-print">To Print</TabsTrigger>
+                        <TabsTrigger value="printed">Already Printed</TabsTrigger>
+                    </TabsList>
+                </Tabs>
+                <div className="relative w-64">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                        placeholder="Search name or ID..." 
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-8 h-9"
+                    />
+                </div>
+            </div>
             <Popover>
                 <PopoverTrigger asChild>
                 <Button variant={"outline"} size="sm" className={cn("w-[240px] justify-start text-left font-normal", !date && "text-muted-foreground")}>
