@@ -4,6 +4,14 @@ import { createClient } from '@supabase/supabase-js';
 // Use Node.js runtime so we can use pdfjs-dist
 export const runtime = 'nodejs';
 
+// Vercel serverless polyfills for browser-only globals that pdf.js expects
+if (typeof globalThis.DOMMatrix === 'undefined') {
+  globalThis.DOMMatrix = class DOMMatrix { constructor() {} } as any;
+}
+if (typeof globalThis.Path2D === 'undefined') {
+  globalThis.Path2D = class Path2D { constructor() {} } as any;
+}
+
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
