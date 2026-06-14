@@ -17,10 +17,8 @@ export async function POST(request: Request) {
     const arrayBuffer = await file.arrayBuffer();
     const data = new Uint8Array(arrayBuffer);
 
-    // Bypass Webpack/Turbopack static analysis using eval('import(...)') 
-    // This allows it to load the ESM version natively in Node.js
-    const modulePath = 'file:///' + process.cwd().replace(/\\/g, '/') + '/node_modules/pdfjs-dist/legacy/build/pdf.mjs';
-    const pdfjsLib = await eval(`import('${modulePath}')`);
+    // Statically import so Vercel's bundler includes it in the serverless function
+    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
 
     const loadingTask = pdfjsLib.getDocument({
       data: data,
