@@ -17,8 +17,8 @@ export async function POST(request: Request) {
     const arrayBuffer = await file.arrayBuffer();
     const data = new Uint8Array(arrayBuffer);
 
-    // Statically import so Vercel's bundler includes it in the serverless function
-    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    // Statically import the older legacy build that is 100% Node compatible without DOMMatrix
+    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.js');
 
     const loadingTask = pdfjsLib.getDocument({
       data: data,
