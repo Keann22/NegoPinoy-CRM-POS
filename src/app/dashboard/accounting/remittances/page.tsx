@@ -142,15 +142,18 @@ export default function SPXRemittancesPage() {
           const joinedTracking = matchedTrackingNos.join(', ');
           const shortOrderId = order.id.substring(0, 7).toUpperCase();
 
-          // Check if already fully paid or if we should skip
-          if (order.status === 'Payment Received (COD)' && order.balance_due === 0) {
+          // Check if already fully paid or if we should skip to prevent duplicate syncing
+          if (
+            order.status === 'Payment Received (COD)' || 
+            (order.amount_paid && order.amount_paid >= totalCod)
+          ) {
              syncResults.push({
                trackingNumber: joinedTracking,
                orderId: shortOrderId,
                codAmount: totalCod,
                shippingFee: totalShippingFee,
                category: 'already_paid',
-               message: 'Order is already marked as Paid and balance is 0.'
+               message: 'Order COD has already been synced or is fully paid.'
              });
              continue;
           }

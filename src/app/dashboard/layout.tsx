@@ -95,7 +95,7 @@ export default function DashboardLayout({
 
     if (isManagement || isInventory) {
       const inventorySubItems = [
-        { href: '/dashboard/inventory/out-of-stock', label: 'Out of Stock Entry', icon: ListChecks },
+        { href: '/dashboard/inventory/audit', label: 'Out of Stock Audit', icon: ListChecks },
         { href: '/dashboard/inventory/receive', label: 'Bulk Receive', icon: Truck },
         { href: '/dashboard/inventory/restock', label: 'Restock / Purchase', icon: ArrowDownUp },
         { href: '/dashboard/inventory/batches', label: 'Stock Batch List', icon: ListChecks },
@@ -103,8 +103,8 @@ export default function DashboardLayout({
       ];
 
       if (isManagement) {
+        inventorySubItems.unshift({ href: '/dashboard/reports/procurement', label: 'Procurement Sheet', icon: ListChecks });
         inventorySubItems.unshift({ href: '/dashboard/inventory/scan-receipt', label: 'Upload Receipt', icon: Upload });
-        inventorySubItems.unshift({ href: '/dashboard/reports/discrepancies', label: 'Out of Stock Verification', icon: ListChecks });
         inventorySubItems.push({ href: '/dashboard/inventory/pending-costs', label: 'Encode Costs', icon: PhilippinePeso });
       }
 
@@ -137,7 +137,6 @@ export default function DashboardLayout({
       links.push({ href: '/dashboard/users', label: 'User Management', icon: Users });
       
       // New AI/Admin Features
-      links.push({ href: '/dashboard/reports/procurement', label: 'Procurement Sheet', icon: ListChecks });
       links.push({ href: '/dashboard/approval-queue', label: 'AI Approval Queue', icon: ListChecks });
       links.push({ href: '/dashboard/simulator', label: 'AI Simulator', icon: Bot });
       links.push({ href: '/dashboard/chat', label: 'Chat History', icon: MessageCircle });

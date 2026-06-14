@@ -21,16 +21,6 @@ export async function GET(req: Request) {
       .lt('stock_level', 0);
     if (lErr) throw lErr;
 
-    // 3. Get pending OS reports
-    const { data: pendingItems, error: pErr } = await supabase
-      .from('out_of_stock_items')
-      .select(`
-        product_id, reported_qty,
-        products (name, variant_name, supplier_id, initial_unit_cost)
-      `)
-      .eq('status', 'pending');
-    if (pErr) throw pErr;
-
     // Combine
     const osMap = new Map();
     
@@ -42,20 +32,6 @@ export async function GET(req: Request) {
         supplierId: p.supplier_id,
         unitCost: p.initial_unit_cost || 0
       });
-    }
-
-    for (const p of pendingItems) {
-      if (!osMap.has(p.product_id)) {
-        osMap.set(p.product_id, {
-          productId: p.product_id,
-          productName: `${p.products.name} ${p.products.variant_name ? `[${p.products.variant_name}]` : ''}`,
-          neededQty: p.reported_qty,
-          supplierId: p.products.supplier_id,
-          unitCost: p.products.initial_unit_cost || 0
-        });
-      } else {
-        osMap.get(p.product_id).neededQty = p.reported_qty;
-      }
     }
 
     // Convert map to grouped array

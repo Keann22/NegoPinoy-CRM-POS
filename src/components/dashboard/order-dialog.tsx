@@ -414,7 +414,7 @@ export function OrderDialog(props: OrderDialogProps) {
 
       // 1.5 Insert payment record for the initial payment
       if (actualAmountPaid > 0) {
-        const { error: paymentError } = await supabase
+        const { data: paymentData, error: paymentError } = await supabase
           .from('payments')
           .insert({
             order_id: newOrderId,
@@ -423,9 +423,21 @@ export function OrderDialog(props: OrderDialogProps) {
             payment_method: values.paymentType === 'Full Payment' ? 'Full Payment' : 'Downpayment',
             proof_url: proofUrl,
             notes: 'Initial Order Payment'
-          });
+          })
+          .select()
+          .single();
+
         if (paymentError) {
           throw paymentError;
+        }
+
+        // Trigger Google Cloud Vision OCR in the background
+        if (proofUrl && paymentData?.id) {
+            fetch('/api/payments/extract-ocr', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ proofUrl, paymentId: paymentData.id })
+            }).catch(err => console.error("OCR trigger failed:", err));
         }
       }
 

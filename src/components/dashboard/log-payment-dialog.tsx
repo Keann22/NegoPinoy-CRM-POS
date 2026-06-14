@@ -133,7 +133,7 @@ export function LogPaymentDialog({ order, open, onOpenChange }: LogPaymentDialog
         }
 
         // 3. Log Payment
-        const { error: paymentError } = await supabase
+        const { data: paymentData, error: paymentError } = await supabase
             .from('payments')
             .insert({
                 order_id: order.id,
@@ -142,9 +142,20 @@ export function LogPaymentDialog({ order, open, onOpenChange }: LogPaymentDialog
                 payment_method: values.paymentMethod,
                 notes: values.notes,
                 proof_url: proofUrl,
-            });
+            })
+            .select()
+            .single();
 
         if (paymentError) throw paymentError;
+
+        // Trigger Google Cloud Vision OCR in the background
+        if (proofUrl && paymentData?.id) {
+            fetch('/api/payments/extract-ocr', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ proofUrl, paymentId: paymentData.id })
+            }).catch(err => console.error("OCR trigger failed:", err));
+        }
 
         // 4. Update Order
         const { error: updateError } = await supabase

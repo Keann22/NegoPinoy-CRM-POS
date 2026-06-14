@@ -297,7 +297,7 @@ export default function ForShippingPage() {
         const items = order.items.length > 0 ? order.items : [{ product_name: 'Item', quantity: 1, selling_price_at_sale: order.totalAmount, discount: 0 }];
         
         const balanceDue = order.totalAmount - order.amountPaid;
-        const codAmount = balanceDue > 0 ? balanceDue + order.shippingAmount : 0;
+        const codAmount = balanceDue > 0 ? balanceDue : 0;
         const isCOD = codAmount > 0;
         
         const addr = order.shippingAddress || {};

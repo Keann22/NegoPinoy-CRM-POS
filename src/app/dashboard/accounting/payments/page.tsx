@@ -24,9 +24,11 @@ import { useUserProfile } from '@/hooks/useUserProfile';
 import Link from 'next/link';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Eye } from 'lucide-react';
+import { MoreHorizontal, Eye, FileUp, FileSearch, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type Payment = {
   id: string;
@@ -35,7 +37,9 @@ type Payment = {
   payment_date: string;
   payment_method: string;
   notes?: string;
+  reference_number?: string;
   proof_url?: string;
+  ocr_amount?: number;
   status: 'Pending' | 'Verified' | 'Rejected';
 };
 
@@ -49,10 +53,20 @@ export default function PaymentsPage() {
 
   const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoadingPayments, setIsLoadingPayments] = useState(true);
+  const [activeTab, setActiveTab] = useState('Pending');
+
+  const [isVerifyDialogOpen, setIsVerifyDialogOpen] = useState(false);
+  const [verifyFile, setVerifyFile] = useState<File | null>(null);
+  const [verifyPassword, setVerifyPassword] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
   
   // Map of order_id to order & customer info
   const [orderMap, setOrderMap] = useState<Map<string, { customerName: string; salesPersonName: string }>>(new Map());
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
+
+  const filteredPayments = useMemo(() => {
+    return payments.filter(p => (p.status || 'Pending') === activeTab);
+  }, [payments, activeTab]);
 
   // Fetch payments
   const fetchPayments = async () => {
@@ -169,6 +183,48 @@ export default function PaymentsPage() {
     }
   };
 
+  const handleVerifySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!verifyFile) return;
+
+    setIsVerifying(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', verifyFile);
+      if (verifyPassword) formData.append('password', verifyPassword);
+
+      const res = await fetch('/api/payments/verify-pdf', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to verify');
+      }
+
+      toast({
+        title: "Verification Complete",
+        description: `Successfully verified ${data.verifiedCount} payments!`,
+      });
+      
+      setIsVerifyDialogOpen(false);
+      setVerifyFile(null);
+      setVerifyPassword('');
+      fetchPayments();
+      
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Verification Failed",
+        description: error.message,
+      });
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
   if (userProfile && !isManagement) {
     return (
         <Card className="m-6 border-destructive/20 bg-destructive/5">
@@ -190,6 +246,62 @@ export default function PaymentsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList>
+                <TabsTrigger value="Pending">Pending</TabsTrigger>
+                <TabsTrigger value="Verified">Verified</TabsTrigger>
+                <TabsTrigger value="Rejected">Rejected</TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            <Dialog open={isVerifyDialogOpen} onOpenChange={setIsVerifyDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="secondary">
+                  <FileSearch className="mr-2 h-4 w-4" />
+                  Verify via Statement
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Upload Bank Statement</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleVerifySubmit} className="space-y-4 pt-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Bank Statement PDF</label>
+                    <Input 
+                      type="file" 
+                      accept=".pdf" 
+                      onChange={(e) => setVerifyFile(e.target.files?.[0] || null)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Document Password (Optional)</label>
+                    <Input 
+                      type="password" 
+                      placeholder="Enter PDF password if protected"
+                      value={verifyPassword}
+                      onChange={(e) => setVerifyPassword(e.target.value)}
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={isVerifying || !verifyFile}>
+                    {isVerifying ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Scanning PDF...
+                      </>
+                    ) : (
+                      <>
+                        <FileUp className="mr-2 h-4 w-4" />
+                        Upload & Verify
+                      </>
+                    )}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -198,9 +310,11 @@ export default function PaymentsPage() {
                 <TableHead>Customer</TableHead>
                 <TableHead>Processor</TableHead>
                 <TableHead>Method</TableHead>
+                <TableHead>Ref No.</TableHead>
                 <TableHead>Proof</TableHead>
                 <TableHead>Notes</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
+                <TableHead className="text-right">OCR Amount</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -213,14 +327,16 @@ export default function PaymentsPage() {
                       <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-8 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
                       <TableCell className="text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
                       <TableCell><Skeleton className="h-6 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                    </TableRow>
               ))}
-              {!isLoading && payments.map((payment) => {
+              {!isLoading && filteredPayments.map((payment) => {
                 const orderInfo = orderMap.get(payment.order_id);
                 const d = new Date(payment.payment_date);
                 const isDateValid = isValid(d);
@@ -242,6 +358,7 @@ export default function PaymentsPage() {
                       {orderInfo?.salesPersonName || 'Unknown'}
                     </TableCell>
                     <TableCell>{payment.payment_method}</TableCell>
+                    <TableCell>{payment.reference_number || '-'}</TableCell>
                     <TableCell>
                       {payment.proof_url ? (
                         <Dialog>
@@ -273,6 +390,9 @@ export default function PaymentsPage() {
                     <TableCell className="text-right font-semibold">
                       ₱{(Number(payment.amount) || 0).toFixed(2)}
                     </TableCell>
+                    <TableCell className={`text-right font-semibold ${payment.ocr_amount && payment.ocr_amount !== payment.amount ? 'text-destructive' : ''}`}>
+                      {payment.ocr_amount ? `₱${(Number(payment.ocr_amount)).toFixed(2)}` : '-'}
+                    </TableCell>
                     <TableCell>
                       <Badge variant={getStatusVariant(payment.status || 'Pending')}>
                         {payment.status || 'Pending'}
@@ -302,7 +422,7 @@ export default function PaymentsPage() {
               })}
             </TableBody>
           </Table>
-          {!isLoading && payments.length === 0 && (
+          {!isLoading && filteredPayments.length === 0 && (
               <div className="flex flex-col items-center justify-center text-center border-2 border-dashed rounded-lg p-12 mt-4">
                   <p className="text-lg font-semibold">No payments found</p>
                   <p className="text-muted-foreground mt-2">
