@@ -94,14 +94,14 @@ export function WaybillSummaryDialog({ open, onOpenChange, order }: WaybillSumma
                     
                     <div className="space-y-4">
                         <div className="grid grid-cols-[120px_1fr] items-center text-sm gap-2">
-                            <span className="text-slate-500 text-right leading-tight">Estimate Shipping Fee :</span>
+                            <span className="text-slate-500 text-right leading-tight">Total Shipping Fee :</span>
                             <span className="font-medium text-red-500">₱{spx.estimated_shipping_fee || 0}</span>
                         </div>
                         {(spx.basic_shipping_fee > 0 || spx.insurance_fee > 0 || spx.cod_service_fee > 0) && (
                             <div className="border-t pt-2 mt-2 space-y-1.5">
                                 <div className="text-xs text-slate-400 font-medium mb-1">Fee Breakdown:</div>
                                 <div className="grid grid-cols-[120px_1fr] items-center text-xs gap-2">
-                                    <span className="text-slate-500 text-right">Basic Shipping Fee :</span>
+                                    <span className="text-slate-500 text-right">Shipping Fee :</span>
                                     <span className="text-slate-700">₱{spx.basic_shipping_fee || 0}</span>
                                 </div>
                                 <div className="grid grid-cols-[120px_1fr] items-center text-xs gap-2">
