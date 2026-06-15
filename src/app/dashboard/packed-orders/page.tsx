@@ -56,6 +56,11 @@ export default function PackedOrdersPage() {
           totalAmount: o.total_amount,
           discountAmount: o.discount_amount,
           paymentMethod: o.payment_method,
+          paymentType: o.payment_method, // Maps db payment_method to expected paymentType
+          amountPaid: o.amount_paid || 0,
+          balanceDue: o.balance_due || 0,
+          monthlyPayment: o.monthly_payment || 0,
+          installmentMonths: o.installment_months || 0,
           courierName: o.courier_name,
           shippingFee: o.shipping_fee,
           deliveryAddress: o.delivery_address,

@@ -94,11 +94,25 @@ export function VerifyShippingDialog({ order, open, onOpenChange, onSuccess }: V
       });
       setPaymentType('sf only');
       setShippingAmount('0');
-      setBalanceDue(order.balanceDue?.toString() || '0');
+      
+      let expectedCod = order.balanceDue || 0;
+      if (order.amountPaid === 0) {
+         if (order.paymentType === 'Installment' || order.paymentType === 'Lay-away') {
+           expectedCod = order.totalAmount - ((order.monthlyPayment || 0) * (order.installmentMonths || 0));
+         } else {
+           expectedCod = order.totalAmount;
+         }
+      } else if (order.amountPaid < order.totalAmount && order.paymentType !== 'Installment' && order.paymentType !== 'Lay-away') {
+         expectedCod = order.totalAmount - order.amountPaid;
+      }
+      expectedCod = expectedCod > 0 ? expectedCod : 0;
+      
+      setBalanceDue(expectedCod.toString());
+      
       if (order.boxes_config && Array.isArray(order.boxes_config) && order.boxes_config.length > 1) {
           const amounts: Record<string, string> = {};
           order.boxes_config.forEach((b: any, index: number) => {
-              amounts[b.id] = b.cod_amount?.toString() || (index === 0 ? (order.balanceDue?.toString() || '0') : '0');
+              amounts[b.id] = b.cod_amount?.toString() || (index === 0 ? expectedCod.toString() : '0');
           });
           setBoxCodAmounts(amounts);
       } else {

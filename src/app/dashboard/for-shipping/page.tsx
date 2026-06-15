@@ -24,6 +24,9 @@ type ShippingOrder = {
   paymentType: string;
   totalAmount: number;
   amountPaid: number;
+  paymentMethod?: string;
+  monthlyPayment?: number;
+  installmentMonths?: number;
   items: any[];
   shippingAddress: any;
   weight: number | null;
@@ -62,14 +65,17 @@ export default function ForShippingPage() {
           shipping_amount,
           shipping_address,
           delivery_instructions,
+          payment_method,
+          monthly_payment,
+          installment_months,
           order_items (
             product_name,
             quantity,
-            selling_price_at_sale,
-            discount
-          )
-        `)
-        .eq('status', 'For Shipping')
+          selling_price_at_sale,
+          discount
+        )
+      `)
+      .eq('status', 'For Shipping')
         .order('order_date', { ascending: true });
       
       if (error) throw error;
@@ -84,8 +90,11 @@ export default function ForShippingPage() {
         paymentType: item.shipping_payment_type || '',
         totalAmount: item.total_amount || 0,
         amountPaid: item.amount_paid || 0,
+        paymentMethod: item.payment_method,
+        monthlyPayment: item.monthly_payment,
+        installmentMonths: item.installment_months,
         items: item.order_items || [],
-        shippingAddress: item.shipping_address || {},
+        shippingAddress: typeof item.shipping_address === 'string' ? JSON.parse(item.shipping_address) : (item.shipping_address || {}),
         weight: item.package_weight,
         length: item.package_length,
         width: item.package_width,
@@ -133,6 +142,9 @@ export default function ForShippingPage() {
       let paymentRoleCol = 32;
       let codAmountCol = 38;
       let estShippingFeeCol = 42;
+      let basicShippingFeeCol = -1;
+      let insuranceFeeCol = -1;
+      let codServiceFeeCol = -1;
       let foundHeaders = false;
 
       worksheet.eachRow((row, rowNumber) => {
@@ -145,6 +157,9 @@ export default function ForShippingPage() {
                   else if (paymentRoleCol === 32 && val.includes('payment role')) paymentRoleCol = colNumber;
                   else if (codAmountCol === 38 && val.includes('cod amount')) codAmountCol = colNumber;
                   else if (estShippingFeeCol === 42 && (val === 'estimated shipping fee' || val === 'est. shipping fee' || val.includes('est. shipping'))) estShippingFeeCol = colNumber;
+                  else if (basicShippingFeeCol === -1 && val.includes('basic shipping fee')) basicShippingFeeCol = colNumber;
+                  else if (insuranceFeeCol === -1 && val.includes('insurance fee')) insuranceFeeCol = colNumber;
+                  else if (codServiceFeeCol === -1 && val.includes('cod service fee')) codServiceFeeCol = colNumber;
               });
               
               if (trackingCol !== -1 && refCol !== -1) {
@@ -167,6 +182,9 @@ export default function ForShippingPage() {
           const paymentRole = row.getCell(paymentRoleCol).value?.toString() || '';
           const codAmount = parseFloat(row.getCell(codAmountCol).value?.toString() || '0') || 0;
           const estShippingFee = parseFloat(row.getCell(estShippingFeeCol).value?.toString() || '0') || 0;
+          const basicShippingFee = basicShippingFeeCol !== -1 ? parseFloat(row.getCell(basicShippingFeeCol).value?.toString() || '0') || 0 : 0;
+          const insuranceFee = insuranceFeeCol !== -1 ? parseFloat(row.getCell(insuranceFeeCol).value?.toString() || '0') || 0 : 0;
+          const codServiceFee = codServiceFeeCol !== -1 ? parseFloat(row.getCell(codServiceFeeCol).value?.toString() || '0') || 0 : 0;
           
           let rawPrefix = '';
           const orderIdMatch = rawCustRef.match(/ORDER\s*#?\s*([A-Za-z0-9-]+)/i);
@@ -187,6 +205,9 @@ export default function ForShippingPage() {
                           tracking_numbers: [],
                           cod_amount: 0,
                           estimated_shipping_fee: 0,
+                          basic_shipping_fee: 0,
+                          insurance_fee: 0,
+                          cod_service_fee: 0,
                           scheduled_pickup_time: pickupTime,
                           payment_role: paymentRole
                       };
@@ -197,6 +218,9 @@ export default function ForShippingPage() {
                   }
                   orderUpdates[fullId].cod_amount += codAmount;
                   orderUpdates[fullId].estimated_shipping_fee += estShippingFee;
+                  orderUpdates[fullId].basic_shipping_fee += basicShippingFee;
+                  orderUpdates[fullId].insurance_fee += insuranceFee;
+                  orderUpdates[fullId].cod_service_fee += codServiceFee;
               }
           }
       });
@@ -215,6 +239,9 @@ export default function ForShippingPage() {
                spx_sync_data: {
                    scheduled_pickup_time: data.scheduled_pickup_time,
                    estimated_shipping_fee: data.estimated_shipping_fee,
+                   basic_shipping_fee: data.basic_shipping_fee,
+                   insurance_fee: data.insurance_fee,
+                   cod_service_fee: data.cod_service_fee,
                    cod_amount: data.cod_amount,
                    payment_role: data.payment_role,
                    service_type: 'Standard Service',
@@ -296,8 +323,7 @@ export default function ForShippingPage() {
       orders.forEach(order => {
         const items = order.items.length > 0 ? order.items : [{ product_name: 'Item', quantity: 1, selling_price_at_sale: order.totalAmount, discount: 0 }];
         
-        const balanceDue = order.totalAmount - order.amountPaid;
-        const codAmount = balanceDue > 0 ? balanceDue : 0;
+        let codAmount = order.balanceDue || 0;
         const isCOD = codAmount > 0;
         
         const addr = order.shippingAddress || {};

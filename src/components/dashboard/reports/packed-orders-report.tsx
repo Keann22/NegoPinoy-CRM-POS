@@ -27,6 +27,9 @@ type PackedOrder = {
   trackingNumber: string | null;
   amountPaid: number;
   totalAmount: number;
+  balanceDue?: number;
+  monthlyPayment?: number;
+  installmentMonths?: number;
   isDownpaymentCOD: boolean;
 };
 
@@ -51,9 +54,12 @@ export function PackedOrdersReport() {
             package_height,
             package_weight,
             payment_method,
+            monthly_payment,
+            installment_months,
             tracking_number,
             amount_paid,
             total_amount,
+            balance_due,
             customers (
               full_name,
               mobile_number,
@@ -92,9 +98,12 @@ export function PackedOrdersReport() {
             customer: item.customers,
             items: item.order_items || [],
             paymentMethod: item.payment_method || 'COD',
+            monthlyPayment: item.monthly_payment,
+            installmentMonths: item.installment_months,
             trackingNumber: item.tracking_number,
             amountPaid: item.amount_paid || 0,
             totalAmount: item.total_amount || 0,
+            balanceDue: item.balance_due || 0,
             isDownpaymentCOD: false // Not directly fetched, assuming if COD and amountPaid < totalAmount it's COD
           };
         });
@@ -123,8 +132,8 @@ export function PackedOrdersReport() {
         order.items = [{ product_name: 'Item', quantity: 1, selling_price_at_sale: order.totalAmount, discount: 0 }];
       }
 
-      const isCOD = order.paymentMethod === 'COD' || order.amountPaid < order.totalAmount;
-      const codAmount = isCOD ? (order.totalAmount - order.amountPaid) : 0;
+      let codAmount = order.balanceDue || 0;
+      const isCOD = codAmount > 0;
       
       const detailedAddress = order.customer?.street_address 
         ? order.customer.street_address 

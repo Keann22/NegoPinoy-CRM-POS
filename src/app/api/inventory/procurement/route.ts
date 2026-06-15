@@ -14,21 +14,49 @@ export async function GET(req: Request) {
       .order('name');
     if (sErr) throw sErr;
 
-    // 2. Get live out of stock
-    const { data: liveOS, error: lErr } = await supabase
+    // 2. Get all draft requests from Jasmin
+    const { data: drafts, error: dErr } = await supabase
+      .from('purchase_order_items')
+      .select('id, product_id, expected_qty, po_id')
+      .eq('status', 'draft');
+    if (dErr) throw dErr;
+
+    const draftMap = new Map();
+    const productIdsToFetch = new Set<string>();
+    
+    drafts?.forEach(d => {
+      draftMap.set(d.product_id, d);
+      productIdsToFetch.add(d.product_id);
+    });
+
+    // 3. Get live out of stock OR products that have a draft
+    let query = supabase
       .from('products')
-      .select('id, name, variant_name, stock_level, supplier_id, initial_unit_cost')
-      .lt('stock_level', 0);
+      .select('id, name, variant_name, stock_level, supplier_id, initial_unit_cost');
+      
+    if (productIdsToFetch.size > 0) {
+      query = query.or(`stock_level.lt.0,id.in.(${Array.from(productIdsToFetch).map(id => `"${id}"`).join(',')})`);
+    } else {
+      query = query.lt('stock_level', 0);
+    }
+
+    const { data: liveOS, error: lErr } = await query;
     if (lErr) throw lErr;
 
     // Combine
     const osMap = new Map();
     
     for (const p of liveOS) {
+      const draft = draftMap.get(p.id);
+      const systemQty = Math.max(0, -p.stock_level);
+      
       osMap.set(p.id, {
         productId: p.id,
         productName: `${p.name} ${p.variant_name ? `[${p.variant_name}]` : ''}`,
-        neededQty: Math.abs(p.stock_level),
+        neededQty: draft ? draft.expected_qty : systemQty, // Default to Jasmin's request if exists, else system
+        systemQty: systemQty,
+        jasminRequestedQty: draft ? draft.expected_qty : null,
+        draftItemId: draft ? draft.id : null,
         supplierId: p.supplier_id,
         unitCost: p.initial_unit_cost || 0
       });
@@ -63,13 +91,13 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { purchases } = await req.json(); // Array of { productId, supplierId, qty, cost }
+    const { purchases } = await req.json(); // Array of { productId, supplierId, qty, cost, draftItemId }
 
     if (!purchases || purchases.length === 0) {
       return NextResponse.json({ error: 'No purchases provided' }, { status: 400 });
     }
 
-    // Create Purchase Order
+    // Create one official Purchase Order
     const { data: po, error: poErr } = await supabase
       .from('purchase_orders')
       .insert({ status: 'pending_receipt' })
@@ -78,21 +106,49 @@ export async function POST(req: Request) {
 
     if (poErr) throw poErr;
 
-    // Insert PO items
-    const itemsToInsert = purchases.map((p: any) => ({
-      po_id: po.id,
-      product_id: p.productId,
-      supplier_id: p.supplierId || null,
-      expected_qty: p.qty,
-      unit_cost: p.cost || 0,
-      status: 'pending_receipt'
-    }));
-
-    const { error: itemsErr } = await supabase
-      .from('purchase_order_items')
-      .insert(itemsToInsert);
-
-    if (itemsErr) throw itemsErr;
+    for (const p of purchases) {
+      if (p.draftItemId) {
+        // Update existing draft item
+        const { error: updErr } = await supabase
+          .from('purchase_order_items')
+          .update({
+            po_id: po.id,
+            supplier_id: p.supplierId || null,
+            expected_qty: p.qty,
+            unit_cost: p.cost || 0,
+            status: 'pending_receipt'
+          })
+          .eq('id', p.draftItemId);
+        if (updErr) throw updErr;
+      } else {
+        // Create new item if no draft existed
+        const { error: insErr } = await supabase
+          .from('purchase_order_items')
+          .insert({
+            po_id: po.id,
+            product_id: p.productId,
+            supplier_id: p.supplierId || null,
+            expected_qty: p.qty,
+            unit_cost: p.cost || 0,
+            status: 'pending_receipt'
+          });
+        if (insErr) throw insErr;
+      }
+    }
+    
+    // Clean up any remaining draft POs that are now empty
+    const { data: emptyDraftPos } = await supabase
+      .from('purchase_orders')
+      .select('id, purchase_order_items(id)')
+      .eq('status', 'draft');
+      
+    if (emptyDraftPos) {
+      for (const draftPo of emptyDraftPos) {
+        if (draftPo.purchase_order_items.length === 0) {
+          await supabase.from('purchase_orders').delete().eq('id', draftPo.id);
+        }
+      }
+    }
 
     return NextResponse.json({ success: true, poId: po.id });
   } catch (error: any) {

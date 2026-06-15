@@ -95,6 +95,7 @@ export default function DashboardLayout({
 
     if (isManagement || isInventory) {
       const inventorySubItems = [
+        { href: '/dashboard/inventory/procurement-request', label: 'Procurement Request', icon: ListChecks },
         { href: '/dashboard/inventory/audit', label: 'Out of Stock Audit', icon: ListChecks },
         { href: '/dashboard/inventory/receive', label: 'Bulk Receive', icon: Truck },
         { href: '/dashboard/inventory/restock', label: 'Restock / Purchase', icon: ArrowDownUp },

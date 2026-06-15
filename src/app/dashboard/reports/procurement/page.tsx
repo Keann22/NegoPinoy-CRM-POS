@@ -23,6 +23,19 @@ export default function ProcurementSheet() {
       const data = await res.json();
       setSuppliers(data.suppliers || []);
       setGroupedItems(data.groupedOutofStock || []);
+      
+      const initialPurchases: Record<string, any> = {};
+      (data.groupedOutofStock || []).forEach((group: any) => {
+        group.items.forEach((item: any) => {
+          initialPurchases[item.productId] = {
+            qty: String(item.neededQty), // Pre-fill with Jasmin's request or system qty
+            cost: item.unitCost || '',
+            supplierId: item.supplierId || '',
+            draftItemId: item.draftItemId || null
+          };
+        });
+      });
+      setPurchases(initialPurchases);
     } catch (e) {
       console.error(e);
     } finally {
@@ -63,7 +76,8 @@ export default function ProcurementSheet() {
         productId,
         qty: Number(data.qty),
         cost: Number(data.cost || 0),
-        supplierId: data.supplierId
+        supplierId: data.supplierId,
+        draftItemId: data.draftItemId
       }));
 
     if (validPurchases.length === 0) {
@@ -121,20 +135,28 @@ export default function ProcurementSheet() {
                 <thead className="bg-slate-50 text-slate-600 border-b">
                   <tr>
                     <th className="p-3 w-1/4">Product Name</th>
-                    <th className="p-3 w-1/12 text-center">OS Qty</th>
+                    <th className="p-3 w-[10%] text-center leading-tight">System<br/>Needed</th>
+                    <th className="p-3 w-[10%] text-center leading-tight">Jasmin's<br/>Request</th>
                     <th className="p-3 w-2/12">Actual Supplier</th>
                     <th className="p-3 w-2/12">Unit Cost (₱)</th>
-                    <th className="p-3 w-2/12">Purchased Qty</th>
+                    <th className="p-3 w-2/12">Final Qty Bought</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y text-slate-700">
                   {group.items.map((item: any) => {
-                    const pState = purchases[item.productId] || { qty: '', cost: item.unitCost || '', supplierId: item.supplierId || '' };
+                    const pState = purchases[item.productId] || { qty: '', cost: item.unitCost || '', supplierId: item.supplierId || '', draftItemId: null };
                     
+                    const hasDiscrepancy = item.jasminRequestedQty !== null && item.systemQty !== item.jasminRequestedQty;
+
                     return (
-                      <tr key={item.productId} className="hover:bg-slate-50">
+                      <tr key={item.productId} className={hasDiscrepancy ? "bg-orange-50 hover:bg-orange-100" : "hover:bg-slate-50"}>
                         <td className="p-3 font-medium text-slate-900">
                           {item.productName}
+                          {hasDiscrepancy && (
+                              <div className="text-xs font-bold text-orange-600 mt-1">
+                                  ⚠️ Discrepancy detected. Ask Jasmin for reason.
+                              </div>
+                          )}
                           {group.id === null && (
                             <div className="mt-2">
                               <select 
@@ -148,7 +170,10 @@ export default function ProcurementSheet() {
                             </div>
                           )}
                         </td>
-                        <td className="p-3 font-bold text-slate-800 text-center text-lg">{item.neededQty}</td>
+                        <td className="p-3 font-bold text-slate-500 text-center text-lg">{item.systemQty}</td>
+                        <td className={`p-3 font-bold text-center text-lg ${hasDiscrepancy ? "text-orange-600" : "text-green-600"}`}>
+                            {item.jasminRequestedQty !== null ? item.jasminRequestedQty : <span className="text-xs text-slate-400 font-normal">Pending</span>}
+                        </td>
                         <td className="p-3">
                           <select 
                             className="w-full border p-2 rounded-md"
@@ -171,7 +196,7 @@ export default function ProcurementSheet() {
                         <td className="p-3 bg-indigo-50/50">
                           <input 
                             type="number" 
-                            className="w-full border border-indigo-300 p-2 rounded-md focus:ring-2 focus:ring-indigo-500" 
+                            className="w-full border border-indigo-300 p-2 rounded-md focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-900" 
                             placeholder="Qty Bought"
                             value={pState.qty}
                             onChange={(e) => handleUpdatePurchase(item.productId, 'qty', e.target.value)}

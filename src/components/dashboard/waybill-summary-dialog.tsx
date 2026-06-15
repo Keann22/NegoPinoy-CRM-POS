@@ -80,7 +80,7 @@ export function WaybillSummaryDialog({ open, onOpenChange, order }: WaybillSumma
                         </div>
                         <div className="grid grid-cols-[130px_1fr] items-center text-gray-600">
                             <span className="text-right pr-4">COD Amount :</span>
-                            <span className="font-semibold text-gray-900">₱{(spx.cod_amount !== undefined ? Number(spx.cod_amount) : Number(order.amountPaid || order.totalAmount || 0)) + Number(spx.estimated_shipping_fee || 0)}</span>
+                            <span className="font-semibold text-gray-900">₱{(spx.cod_amount !== undefined ? Number(spx.cod_amount) : Number(order.amountPaid || order.totalAmount || 0))}</span>
                         </div>
                     </div>
                 </div>
@@ -97,6 +97,23 @@ export function WaybillSummaryDialog({ open, onOpenChange, order }: WaybillSumma
                             <span className="text-slate-500 text-right leading-tight">Estimate Shipping Fee :</span>
                             <span className="font-medium text-red-500">₱{spx.estimated_shipping_fee || 0}</span>
                         </div>
+                        {(spx.basic_shipping_fee > 0 || spx.insurance_fee > 0 || spx.cod_service_fee > 0) && (
+                            <div className="border-t pt-2 mt-2 space-y-1.5">
+                                <div className="text-xs text-slate-400 font-medium mb-1">Fee Breakdown:</div>
+                                <div className="grid grid-cols-[120px_1fr] items-center text-xs gap-2">
+                                    <span className="text-slate-500 text-right">Basic Shipping Fee :</span>
+                                    <span className="text-slate-700">₱{spx.basic_shipping_fee || 0}</span>
+                                </div>
+                                <div className="grid grid-cols-[120px_1fr] items-center text-xs gap-2">
+                                    <span className="text-slate-500 text-right">Insurance Fee :</span>
+                                    <span className="text-slate-700">₱{spx.insurance_fee || 0}</span>
+                                </div>
+                                <div className="grid grid-cols-[120px_1fr] items-center text-xs gap-2">
+                                    <span className="text-slate-500 text-right">COD Service Fee :</span>
+                                    <span className="text-slate-700">₱{spx.cod_service_fee || 0}</span>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
