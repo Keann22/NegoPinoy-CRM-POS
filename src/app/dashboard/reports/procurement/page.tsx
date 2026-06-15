@@ -128,7 +128,7 @@ export default function ProcurementSheet() {
     }
   };
 
-  const handleAddAdhocProduct = (product: any) => {
+  const handleAddAdhocProduct = async (product: any) => {
     // Check if it's already in the list
     for (const group of groupedItems) {
       if (group.items.some((i: any) => i.productId === product.id)) {
@@ -139,76 +139,25 @@ export default function ProcurementSheet() {
       }
     }
 
-    // Get pricing
-    let sp = product.supplier_pricing || [];
-    if (sp.length === 0 && product.initial_unit_cost) {
-      sp = [{ supplierName: 'Initial Stock', unitCost: product.initial_unit_cost }];
+    try {
+      setIsSearchingProducts(true);
+      const res = await fetch('/api/inventory/procurement-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requests: [{ productId: product.id, requestedQty: 1 }]
+        })
+      });
+      if (!res.ok) throw new Error(await res.text());
+      
+      setIsAddDialogOpen(false);
+      setProductSearch("");
+      fetchData(); // Reload from DB so it becomes a real draft item
+    } catch (e: any) {
+      alert("Failed to add product: " + e.message);
+    } finally {
+      setIsSearchingProducts(false);
     }
-    
-    // Find best cost
-    let matchedCost = product.initial_unit_cost || 0;
-    if (product.supplier_id) {
-        const matchingPricing = sp.find((p: any) => p.supplierName === suppliers.find(s => s.id === product.supplier_id)?.name);
-        if (matchingPricing) {
-            matchedCost = matchingPricing.unitCost;
-        }
-    }
-
-    const newItem = {
-      productId: product.id,
-      productName: `${product.name} ${product.variant_name ? `[${product.variant_name}]` : ''}`,
-      neededQty: 1, // Default 1
-      systemQty: product.stock_level ?? 0,
-      staffRequestedQty: null,
-      draftItemId: null,
-      supplierId: product.supplier_id,
-      unitCost: matchedCost
-    };
-
-    // Add to groupedItems
-    setGroupedItems(prev => {
-      // Deep copy to prevent React strict mode double-mutation
-      const newGroups = prev.map(g => ({ ...g, items: [...g.items] }));
-      
-      let targetGroup = newGroups.find(g => g.id === product.supplier_id);
-      if (!targetGroup) {
-        targetGroup = newGroups.find(g => g.id === null);
-      }
-      
-      // If unassigned group doesn't exist, create it
-      if (!targetGroup) {
-        if (!product.supplier_id) {
-            targetGroup = { id: null, name: 'Unassigned (No Supplier)', items: [] };
-            newGroups.unshift(targetGroup);
-        } else {
-            const supplier = suppliers.find(s => s.id === product.supplier_id);
-            if (supplier) {
-                targetGroup = { id: supplier.id, name: supplier.name, items: [] };
-                newGroups.push(targetGroup);
-            } else {
-                targetGroup = { id: null, name: 'Unassigned (No Supplier)', items: [] };
-                newGroups.unshift(targetGroup);
-            }
-        }
-      }
-      
-      targetGroup.items.push(newItem);
-      return newGroups;
-    });
-
-    // Add to purchases state
-    setPurchases(prev => ({
-      ...prev,
-      [product.id]: {
-        qty: "1",
-        cost: matchedCost || '',
-        supplierId: product.supplier_id || '',
-        draftItemId: null
-      }
-    }));
-
-    setIsAddDialogOpen(false);
-    setProductSearch("");
   };
 
   const handleAssignSupplier = async (productId: string, newSupplierId: string) => {
