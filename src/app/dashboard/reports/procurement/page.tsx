@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { ViewProductDetailsDialog } from "@/components/dashboard/view-product-details-dialog";
-import { Copy, PlusCircle, Search, Trash2 } from "lucide-react";
+import { Copy, PlusCircle, Search, Trash2, Flag } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +32,11 @@ export default function ProcurementSheet() {
   const [productSearch, setProductSearch] = useState('');
   const [productResults, setProductResults] = useState<any[]>([]);
   const [isSearchingProducts, setIsSearchingProducts] = useState(false);
+
+  const [issueDialogOpen, setIssueDialogOpen] = useState(false);
+  const [issueProduct, setIssueProduct] = useState<any>(null);
+  const [issueNote, setIssueNote] = useState("");
+  const [isSubmittingIssue, setIsSubmittingIssue] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -189,6 +194,37 @@ export default function ProcurementSheet() {
       fetchData();
     } catch (e: any) {
       alert("Failed to delete item: " + e.message);
+    }
+  };
+
+  const handleReportIssue = async () => {
+    if (!issueProduct || !issueNote.trim()) {
+      alert("Please enter a note describing why this item cannot be purchased.");
+      return;
+    }
+
+    setIsSubmittingIssue(true);
+    try {
+      const res = await fetch('/api/inventory/products/issue', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId: issueProduct.productId,
+          note: issueNote.trim()
+        })
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+      
+      alert("Issue reported successfully! It will now appear on the main dashboard for Sales.");
+      setIssueDialogOpen(false);
+      setIssueProduct(null);
+      setIssueNote("");
+      // Optionally we could fetch data again if we displayed it here, but we don't.
+    } catch (e: any) {
+      alert("Failed to report issue: " + e.message);
+    } finally {
+      setIsSubmittingIssue(false);
     }
   };
 
@@ -392,7 +428,18 @@ export default function ProcurementSheet() {
                             onChange={(e) => handleUpdatePurchase(item.productId, 'qty', e.target.value)}
                           />
                         </td>
-                        <td className="p-3 text-center">
+                        <td className="p-3 text-center flex flex-col gap-1 items-center justify-center">
+                          <button 
+                            onClick={() => {
+                              setIssueProduct(item);
+                              setIssueNote("");
+                              setIssueDialogOpen(true);
+                            }}
+                            className="text-slate-400 hover:text-amber-500 transition-colors p-1"
+                            title="Report issue / Cannot purchase"
+                          >
+                            <Flag className="w-5 h-5" />
+                          </button>
                           {item.draftItemId && (
                             <button 
                               onClick={() => handleDeleteDraftItem(item.draftItemId)}
@@ -461,6 +508,43 @@ export default function ProcurementSheet() {
                 ))
               )}
             </div>
+            <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={issueDialogOpen} onOpenChange={setIssueDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-amber-600 flex items-center gap-2">
+              <Flag className="w-5 h-5" />
+              Report Procurement Issue
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-slate-600">
+              Reporting an issue for: <span className="font-semibold text-slate-900">{issueProduct?.productName}</span>
+            </p>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700">Why can't this be purchased?</label>
+              <textarea
+                value={issueNote}
+                onChange={e => setIssueNote(e.target.value)}
+                placeholder="e.g. Out of stock at all suppliers, Price doubled, Discontinued..."
+                className="w-full border rounded-md p-2 text-sm min-h-[100px]"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setIssueDialogOpen(false)}>Cancel</Button>
+            <Button 
+              type="button" 
+              className="bg-amber-600 hover:bg-amber-700 text-white" 
+              onClick={handleReportIssue}
+              disabled={isSubmittingIssue}
+            >
+              {isSubmittingIssue ? "Reporting..." : "Submit Issue"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
