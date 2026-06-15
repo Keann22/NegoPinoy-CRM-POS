@@ -14,11 +14,11 @@ export async function GET(req: Request) {
       .order('name');
     if (sErr) throw sErr;
 
-    // 2. Get all draft requests from Jasmin
+    // 2. Get all draft requests from Staff
     const { data: drafts, error: dErr } = await supabase
       .from('purchase_order_items')
-      .select('id, product_id, expected_qty, po_id')
-      .eq('status', 'draft');
+      .select('id, product_id, expected_qty, po_id, purchase_orders!inner(notes)')
+      .eq('purchase_orders.notes', 'STAFF_DRAFT');
     if (dErr) throw dErr;
 
     const draftMap = new Map();
@@ -29,18 +29,14 @@ export async function GET(req: Request) {
       productIdsToFetch.add(d.product_id);
     });
 
-    // 3. Get live out of stock OR products that have a draft
-    let query = supabase
-      .from('products')
-      .select('id, name, variant_name, stock_level, supplier_id, initial_unit_cost');
-      
-    if (productIdsToFetch.size > 0) {
-      query = query.or(`stock_level.lt.0,id.in.(${Array.from(productIdsToFetch).map(id => `"${id}"`).join(',')})`);
-    } else {
-      query = query.lt('stock_level', 0);
+    if (productIdsToFetch.size === 0) {
+      return NextResponse.json({ suppliers, groupedOutofStock: [] });
     }
 
-    const { data: liveOS, error: lErr } = await query;
+    const { data: liveOS, error: lErr } = await supabase
+      .from('products')
+      .select('id, name, variant_name, stock_level, supplier_id, initial_unit_cost, supplier_pricing')
+      .in('id', Array.from(productIdsToFetch));
     if (lErr) throw lErr;
 
     // Combine
@@ -49,16 +45,27 @@ export async function GET(req: Request) {
     for (const p of liveOS) {
       const draft = draftMap.get(p.id);
       const systemQty = Math.max(0, -p.stock_level);
+
+      let matchedCost = p.initial_unit_cost || 0;
+      if (p.supplier_id && p.supplier_pricing) {
+        const sup = suppliers.find((s: any) => s.id === p.supplier_id);
+        if (sup) {
+          const pricing = p.supplier_pricing.find((sp: any) => sp.supplierName === sup.name);
+          if (pricing && pricing.unitCost) {
+            matchedCost = Number(pricing.unitCost);
+          }
+        }
+      }
       
       osMap.set(p.id, {
         productId: p.id,
         productName: `${p.name} ${p.variant_name ? `[${p.variant_name}]` : ''}`,
-        neededQty: draft ? draft.expected_qty : systemQty, // Default to Jasmin's request if exists, else system
+        neededQty: draft ? draft.expected_qty : systemQty, // Default to Staff request if exists, else system
         systemQty: systemQty,
-        jasminRequestedQty: draft ? draft.expected_qty : null,
+        staffRequestedQty: draft ? draft.expected_qty : null,
         draftItemId: draft ? draft.id : null,
         supplierId: p.supplier_id,
-        unitCost: p.initial_unit_cost || 0
+        unitCost: matchedCost
       });
     }
 
@@ -136,11 +143,11 @@ export async function POST(req: Request) {
       }
     }
     
-    // Clean up any remaining draft POs that are now empty
+    // Clean up any remaining STAFF_DRAFT POs that are now empty
     const { data: emptyDraftPos } = await supabase
       .from('purchase_orders')
       .select('id, purchase_order_items(id)')
-      .eq('status', 'draft');
+      .eq('notes', 'STAFF_DRAFT');
       
     if (emptyDraftPos) {
       for (const draftPo of emptyDraftPos) {
@@ -153,6 +160,25 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, poId: po.id });
   } catch (error: any) {
     console.error('Error in procurement POST:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: Request) {
+  try {
+    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+    const { productId, newSupplierId } = await req.json();
+
+    if (!productId || !newSupplierId) {
+      return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
+    }
+
+    const { error } = await supabase.from('products').update({ supplier_id: newSupplierId }).eq('id', productId);
+    if (error) throw error;
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error('Error in procurement PATCH:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

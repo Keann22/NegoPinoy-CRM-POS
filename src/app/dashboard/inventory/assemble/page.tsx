@@ -49,15 +49,13 @@ export default function AssembleKitPage() {
         const handler = setTimeout(async () => {
             setIsSearching(true);
             try {
-                const searchTermCapitalized = productSearch.charAt(0).toUpperCase() + productSearch.slice(1);
-                const { data, error } = await supabase
-                    .from('products')
-                    .select('id, name, stock_level, initial_unit_cost, assembly_recipe')
-                    .gte('name', searchTermCapitalized)
-                    .lte('name', searchTermCapitalized + '\uf8ff')
-                    .order('name')
-                    .limit(10);
-                if (error) throw error;
+                let query = supabase.from('products').select('*');
+        const searchWords = productSearch.split(' ').filter(w => w.trim() !== '');
+        searchWords.forEach(w => {
+            query = query.or(`name.ilike.%${w}%,variant_name.ilike.%${w}%`);
+        });
+        const { data, error } = await query.order('name').limit(10);
+        if (error) throw error;
                 setSearchResults(data || []);
             } catch (err) {
                 console.error('Assemble product search error:', err);

@@ -36,10 +36,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'No items provided' }, { status: 400 });
     }
 
-    // Create Draft Purchase Order (Jasmin's Request)
+    // Create Draft Purchase Order (Staff Request)
     const { data: po, error: poErr } = await supabase
       .from('purchase_orders')
-      .insert({ status: 'draft' })
+      .insert({ status: 'pending_receipt', notes: 'STAFF_DRAFT' })
       .select('id')
       .single();
 
@@ -50,8 +50,8 @@ export async function POST(req: Request) {
       po_id: po.id,
       product_id: p.productId,
       expected_qty: p.requestedQty,
-      unit_cost: 0, // Jasmin doesn't know cost
-      status: 'draft'
+      unit_cost: 0, // Staff doesn't know cost
+      status: 'pending_receipt'
     }));
 
     const { error: itemsErr } = await supabase

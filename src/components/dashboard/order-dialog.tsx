@@ -192,11 +192,12 @@ export function OrderDialog(props: OrderDialogProps) {
 
       setIsSearchingCustomers(true);
       try {
-        const { data, error } = await supabase
-          .from('customers')
-          .select('*')
-          .ilike('full_name', `%${customerSearch}%`)
-          .limit(10);
+        let query = supabase.from('customers').select('*');
+        const searchWords = customerSearch.split(' ').filter(w => w.trim() !== '');
+        searchWords.forEach(w => {
+            query = query.ilike('full_name', `%${w}%`);
+        });
+        const { data, error } = await query.limit(10);
 
         if (error) throw error;
 
@@ -232,12 +233,12 @@ export function OrderDialog(props: OrderDialogProps) {
 
       setIsSearchingProducts(true);
       try {
-        const { data, error } = await supabase
-          .from('products')
-          .select('id, name, stock_level, selling_price, installment_price, parent_id, supplier_pricing')
-          .ilike('name', `%${productSearch}%`)
-          .gt('selling_price', 0)  // exclude pure parent containers (price = 0)
-          .limit(15);
+        let query = supabase.from('products').select('id, name, stock_level, selling_price, installment_price, parent_id, supplier_pricing');
+        const searchWords = productSearch.split(' ').filter(w => w.trim() !== '');
+        searchWords.forEach(w => {
+            query = query.or(`name.ilike.%${w}%,variant_name.ilike.%${w}%`);
+        });
+        const { data, error } = await query.gt('selling_price', 0).limit(15);
 
         if (error) throw error;
 

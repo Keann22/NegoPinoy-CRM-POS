@@ -126,8 +126,12 @@ export function ProductDialog(props: ProductDialogProps) {
     if (!supabase || !user || !isManagement || supplierSearch.length < 1) { setSupplierResults([]); return; }
     const handler = setTimeout(async () => {
       setIsLoadingSuppliers(true);
-      const t = supplierSearch.charAt(0).toUpperCase() + supplierSearch.slice(1);
-      const { data } = await supabase.from('suppliers').select('id, name').gte('name', t).lte('name', t + '\uf8ff').order('name').limit(10);
+      let query = supabase.from('suppliers').select('id, name');
+      const searchWords = supplierSearch.split(' ').filter(w => w.trim() !== '');
+      searchWords.forEach(w => {
+          query = query.ilike('name', `%${w}%`);
+      });
+      const { data } = await query.order('name').limit(10);
       setSupplierResults(data || []);
       setIsLoadingSuppliers(false);
     }, 250);
@@ -151,8 +155,12 @@ export function ProductDialog(props: ProductDialogProps) {
     if (!supabase || !user || componentSearch.length < 1) { setComponentResults([]); return; }
     const handler = setTimeout(async () => {
       setIsLoadingComponents(true);
-      const t = componentSearch.charAt(0).toUpperCase() + componentSearch.slice(1);
-      const { data } = await supabase.from('products').select('id, name').gte('name', t).lte('name', t + '\uf8ff').order('name').limit(10);
+      let query = supabase.from('products').select('id, name, variant_name');
+      const searchWords = componentSearch.split(' ').filter(w => w.trim() !== '');
+      searchWords.forEach(w => {
+          query = query.or(`name.ilike.%${w}%,variant_name.ilike.%${w}%`);
+      });
+      const { data } = await query.order('name').limit(10);
       setComponentResults(data || []);
       setIsLoadingComponents(false);
     }, 250);

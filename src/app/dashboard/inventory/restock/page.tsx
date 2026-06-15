@@ -54,14 +54,12 @@ export default function RestockPage() {
     const handler = setTimeout(async () => {
       setIsLoadingProducts(true);
       try {
-        const searchTermCapitalized = productSearch.charAt(0).toUpperCase() + productSearch.slice(1);
-        const { data, error } = await supabase
-          .from('products')
-          .select('*')
-          .gte('name', searchTermCapitalized)
-          .lte('name', searchTermCapitalized + '\uf8ff')
-          .order('name')
-          .limit(10);
+        let query = supabase.from('products').select('*');
+        const searchWords = productSearch.split(' ').filter(w => w.trim() !== '');
+        searchWords.forEach(w => {
+            query = query.or(`name.ilike.%${w}%,variant_name.ilike.%${w}%`);
+        });
+        const { data, error } = await query.order('name').limit(10);
         if (error) throw error;
         setProductResults(data || []);
       } catch (err) {

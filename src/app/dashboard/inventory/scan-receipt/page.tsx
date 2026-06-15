@@ -71,11 +71,12 @@ function ProductSearch({ rowIndex, form, onAddNewProduct }: { rowIndex: number; 
             setIsLoadingProducts(true);
             try {
               const supabase = createClient();
-              const { data, error } = await supabase
-                .from('products')
-                .select('id, name, sku')
-                .ilike('name', `${search}%`)
-                .limit(10);
+              let query = supabase.from('products').select('id, name, sku');
+              const searchWords = search.split(' ').filter(w => w.trim() !== '');
+              searchWords.forEach(w => {
+                  query = query.or(`name.ilike.%${w}%,variant_name.ilike.%${w}%`);
+              });
+              const { data, error } = await query.limit(10);
               
               if (!error && data) {
                 setProductResults(data as Product[]);

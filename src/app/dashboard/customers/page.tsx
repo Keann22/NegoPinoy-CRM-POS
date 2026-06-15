@@ -59,7 +59,11 @@ export default function CustomersPage() {
                 .not('address_line', 'is', null).neq('address_line', '');
             
             if (debouncedQuery.trim()) {
-                query = query.ilike('full_name', `%${debouncedQuery.trim()}%`).limit(20);
+                const searchWords = debouncedQuery.split(' ').filter(w => w.trim() !== '');
+                searchWords.forEach(w => {
+                    query = query.ilike('full_name', `%${w}%`);
+                });
+                query = query.limit(20);
             } else {
                 query = query.order('created_at', { ascending: false }).limit(20);
             }

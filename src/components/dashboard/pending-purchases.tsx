@@ -24,14 +24,12 @@ function ProductSearch({ onProductSelect }: { onProductSelect: (product: any) =>
     const handler = setTimeout(async () => {
       setIsLoadingProducts(true);
       try {
-        const searchTermCapitalized = search.charAt(0).toUpperCase() + search.slice(1);
-        const { data, error } = await supabase
-          .from('products')
-          .select('*')
-          .gte('name', searchTermCapitalized)
-          .lte('name', searchTermCapitalized + '\uf8ff')
-          .order('name')
-          .limit(10);
+        let query = supabase.from('products').select('id, name, stock_level, variant_name');
+        const searchWords = search.split(' ').filter(w => w.trim() !== '');
+        searchWords.forEach(w => {
+            query = query.or(`name.ilike.%${w}%,variant_name.ilike.%${w}%`);
+        });
+        const { data, error } = await query.order('name').limit(10);
         if (error) throw error;
         setProductResults(data || []);
       } catch (err) {

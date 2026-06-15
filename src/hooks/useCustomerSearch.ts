@@ -31,12 +31,12 @@ export function useCustomerSearch() {
       const searchTermCapitalized = searchTerm.charAt(0).toUpperCase() + searchTerm.slice(1);
       
       try {
-        const { data, error } = await supabase
-          .from('customers')
-          .select('*')
-          .gte('full_name', searchTermCapitalized)
-          .lt('full_name', searchTermCapitalized + '\uf8ff')
-          .limit(10);
+        let query = supabase.from('customers').select('*');
+        const searchWords = searchTerm.split(' ').filter(w => w.trim() !== '');
+        searchWords.forEach(w => {
+            query = query.ilike('full_name', `%${w}%`);
+        });
+        const { data, error } = await query.limit(10);
           
         if (error) throw error;
         

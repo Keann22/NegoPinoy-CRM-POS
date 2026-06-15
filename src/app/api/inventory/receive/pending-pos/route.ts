@@ -11,14 +11,17 @@ export async function GET(req: Request) {
       .from('purchase_order_items')
       .select(`
         id, expected_qty, received_qty,
-        products (name, variant_name)
+        products (name, variant_name),
+        purchase_orders!inner(notes)
       `)
       .eq('status', 'pending_receipt')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
 
-    const mapped = items.map((i: any) => ({
+    const filteredItems = items.filter((i: any) => i.purchase_orders?.notes !== 'STAFF_DRAFT');
+
+    const mapped = filteredItems.map((i: any) => ({
       id: i.id,
       productName: `${i.products.name} ${i.products.variant_name ? `[${i.products.variant_name}]` : ''}`,
       expectedQty: i.expected_qty,

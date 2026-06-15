@@ -27,14 +27,12 @@ export function useSupplierSearch() {
     const handler = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const t = searchTerm.charAt(0).toUpperCase() + searchTerm.slice(1);
-        const { data, error } = await supabase
-          .from('suppliers')
-          .select('id, name')
-          .gte('name', t)
-          .lte('name', t + '\uf8ff')
-          .order('name')
-          .limit(10);
+        let query = supabase.from('suppliers').select('id, name');
+        const searchWords = searchTerm.split(' ').filter(w => w.trim() !== '');
+        searchWords.forEach(w => {
+            query = query.ilike('name', `%${w}%`);
+        });
+        const { data, error } = await query.order('name').limit(10);
         if (error) throw error;
         setResults(data || []);
       } catch (err) {

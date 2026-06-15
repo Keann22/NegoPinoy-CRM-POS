@@ -42,12 +42,12 @@ export function useProductSearch() {
       const searchTermCapitalized = searchTerm.charAt(0).toUpperCase() + searchTerm.slice(1);
 
       try {
-        const { data, error } = await supabase
-          .from('products')
-          .select('*')
-          .gte('name', searchTermCapitalized)
-          .lt('name', searchTermCapitalized + '\uf8ff')
-          .limit(10);
+        let query = supabase.from('products').select('*');
+        const searchWords = searchTerm.split(' ').filter(w => w.trim() !== '');
+        searchWords.forEach(w => {
+            query = query.or(`name.ilike.%${w}%,variant_name.ilike.%${w}%`);
+        });
+        const { data, error } = await query.limit(10);
         
         if (error) throw error;
         
