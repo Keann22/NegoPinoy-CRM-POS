@@ -182,3 +182,23 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export async function DELETE(req: Request) {
+  try {
+    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+    const { searchParams } = new URL(req.url);
+    const draftItemId = searchParams.get('draftItemId');
+
+    if (!draftItemId) {
+      return NextResponse.json({ error: 'Missing draftItemId' }, { status: 400 });
+    }
+
+    const { error } = await supabase.from('purchase_order_items').delete().eq('id', draftItemId);
+    if (error) throw error;
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error('Error in procurement DELETE:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { ViewProductDetailsDialog } from "@/components/dashboard/view-product-details-dialog";
-import { Copy, PlusCircle, Search } from "lucide-react";
+import { Copy, PlusCircle, Search, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -177,6 +177,21 @@ export default function ProcurementSheet() {
     }
   };
 
+  const handleDeleteDraftItem = async (draftItemId: string | null) => {
+    if (!draftItemId) return;
+    if (!confirm("Are you sure you want to remove this item from the procurement sheet?")) return;
+
+    try {
+      const res = await fetch(`/api/inventory/procurement?draftItemId=${draftItemId}`, {
+        method: "DELETE"
+      });
+      if (!res.ok) throw new Error(await res.text());
+      fetchData();
+    } catch (e: any) {
+      alert("Failed to delete item: " + e.message);
+    }
+  };
+
   const handleSubmitPurchases = async (targetSupplierId: string | null, groupItems: any[]) => {
     // Filter only items that have a quantity entered AND belong to this visual group
     const targetGroupSupplier = targetSupplierId || '';
@@ -287,14 +302,15 @@ export default function ProcurementSheet() {
               </div>
               
               <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 text-slate-600 border-b">
-                  <tr>
-                    <th className="p-3 w-1/4">Product Name</th>
-                    <th className="p-3 w-[10%] text-center leading-tight">System<br/>Needed</th>
-                    <th className="p-3 w-[10%] text-center leading-tight">Staff's<br/>Request</th>
-                    <th className="p-3 w-2/12">Actual Supplier</th>
-                    <th className="p-3 w-2/12">Unit Cost (₱)</th>
-                    <th className="p-3 w-2/12">Final Qty Bought</th>
+                <thead>
+                  <tr className="bg-slate-50 text-slate-500 text-sm border-b">
+                    <th className="p-3 text-left w-1/3">Product</th>
+                    <th className="p-3 text-center">System Qty</th>
+                    <th className="p-3 text-center">Staff Req.</th>
+                    <th className="p-3 text-left w-1/5">Assign Supplier</th>
+                    <th className="p-3 text-left w-32">Unit Cost</th>
+                    <th className="p-3 text-left w-32">Final Qty Bought</th>
+                    <th className="p-3 text-center w-12"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y text-slate-700">
@@ -375,6 +391,17 @@ export default function ProcurementSheet() {
                             value={pState.qty}
                             onChange={(e) => handleUpdatePurchase(item.productId, 'qty', e.target.value)}
                           />
+                        </td>
+                        <td className="p-3 text-center">
+                          {item.draftItemId && (
+                            <button 
+                              onClick={() => handleDeleteDraftItem(item.draftItemId)}
+                              className="text-slate-400 hover:text-red-500 transition-colors p-1"
+                              title="Remove item"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );
