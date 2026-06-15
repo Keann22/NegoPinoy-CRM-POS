@@ -44,7 +44,7 @@ export default function ProcurementSheet() {
       (data.groupedOutofStock || []).forEach((group: any) => {
         group.items.forEach((item: any) => {
           initialPurchases[item.productId] = {
-            qty: String(item.neededQty), // Pre-fill with Staff request or system qty
+            qty: "", // Must be manually entered to prevent accidental submission
             cost: item.unitCost || '',
             supplierId: item.supplierId || '',
             draftItemId: item.draftItemId || null

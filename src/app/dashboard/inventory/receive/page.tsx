@@ -109,7 +109,6 @@ function ProductSearch({ onProductSelect }: { onProductSelect: (product: Product
   );
 }
 
-import { NeedsProcurementList } from '@/components/dashboard/needs-procurement-list';
 import { PendingPurchases } from '@/components/dashboard/pending-purchases';
 
 export default function BulkReceivePage() {
@@ -232,8 +231,8 @@ export default function BulkReceivePage() {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div className="lg:col-span-2">
+    <div className="max-w-5xl mx-auto space-y-6">
+      <div>
         <PendingPurchases onReceiveComplete={() => {
           // You could optionally refresh some other state here if needed
         }} />
@@ -376,46 +375,7 @@ export default function BulkReceivePage() {
         </Form>
       </CardContent>
     </Card>
-    </div>
-    
-    <div className="hidden lg:block lg:col-span-1 h-[calc(100vh-12rem)] sticky top-6">
-      <NeedsProcurementList 
-        onAddProduct={(product) => {
-          append({ 
-            productId: product.id, 
-            productName: product.name, 
-            quantity: 1, 
-            unitCost: 0, 
-            supplierName: '' 
-          });
-          toast({
-            title: "Added to Shipment",
-            description: `${product.name} has been added to your receive list.`,
-          });
-        }} 
-      />
-    </div>
-    
-    {/* Mobile view of the list */}
-    <div className="block lg:hidden mt-6">
-      <NeedsProcurementList 
-        onAddProduct={(product) => {
-          append({ 
-            productId: product.id, 
-            productName: product.name, 
-            quantity: 1, 
-            unitCost: 0, 
-            supplierName: '' 
-          });
-          toast({
-            title: "Added to Shipment",
-            description: `${product.name} has been added to your receive list.`,
-          });
-          // scroll to bottom to see the added item
-          window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-        }} 
-      />
-    </div>
+      </div>
     </div>
   );
 }
