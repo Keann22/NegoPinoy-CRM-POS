@@ -133,7 +133,7 @@ export default function ProcurementRequestPage() {
                   {productResults.length > 0 && (
                     <CommandGroup>
                       {productResults.map((p) => (
-                        <CommandItem key={p.id} value={p.name} onSelect={() => handleProductSelect(p)}>
+                        <CommandItem key={p.id} value={`${p.name} ${p.variant_name || ''} ${p.id}`} onSelect={() => handleProductSelect(p)}>
                           {p.name} {p.variant_name ? `[${p.variant_name}]` : ''}
                         </CommandItem>
                       ))}
