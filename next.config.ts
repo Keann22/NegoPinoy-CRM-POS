@@ -36,9 +36,11 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // Exclude Genkit AI packages from the server bundle — they use Node.js internals
-  // incompatible with the Next.js Edge/Turbopack server runtime.
-  serverExternalPackages: ['genkit', '@genkit-ai/google-genai', '@genkit-ai/googleai'],
+  serverExternalPackages: ['genkit', '@genkit-ai/google-genai', '@genkit-ai/googleai', 'pdfjs-dist', 'canvas'],
+  webpack: (config) => {
+    config.resolve.alias.canvas = false;
+    return config;
+  },
 };
 
 export default nextConfig;
