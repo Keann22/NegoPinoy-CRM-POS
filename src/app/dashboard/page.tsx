@@ -97,7 +97,12 @@ export default function DashboardPage() {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        if (!supabase || !user || (!isManagement && !isSales)) return;
+        if (!supabase || !user) return;
+        
+        if (!isManagement && !isSales) {
+            setIsLoading(false);
+            return;
+        }
 
         const fetchMetrics = async () => {
             setIsLoading(true);
