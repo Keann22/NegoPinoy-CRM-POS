@@ -5,6 +5,7 @@ import { AlertCircle, CheckCircle2, MessageSquare, PackageOpen, Send } from "luc
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useUser } from "@/lib/supabase/hooks";
+import { useUserProfile } from "@/hooks/useUserProfile";
 
 export function ProcurementIssues({ isAdmin }: { isAdmin?: boolean }) {
   const [issues, setIssues] = useState<any[]>([]);
@@ -16,6 +17,7 @@ export function ProcurementIssues({ isAdmin }: { isAdmin?: boolean }) {
   const [isSending, setIsSending] = useState(false);
   
   const { user } = useUser();
+  const { userProfile } = useUserProfile();
 
   const fetchIssues = async () => {
     try {
@@ -95,7 +97,7 @@ export function ProcurementIssues({ isAdmin }: { isAdmin?: boolean }) {
         body: JSON.stringify({
           issueId: selectedIssue.id,
           senderRole: 'sales',
-          senderName: user?.displayName || 'Sales Team',
+          senderName: userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : 'Sales Team',
           message: replyText.trim()
         })
       });
