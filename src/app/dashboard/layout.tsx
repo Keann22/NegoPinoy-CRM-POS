@@ -28,7 +28,7 @@ import {
   PhilippinePeso,
   FileText,
 } from 'lucide-react';
-import { useAuth, useUser } from '@/firebase';
+import { useAuth, useUser } from '@/lib/supabase/hooks';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, useMemo } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -73,8 +73,8 @@ export default function DashboardLayout({
   const navLinks = useMemo(() => {
     const links = [];
 
-    // Dashboard only for Sales or Management
-    if (isManagement || isSales) {
+    // Dashboard for Sales, Management, or Inventory
+    if (isManagement || isSales || isInventory) {
       links.push({ href: '/dashboard', label: 'Dashboard', icon: Home });
     }
 
