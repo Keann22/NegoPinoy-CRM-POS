@@ -15,6 +15,7 @@ export async function GET(req: Request) {
       .select('id, name')
       .order('name');
     if (sErr) throw sErr;
+    console.log('API Hit! Suppliers fetched length:', suppliers?.length);
 
     // 2. Get all draft requests from Staff
     const { data: drafts, error: dErr } = await supabase

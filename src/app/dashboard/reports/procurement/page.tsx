@@ -40,7 +40,7 @@ export default function ProcurementSheet() {
 
   const fetchData = async () => {
     try {
-      const res = await fetch("/api/inventory/procurement");
+      const res = await fetch(`/api/inventory/procurement?t=${Date.now()}`, { cache: 'no-store' });
       const data = await res.json();
       setSuppliers(data.suppliers || []);
       setGroupedItems(data.groupedOutofStock || []);
@@ -57,8 +57,9 @@ export default function ProcurementSheet() {
         });
       });
       setPurchases(initialPurchases);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      alert("Failed to load procurement data: " + e.message);
     } finally {
       setLoading(false);
     }
