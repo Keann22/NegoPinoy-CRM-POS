@@ -338,8 +338,9 @@ export default function ProcurementSheet() {
                 </div>
               </div>
               
-              <table className="w-full text-left text-sm">
-                <thead>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm min-w-[900px]">
+                  <thead>
                   <tr className="bg-slate-50 text-slate-500 text-sm border-b">
                     <th className="p-3 text-left w-1/3">Product</th>
                     <th className="p-3 text-center">System Qty</th>
@@ -456,6 +457,7 @@ export default function ProcurementSheet() {
                   })}
                 </tbody>
               </table>
+            </div>
             </div>
           ))}
         </div>
