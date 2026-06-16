@@ -63,6 +63,7 @@ export default function DashboardLayout({
 
   const [openInventory, setOpenInventory] = useState(false);
   const [openAccounting, setOpenAccounting] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const roles = useMemo(() => userProfile?.roles || [], [userProfile]);
   
@@ -157,21 +158,9 @@ export default function DashboardLayout({
     if (pathname.startsWith('/dashboard/accounting')) {
       setOpenAccounting(true);
     }
-
-    // Force clean up any Radix UI dialog locks and orphaned overlays on route change
-    document.body.style.pointerEvents = 'auto';
-    document.body.removeAttribute('data-scroll-locked');
     
-    // Remove any orphaned portals (like Dialog overlays) that get stuck during fast navigation
-    const timer = setTimeout(() => {
-      const portals = document.querySelectorAll('[data-radix-portal]');
-      portals.forEach(portal => {
-        // If they are stuck after navigation, hide them
-        portal.remove();
-      });
-    }, 100);
-
-    return () => clearTimeout(timer);
+    // Close mobile menu on navigation
+    setIsMobileMenuOpen(false);
   }, [pathname]);
 
   useEffect(() => {
@@ -275,7 +264,7 @@ export default function DashboardLayout({
       </div>
       <div className="flex flex-col">
         <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-4 lg:h-[60px] lg:px-6">
-          <Sheet>
+          <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
             <SheetTrigger asChild>
               <Button
                 variant="outline"
