@@ -165,9 +165,12 @@ export default function DashboardLayout({
 
   useEffect(() => {
     if (!isUserLoading && !user) {
-      router.push('/');
+      // Sign out to clear any stale session in localStorage that getSession might falsely read
+      auth.signOut().finally(() => {
+        router.push('/');
+      });
     }
-  }, [user, isUserLoading, router]);
+  }, [user, isUserLoading, router, auth]);
 
   const handleLogout = () => {
     auth.signOut();
