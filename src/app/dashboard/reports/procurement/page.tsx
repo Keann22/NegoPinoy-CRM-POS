@@ -206,8 +206,8 @@ export default function ProcurementSheet() {
 
     setIsSubmittingIssue(true);
     try {
-      const res = await fetch('/api/inventory/products/issue', {
-        method: 'PATCH',
+      const res = await fetch('/api/inventory/issues', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           productId: issueProduct.productId,

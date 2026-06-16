@@ -234,7 +234,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
-        {(!isSales || isManagement) && <ProcurementIssues />}
+        {(!isSales || isManagement) && <ProcurementIssues isAdmin={isManagement} />}
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
