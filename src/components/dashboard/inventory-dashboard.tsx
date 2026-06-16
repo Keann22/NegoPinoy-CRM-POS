@@ -7,10 +7,13 @@ import { useSupabase, useUser } from "@/lib/supabase/hooks";
 import { AlertTriangle, Package, ArrowDownToLine, ArrowUpRight, ClipboardList, Settings2, PackageSearch } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ProcurementIssues } from "@/components/dashboard/procurement-issues";
+import { useRoleCheck } from "@/hooks/useRoleCheck";
 
 export function InventoryDashboard() {
   const supabase = useSupabase();
   const { user } = useUser();
+  const { isManagement } = useRoleCheck();
   const [metrics, setMetrics] = useState({
     totalProducts: 0,
     lowStockCount: 0,
@@ -64,7 +67,9 @@ export function InventoryDashboard() {
         <p className="text-muted-foreground">Overview of your warehouse stock and quick actions.</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <ProcurementIssues isAdmin={isManagement} />
+
+      <div className="grid gap-4 md:grid-cols-3 mt-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Products</CardTitle>
