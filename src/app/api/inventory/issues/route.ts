@@ -41,13 +41,23 @@ export async function GET(req: Request) {
         .select(`
           *,
           products(name, variant_name, images),
-          procurement_issue_messages(id)
+          procurement_issue_messages(id, sender_name, created_at)
         `)
         .eq('status', 'open')
         .order('created_at', { ascending: false });
       
       if (error) throw error;
       
+      if (data) {
+        data.forEach((issue: any) => {
+          if (issue.procurement_issue_messages) {
+            issue.procurement_issue_messages.sort((a: any, b: any) => 
+              new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            );
+          }
+        });
+      }
+
       return NextResponse.json(data);
     }
   } catch (error: any) {
