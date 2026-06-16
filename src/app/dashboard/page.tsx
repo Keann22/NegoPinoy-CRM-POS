@@ -2,7 +2,7 @@
 
 import { Activity, CreditCard, DollarSign, TrendingUp, CalendarIcon, Filter } from 'lucide-react';
 import { useMemo, useEffect, useState } from 'react';
-import { useUser, useSupabase } from '@/firebase';
+import { useUser, useSupabase } from '@/lib/supabase/hooks';
 import { useRouter } from 'next/navigation';
 import { DateRange } from 'react-day-picker';
 import { startOfMonth, endOfMonth, format } from 'date-fns';
@@ -23,6 +23,7 @@ import { TopCustomers } from '@/components/dashboard/top-customers';
 import { TopProducts } from '@/components/dashboard/top-products';
 import { CollectionsDueSoon } from '@/components/dashboard/collections-due-soon';
 import { ProcurementIssues } from '@/components/dashboard/procurement-issues';
+import { InventoryDashboard } from '@/components/dashboard/inventory-dashboard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUserProfile } from '@/hooks/useUserProfile';
 
@@ -84,12 +85,7 @@ export default function DashboardPage() {
         }
     }, [userProfile, isManagement, selectedSalesperson]);
 
-    // Redirect Inventory users away from the dashboard immediately
-    useEffect(() => {
-        if (isInventoryOnly) {
-            router.replace('/dashboard/products');
-        }
-    }, [isInventoryOnly, router]);
+    // We no longer redirect Inventory users. They have their own dashboard now.
 
     const [dashboardMetrics, setDashboardMetrics] = useState({
         totalRevenue: 0,
@@ -191,12 +187,7 @@ export default function DashboardPage() {
     }, [supabase, user, isManagement, isSales, dateRange, selectedSalesperson]);
 
   if (isInventoryOnly) {
-    return (
-        <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
-            <Skeleton className="h-8 w-48" />
-            <p className="text-muted-foreground">Redirecting to Inventory workspace...</p>
-        </div>
-    );
+    return <InventoryDashboard />;
   }
 
   return (
