@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { AlertCircle, CheckCircle2, MessageSquare, PackageOpen, Send } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { useUser } from "@/firebase";
+import { useUser } from "@/lib/supabase/hooks";
 
 export function ProcurementIssues({ isAdmin }: { isAdmin?: boolean }) {
   const [issues, setIssues] = useState<any[]>([]);
