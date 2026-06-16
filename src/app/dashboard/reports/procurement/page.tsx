@@ -270,22 +270,17 @@ export default function ProcurementSheet() {
   };
 
   const handleCopyOrder = (supplierName: string, groupItems: any[]) => {
-    const itemIdsInGroup = new Set(groupItems.map((i: any) => i.productId));
-    const validPurchases = Object.entries(purchases)
-      .filter(([productId, data]) => data.qty && Number(data.qty) > 0 && itemIdsInGroup.has(productId));
-
-    if (validPurchases.length === 0) {
-      return alert("No items have a quantity to order!");
-    }
-
     let text = "";
     
-    validPurchases.forEach(([productId, data]) => {
-      const item = groupItems.find(i => i.productId === productId);
-      if (item) {
-        text += `${data.qty}x ${item.productName}\n`;
+    groupItems.forEach((item) => {
+      if (item.neededQty && Number(item.neededQty) > 0) {
+        text += `${item.neededQty}x ${item.productName}\n`;
       }
     });
+
+    if (!text) {
+      return alert("No items have a quantity to order!");
+    }
 
     navigator.clipboard.writeText(text.trim()).then(() => {
       alert("Order copied to clipboard! You can now paste it into Messenger.");
