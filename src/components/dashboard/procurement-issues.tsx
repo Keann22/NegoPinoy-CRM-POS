@@ -134,7 +134,9 @@ export function ProcurementIssues({ isAdmin }: { isAdmin?: boolean }) {
             <div className="text-sm text-slate-500">Checking for issues...</div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {issues.map(issue => (
+              {issues.map(issue => {
+                const reporter = issue.procurement_issue_messages?.[0]?.sender_name || 'Unknown';
+                return (
                 <div 
                   key={issue.id} 
                   onClick={() => openIssue(issue)}
@@ -144,16 +146,21 @@ export function ProcurementIssues({ isAdmin }: { isAdmin?: boolean }) {
                     <h4 className="font-semibold text-slate-900 text-sm line-clamp-2">
                       {issue.products?.name} {issue.products?.variant_name ? `[${issue.products.variant_name}]` : ''}
                     </h4>
-                    <p className="text-xs text-slate-500 mt-2 flex items-center gap-1">
-                      <MessageSquare className="w-3 h-3" />
-                      {issue.procurement_issue_messages?.length || 0} messages
-                    </p>
+                    <div className="text-xs text-slate-500 mt-2 space-y-1">
+                      <p className="flex items-center gap-1">
+                        <MessageSquare className="w-3 h-3" />
+                        {issue.procurement_issue_messages?.length || 0} messages
+                      </p>
+                      <p className="flex items-center gap-1 text-slate-600">
+                        Reported by: <span className="font-medium text-slate-800">{reporter}</span>
+                      </p>
+                    </div>
                   </div>
                   <Button variant="ghost" size="sm" className="w-full mt-4 text-amber-700 bg-amber-50 hover:bg-amber-100">
                     View Details
                   </Button>
                 </div>
-              ))}
+              )})}
             </div>
           )}
         </CardContent>
@@ -162,10 +169,15 @@ export function ProcurementIssues({ isAdmin }: { isAdmin?: boolean }) {
       <Dialog open={!!selectedIssue} onOpenChange={(open) => !open && setSelectedIssue(null)}>
         <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col overflow-hidden p-0">
           <DialogHeader className="p-6 border-b bg-slate-50 shrink-0">
-            <DialogTitle className="flex items-center gap-2 text-xl">
-              <AlertCircle className="text-amber-600 w-6 h-6" />
-              Procurement Issue: {selectedIssue?.products?.name}
-            </DialogTitle>
+            <div>
+              <DialogTitle className="flex items-center gap-2 text-xl">
+                <AlertCircle className="text-amber-600 w-6 h-6" />
+                Procurement Issue: {selectedIssue?.products?.name}
+              </DialogTitle>
+              <p className="text-sm text-slate-500 mt-1 pl-8">
+                Reported by: <span className="font-medium text-slate-700">{selectedIssue?.procurement_issue_messages?.[0]?.sender_name || 'Unknown'}</span>
+              </p>
+            </div>
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
