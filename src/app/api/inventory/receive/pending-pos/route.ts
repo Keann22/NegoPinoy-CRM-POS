@@ -19,7 +19,9 @@ export async function GET(req: Request) {
 
     if (error) throw error;
 
-    const filteredItems = items.filter((i: any) => i.purchase_orders?.notes !== 'STAFF_DRAFT');
+    // Do not filter out STAFF_DRAFT so that inventory can receive them
+    // even if management hasn't finalized the amount/qty.
+    const filteredItems = items;
 
     const mapped = filteredItems.map((i: any) => ({
       id: i.id,

@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useUser, useSupabase } from '@/firebase';
+import { useUser, useSupabase } from '@/lib/supabase/hooks';
 import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -139,6 +139,83 @@ export default function BulkReceivePage() {
   const totalCost = items.reduce((total, item) => {
     return total + ((item.quantity || 0) * (item.unitCost || 0));
   }, 0);
+
+  const [submittingIndex, setSubmittingIndex] = useState<number | null>(null);
+
+  const handleReceiveSingleItem = async (index: number) => {
+    const values = form.getValues();
+    const item = values.items[index];
+    
+    if (!item.productId || !item.quantity || item.quantity <= 0) {
+        toast({ variant: 'destructive', title: 'Invalid Item', description: 'Please ensure product is selected and quantity is valid.' });
+        return;
+    }
+
+    setSubmittingIndex(index);
+    toast({ title: 'Saving Item...', description: 'Please wait.' });
+
+    try {
+        const { data: product, error: productsError } = await supabase
+            .from('products')
+            .select('id, stock_level, name')
+            .eq('id', item.productId)
+            .single();
+        
+        if (productsError) throw productsError;
+        
+        const itemExpense = (item.quantity * (item.unitCost || 0));
+        if (itemExpense > 0 && item.supplierName !== 'Internal Inventory') {
+            const supplierText = item.supplierName ? ` from ${item.supplierName}` : '';
+            const { error: expenseError } = await supabase
+                .from('expenses')
+                .insert({
+                    expense_date: values.purchaseDate.toISOString(),
+                    amount: itemExpense,
+                    category: 'Cost of Goods Sold',
+                    description: `Shipment received${supplierText} - ${product.name}`,
+                });
+            if (expenseError) throw expenseError;
+        }
+
+        const { error: updateError } = await supabase.rpc('increment_stock', {
+            p_product_id: item.productId,
+            qty: item.quantity,
+            new_unit_cost: item.unitCost || 0
+        });
+        
+        if (updateError) throw updateError;
+
+        const { error: movementError } = await supabase
+            .from('inventory_movements')
+            .insert({
+                product_id: item.productId,
+                quantity_change: item.quantity,
+                movement_type: 'RESTOCK',
+                timestamp: new Date().toISOString(),
+                reason: `Bulk receive${item.supplierName ? ` from ${item.supplierName}` : ''}`,
+                supplier_name: item.supplierName || null,
+                unit_cost: item.unitCost || 0
+            });
+            
+        if (movementError) throw movementError;
+
+        toast({
+            title: 'Item Saved!',
+            description: `${item.productName} has been received.`,
+        });
+        
+        remove(index);
+    } catch (e: any) {
+        console.error("Single item receive failed: ", e);
+        toast({
+            variant: 'destructive',
+            title: 'Save Failed',
+            description: e.message || 'Could not save the item.',
+        });
+    } finally {
+        setSubmittingIndex(null);
+    }
+  };
 
   const onSubmit = async (values: ShipmentFormValues) => {
     setIsSubmitting(true);
@@ -338,9 +415,20 @@ export default function BulkReceivePage() {
                                     </TableCell>
                                 )}
                                 <TableCell className="text-right">
-                                    <Button type="button" variant='ghost' size='icon' onClick={() => remove(index)}>
-                                        <Trash2 className='h-4 w-4 text-destructive'/>
-                                    </Button>
+                                    <div className="flex items-center justify-end gap-2">
+                                        <Button 
+                                            type="button" 
+                                            size="sm"
+                                            className="bg-green-600 hover:bg-green-700 text-white"
+                                            onClick={() => handleReceiveSingleItem(index)}
+                                            disabled={submittingIndex === index}
+                                        >
+                                            {submittingIndex === index ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
+                                        </Button>
+                                        <Button type="button" variant='ghost' size='icon' onClick={() => remove(index)}>
+                                            <Trash2 className='h-4 w-4 text-destructive'/>
+                                        </Button>
+                                    </div>
                                 </TableCell>
                             </TableRow>
                         ))}
@@ -357,7 +445,29 @@ export default function BulkReceivePage() {
                  <FormMessage>{form.formState.errors.items?.message || form.formState.errors.items?.root?.message}</FormMessage>
             </div>
             
-            <Button type='button' variant='outline' onClick={addNewItem}>Add Item</Button>
+            <div className="flex gap-2">
+                <Button type='button' variant='outline' onClick={addNewItem}>Add Item</Button>
+                <Button type='button' variant='secondary' onClick={async () => {
+                    try {
+                        const res = await fetch("/api/inventory/procurement-request");
+                        const data = await res.json();
+                        if (data.outOfStock && data.outOfStock.length > 0) {
+                            data.outOfStock.forEach((p: any) => {
+                                const exists = form.getValues('items').some((f: any) => f.productId === p.productId);
+                                if (!exists) {
+                                    append({ productId: p.productId, productName: p.productName, quantity: p.systemQty, unitCost: 0 });
+                                }
+                            });
+                            toast({ title: "Loaded To Procure items", description: "Items have been added to the form." });
+                        } else {
+                            toast({ title: "No items to procure", description: "All products have sufficient stock." });
+                        }
+                    } catch (e) {
+                        console.error(e);
+                        toast({ variant: 'destructive', title: "Error loading items" });
+                    }
+                }}>Load 'To Procure' Items</Button>
+            </div>
 
             {isManagement && (
                 <div className="pt-4 space-y-2 text-right">
