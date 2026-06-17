@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { useSupabase } from "@/firebase";
+import { useSupabase } from "@/lib/supabase/hooks";
+import { useToast } from "@/hooks/use-toast";
 
 function ProductSearch({ onProductSelect }: { onProductSelect: (product: any) => void }) {
   const [open, setOpen] = useState(false);
@@ -88,6 +89,8 @@ export function PendingPurchases({ onReceiveComplete }: { onReceiveComplete: () 
   const [unexpectedItems, setUnexpectedItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const fetchPending = async () => {
     try {
@@ -113,6 +116,58 @@ export function PendingPurchases({ onReceiveComplete }: { onReceiveComplete: () 
     setItems(items.map(i => i.id === id ? { ...i, discrepancyReason: reason } : i));
   };
 
+  const handleReceiveSingle = async (item: any, isUnexpected: boolean = false) => {
+    let toReceive = [];
+    let toReceiveUnexpected = [];
+
+    if (isUnexpected) {
+        if (!item.receivedQty || Number(item.receivedQty) <= 0) {
+            return toast({ variant: 'destructive', title: 'Invalid Quantity', description: 'Please enter a valid received quantity.' });
+        }
+        toReceiveUnexpected.push({
+            productId: item.id,
+            receivedQty: Number(item.receivedQty),
+            unitCost: item.sellingPrice ? item.sellingPrice * 0.8 : 0
+        });
+    } else {
+        if (!item.receivedQty || Number(item.receivedQty) <= 0) {
+            return toast({ variant: 'destructive', title: 'Invalid Quantity', description: 'Please enter a valid received quantity.' });
+        }
+        if (Number(item.receivedQty) < Number(item.remainingQty) && (!item.discrepancyReason || item.discrepancyReason.trim() === '')) {
+            return toast({ variant: 'destructive', title: 'Reason Required', description: `Please provide a discrepancy reason for: ${item.productName}` });
+        }
+        toReceive.push({
+            itemId: item.id,
+            receivedQty: Number(item.receivedQty),
+            discrepancyReason: Number(item.receivedQty) < Number(item.remainingQty) ? item.discrepancyReason : undefined
+        });
+    }
+
+    setSubmittingId(item.id);
+    try {
+      const res = await fetch("/api/inventory/receive/pending-pos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ receives: toReceive, unexpectedItems: toReceiveUnexpected })
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+
+      toast({ title: 'Item Saved!', description: `Successfully received ${item.productName || item.name}.` });
+      
+      if (isUnexpected) {
+          setUnexpectedItems(unexpectedItems.filter(i => i.id !== item.id));
+      } else {
+          fetchPending();
+      }
+      onReceiveComplete();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
+    } finally {
+      setSubmittingId(null);
+    }
+  };
+
   const handleReceive = async () => {
     // filter out items that have receivedQty entered
     const toReceive = items.filter(i => i.receivedQty && Number(i.receivedQty) > 0).map(i => ({
@@ -130,11 +185,11 @@ export function PendingPurchases({ onReceiveComplete }: { onReceiveComplete: () 
     // Validation
     const invalidDiscrepancies = items.filter(i => i.receivedQty && Number(i.receivedQty) > 0 && Number(i.receivedQty) < Number(i.remainingQty) && (!i.discrepancyReason || i.discrepancyReason.trim() === ''));
     if (invalidDiscrepancies.length > 0) {
-        return alert(`Please provide a discrepancy reason for: ${invalidDiscrepancies.map(i => i.productName).join(', ')}`);
+        return toast({ variant: 'destructive', title: 'Reason Required', description: `Please provide a discrepancy reason for: ${invalidDiscrepancies.map(i => i.productName).join(', ')}` });
     }
 
     if (toReceive.length === 0 && toReceiveUnexpected.length === 0) {
-      return alert("Please enter the received quantity for at least one item.");
+      return toast({ variant: 'destructive', title: 'No Items', description: "Please enter the received quantity for at least one item." });
     }
 
     setIsSubmitting(true);
@@ -147,12 +202,12 @@ export function PendingPurchases({ onReceiveComplete }: { onReceiveComplete: () 
 
       if (!res.ok) throw new Error(await res.text());
 
-      alert("Successfully received purchases!");
+      toast({ title: 'Success', description: "Successfully received purchases!" });
       setUnexpectedItems([]);
       fetchPending();
       onReceiveComplete();
     } catch (e: any) {
-      alert("Error: " + e.message);
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
     } finally {
       setIsSubmitting(false);
     }
@@ -211,7 +266,7 @@ export function PendingPurchases({ onReceiveComplete }: { onReceiveComplete: () 
                           <div className="text-xs font-normal text-slate-400 mt-1">({item.alreadyReceivedQty} prev. received)</div>
                       )}
                   </td>
-                  <td className="p-4">
+                  <td className="p-4 flex items-center gap-2">
                     <Input 
                       type="number" 
                       placeholder={`Matches ${item.remainingQty}?`}
@@ -219,6 +274,15 @@ export function PendingPurchases({ onReceiveComplete }: { onReceiveComplete: () 
                       onChange={(e) => handleQtyChange(item.id, e.target.value)}
                       className={isDiscrepancy ? "border-red-300" : "border-indigo-200 focus-visible:ring-indigo-500"}
                     />
+                    <Button 
+                        type="button" 
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700 text-white whitespace-nowrap"
+                        onClick={() => handleReceiveSingle(item, false)}
+                        disabled={submittingId === item.id}
+                    >
+                        {submittingId === item.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
+                    </Button>
                   </td>
                 </tr>
               );
@@ -249,6 +313,15 @@ export function PendingPurchases({ onReceiveComplete }: { onReceiveComplete: () 
                       }}
                       className="border-amber-200 focus-visible:ring-amber-500"
                     />
+                    <Button 
+                        type="button" 
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700 text-white whitespace-nowrap"
+                        onClick={() => handleReceiveSingle(item, true)}
+                        disabled={submittingId === item.id}
+                    >
+                        {submittingId === item.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
+                    </Button>
                     <Button variant="ghost" size="icon" onClick={() => setUnexpectedItems(unexpectedItems.filter(i => i.id !== item.id))}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
