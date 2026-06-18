@@ -12,7 +12,7 @@ interface ShareReceiptDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   order: Order | null;
-  customer: { firstName: string; lastName: string } | null;
+  customer: { firstName: string; lastName: string } | { fullName: string } | null;
   orderItems: any[];
 }
 
@@ -87,7 +87,9 @@ export function ShareReceiptDialog({ open, onOpenChange, order, customer, orderI
             {customer && (
                 <div className="flex justify-between">
                     <span className="text-gray-500">Customer:</span>
-                    <span className="font-semibold text-right max-w-[150px] truncate">{customer.firstName} {customer.lastName}</span>
+                    <span className="font-semibold text-right max-w-[150px] truncate">
+                        {'fullName' in customer ? customer.fullName : `${customer.firstName} ${customer.lastName}`}
+                    </span>
                 </div>
             )}
         </div>

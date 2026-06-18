@@ -21,8 +21,7 @@ import { Truck } from 'lucide-react';
 
 type Customer = {
   id: string;
-  firstName: string;
-  lastName: string;
+  fullName: string;
   email: string;
 };
 
@@ -133,11 +132,11 @@ export default function OrderDetailPage() {
       try {
         const { data, error } = await supabase
           .from('customers')
-          .select('id, first_name, last_name, email')
+          .select('id, full_name, email')
           .eq('id', order.customerId)
           .single();
         if (error) throw error;
-        if (data) setCustomer({ id: data.id, firstName: data.first_name, lastName: data.last_name, email: data.email });
+        if (data) setCustomer({ id: data.id, fullName: data.full_name, email: data.email });
       } catch (err) { console.error('Customer fetch error:', err); }
       finally { setIsLoadingCustomer(false); }
     };
@@ -359,12 +358,14 @@ export default function OrderDetailPage() {
         <CardContent className="grid gap-4 md:grid-cols-3">
           <div>
             <p className="text-sm font-medium text-muted-foreground">Customer</p>
-            {customer ? (
+            {isLoadingCustomer ? (
+                <p className="font-semibold">Loading...</p>
+            ) : customer ? (
                 <Link href={`/dashboard/customers/${customer.id}`} className="font-semibold text-primary hover:underline block">
-                    {customer.firstName} {customer.lastName}
+                    {customer.fullName}
                 </Link>
             ) : (
-                <p className="font-semibold">Loading...</p>
+                <p className="font-semibold">{order.spx_sync_data ? 'Shopee Customer' : 'Walk-in / Unknown'}</p>
             )}
             <p className="text-sm text-muted-foreground">{customer?.email}</p>
           </div>
@@ -525,7 +526,7 @@ export default function OrderDetailPage() {
         </Card>
       </div>
 
-      {order && customer && (
+      {order && (
         <ShareReceiptDialog
           open={isShareReceiptOpen}
           onOpenChange={setIsShareReceiptOpen}
