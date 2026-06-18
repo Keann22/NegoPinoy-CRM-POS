@@ -23,6 +23,7 @@ type Customer = {
   id: string;
   fullName: string;
   email: string;
+  address?: string;
 };
 
 type Product = {
@@ -132,11 +133,26 @@ export default function OrderDetailPage() {
       try {
         const { data, error } = await supabase
           .from('customers')
-          .select('id, full_name, email')
+          .select('id, full_name, email, address_line, region, province, city, barangay, postal_code, street_address')
           .eq('id', order.customerId)
           .single();
         if (error) throw error;
-        if (data) setCustomer({ id: data.id, fullName: data.full_name, email: data.email });
+        
+        if (data) {
+          let address = '';
+          if (data.region || data.province) {
+             const parts = [];
+             if (data.street_address) parts.push(data.street_address);
+             if (data.barangay) parts.push(data.barangay);
+             if (data.city) parts.push(data.city);
+             if (data.province) parts.push(data.province);
+             address = parts.join(', ');
+          } else if (data.address_line) {
+             address = data.address_line;
+          }
+          
+          setCustomer({ id: data.id, fullName: data.full_name, email: data.email, address });
+        }
       } catch (err) { console.error('Customer fetch error:', err); }
       finally { setIsLoadingCustomer(false); }
     };
@@ -531,7 +547,7 @@ export default function OrderDetailPage() {
           open={isShareReceiptOpen}
           onOpenChange={setIsShareReceiptOpen}
           order={order}
-          customer={customer}
+          customer={customer ? { fullName: customer.fullName, address: customer.address } : null}
           orderItems={orderItems}
           payments={payments}
         />
