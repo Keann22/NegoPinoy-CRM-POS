@@ -61,9 +61,14 @@ export async function GET(req: Request) {
         }
       }
       
+      let displayName = p.name;
+      if (p.variant_name && !p.name.includes(p.variant_name)) {
+        displayName = `${p.name} [${p.variant_name}]`;
+      }
+
       osMap.set(p.id, {
         productId: p.id,
-        productName: `${p.name} ${p.variant_name ? `[${p.variant_name}]` : ''}`,
+        productName: displayName,
         neededQty: draft ? draft.expected_qty : systemQty, // Default to Staff request if exists, else system
         systemQty: systemQty,
         staffRequestedQty: draft ? draft.expected_qty : null,
