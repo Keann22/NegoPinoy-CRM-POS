@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useSupabase, useUser } from '@/firebase';
+import { useSupabase, useUser } from '@/lib/supabase/hooks';
 
 export function SalesSummaryReport() {
   const [date, setDate] = useState<DateRange | undefined>({

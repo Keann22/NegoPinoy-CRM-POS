@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import { useSupabase, useUser } from '@/firebase';
+import { useSupabase, useUser } from '@/lib/supabase/hooks';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { DateRange } from 'react-day-picker';
@@ -22,11 +22,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { AddExpenseDialog } from '@/components/dashboard/accounting/add-expense-dialog';
 import { PostRecurringExpensesButton } from '@/components/dashboard/accounting/post-recurring-expenses-button';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { ReportDateFilter } from '@/components/dashboard/reports/report-date-filter';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 
 // Matches the Firestore document structure for an expense
 type Expense = {
@@ -115,15 +116,19 @@ export default function ExpensesPage() {
     return filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
   }, [filteredExpenses]);
 
-  const expensesByCategory = useMemo(() => {
-    if (!filteredExpenses) return null;
-    return filteredExpenses.reduce((acc, exp) => {
-        if (!acc[exp.category]) acc[exp.category] = { total: 0, items: [] };
-        acc[exp.category].total += exp.amount;
-        acc[exp.category].items.push(exp);
-        return acc;
-    }, {} as Record<string, { total: number, items: any[] }>);
-  }, [filteredExpenses]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [date]);
+
+  const totalPages = Math.ceil((filteredExpenses?.length || 0) / rowsPerPage) || 1;
+  const paginatedData = useMemo(() => {
+    if (!filteredExpenses) return [];
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    return filteredExpenses.slice(startIndex, startIndex + rowsPerPage);
+  }, [filteredExpenses, currentPage, rowsPerPage]);
 
   if (userProfile && !isManagement) {
     return (
@@ -158,13 +163,17 @@ export default function ExpensesPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[150px]">Date</TableHead>
                 <TableHead>Category</TableHead>
-                <TableHead className="text-right">Total Amount</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {Array.from({ length: 5 }).map((_, i) => (
                    <TableRow key={i}>
+                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-48" /></TableCell>
                       <TableCell className="text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
                    </TableRow>
@@ -179,44 +188,51 @@ export default function ExpensesPage() {
                 </p>
             </div>
         ) : (
-            <Accordion type="multiple" className="w-full border rounded-md">
-              {expensesByCategory && Object.entries(expensesByCategory).map(([category, data], i) => (
-                  <AccordionItem value={`cat-${i}`} key={category} className="last:border-b-0">
-                    <AccordionTrigger className="hover:no-underline px-4 py-3 bg-muted/30">
-                      <div className="flex justify-between w-full font-semibold pr-4">
-                        <span>{category}</span>
-                        <span className="text-destructive">₱{data.total.toFixed(2)}</span>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="pt-2 px-2">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[150px]">Date</TableHead>
-                            <TableHead>Description</TableHead>
-                            <TableHead className="text-right">Amount</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {data.items.map((expense) => (
-                            <TableRow key={expense.id}>
-                              <TableCell className="w-[150px]">{format(new Date(expense.expenseDate), 'MMM d, yyyy')}</TableCell>
-                              <TableCell className="font-medium">{renderDescription(expense.description)}</TableCell>
-                              <TableCell className="text-right">₱{expense.amount.toFixed(2)}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </AccordionContent>
-                  </AccordionItem>
-              ))}
-            </Accordion>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[150px]">Date</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedData.map((expense) => (
+                  <TableRow key={expense.id}>
+                    <TableCell className="w-[150px]">{format(new Date(expense.expenseDate), 'MMM d, yyyy')}</TableCell>
+                    <TableCell>{expense.category}</TableCell>
+                    <TableCell className="font-medium">{renderDescription(expense.description)}</TableCell>
+                    <TableCell className="text-right">₱{expense.amount.toFixed(2)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
         )}
       </CardContent>
       {filteredExpenses && filteredExpenses.length > 0 && (
-        <CardFooter className="justify-end space-x-2 font-semibold">
-           <span>Total Expenses:</span> 
-           <span>₱{totalExpenses.toFixed(2)}</span>
+        <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-2">
+            <div className="text-sm text-muted-foreground flex items-center gap-4">
+              <span>Showing <strong>{(currentPage - 1) * rowsPerPage + 1}-{Math.min(currentPage * rowsPerPage, filteredExpenses.length)}</strong> of <strong>{filteredExpenses.length}</strong> expenses</span>
+              <span className="font-semibold text-foreground">Total: ₱{totalExpenses.toFixed(2)}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Select value={rowsPerPage.toString()} onValueChange={(val) => { setRowsPerPage(Number(val)); setCurrentPage(1); }}>
+                <SelectTrigger className="w-[70px] h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="flex items-center border rounded-md h-9 px-1">
+                <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Prev</Button>
+                <span className="text-sm mx-2 min-w-[3rem] text-center">{currentPage} / {totalPages}</span>
+                <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Next</Button>
+              </div>
+            </div>
         </CardFooter>
       )}
     </Card>

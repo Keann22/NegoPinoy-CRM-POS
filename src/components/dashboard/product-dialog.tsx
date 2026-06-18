@@ -8,7 +8,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useSupabase, useUser } from "@/firebase";
+import { useSupabase, useUser } from "@/lib/supabase/hooks";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState, useMemo } from "react";
 import { Switch } from "@/components/ui/switch";

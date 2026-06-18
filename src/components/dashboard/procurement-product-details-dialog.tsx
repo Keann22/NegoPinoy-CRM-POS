@@ -2,7 +2,7 @@
 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { useSupabase, useUser } from "@/firebase";
+import { useSupabase, useUser } from "@/lib/supabase/hooks";
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";

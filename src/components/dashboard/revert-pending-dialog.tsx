@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { useSupabase } from '@/firebase';
+import { useSupabase } from '@/lib/supabase/hooks';
 import { useToast } from '@/hooks/use-toast';
 import { Order } from '@/app/dashboard/orders/page';
 

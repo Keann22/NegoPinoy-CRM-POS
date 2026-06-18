@@ -28,7 +28,8 @@ export async function GET(req: Request) {
       productName: `${i.products.name} ${i.products.variant_name ? `[${i.products.variant_name}]` : ''}`,
       expectedQty: i.expected_qty,
       alreadyReceivedQty: i.received_qty || 0,
-      remainingQty: Math.max(0, i.expected_qty - (i.received_qty || 0))
+      remainingQty: Math.max(0, i.expected_qty - (i.received_qty || 0)),
+      batchName: i.purchase_orders?.notes === 'STAFF_DRAFT' ? 'Pending Staff Requests' : i.purchase_orders?.notes || 'Unknown Batch'
     }));
 
     // Sort alphabetically
@@ -91,7 +92,7 @@ export async function POST(req: Request) {
           .insert({
             product_id: poItem.product_id,
             quantity_change: r.receivedQty,
-            movement_type: 'restock',
+            movement_type: 'RESTOCK',
             unit_cost: poItem.unit_cost,
             reason: reason
           });
@@ -115,7 +116,7 @@ export async function POST(req: Request) {
           .insert({
             product_id: item.productId,
             quantity_change: item.receivedQty,
-            movement_type: 'restock',
+            movement_type: 'RESTOCK',
             unit_cost: item.unitCost || 0,
             reason: 'Unexpected Delivery Item'
           });

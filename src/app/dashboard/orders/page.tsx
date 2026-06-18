@@ -53,7 +53,7 @@ import { WaybillSummaryDialog } from '@/components/dashboard/waybill-summary-dia
 import { 
   useUser, 
   useSupabase,
-} from '@/firebase';
+} from '@/lib/supabase/hooks';
 
 import { Progress } from '@/components/ui/progress';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -146,6 +146,13 @@ export default function OrdersPage() {
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
   const [refetchTrigger, setRefetchTrigger] = useState(0);
   const refetch = () => setRefetchTrigger(n => n + 1);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [date, statusFilter, typeFilter, searchQuery]);
 
   useEffect(() => {
     if (!supabase || !user || !userProfile) return;
@@ -277,6 +284,12 @@ export default function OrdersPage() {
       };
     });
   }, [orders, customerMap, date, statusFilter, typeFilter, searchQuery]);
+  
+  const totalPages = Math.ceil((formattedOrders?.length || 0) / rowsPerPage) || 1;
+  const paginatedOrders = useMemo(() => {
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    return formattedOrders.slice(startIndex, startIndex + rowsPerPage);
+  }, [formattedOrders, currentPage, rowsPerPage]);
   
 
   const handleStatusChange = async (orderId: string, newStatus: Order['orderStatus']) => {
@@ -435,12 +448,14 @@ export default function OrdersPage() {
               <TableRow>
                 <TableHead className="w-[50px]">
                   <Checkbox 
-                    checked={formattedOrders.length > 0 && selectedOrderIds.length === formattedOrders.length}
+                    checked={paginatedOrders.length > 0 && paginatedOrders.every(o => selectedOrderIds.includes(o.id))}
                     onCheckedChange={(checked) => {
                       if (checked) {
-                        setSelectedOrderIds(formattedOrders.map(o => o.id));
+                        const newSelection = new Set([...selectedOrderIds, ...paginatedOrders.map(o => o.id)]);
+                        setSelectedOrderIds(Array.from(newSelection));
                       } else {
-                        setSelectedOrderIds([]);
+                        const visibleIds = new Set(paginatedOrders.map(o => o.id));
+                        setSelectedOrderIds(selectedOrderIds.filter(id => !visibleIds.has(id)));
                       }
                     }}
                     aria-label="Select all"
@@ -468,7 +483,7 @@ export default function OrdersPage() {
                       <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                    </TableRow>
               ))}
-                {formattedOrders && formattedOrders.map((order) => (
+                {paginatedOrders && paginatedOrders.map((order) => (
                 <TableRow key={order.id || Math.random().toString()}>
                   <TableCell>
                     <Checkbox 
@@ -619,9 +634,26 @@ export default function OrdersPage() {
           )}
         </CardContent>
          {formattedOrders && formattedOrders.length > 0 && (
-          <CardFooter>
-              <div className="text-xs text-muted-foreground">
-              Showing <strong>1-{formattedOrders.length}</strong> of <strong>{formattedOrders.length}</strong> orders
+          <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-2">
+              <div className="text-sm text-muted-foreground">
+                Showing <strong>{(currentPage - 1) * rowsPerPage + 1}-{Math.min(currentPage * rowsPerPage, formattedOrders.length)}</strong> of <strong>{formattedOrders.length}</strong> orders
+              </div>
+              <div className="flex items-center gap-2">
+                <Select value={rowsPerPage.toString()} onValueChange={(val) => { setRowsPerPage(Number(val)); setCurrentPage(1); }}>
+                  <SelectTrigger className="w-[70px] h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="flex items-center border rounded-md h-9 px-1">
+                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Prev</Button>
+                  <span className="text-sm mx-2 min-w-[3rem] text-center">{currentPage} / {totalPages}</span>
+                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Next</Button>
+                </div>
               </div>
           </CardFooter>
         )}

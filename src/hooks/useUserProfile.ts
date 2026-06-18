@@ -1,5 +1,5 @@
 'use client';
-import { useUser } from '@/firebase';
+import { useUser } from '@/lib/supabase/hooks';
 import { useMemo } from 'react';
 
 export type UserProfile = {

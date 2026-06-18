@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useSupabase } from '@/firebase';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useSupabase } from '@/lib/supabase/hooks';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { Button } from '@/components/ui/button';
 
 type FlattenedBatch = {
   batchId: string;
@@ -24,6 +25,16 @@ export default function BatchesPage() {
   const [allBatches, setAllBatches] = useState<FlattenedBatch[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { userProfile } = useUserProfile();
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+
+  const totalPages = Math.ceil(allBatches.length / itemsPerPage);
+  
+  const paginatedData = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return allBatches.slice(startIndex, startIndex + itemsPerPage);
+  }, [allBatches, currentPage]);
 
   const canSeeUnitCost = useMemo(() => {
       if (!userProfile) return false;
@@ -171,7 +182,7 @@ export default function BatchesPage() {
                   </TableCell>
                 </TableRow>
               ))}
-            {!isLoading && allBatches.map((batch) => (
+            {!isLoading && paginatedData.map((batch) => (
               <TableRow key={batch.batchId}>
                 <TableCell className="font-medium">{batch.productName}</TableCell>
                 <TableCell className="hidden sm:table-cell text-muted-foreground">{batch.productSku}</TableCell>
@@ -193,6 +204,20 @@ export default function BatchesPage() {
             </div>
         )}
       </CardContent>
+      <CardFooter className="flex items-center justify-between border-t p-4">
+        <div className="text-sm text-muted-foreground">
+          Showing <strong>{allBatches.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}-{Math.min(currentPage * itemsPerPage, allBatches.length)}</strong> of <strong>{allBatches.length}</strong> batches
+        </div>
+        <div className="flex items-center space-x-2">
+          <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>
+            Previous
+          </Button>
+          <span className="text-sm font-medium mx-2">{currentPage} of {totalPages || 1}</span>
+          <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages || totalPages === 0}>
+            Next
+          </Button>
+        </div>
+      </CardFooter>
     </Card>
   );
 }

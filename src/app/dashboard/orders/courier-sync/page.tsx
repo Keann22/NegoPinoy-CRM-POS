@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Upload, Truck, AlertCircle, CheckCircle2, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useSupabase } from '@/firebase';
+import { useSupabase } from '@/lib/supabase/hooks';
 import ExcelJS from 'exceljs';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useRouter } from 'next/navigation';
@@ -171,6 +171,18 @@ export default function CourierSyncPage() {
                 newStatus: rawStatus,
                 category: 'error',
                 message: `Unknown courier status: "${rawStatus}". Could not map to system status.`
+            });
+            return;
+        }
+
+        if (matchedOrder.status === 'Payment Received (COD)') {
+            syncResults.push({
+                orderId: matchedOrder.id.substring(0,7).toUpperCase(),
+                trackingNumber: rawTracking,
+                originalStatus: matchedOrder.status,
+                newStatus: systemStatus,
+                category: 'already_updated',
+                message: 'Order is already marked as Payment Received (COD). Skipping update.'
             });
             return;
         }

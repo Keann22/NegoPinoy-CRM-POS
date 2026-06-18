@@ -9,7 +9,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useSupabase } from "@/firebase";
+import { useSupabase } from "@/lib/supabase/hooks";
 import { FileUpload } from "@/components/ui/file-upload";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";

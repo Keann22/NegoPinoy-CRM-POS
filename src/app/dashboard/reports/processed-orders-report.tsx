@@ -36,7 +36,7 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useUser, useSupabase } from '@/firebase';
+import { useUser, useSupabase } from '@/lib/supabase/hooks';
 
 type Order = {
   id: string;

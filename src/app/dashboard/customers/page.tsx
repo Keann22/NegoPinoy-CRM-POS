@@ -39,11 +39,14 @@ export default function CustomersPage() {
   const [customers, setCustomers] = useState<any[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<any | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   const supabase = createClient();
 
   useEffect(() => {
     const handler = setTimeout(() => {
         setDebouncedQuery(searchQuery);
+        setCurrentPage(1);
     }, 500);
     return () => clearTimeout(handler);
   }, [searchQuery]);
@@ -63,9 +66,8 @@ export default function CustomersPage() {
                 searchWords.forEach(w => {
                     query = query.ilike('full_name', `%${w}%`);
                 });
-                query = query.limit(20);
             } else {
-                query = query.order('created_at', { ascending: false }).limit(20);
+                query = query.order('created_at', { ascending: false });
             }
             
             const { data, error } = await query;
@@ -91,6 +93,12 @@ export default function CustomersPage() {
     fetchCustomers();
     return () => { isMounted = false; };
   }, [debouncedQuery, supabase]);
+
+  const paginatedData = customers ? customers.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  ) : [];
+  const totalPages = customers ? Math.ceil(customers.length / itemsPerPage) : 0;
 
   return (
     <Card>
@@ -151,7 +159,7 @@ export default function CustomersPage() {
                     <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                  </TableRow>
             ))}
-            {!isLoading && customers && customers.map((cust) => {
+            {!isLoading && paginatedData && paginatedData.map((cust) => {
               return (
               <TableRow key={cust.id}>
                 <TableCell>
@@ -235,10 +243,28 @@ export default function CustomersPage() {
         )}
       </CardContent>
       {customers && customers.length > 0 && (
-        <CardFooter>
-            <div className="text-xs text-muted-foreground">
-            Showing up to <strong>{customers.length}</strong> results
-            </div>
+        <CardFooter className="flex flex-col sm:flex-row justify-between items-center py-4 gap-4 border-t">
+          <div className="text-xs text-muted-foreground text-center sm:text-left">
+            Showing <strong>{(currentPage - 1) * itemsPerPage + 1}</strong>-<strong>{Math.min(currentPage * itemsPerPage, customers.length)}</strong> of <strong>{customers.length}</strong> results
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </Button>
+          </div>
         </CardFooter>
       )}
     </Card>

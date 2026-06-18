@@ -29,7 +29,7 @@ import {
   TableFooter,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useSupabase, useUser } from '@/firebase';
+import { useSupabase, useUser } from '@/lib/supabase/hooks';
 import { Badge } from '@/components/ui/badge';
 
 type Order = {

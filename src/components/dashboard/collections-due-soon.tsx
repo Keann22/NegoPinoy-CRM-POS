@@ -1,6 +1,6 @@
 'use client';
 
-import { useSupabase, useUser } from '@/firebase';
+import { useSupabase, useUser } from '@/lib/supabase/hooks';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useEffect, useState } from 'react';
 import { format, isBefore, addDays, startOfDay } from 'date-fns';

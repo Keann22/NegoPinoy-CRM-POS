@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { useSupabase } from '@/firebase';
+import { useSupabase } from '@/lib/supabase/hooks';
 import { useToast } from '@/hooks/use-toast';
 import { Order } from '@/app/dashboard/orders/page';
 

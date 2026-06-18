@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useEffect, useState } from 'react';
-import { useSupabase, useUser } from '@/firebase';
+import { useSupabase, useUser } from '@/lib/supabase/hooks';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Card,

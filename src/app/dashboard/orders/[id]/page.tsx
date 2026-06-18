@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { useDoc, useCollection, useSupabase, where, collection, doc, query } from '@/firebase';
+import { useSupabase } from '@/lib/supabase/hooks';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
@@ -78,17 +78,125 @@ export default function OrderDetailPage() {
   const orderId = params.id as string;
   const supabase = useSupabase();
 
-  const orderRef = useMemo(() => (supabase && orderId ? doc(supabase, 'orders', orderId) : null), [supabase, orderId]);
-  const { data: order, isLoading: isLoadingOrder } = useDoc<Order>(orderRef);
+  const [order, setOrder] = useState<Order | null>(null);
+  const [isLoadingOrder, setIsLoadingOrder] = useState(true);
 
-  const customerRef = useMemo(() => (supabase && order?.customerId ? doc(supabase, 'customers', order.customerId) : null), [supabase, order]);
-  const { data: customer, isLoading: isLoadingCustomer } = useDoc<Customer>(customerRef);
+  const [customer, setCustomer] = useState<Customer | null>(null);
+  const [isLoadingCustomer, setIsLoadingCustomer] = useState(false);
 
-  const orderItemsQuery = useMemo(() => (supabase && orderId ? query(collection(supabase, 'orderItems'), where('orderId', '==', orderId)) : null), [supabase, orderId]);
-  const { data: allOrderItems, isLoading: isLoadingOrderItems } = useCollection<OrderItem>(orderItemsQuery);
-  
-  const paymentsQuery = useMemo(() => (supabase && orderId ? query(collection(supabase, 'payments'), where('orderId', '==', orderId)) : null), [supabase, orderId]);
-  const { data: allPayments, isLoading: isLoadingPayments } = useCollection<Payment>(paymentsQuery);
+  const [allOrderItems, setAllOrderItems] = useState<OrderItem[]>([]);
+  const [isLoadingOrderItems, setIsLoadingOrderItems] = useState(true);
+
+  const [allPayments, setAllPayments] = useState<Payment[]>([]);
+  const [isLoadingPayments, setIsLoadingPayments] = useState(true);
+
+  // Fetch order
+  useEffect(() => {
+    if (!supabase || !orderId) return;
+    const fetch = async () => {
+      setIsLoadingOrder(true);
+      try {
+        const { data, error } = await supabase.from('orders').select('*').eq('id', orderId).single();
+        if (error) throw error;
+        if (data) {
+          setOrder({
+            id: data.id,
+            customerId: data.customer_id,
+            orderDate: data.order_date,
+            orderStatus: data.status,
+            totalAmount: data.total_amount,
+            balanceDue: data.balance_due,
+            amountPaid: data.amount_paid,
+            subtotal: data.subtotal,
+            totalDiscount: data.total_discount,
+            paymentType: data.payment_type,
+            installmentMonths: data.installment_months,
+            monthlyPayment: data.monthly_payment,
+            salesPersonName: data.sales_person_name,
+            salesRepId: data.sales_rep_id,
+            insurance_fee: data.insurance_fee,
+            tracking_number: data.tracking_number,
+            spx_sync_data: data.spx_sync_data,
+          } as any);
+        }
+      } catch (err) { console.error('Order fetch error:', err); }
+      finally { setIsLoadingOrder(false); }
+    };
+    fetch();
+  }, [supabase, orderId]);
+
+  // Fetch customer when order is loaded
+  useEffect(() => {
+    if (!supabase || !order?.customerId) return;
+    const fetch = async () => {
+      setIsLoadingCustomer(true);
+      try {
+        const { data, error } = await supabase
+          .from('customers')
+          .select('id, first_name, last_name, email')
+          .eq('id', order.customerId)
+          .single();
+        if (error) throw error;
+        if (data) setCustomer({ id: data.id, firstName: data.first_name, lastName: data.last_name, email: data.email });
+      } catch (err) { console.error('Customer fetch error:', err); }
+      finally { setIsLoadingCustomer(false); }
+    };
+    fetch();
+  }, [supabase, order?.customerId]);
+
+  // Fetch order items
+  useEffect(() => {
+    if (!supabase || !orderId) return;
+    const fetch = async () => {
+      setIsLoadingOrderItems(true);
+      try {
+        const { data, error } = await supabase
+          .from('order_items')
+          .select('*')
+          .eq('order_id', orderId);
+        if (error) throw error;
+        setAllOrderItems((data || []).map((item: any) => ({
+          id: item.id,
+          orderId: item.order_id,
+          productId: item.product_id,
+          productName: item.product_name,
+          quantity: item.quantity,
+          costPriceAtSale: item.cost_price_at_sale,
+          sellingPriceAtSale: item.selling_price_at_sale,
+          discount: item.discount,
+          shelfLocation: item.shelf_location,
+        })));
+      } catch (err) { console.error('Order items fetch error:', err); }
+      finally { setIsLoadingOrderItems(false); }
+    };
+    fetch();
+  }, [supabase, orderId]);
+
+  // Fetch payments
+  useEffect(() => {
+    if (!supabase || !orderId) return;
+    const fetch = async () => {
+      setIsLoadingPayments(true);
+      try {
+        const { data, error } = await supabase
+          .from('payments')
+          .select('*')
+          .eq('order_id', orderId);
+        if (error) throw error;
+        setAllPayments((data || []).map((p: any) => ({
+          id: p.id,
+          orderId: p.order_id,
+          paymentDate: p.payment_date,
+          amount: p.amount,
+          paymentMethod: p.payment_method,
+          notes: p.notes,
+          proofUrl: p.proof_url,
+        })));
+      } catch (err) { console.error('Payments fetch error:', err); }
+      finally { setIsLoadingPayments(false); }
+    };
+    fetch();
+  }, [supabase, orderId]);
 
   const [productMap, setProductMap] = useState<Map<string, { name: string, location: string }>>(new Map());
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);

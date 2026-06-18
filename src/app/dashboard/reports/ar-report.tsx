@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useUser, useSupabase } from '@/firebase';
+import { useUser, useSupabase } from '@/lib/supabase/hooks';
 
 type ReceivableOrder = {
     id: string;

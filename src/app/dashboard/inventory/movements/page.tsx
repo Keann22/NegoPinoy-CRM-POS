@@ -1,9 +1,9 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useSupabase, useUser } from '@/firebase';
+import { useSupabase, useUser } from '@/lib/supabase/hooks';
 import { useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -46,6 +46,9 @@ export default function InventoryHistoryPage() {
 
   const [movements, setMovements] = useState<InventoryMovement[]>([]);
   const [isLoadingMovements, setIsLoadingMovements] = useState(true);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
 
@@ -116,6 +119,12 @@ export default function InventoryHistoryPage() {
 
   const isLoading = isLoadingMovements || isLoadingProducts;
 
+  const totalPages = Math.ceil(movements.length / itemsPerPage);
+  const paginatedData = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return movements.slice(start, start + itemsPerPage);
+  }, [movements, currentPage, itemsPerPage]);
+
   const handleEdit = (movement: InventoryMovement) => {
     setSelectedMovement(movement);
     setEditDialogOpen(true);
@@ -137,7 +146,7 @@ export default function InventoryHistoryPage() {
       </CardHeader>
       <CardContent>
         <div className="flex flex-wrap items-center gap-4 mb-6">
-            <Select value={dateFilter} onValueChange={(val: any) => setDateFilter(val)}>
+            <Select value={dateFilter} onValueChange={(val: any) => { setDateFilter(val); setCurrentPage(1); }}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Filter by Date" />
               </SelectTrigger>
@@ -164,7 +173,7 @@ export default function InventoryHistoryPage() {
             )}
 
             {(dateFilter !== 'today') && (
-              <Button variant="ghost" onClick={() => { setDateFilter('today'); setDate(undefined); }} className="text-muted-foreground hover:text-foreground">
+              <Button variant="ghost" onClick={() => { setDateFilter('today'); setDate(undefined); setCurrentPage(1); }} className="text-muted-foreground hover:text-foreground">
                 <FilterX className="mr-2 h-4 w-4" /> Reset to Today
               </Button>
             )}
@@ -195,8 +204,8 @@ export default function InventoryHistoryPage() {
                     <TableCell><Skeleton className="h-8 w-16 ml-auto" /></TableCell>
                   </TableRow>
                 ))
-              ) : movements && movements.length > 0 ? (
-                movements.map((movement, i) => {
+              ) : paginatedData && paginatedData.length > 0 ? (
+                paginatedData.map((movement, i) => {
                   const isPositive = movement.quantity_change > 0;
                   return (
                     <TableRow key={movement.id || i}>
@@ -238,6 +247,29 @@ export default function InventoryHistoryPage() {
           </Table>
         </div>
       </CardContent>
+      <CardFooter className="flex items-center justify-between border-t px-6 py-4">
+        <div className="text-sm text-muted-foreground">
+          Showing <strong>{movements.length === 0 ? 0 : ((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, movements.length)}</strong> of <strong>{movements.length}</strong> items
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1 || isLoading}
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages || totalPages === 0 || isLoading}
+          >
+            Next
+          </Button>
+        </div>
+      </CardFooter>
     </Card>
 
     <EditMovementDialog
@@ -245,8 +277,7 @@ export default function InventoryHistoryPage() {
         onOpenChange={setEditDialogOpen}
         movement={selectedMovement as any}
         onSuccess={() => {
-            // Because we're using a realtime subscription via useCollection, 
-            // the table will automatically update when Supabase broadcast the change.
+            // Data will refresh on next open since this dialog closes after save.
         }}
     />
 

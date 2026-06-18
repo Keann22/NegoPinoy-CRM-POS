@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { RefreshCw, MessageCircle, User, Brain, Clock, Bot } from 'lucide-react';
 import { useEffect } from 'react';
-import { useSupabase } from '@/firebase';
+import { useSupabase } from '@/lib/supabase/hooks';
 
 export default function ChatHistoryPage() {
   const [selectedCustomerPsid, setSelectedCustomerPsid] = useState<string | null>(null);

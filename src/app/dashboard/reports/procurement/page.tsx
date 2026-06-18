@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { ViewProductDetailsDialog } from "@/components/dashboard/view-product-details-dialog";
-import { Copy, PlusCircle, Search, Trash2, Flag } from "lucide-react";
+import { Copy, PlusCircle, Search, Trash2, Flag, ShoppingCart } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -21,12 +21,22 @@ export default function ProcurementSheet() {
   const [groupedItems, setGroupedItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // State to hold user input for purchases
-  const [purchases, setPurchases] = useState<Record<string, {qty: string, cost: string, supplierId: string}>>({});
   const [isSubmitting, setIsSubmitting] = useState<boolean | string>(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [isLoadingProduct, setIsLoadingProduct] = useState(false);
   const [pendingSupplier, setPendingSupplier] = useState<Record<string, string>>({});
+
+  const [selectedItems, setSelectedItems] = useState<Record<string, boolean>>({});
+
+  // Dialog state for Single Item Buy
+  const [buyDialogOpen, setBuyDialogOpen] = useState(false);
+  const [buyItem, setBuyItem] = useState<any>(null);
+  const [buyForm, setBuyForm] = useState({ qty: '', cost: '', supplierId: '' });
+
+  // Dialog state for Bulk Buy
+  const [bulkBuyDialogOpen, setBulkBuyDialogOpen] = useState(false);
+  const [bulkBuyGroup, setBulkBuyGroup] = useState<any>(null);
+  const [bulkBuyItems, setBulkBuyItems] = useState<any[]>([]);
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [productSearch, setProductSearch] = useState('');
@@ -44,19 +54,6 @@ export default function ProcurementSheet() {
       const data = await res.json();
       setSuppliers(data.suppliers || []);
       setGroupedItems(data.groupedOutofStock || []);
-      
-      const initialPurchases: Record<string, any> = {};
-      (data.groupedOutofStock || []).forEach((group: any) => {
-        group.items.forEach((item: any) => {
-          initialPurchases[item.productId] = {
-            qty: "", // Must be manually entered to prevent accidental submission
-            cost: item.unitCost || '',
-            supplierId: item.supplierId || '',
-            draftItemId: item.draftItemId || null
-          };
-        });
-      });
-      setPurchases(initialPurchases);
     } catch (e: any) {
       console.error(e);
       alert("Failed to load procurement data: " + e.message);
@@ -92,14 +89,101 @@ export default function ProcurementSheet() {
     return () => clearTimeout(to);
   }, [productSearch]);
 
-  const handleUpdatePurchase = (productId: string, field: string, value: string) => {
-    setPurchases(prev => ({
-      ...prev,
-      [productId]: {
-        ...prev[productId],
-        [field]: value
-      }
-    }));
+  const toggleItemSelection = (productId: string) => {
+    setSelectedItems(prev => ({...prev, [productId]: !prev[productId]}));
+  };
+
+  const toggleGroupSelection = (groupItems: any[]) => {
+    const allSelected = groupItems.every((i: any) => selectedItems[i.productId]);
+    const newState = { ...selectedItems };
+    groupItems.forEach((i: any) => {
+      newState[i.productId] = !allSelected;
+    });
+    setSelectedItems(newState);
+  };
+
+  const openBuyDialog = (item: any, groupId: string | null) => {
+    setBuyItem({ ...item, groupId });
+    setBuyForm({
+      qty: item.staffRequestedQty !== null ? String(item.staffRequestedQty) : String(item.systemQty),
+      cost: item.unitCost ? String(item.unitCost) : '',
+      supplierId: item.supplierId || groupId || ''
+    });
+    setBuyDialogOpen(true);
+  };
+
+  const handleSinglePurchaseSubmit = async () => {
+    if (!buyForm.qty || Number(buyForm.qty) <= 0) {
+      return alert("Please enter a valid quantity.");
+    }
+    setIsSubmitting("single");
+    try {
+      const purchases = [{
+        productId: buyItem.productId,
+        qty: Number(buyForm.qty),
+        cost: Number(buyForm.cost || 0),
+        supplierId: buyForm.supplierId || null,
+        draftItemId: buyItem.draftItemId
+      }];
+      const res = await fetch("/api/inventory/procurement", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ purchases })
+      });
+      if (!res.ok) throw new Error(await res.text());
+      
+      setBuyDialogOpen(false);
+      setBuyItem(null);
+      fetchData();
+    } catch (e: any) {
+      alert("Error: " + e.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const openBulkBuyDialog = (groupId: string | null, groupItems: any[], groupName: string) => {
+    const selectedInGroup = groupItems.filter((i: any) => selectedItems[i.productId]);
+    if (selectedInGroup.length === 0) {
+      return alert("Please select at least one item to purchase.");
+    }
+    setBulkBuyGroup({ id: groupId, name: groupName });
+    setBulkBuyItems(selectedInGroup);
+    setBulkBuyDialogOpen(true);
+  };
+
+  const handleBulkPurchaseSubmit = async () => {
+    setIsSubmitting("bulk");
+    try {
+      const purchases = bulkBuyItems.map((item: any) => ({
+        productId: item.productId,
+        qty: item.staffRequestedQty !== null ? item.staffRequestedQty : item.systemQty,
+        cost: Number(item.unitCost || 0),
+        supplierId: item.supplierId || bulkBuyGroup.id || null,
+        draftItemId: item.draftItemId
+      }));
+
+      const res = await fetch("/api/inventory/procurement", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ purchases })
+      });
+      if (!res.ok) throw new Error(await res.text());
+      
+      alert(`Successfully recorded ${bulkBuyItems.length} purchases!`);
+      
+      // Clear selection for these items
+      const newSelected = { ...selectedItems };
+      bulkBuyItems.forEach((i: any) => delete newSelected[i.productId]);
+      setSelectedItems(newSelected);
+      
+      setBulkBuyDialogOpen(false);
+      fetchData();
+    } catch(e: any) {
+      alert("Error: " + e.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleProductClick = async (productId: string) => {
@@ -221,7 +305,6 @@ export default function ProcurementSheet() {
       setIssueDialogOpen(false);
       setIssueProduct(null);
       setIssueNote("");
-      // Optionally we could fetch data again if we displayed it here, but we don't.
     } catch (e: any) {
       alert("Failed to report issue: " + e.message);
     } finally {
@@ -229,50 +312,10 @@ export default function ProcurementSheet() {
     }
   };
 
-  const handleSubmitPurchases = async (targetSupplierId: string | null, groupItems: any[]) => {
-    // Filter only items that have a quantity entered AND belong to this visual group
-    const targetGroupSupplier = targetSupplierId || '';
-    const itemIdsInGroup = new Set(groupItems.map((i: any) => i.productId));
-    
-    const validPurchases = Object.entries(purchases)
-      .filter(([productId, data]) => data.qty && Number(data.qty) > 0 && itemIdsInGroup.has(productId))
-      .map(([productId, data]) => ({
-        productId,
-        qty: Number(data.qty),
-        cost: Number(data.cost || 0),
-        supplierId: data.supplierId,
-        draftItemId: data.draftItemId
-      }));
-
-    if (validPurchases.length === 0) {
-      return alert("Please enter a purchased quantity for at least one item.");
-    }
-
-    setIsSubmitting(targetGroupSupplier);
-    try {
-      const res = await fetch("/api/inventory/procurement", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ purchases: validPurchases })
-      });
-
-      if (!res.ok) throw new Error(await res.text());
-
-      alert("Successfully recorded purchases as Pending Purchase Orders!");
-      // Clear inputs
-      setPurchases({});
-      fetchData();
-    } catch (e: any) {
-      alert("Error: " + e.message);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   const handleCopyOrder = (supplierName: string, groupItems: any[]) => {
     let text = "";
     
-    groupItems.forEach((item) => {
+    groupItems.forEach((item: any) => {
       if (item.neededQty && Number(item.neededQty) > 0) {
         text += `${item.neededQty}x ${item.productName}\n`;
       }
@@ -292,68 +335,70 @@ export default function ProcurementSheet() {
   if (loading) return <div className="p-8 text-center text-slate-500">Loading Procurement Sheet...</div>;
 
   return (
-    <div className="max-w-7xl mx-auto p-6 space-y-8 bg-white shadow rounded-lg mt-8">
-      <div className="flex justify-between items-center border-b pb-4">
+    <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-8 bg-white shadow rounded-lg md:mt-8">
+      <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 border-b pb-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-800">Procurement Master Sheet</h1>
-          <p className="text-slate-600">Your confidential shopping list. Enter what you bought and it will be sent to the inventory team as a Pending Shipment.</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-800">Procurement Master Sheet</h1>
+          <p className="text-slate-600 text-sm md:text-base">Your on-the-go shopping list. Click 'Buy' to record items as you shop.</p>
         </div>
-        <Button onClick={() => setIsAddDialogOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 flex items-center gap-2">
+        <Button onClick={() => setIsAddDialogOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 flex items-center justify-center gap-2">
           <PlusCircle className="w-5 h-5" /> Add Missing Item
         </Button>
       </div>
 
       {groupedItems.length === 0 ? (
         <div className="p-8 text-center bg-slate-50 border rounded-lg text-slate-500">
-          No items currently out of stock!
+          No items currently out of stock or requested!
         </div>
       ) : (
         <div className="space-y-10">
           {groupedItems.map(group => (
             <div key={group.id || 'unassigned'} className="border rounded-lg overflow-hidden shadow-sm">
-              <div className={`px-4 py-3 border-b flex justify-between items-center ${group.id === null ? 'bg-orange-100' : 'bg-slate-100'}`}>
+              <div className={`px-4 py-3 border-b flex flex-col md:flex-row justify-between md:items-center gap-3 ${group.id === null ? 'bg-orange-100' : 'bg-slate-100'}`}>
                 <h2 className="text-xl font-bold text-slate-800">{group.name}</h2>
                 <div className="flex items-center gap-2">
                   {group.id !== null && (
                     <Button 
                       variant="outline"
                       onClick={() => handleCopyOrder(group.name, group.items)}
-                      className="text-slate-600 font-bold px-4 py-1 h-auto flex items-center gap-2"
+                      className="text-slate-600 font-bold px-3 py-1 h-auto flex items-center gap-2 text-xs md:text-sm"
                     >
                       <Copy className="w-4 h-4" /> Copy Order
                     </Button>
                   )}
                   <Button 
-                    onClick={() => handleSubmitPurchases(group.id, group.items)} 
-                    disabled={isSubmitting !== false && isSubmitting !== (group.id || '')} 
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-1 h-auto"
+                    onClick={() => openBulkBuyDialog(group.id, group.items, group.name)} 
+                    disabled={group.items.filter((i: any) => selectedItems[i.productId]).length === 0} 
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-1 h-auto text-xs md:text-sm disabled:opacity-50"
                   >
-                    {isSubmitting === (group.id || '') ? "Recording..." : `Record ${group.name !== 'Unassigned (No Supplier)' ? group.name : ''} Purchases`}
+                    Record Selected
                   </Button>
                 </div>
               </div>
               
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm min-w-[900px]">
+                <table className="w-full text-left text-sm min-w-[600px]">
                   <thead>
                   <tr className="bg-slate-50 text-slate-500 text-sm border-b">
+                    <th className="p-3 w-10 text-center">
+                      <input type="checkbox" onChange={() => toggleGroupSelection(group.items)} checked={group.items.length > 0 && group.items.every((i: any) => selectedItems[i.productId])} className="w-5 h-5 cursor-pointer accent-indigo-600" />
+                    </th>
                     <th className="p-3 text-left w-1/3">Product</th>
                     <th className="p-3 text-center">System Qty</th>
                     <th className="p-3 text-center">Staff Req.</th>
-                    <th className="p-3 text-left w-1/5">Assign Supplier</th>
-                    <th className="p-3 text-left w-32">Unit Cost</th>
-                    <th className="p-3 text-left w-32">Final Qty Bought</th>
+                    <th className="p-3 text-center w-28">Buy Action</th>
                     <th className="p-3 text-center w-12"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y text-slate-700">
                   {group.items.map((item: any) => {
-                    const pState = purchases[item.productId] || { qty: '', cost: item.unitCost || '', supplierId: item.supplierId || '', draftItemId: null };
-                    
                     const hasDiscrepancy = item.staffRequestedQty !== null && item.systemQty !== item.staffRequestedQty;
 
                     return (
-                      <tr key={item.productId} className={hasDiscrepancy ? "bg-orange-50 hover:bg-orange-100" : "hover:bg-slate-50"}>
+                      <tr key={item.productId} className={hasDiscrepancy ? "bg-orange-50 hover:bg-orange-100" : "hover:bg-slate-50 transition-colors"}>
+                        <td className="p-3 text-center">
+                          <input type="checkbox" onChange={() => toggleItemSelection(item.productId)} checked={!!selectedItems[item.productId]} className="w-5 h-5 cursor-pointer accent-indigo-600" />
+                        </td>
                         <td className="p-3 font-medium text-slate-900">
                           <button 
                             type="button" 
@@ -365,7 +410,7 @@ export default function ProcurementSheet() {
                           </button>
                           {hasDiscrepancy && (
                               <div className="text-xs font-bold text-orange-600 mt-1">
-                                  ⚠️ Discrepancy detected. Ask the staff for a reason.
+                                  ⚠️ Discrepancy detected.
                               </div>
                           )}
                           {group.id === null && (
@@ -375,7 +420,7 @@ export default function ProcurementSheet() {
                                 onChange={(e) => setPendingSupplier(prev => ({ ...prev, [item.productId]: e.target.value }))}
                                 value={pendingSupplier[item.productId] || ""}
                               >
-                                <option value="" disabled>Select Default Supplier...</option>
+                                <option value="" disabled>Select Supplier...</option>
                                 {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                               </select>
                               {pendingSupplier[item.productId] && (
@@ -397,33 +442,14 @@ export default function ProcurementSheet() {
                         <td className={`p-3 font-bold text-center text-lg ${hasDiscrepancy ? "text-orange-600" : "text-green-600"}`}>
                             {item.staffRequestedQty !== null ? item.staffRequestedQty : <span className="text-xs text-slate-400 font-normal">Pending</span>}
                         </td>
-                        <td className="p-3">
-                          <select 
-                            className="w-full border p-2 rounded-md"
-                            value={pState.supplierId}
-                            onChange={(e) => handleUpdatePurchase(item.productId, 'supplierId', e.target.value)}
+                        <td className="p-3 text-center">
+                          <Button 
+                            size="sm" 
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white w-full flex items-center justify-center gap-2 font-bold"
+                            onClick={() => openBuyDialog(item, group.id)}
                           >
-                            <option value="">-- No Supplier --</option>
-                            {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                          </select>
-                        </td>
-                        <td className="p-3">
-                          <input 
-                            type="number" 
-                            className="w-full border p-2 rounded-md" 
-                            placeholder="0.00"
-                            value={pState.cost}
-                            onChange={(e) => handleUpdatePurchase(item.productId, 'cost', e.target.value)}
-                          />
-                        </td>
-                        <td className="p-3 bg-indigo-50/50">
-                          <input 
-                            type="number" 
-                            className="w-full border border-indigo-300 p-2 rounded-md focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-900" 
-                            placeholder="Qty Bought"
-                            value={pState.qty}
-                            onChange={(e) => handleUpdatePurchase(item.productId, 'qty', e.target.value)}
-                          />
+                            <ShoppingCart className="w-4 h-4" /> Buy
+                          </Button>
                         </td>
                         <td className="p-3 text-center flex flex-col gap-1 items-center justify-center">
                           <button 
@@ -457,6 +483,96 @@ export default function ProcurementSheet() {
           ))}
         </div>
       )}
+
+      {/* SINGLE ITEM BUY DIALOG */}
+      <Dialog open={buyDialogOpen} onOpenChange={setBuyDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Record Purchase</DialogTitle>
+          </DialogHeader>
+          {buyItem && (
+            <div className="space-y-4 py-4">
+              <p className="text-sm font-semibold text-slate-800">{buyItem.productName}</p>
+              
+              <div className="space-y-2">
+                <label className="text-sm text-slate-600">Supplier</label>
+                <select 
+                  className="w-full border p-2 rounded-md bg-white"
+                  value={buyForm.supplierId}
+                  onChange={(e) => setBuyForm(prev => ({...prev, supplierId: e.target.value}))}
+                >
+                  <option value="">-- No Supplier --</option>
+                  {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm text-slate-600">Qty Bought</label>
+                  <input 
+                    type="number" 
+                    className="w-full border border-indigo-300 p-2 rounded-md focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-900 text-lg" 
+                    value={buyForm.qty}
+                    onChange={(e) => setBuyForm(prev => ({...prev, qty: e.target.value}))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm text-slate-600">Unit Cost (₱)</label>
+                  <input 
+                    type="number" 
+                    className="w-full border p-2 rounded-md text-lg" 
+                    value={buyForm.cost}
+                    onChange={(e) => setBuyForm(prev => ({...prev, cost: e.target.value}))}
+                  />
+                </div>
+              </div>
+
+              <Button 
+                onClick={handleSinglePurchaseSubmit} 
+                disabled={isSubmitting === "single"}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-12 text-lg mt-4"
+              >
+                {isSubmitting === "single" ? "Saving..." : "Save Purchase"}
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* BULK BUY DIALOG */}
+      <Dialog open={bulkBuyDialogOpen} onOpenChange={setBulkBuyDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Record Selected Purchases</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-slate-600">
+              You are about to record <strong className="text-slate-900">{bulkBuyItems.length} items</strong> from <strong className="text-indigo-700">{bulkBuyGroup?.name}</strong>.
+            </p>
+            <p className="text-sm text-slate-600">
+              The system will automatically use the <strong>requested quantities</strong> and the <strong>default unit costs</strong>.
+            </p>
+            <div className="max-h-48 overflow-y-auto bg-slate-50 border rounded p-2 text-sm space-y-1">
+              {bulkBuyItems.map(item => (
+                <div key={item.productId} className="flex justify-between border-b pb-1">
+                  <span className="truncate pr-2 text-slate-700">{item.productName}</span>
+                  <span className="font-bold shrink-0">{item.staffRequestedQty !== null ? item.staffRequestedQty : item.systemQty}x</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2 justify-end pt-2">
+              <Button variant="outline" onClick={() => setBulkBuyDialogOpen(false)}>Cancel</Button>
+              <Button 
+                onClick={handleBulkPurchaseSubmit} 
+                disabled={isSubmitting === "bulk"}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold"
+              >
+                {isSubmitting === "bulk" ? "Saving..." : "Confirm & Save All"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <ViewProductDetailsDialog 
         product={selectedProduct} 

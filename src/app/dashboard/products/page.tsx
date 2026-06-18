@@ -27,7 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useUser, useSupabase } from '@/firebase';
+import { useUser, useSupabase } from '@/lib/supabase/hooks';
 import { AddProductDialog } from '@/components/dashboard/product-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BulkUploadProductsDialog } from '@/components/dashboard/bulk-upload-products-dialog';
@@ -104,7 +104,7 @@ export default function ProductsPage() {
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 50;
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -240,13 +240,11 @@ export default function ProductsPage() {
     return results;
   }, [formattedProducts, searchTerm, stockFilter]);
 
-  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredProducts.length / rowsPerPage) || 1;
   const paginatedProducts = filteredProducts.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    (currentPage - 1) * rowsPerPage,
+    currentPage * rowsPerPage
   );
-  const startIndex = filteredProducts.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0;
-  const endIndex = filteredProducts.length > 0 ? Math.min(currentPage * itemsPerPage, filteredProducts.length) : 0;
 
 
   const handleDeleteConfirm = async () => {
@@ -344,8 +342,6 @@ export default function ProductsPage() {
     }
   };
 
-  const areAllFilteredSelected = filteredProducts.length > 0 && filteredProducts.every(p => selectedProductIds.includes(p.id));
-
   return (
     <>
       <Card>
@@ -404,13 +400,13 @@ export default function ProductsPage() {
                   <Checkbox
                     onCheckedChange={(checked) => {
                         if (checked) {
-                            setSelectedProductIds(prev => Array.from(new Set([...prev, ...filteredProducts.map(p => p.id)])));
+                            setSelectedProductIds(prev => Array.from(new Set([...prev, ...paginatedProducts.map(p => p.id)])));
                         } else {
-                            const filteredIds = new Set(filteredProducts.map(p => p.id));
-                            setSelectedProductIds(prev => prev.filter(id => !filteredIds.has(id)));
+                            const paginatedIds = new Set(paginatedProducts.map(p => p.id));
+                            setSelectedProductIds(prev => prev.filter(id => !paginatedIds.has(id)));
                         }
                     }}
-                    checked={areAllFilteredSelected}
+                    checked={paginatedProducts.length > 0 && paginatedProducts.every(p => selectedProductIds.includes(p.id))}
                     aria-label="Select all"
                   />
                 </TableHead>
@@ -688,32 +684,28 @@ export default function ProductsPage() {
               </div>
           )}
         </CardContent>
-        {filteredProducts.length > 0 && (
-          <CardFooter className="flex items-center justify-between">
-            <div className="text-xs text-muted-foreground">
-              Showing <strong>{startIndex}-{endIndex}</strong> of <strong>{filteredProducts.length}</strong> products
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(p => p - 1)}
-                disabled={currentPage <= 1}
-              >
-                Previous
-              </Button>
-              <span className='text-sm text-muted-foreground'>
-                Page {currentPage} of {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(p => p + 1)}
-                disabled={currentPage >= totalPages}
-              >
-                Next
-              </Button>
-            </div>
+        {filteredProducts && filteredProducts.length > 0 && (
+          <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-2">
+              <div className="text-sm text-muted-foreground">
+                Showing <strong>{(currentPage - 1) * rowsPerPage + 1}-{Math.min(currentPage * rowsPerPage, filteredProducts.length)}</strong> of <strong>{filteredProducts.length}</strong> items
+              </div>
+              <div className="flex items-center gap-2">
+                <Select value={rowsPerPage.toString()} onValueChange={(val) => { setRowsPerPage(Number(val)); setCurrentPage(1); }}>
+                  <SelectTrigger className="w-[70px] h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="flex items-center border rounded-md h-9 px-1">
+                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Prev</Button>
+                  <span className="text-sm mx-2 min-w-[3rem] text-center">{currentPage} / {totalPages}</span>
+                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Next</Button>
+                </div>
+              </div>
           </CardFooter>
         )}
       </Card>

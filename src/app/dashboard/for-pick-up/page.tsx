@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Truck, FileText } from 'lucide-react';
-import { useSupabase } from '@/firebase';
+import { useSupabase } from '@/lib/supabase/hooks';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MarkShippedDialog } from '@/components/dashboard/mark-shipped-dialog';
 import { WaybillSummaryDialog } from '@/components/dashboard/waybill-summary-dialog';
@@ -29,7 +29,12 @@ export default function ForPickUpPage() {
   const supabase = useSupabase();
   const [loading, setLoading] = useState(false);
   const [orders, setOrders] = useState<PickUpOrder[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   const [markShippedOrder, setMarkShippedOrder] = useState<{id: string, tracking_number: string} | null>(null);
+
+  const totalPages = Math.ceil(orders.length / itemsPerPage) || 1;
+  const paginatedOrders = orders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   const [viewWaybillOrder, setViewWaybillOrder] = useState<PickUpOrder | null>(null);
 
   const fetchForPickUpOrders = async () => {
@@ -129,7 +134,7 @@ export default function ForPickUpPage() {
                   </TableCell>
                 </TableRow>
               )}
-              {!loading && orders.map(order => (
+              {!loading && paginatedOrders.map(order => (
                 <TableRow key={order.id}>
                   <TableCell className="font-mono text-sm">{order.orderId}</TableCell>
                   <TableCell className="font-mono text-sm font-semibold">{order.tracking_number}</TableCell>
@@ -153,6 +158,29 @@ export default function ForPickUpPage() {
             </TableBody>
           </Table>
         </CardContent>
+        <CardFooter className="flex items-center justify-between">
+          <div className="text-xs text-muted-foreground">
+            Showing <strong>{orders.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, orders.length)}</strong> of <strong>{orders.length}</strong> orders
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1 || loading}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages || loading || orders.length === 0}
+            >
+              Next
+            </Button>
+          </div>
+        </CardFooter>
       </Card>
 
       {markShippedOrder && (

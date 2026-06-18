@@ -17,7 +17,7 @@ import {
   TableRow,
   TableFooter,
 } from '@/components/ui/table';
-import { useSupabase } from '@/firebase';
+import { useSupabase } from '@/lib/supabase/hooks';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useState, useEffect } from 'react';

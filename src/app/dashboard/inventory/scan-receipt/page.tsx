@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useSupabase } from '@/firebase';
+import { useSupabase } from '@/lib/supabase/hooks';
 import { createClient } from '@/lib/supabase/client';
 
 import { Button } from '@/components/ui/button';

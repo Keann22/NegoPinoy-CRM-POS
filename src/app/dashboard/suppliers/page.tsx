@@ -18,7 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useSupabase, useUser } from '@/firebase';
+import { useSupabase, useUser } from '@/lib/supabase/hooks';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AddSupplierDialog } from '@/components/dashboard/add-supplier-dialog';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -50,6 +50,8 @@ export default function SuppliersPage() {
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
 
   useEffect(() => {
     if (!supabase || !user || !isManagement) return;
@@ -80,6 +82,14 @@ export default function SuppliersPage() {
         </Card>
     );
   }
+
+  const totalPages = Math.ceil(suppliers.length / itemsPerPage);
+  const paginatedSuppliers = suppliers.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+  const startIndex = suppliers.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0;
+  const endIndex = suppliers.length > 0 ? Math.min(currentPage * itemsPerPage, suppliers.length) : 0;
 
   return (
     <>
@@ -123,7 +133,7 @@ export default function SuppliersPage() {
                       </TableCell>
                    </TableRow>
               ))}
-              {suppliers && suppliers.map((supplier) => (
+              {paginatedSuppliers && paginatedSuppliers.map((supplier) => (
                 <TableRow 
                   key={supplier.id} 
                   className="cursor-pointer hover:bg-muted/50"
@@ -184,10 +194,31 @@ export default function SuppliersPage() {
           )}
         </CardContent>
         {suppliers && suppliers.length > 0 && (
-          <CardFooter>
-              <div className="text-xs text-muted-foreground">
-              Showing <strong>1-{suppliers.length}</strong> of <strong>{suppliers.length}</strong> suppliers
-              </div>
+          <CardFooter className="flex items-center justify-between">
+            <div className="text-xs text-muted-foreground">
+              Showing <strong>{startIndex}-{endIndex}</strong> of <strong>{suppliers.length}</strong> suppliers
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => p - 1)}
+                disabled={currentPage <= 1}
+              >
+                Previous
+              </Button>
+              <span className='text-sm text-muted-foreground'>
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => p + 1)}
+                disabled={currentPage >= totalPages}
+              >
+                Next
+              </Button>
+            </div>
           </CardFooter>
         )}
       </Card>

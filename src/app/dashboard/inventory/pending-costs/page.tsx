@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSupabase, useUser } from '@/firebase';
+import { useSupabase, useUser } from '@/lib/supabase/hooks';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -67,7 +67,7 @@ export default function PendingCostsPage() {
             products!inner(name, description, images, supplier_pricing, initial_unit_cost)
           `)
           .eq('unit_cost', 0)
-          .eq('movement_type', 'RESTOCK')
+          .ilike('movement_type', 'restock')
           .order('timestamp', { ascending: false });
 
         if (error) throw error;

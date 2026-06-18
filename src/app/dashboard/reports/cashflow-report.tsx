@@ -2,7 +2,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { DateRange } from 'react-day-picker';
 import { startOfMonth, endOfMonth } from 'date-fns';
-import { useUser, useSupabase } from '@/firebase';
+import { useUser, useSupabase } from '@/lib/supabase/hooks';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReportDateFilter } from '@/components/dashboard/reports/report-date-filter';

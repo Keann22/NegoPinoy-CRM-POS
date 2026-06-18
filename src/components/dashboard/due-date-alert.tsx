@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSupabase, useUser } from '@/firebase';
+import { useSupabase, useUser } from '@/lib/supabase/hooks';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { startOfDay, endOfDay } from 'date-fns';
 import { AlertCircle, X } from 'lucide-react';

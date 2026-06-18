@@ -8,7 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { format, addMonths } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useSupabase } from "@/firebase";
+import { useSupabase } from "@/lib/supabase/hooks";
 import { useToast } from "@/hooks/use-toast";
 
 interface SetDueDateDialogProps {

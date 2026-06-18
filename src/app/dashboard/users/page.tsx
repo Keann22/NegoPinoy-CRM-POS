@@ -6,6 +6,7 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -25,7 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useAuth } from '@/firebase';
+import { useAuth } from '@/lib/supabase/hooks';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -62,6 +63,8 @@ export default function UsersPage() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [refreshCount, setRefreshCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   const { toast } = useToast();
 
   const canManageUsers = currentUserProfile &&
@@ -153,6 +156,14 @@ export default function UsersPage() {
     setDeletingUser(null);
   };
 
+  const totalPages = Math.ceil(users.length / itemsPerPage);
+  const paginatedUsers = users.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+  const startIndex = users.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0;
+  const endIndex = users.length > 0 ? Math.min(currentPage * itemsPerPage, users.length) : 0;
+
   return (
     <>
       <Card>
@@ -181,7 +192,7 @@ export default function UsersPage() {
                   <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                 </TableRow>
               ))}
-              {users.map((user) => (
+              {paginatedUsers.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell>
                     <div className="flex items-center gap-4">
@@ -222,6 +233,34 @@ export default function UsersPage() {
             </TableBody>
           </Table>
         </CardContent>
+        {users.length > 0 && (
+          <CardFooter className="flex items-center justify-between">
+            <div className="text-xs text-muted-foreground">
+              Showing <strong>{startIndex}-{endIndex}</strong> of <strong>{users.length}</strong> users
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => p - 1)}
+                disabled={currentPage <= 1}
+              >
+                Previous
+              </Button>
+              <span className='text-sm text-muted-foreground'>
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => p + 1)}
+                disabled={currentPage >= totalPages}
+              >
+                Next
+              </Button>
+            </div>
+          </CardFooter>
+        )}
       </Card>
 
       <AlertDialog open={!!deletingUser} onOpenChange={(isOpen) => !isOpen && setDeletingUser(null)}>

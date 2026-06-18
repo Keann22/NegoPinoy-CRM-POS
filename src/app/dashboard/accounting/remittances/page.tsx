@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Upload, FileText, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useSupabase } from '@/firebase';
+import { useSupabase } from '@/lib/supabase/hooks';
 import ExcelJS from 'exceljs';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useMemo } from 'react';
@@ -40,6 +40,9 @@ export default function SPXRemittancesPage() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { userProfile } = useUserProfile();
+  const [activeTab, setActiveTab] = useState('success');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const isManagement = useMemo(() => {
     return userProfile?.roles?.some(r => ['Admin', 'Owner'].includes(r));
@@ -239,6 +242,9 @@ export default function SPXRemittancesPage() {
       }
 
       setResults(syncResults);
+      const successesCount = syncResults.filter(r => r.category === 'success').length;
+      setActiveTab(successesCount > 0 ? 'success' : 'already_paid');
+      setCurrentPage(1);
 
       const successes = syncResults.filter(r => r.category === 'success').length;
       toast({
@@ -274,6 +280,13 @@ export default function SPXRemittancesPage() {
   const alreadyPaid = results?.filter(r => r.category === 'already_paid') || [];
   const notFound = results?.filter(r => r.category === 'not_found') || [];
   const errors = results?.filter(r => r.category === 'error') || [];
+
+  const getPaginated = (data: RemittanceResult[]) => data.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const paginatedSuccesses = getPaginated(successes);
+  const paginatedAlreadyPaid = getPaginated(alreadyPaid);
+  const paginatedNotFound = getPaginated(notFound);
+  const paginatedErrors = getPaginated(errors);
 
   return (
     <div className="space-y-6">
@@ -343,7 +356,11 @@ export default function SPXRemittancesPage() {
               </Card>
             </div>
           ) : (
-            <Tabs defaultValue={successes.length > 0 ? "success" : "already_paid"} className="w-full mt-4">
+            <Tabs 
+              value={activeTab} 
+              onValueChange={(val) => { setActiveTab(val); setCurrentPage(1); }} 
+              className="w-full mt-4"
+            >
               <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 h-auto mb-6">
                 <TabsTrigger value="success" className="py-2 data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-700">
                   <CheckCircle className="h-4 w-4 mr-2" />
@@ -374,14 +391,14 @@ export default function SPXRemittancesPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {successes.length === 0 ? (
+                      {paginatedSuccesses.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
                             No processed payments.
                           </TableCell>
                         </TableRow>
                       ) : (
-                        successes.map((res, i) => (
+                        paginatedSuccesses.map((res, i) => (
                           <TableRow key={i}>
                             <TableCell className="font-medium">{res.trackingNumber}</TableCell>
                             <TableCell className="font-mono text-muted-foreground">{res.orderId}</TableCell>
@@ -408,14 +425,14 @@ export default function SPXRemittancesPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {alreadyPaid.length === 0 ? (
+                      {paginatedAlreadyPaid.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
                             No skipped payments found.
                           </TableCell>
                         </TableRow>
                       ) : (
-                        alreadyPaid.map((res, i) => (
+                        paginatedAlreadyPaid.map((res, i) => (
                           <TableRow key={i}>
                             <TableCell className="font-medium">{res.trackingNumber}</TableCell>
                             <TableCell className="font-mono text-muted-foreground">{res.orderId}</TableCell>
@@ -441,14 +458,14 @@ export default function SPXRemittancesPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {notFound.length === 0 ? (
+                      {paginatedNotFound.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
                             All tracking numbers matched! Great job!
                           </TableCell>
                         </TableRow>
                       ) : (
-                        notFound.map((res, i) => (
+                        paginatedNotFound.map((res, i) => (
                           <TableRow key={i}>
                             <TableCell className="font-medium">{res.trackingNumber}</TableCell>
                             <TableCell className="text-right font-medium">₱{res.codAmount.toLocaleString()}</TableCell>
@@ -473,14 +490,14 @@ export default function SPXRemittancesPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {errors.length === 0 ? (
+                      {paginatedErrors.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
                             No database errors encountered.
                           </TableCell>
                         </TableRow>
                       ) : (
-                        errors.map((res, i) => (
+                        paginatedErrors.map((res, i) => (
                           <TableRow key={i}>
                             <TableCell className="font-medium">{res.trackingNumber}</TableCell>
                             <TableCell className="font-mono text-muted-foreground">{res.orderId}</TableCell>
@@ -495,6 +512,42 @@ export default function SPXRemittancesPage() {
             </Tabs>
           )}
         </CardContent>
+        {results && (
+          <CardFooter className="flex flex-col sm:flex-row items-center justify-between border-t p-6 gap-4">
+            <div className="text-sm text-muted-foreground">
+              {(() => {
+                const activeData = activeTab === 'success' ? successes : activeTab === 'already_paid' ? alreadyPaid : activeTab === 'not_found' ? notFound : errors;
+                const startIndex = activeData.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0;
+                const endIndex = Math.min(currentPage * itemsPerPage, activeData.length);
+                return `Showing ${startIndex}-${endIndex} of ${activeData.length} records`;
+              })()}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage <= 1}
+              >
+                Previous
+              </Button>
+              <div className="text-sm font-medium mx-2">
+                Page {currentPage} of {Math.max(1, Math.ceil((activeTab === 'success' ? successes.length : activeTab === 'already_paid' ? alreadyPaid.length : activeTab === 'not_found' ? notFound.length : errors.length) / itemsPerPage))}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const total = Math.ceil((activeTab === 'success' ? successes.length : activeTab === 'already_paid' ? alreadyPaid.length : activeTab === 'not_found' ? notFound.length : errors.length) / itemsPerPage);
+                  setCurrentPage(p => Math.min(total, p + 1));
+                }}
+                disabled={currentPage >= Math.ceil((activeTab === 'success' ? successes.length : activeTab === 'already_paid' ? alreadyPaid.length : activeTab === 'not_found' ? notFound.length : errors.length) / itemsPerPage)}
+              >
+                Next
+              </Button>
+            </div>
+          </CardFooter>
+        )}
       </Card>
     </div>
   );

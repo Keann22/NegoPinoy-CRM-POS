@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReportDateFilter } from '@/components/dashboard/reports/report-date-filter';
 import { Separator } from '@/components/ui/separator';
-import { useUser, useSupabase } from '@/firebase';
+import { useUser, useSupabase } from '@/lib/supabase/hooks';
 import {
     Accordion,
     AccordionContent,

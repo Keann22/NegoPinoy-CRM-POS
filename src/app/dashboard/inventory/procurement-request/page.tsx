@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, Trash2, Plus } from "lucide-react";
-import { useSupabase, useUser } from "@/firebase";
+import { useSupabase, useUser } from "@/lib/supabase/hooks";
+import { useRoleCheck } from "@/hooks/useRoleCheck";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
@@ -15,6 +16,7 @@ export default function ProcurementRequestPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const supabase = useSupabase();
   const { user } = useUser();
+  const { isManagement } = useRoleCheck();
 
   const [openSearch, setOpenSearch] = useState(false);
   const [productSearch, setProductSearch] = useState('');
@@ -97,6 +99,17 @@ export default function ProcurementRequestPage() {
     }
   };
 
+  const handleCreateBatch = async () => {
+      try {
+          const res = await fetch('/api/inventory/procurement-batch', { method: 'POST' });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Failed to create batch');
+          alert(`Successfully created ${data.batchName}! Check the Receive page to view the batch.`);
+      } catch (err: any) {
+          alert(`Error: ${err.message}`);
+      }
+  };
+
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6 bg-white shadow rounded-lg mt-8">
       <div className="flex justify-between items-center border-b pb-4">
@@ -104,9 +117,16 @@ export default function ProcurementRequestPage() {
           <h1 className="text-3xl font-bold text-slate-800">Procurement Request</h1>
           <p className="text-slate-600">Select products and submit a request to Management for buying.</p>
         </div>
-        <Button onClick={handleSubmit} disabled={isSubmitting || items.length === 0} className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 py-2">
-          {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</> : "Submit Request"}
-        </Button>
+        <div className="flex gap-2">
+            {isManagement && (
+                <Button onClick={handleCreateBatch} variant="secondary" className="font-bold px-4 py-2">
+                    Create Procurement Batch
+                </Button>
+            )}
+            <Button onClick={handleSubmit} disabled={isSubmitting || items.length === 0} className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 py-2">
+              {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</> : "Submit Request"}
+            </Button>
+        </div>
       </div>
 
       <div className="bg-slate-50 p-4 rounded-lg border flex items-center justify-between">

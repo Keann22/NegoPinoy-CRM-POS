@@ -1,13 +1,14 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import { useSupabase, useUser } from '@/firebase';
+import { useSupabase, useUser } from '@/lib/supabase/hooks';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, isValid } from 'date-fns';
 import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -54,6 +55,8 @@ export default function PaymentsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoadingPayments, setIsLoadingPayments] = useState(true);
   const [activeTab, setActiveTab] = useState('Pending');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const [isVerifyDialogOpen, setIsVerifyDialogOpen] = useState(false);
   const [verifyFile, setVerifyFile] = useState<File | null>(null);
@@ -67,6 +70,16 @@ export default function PaymentsPage() {
   const filteredPayments = useMemo(() => {
     return payments.filter(p => (p.status || 'Pending') === activeTab);
   }, [payments, activeTab]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab]);
+
+  const totalPages = Math.ceil(filteredPayments.length / itemsPerPage);
+  const paginatedData = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredPayments.slice(start, start + itemsPerPage);
+  }, [filteredPayments, currentPage, itemsPerPage]);
 
   // Fetch payments
   const fetchPayments = async () => {
@@ -336,7 +349,7 @@ export default function PaymentsPage() {
                       <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                    </TableRow>
               ))}
-              {!isLoading && filteredPayments.map((payment) => {
+              {!isLoading && paginatedData.map((payment) => {
                 const orderInfo = orderMap.get(payment.order_id);
                 const d = new Date(payment.payment_date);
                 const isDateValid = isValid(d);
@@ -431,6 +444,29 @@ export default function PaymentsPage() {
               </div>
           )}
         </CardContent>
+        <CardFooter className="flex items-center justify-between">
+          <div className="text-xs text-muted-foreground">
+            Showing <strong>{filteredPayments.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, filteredPayments.length)}</strong> of <strong>{filteredPayments.length}</strong> payments
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1 || isLoading}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages || isLoading || filteredPayments.length === 0}
+            >
+              Next
+            </Button>
+          </div>
+        </CardFooter>
       </Card>
     </div>
   );

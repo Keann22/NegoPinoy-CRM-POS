@@ -4,7 +4,7 @@ import { useMemo, useEffect, useState } from 'react';
 import { Skeleton } from '../ui/skeleton';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { createClient } from '@/lib/supabase/client';
-import { useUser } from '@/firebase';
+import { useUser } from '@/lib/supabase/hooks';
 import { DateRange } from 'react-day-picker';
 import { Package } from 'lucide-react';
 

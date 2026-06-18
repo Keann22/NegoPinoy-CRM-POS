@@ -1,6 +1,6 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useEffect, useState, useMemo } from "react";
-import { useSupabase } from "@/firebase";
+import { useSupabase } from "@/lib/supabase/hooks";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";

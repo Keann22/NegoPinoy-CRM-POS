@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Download, Truck, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useSupabase } from '@/firebase';
+import { useSupabase } from '@/lib/supabase/hooks';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { MarkShippedDialog } from '@/components/dashboard/mark-shipped-dialog';
@@ -41,6 +41,8 @@ export default function ForShippingPage() {
   const supabase = useSupabase();
   const [loading, setLoading] = useState(false);
   const [orders, setOrders] = useState<ShippingOrder[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   const [markShippedOrder, setMarkShippedOrder] = useState<{id: string, tracking_number: string} | null>(null);
 
   const fetchForShippingOrders = async () => {
@@ -416,6 +418,12 @@ export default function ForShippingPage() {
     }
   };
 
+  const totalPages = Math.ceil(orders.length / itemsPerPage);
+  const paginatedData = orders.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
   return (
     <>
       <Card>
@@ -472,7 +480,7 @@ export default function ForShippingPage() {
                   </TableCell>
                 </TableRow>
               )}
-              {!loading && orders.map(order => (
+              {!loading && paginatedData.map(order => (
                 <TableRow key={order.id}>
                   <TableCell className="font-mono text-sm">{order.orderId}</TableCell>
                   <TableCell>
@@ -491,6 +499,29 @@ export default function ForShippingPage() {
             </TableBody>
           </Table>
         </CardContent>
+        <CardFooter className="flex items-center justify-between">
+          <div className="text-xs text-muted-foreground">
+            Showing <strong>{orders.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, orders.length)}</strong> of <strong>{orders.length}</strong> orders
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1 || loading}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages || loading || orders.length === 0}
+            >
+              Next
+            </Button>
+          </div>
+        </CardFooter>
       </Card>
 
       {markShippedOrder && (

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useSupabase } from '@/firebase';
+import { useSupabase } from '@/lib/supabase/hooks';
 import {
     Dialog,
     DialogContent,

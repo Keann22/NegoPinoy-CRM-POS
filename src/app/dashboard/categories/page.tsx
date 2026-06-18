@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { useSupabase, useUser } from '@/firebase';
+import { useSupabase, useUser } from '@/lib/supabase/hooks';
 import { useUserProfile } from '@/hooks/useUserProfile';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -30,6 +30,9 @@ export default function CategoriesPage() {
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
     const [isAddingCategory, setIsAddingCategory] = useState(false);
     const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
+    
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
 
     const isManagement = useMemo(() => userProfile?.roles?.some(r => ['Admin', 'Owner'].includes(r)), [userProfile]);
     const isInventory = useMemo(() => userProfile?.roles?.some(r => String(r).toLowerCase() === 'inventory'), [userProfile]);
@@ -59,6 +62,23 @@ export default function CategoriesPage() {
         if (!searchTerm) return categories;
         return categories.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()));
     }, [categories, searchTerm]);
+
+    const totalPages = Math.ceil(filteredCategories.length / itemsPerPage) || 1;
+    
+    // Reset to page 1 if search term changes and current page is out of bounds
+    useEffect(() => {
+        if (currentPage > totalPages) {
+            setCurrentPage(1);
+        }
+    }, [searchTerm, totalPages, currentPage]);
+
+    const paginatedCategories = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        return filteredCategories.slice(startIndex, startIndex + itemsPerPage);
+    }, [filteredCategories, currentPage, itemsPerPage]);
+
+    const startIndex = filteredCategories.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0;
+    const endIndex = filteredCategories.length > 0 ? Math.min(currentPage * itemsPerPage, filteredCategories.length) : 0;
 
     const handleDeleteConfirm = async () => {
         if (!deletingCategory || !supabase) return;
@@ -130,7 +150,7 @@ export default function CategoriesPage() {
                                 </TableRow>
                             ))}
                             
-                            {!isLoading && filteredCategories.map((category) => (
+                            {!isLoading && paginatedCategories.map((category) => (
                                 <TableRow key={category.id}>
                                     <TableCell className="font-medium">{category.name}</TableCell>
                                     <TableCell className="text-muted-foreground">{category.description || '-'}</TableCell>
@@ -170,6 +190,34 @@ export default function CategoriesPage() {
                         </div>
                     )}
                 </CardContent>
+                {filteredCategories.length > 0 && (
+                    <CardFooter className="flex items-center justify-between border-t p-4">
+                        <div className="text-xs text-muted-foreground">
+                            Showing <strong>{startIndex}-{endIndex}</strong> of <strong>{filteredCategories.length}</strong> categories
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                disabled={currentPage <= 1}
+                            >
+                                Previous
+                            </Button>
+                            <span className="text-sm text-muted-foreground">
+                                Page {currentPage} of {totalPages}
+                            </span>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                disabled={currentPage >= totalPages}
+                            >
+                                Next
+                            </Button>
+                        </div>
+                    </CardFooter>
+                )}
             </Card>
 
             <ManageCategoryDialog 

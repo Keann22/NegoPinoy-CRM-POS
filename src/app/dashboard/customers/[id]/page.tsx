@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useDoc, useCollection, useSupabase, useUser, collection, doc, query, orderBy } from '@/firebase';
+import { useSupabase } from '@/lib/supabase/hooks';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -64,34 +64,99 @@ export default function CustomerDetailPage() {
 
   const [logPaymentOrder, setLogPaymentOrder] = useState<Order | null>(null);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
-  
-  // Fetch customer
-  const customerRef = useMemo(() => (supabase && customerId ? doc(supabase, 'customers', customerId) : null), [supabase, customerId]);
-  const { data: customer, isLoading: isLoadingCustomer } = useDoc<Customer>(customerRef);
-  
-  // Fetch ALL orders and payments, then filter on the client
-  const allOrdersQuery = useMemo(() => (supabase ? query(collection(supabase, 'orders'), orderBy('orderDate', 'desc')) : null), [supabase]);
-  const { data: allOrders, isLoading: isLoadingOrders } = useCollection<Order>(allOrdersQuery);
 
-  const allPaymentsQuery = useMemo(() => (supabase ? query(collection(supabase, 'payments'), orderBy('paymentDate', 'desc')) : null), [supabase]);
-  const { data: allPayments, isLoading: isLoadingPayments } = useCollection<Payment>(allPaymentsQuery);
+  const [customer, setCustomer] = useState<Customer | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const isLoading = isLoadingCustomer || isLoadingOrders || isLoadingPayments;
+  useEffect(() => {
+    if (!supabase || !customerId) return;
+    const fetchAll = async () => {
+      setIsLoading(true);
+      try {
+        // 1. Fetch customer
+        const { data: custData, error: custErr } = await supabase
+          .from('customers')
+          .select('*')
+          .eq('id', customerId)
+          .single();
+        if (custErr) throw custErr;
+        if (custData) {
+          setCustomer({
+            id: custData.id,
+            firstName: custData.first_name,
+            lastName: custData.last_name,
+            email: custData.email,
+            mobileNumber: custData.mobile_number,
+            addressLine: custData.address_line,
+            region: custData.region,
+            province: custData.province,
+            city: custData.city,
+            barangay: custData.barangay,
+            postalCode: custData.postal_code,
+            streetAddress: custData.street_address,
+            sukiTier: custData.suki_tier,
+            facebookProfileLink: custData.facebook_profile_link,
+            storeCredit: custData.store_credit,
+          });
+        }
 
-  // Client-side filtering for orders
-  const orders = useMemo(() => {
-    if (!allOrders || !customerId) return [];
-    return allOrders.filter(o => o.customerId === customerId);
-  }, [allOrders, customerId]);
-  
-  const orderIds = useMemo(() => orders.map(o => o.id), [orders]);
+        // 2. Fetch this customer's orders only (server-side filter)
+        const { data: ordersData, error: ordersErr } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('customer_id', customerId)
+          .order('order_date', { ascending: false });
+        if (ordersErr) throw ordersErr;
+        const mappedOrders: Order[] = (ordersData || []).map((o: any) => ({
+          id: o.id,
+          customerId: o.customer_id,
+          orderDate: o.order_date,
+          orderStatus: o.status,
+          totalAmount: o.total_amount,
+          balanceDue: o.balance_due,
+          amountPaid: o.amount_paid,
+          subtotal: o.subtotal,
+          totalDiscount: o.total_discount,
+          paymentType: o.payment_type,
+          installmentMonths: o.installment_months,
+          monthlyPayment: o.monthly_payment,
+          salesPersonName: o.sales_person_name,
+          salesRepId: o.sales_rep_id,
+          insurance_fee: o.insurance_fee,
+          tracking_number: o.tracking_number,
+          spx_sync_data: o.spx_sync_data,
+        }));
+        setOrders(mappedOrders);
 
-  // Client-side filtering for payments
-  const payments = useMemo(() => {
-    if (!allPayments || orderIds.length === 0) return [];
-    const orderIdSet = new Set(orderIds);
-    return allPayments.filter(p => orderIdSet.has(p.orderId));
-  }, [allPayments, orderIds]);
+        // 3. Fetch payments only for those orders
+        if (mappedOrders.length > 0) {
+          const orderIds = mappedOrders.map(o => o.id);
+          const { data: paymentsData, error: paymentsErr } = await supabase
+            .from('payments')
+            .select('*')
+            .in('order_id', orderIds)
+            .order('payment_date', { ascending: false });
+          if (paymentsErr) throw paymentsErr;
+          setPayments((paymentsData || []).map((p: any) => ({
+            id: p.id,
+            orderId: p.order_id,
+            paymentDate: p.payment_date,
+            amount: p.amount,
+            paymentMethod: p.payment_method,
+          })));
+        } else {
+          setPayments([]);
+        }
+      } catch (err) {
+        console.error('CustomerDetailPage fetch error:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchAll();
+  }, [supabase, customerId]);
 
   const { totalBalanceOwed, outstandingOrders } = useMemo(() => {
     if (!orders) return { totalBalanceOwed: 0, outstandingOrders: [] };

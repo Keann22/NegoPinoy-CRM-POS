@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CheckCircle2, XCircle, Search, RotateCcw } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { useSupabase } from '@/firebase';
+import { useSupabase } from '@/lib/supabase/hooks';
 import { useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, differenceInDays } from 'date-fns';
@@ -28,6 +28,14 @@ export default function PackedOrdersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSalesPerson, setFilterSalesPerson] = useState<string>('All');
   
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [activeTab, setActiveTab] = useState('ready');
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterSalesPerson, activeTab]);
+
   const [verifyOrder, setVerifyOrder] = useState<Order | null>(null);
   const [notForShippingOrder, setNotForShippingOrder] = useState<Order | null>(null);
   const [revertOrder, setRevertOrder] = useState<Order | null>(null);
@@ -136,6 +144,10 @@ export default function PackedOrdersPage() {
   const readyOrders = formattedOrders.filter(o => !(o as any).not_for_shipping_reason);
   const waitingOrders = formattedOrders.filter(o => !!(o as any).not_for_shipping_reason);
 
+  const currentOrders = activeTab === 'ready' ? readyOrders : waitingOrders;
+  const totalPages = Math.max(1, Math.ceil(currentOrders.length / rowsPerPage));
+  const paginatedData = currentOrders.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
+
   const renderTable = (ordersToRender: PackedOrder[], isWaitingTab: boolean) => (
     <Table>
       <TableHeader>
@@ -241,7 +253,7 @@ export default function PackedOrdersPage() {
             </Select>
           </div>
 
-          <Tabs defaultValue="ready" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="mb-4">
               <TabsTrigger value="ready">
                 Ready to Verify <Badge variant="secondary" className="ml-2 bg-background">{readyOrders.length}</Badge>
@@ -251,13 +263,37 @@ export default function PackedOrdersPage() {
               </TabsTrigger>
             </TabsList>
             <TabsContent value="ready">
-              {renderTable(readyOrders, false)}
+              {renderTable(paginatedData, false)}
             </TabsContent>
             <TabsContent value="waiting">
-              {renderTable(waitingOrders, true)}
+              {renderTable(paginatedData, true)}
             </TabsContent>
           </Tabs>
         </CardContent>
+        {currentOrders.length > 0 && (
+          <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-2">
+            <div className="text-sm text-muted-foreground">
+              Showing <strong>{(currentPage - 1) * rowsPerPage + 1}-{Math.min(currentPage * rowsPerPage, currentOrders.length)}</strong> of <strong>{currentOrders.length}</strong> orders
+            </div>
+            <div className="flex items-center gap-2">
+              <Select value={rowsPerPage.toString()} onValueChange={(val) => { setRowsPerPage(Number(val)); setCurrentPage(1); }}>
+                <SelectTrigger className="w-[70px] h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="flex items-center border rounded-md h-9 px-1">
+                <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Prev</Button>
+                <span className="text-sm mx-2 min-w-[3rem] text-center">{currentPage} / {totalPages}</span>
+                <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Next</Button>
+              </div>
+            </div>
+          </CardFooter>
+        )}
       </Card>
 
       <VerifyShippingDialog 
