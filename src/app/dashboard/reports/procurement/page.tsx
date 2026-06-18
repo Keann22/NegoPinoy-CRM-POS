@@ -15,12 +15,25 @@ import {
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
+import { useRoleCheck } from "@/hooks/useRoleCheck";
 
 export default function ProcurementSheet() {
+  const { isManagement } = useRoleCheck();
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [groupedItems, setGroupedItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
+  const handleCreateBatch = async () => {
+      try {
+          const res = await fetch('/api/inventory/procurement-batch', { method: 'POST' });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Failed to create batch');
+          alert(`Successfully created ${data.batchName}! Check the Receive page to view the batch.`);
+      } catch (err: any) {
+          alert(`Error: ${err.message}`);
+      }
+  };
+
   const [isSubmitting, setIsSubmitting] = useState<boolean | string>(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [isLoadingProduct, setIsLoadingProduct] = useState(false);
@@ -341,9 +354,16 @@ export default function ProcurementSheet() {
           <h1 className="text-2xl md:text-3xl font-bold text-slate-800">Procurement Master Sheet</h1>
           <p className="text-slate-600 text-sm md:text-base">Your on-the-go shopping list. Click 'Buy' to record items as you shop.</p>
         </div>
-        <Button onClick={() => setIsAddDialogOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 flex items-center justify-center gap-2">
-          <PlusCircle className="w-5 h-5" /> Add Missing Item
-        </Button>
+        <div className="flex flex-col md:flex-row gap-2">
+            {isManagement && (
+                <Button onClick={handleCreateBatch} variant="secondary" className="font-bold px-4 py-2">
+                    Create Procurement Batch
+                </Button>
+            )}
+            <Button onClick={() => setIsAddDialogOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 flex items-center justify-center gap-2">
+              <PlusCircle className="w-5 h-5" /> Add Missing Item
+            </Button>
+        </div>
       </div>
 
       {groupedItems.length === 0 ? (

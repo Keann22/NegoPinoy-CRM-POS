@@ -21,7 +21,8 @@ export async function GET(req: Request) {
     const { data: drafts, error: dErr } = await supabase
       .from('purchase_order_items')
       .select('id, product_id, expected_qty, po_id, purchase_orders!inner(notes)')
-      .eq('purchase_orders.notes', 'STAFF_DRAFT');
+      .eq('purchase_orders.notes', 'STAFF_DRAFT')
+      .eq('status', 'pending_receipt');
     if (dErr) throw dErr;
 
     const draftMap = new Map();
