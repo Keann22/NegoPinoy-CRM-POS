@@ -75,7 +75,7 @@ export async function POST(req: Request) {
     for (const p of requests) {
       if (existingMap.has(p.productId)) {
         // Update existing item
-        const existingItem = existingMap.get(p.productId);
+        const existingItem = existingMap.get(p.productId)!;
         await supabase
           .from('purchase_order_items')
           .update({ expected_qty: existingItem.expected_qty + p.requestedQty })

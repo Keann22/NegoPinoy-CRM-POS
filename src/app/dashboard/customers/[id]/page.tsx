@@ -187,7 +187,7 @@ export default function CustomerDetailPage() {
         <Card>
           <CardHeader className="flex flex-row items-center gap-4">
             <Avatar className="h-16 w-16">
-              <AvatarFallback className="text-2xl">{customer.firstName[0]}{customer.lastName[0]}</AvatarFallback>
+              <AvatarFallback className="text-2xl">{(customer.firstName?.[0] || '')}{(customer.lastName?.[0] || '')}</AvatarFallback>
             </Avatar>
             <div className="flex-1">
               <CardTitle className="text-3xl font-headline">{customer.firstName} {customer.lastName}</CardTitle>
@@ -221,11 +221,11 @@ export default function CustomerDetailPage() {
                 )}
               </div>
               <CardDescription className="text-base mt-2">
-                Total Outstanding Balance: <span className="font-bold text-destructive">₱{totalBalanceOwed.toFixed(2)}</span>
+                Total Outstanding Balance: <span className="font-bold text-destructive">₱{Number(totalBalanceOwed || 0).toFixed(2)}</span>
               </CardDescription>
-              {customer.storeCredit && customer.storeCredit > 0 ? (
+              {customer.storeCredit && Number(customer.storeCredit) > 0 ? (
                 <CardDescription className="text-base mt-1 text-green-600 font-semibold">
-                  Store Credit (Overpayment): ₱{customer.storeCredit.toFixed(2)}
+                  Store Credit (Overpayment): ₱{Number(customer.storeCredit || 0).toFixed(2)}
                 </CardDescription>
               ) : null}
             </div>
@@ -265,9 +265,9 @@ export default function CustomerDetailPage() {
               <TableBody>
                 {outstandingOrders.length > 0 ? outstandingOrders.map(order => (
                   <TableRow key={order.id}>
-                    <TableCell>{format(new Date(order.orderDate), 'PPP')}</TableCell>
-                    <TableCell>₱{order.totalAmount.toFixed(2)}</TableCell>
-                    <TableCell className="font-semibold">₱{order.balanceDue.toFixed(2)}</TableCell>
+                    <TableCell>{order.orderDate ? format(new Date(order.orderDate), 'PPP') : 'N/A'}</TableCell>
+                    <TableCell>₱{Number(order.totalAmount || 0).toFixed(2)}</TableCell>
+                    <TableCell className="font-semibold">₱{Number(order.balanceDue || 0).toFixed(2)}</TableCell>
                     <TableCell className="text-right">
                       <Button size="sm" onClick={() => setLogPaymentOrder(order)}>Log Payment</Button>
                     </TableCell>
@@ -300,10 +300,10 @@ export default function CustomerDetailPage() {
               <TableBody>
                 {orders.length > 0 ? orders.map(order => (
                   <TableRow key={order.id}>
-                    <TableCell>{format(new Date(order.orderDate), 'PPP')}</TableCell>
+                    <TableCell>{order.orderDate ? format(new Date(order.orderDate), 'PPP') : 'N/A'}</TableCell>
                     <TableCell><Badge variant={getStatusVariant(order.orderStatus)}>{order.orderStatus}</Badge></TableCell>
                     <TableCell>{order.salesPersonName || 'Unassigned'}</TableCell>
-                    <TableCell className="text-right">₱{order.totalAmount.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">₱{Number(order.totalAmount || 0).toFixed(2)}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="outline" size="sm" onClick={() => router.push(`/dashboard/orders/${order.id}`)}>
                         View Order
@@ -336,9 +336,9 @@ export default function CustomerDetailPage() {
               <TableBody>
                 {payments && payments.length > 0 ? payments.map(payment => (
                   <TableRow key={payment.id}>
-                    <TableCell>{format(new Date(payment.paymentDate), 'PPP p')}</TableCell>
+                    <TableCell>{payment.paymentDate ? format(new Date(payment.paymentDate), 'PPP p') : 'N/A'}</TableCell>
                     <TableCell>{payment.paymentMethod}</TableCell>
-                    <TableCell className="text-right font-medium">₱{payment.amount.toFixed(2)}</TableCell>
+                    <TableCell className="text-right font-medium">₱{Number(payment.amount || 0).toFixed(2)}</TableCell>
                   </TableRow>
                 )) : (
                    <TableRow><TableCell colSpan={3} className="h-24 text-center">No payments recorded.</TableCell></TableRow>
