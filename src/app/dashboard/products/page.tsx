@@ -52,48 +52,12 @@ import { ViewProductHistoryDialog } from '@/components/dashboard/view-product-hi
 import { ViewProductDetailsDialog } from '@/components/dashboard/view-product-details-dialog';
 import { useUserProfile } from '@/hooks/useUserProfile';
 
-// Matches the Firestore document structure for a product
-export type Product = {
-  id: string;
-  name: string;
-  sku: string;
-  description: string;
-  categoryId: string;
-  supplierId?: string;
-  images: string[];
-  sellingPrice: number;
-  quantityOnHand: number;
-  shelf_location?: string;
-  supplier_pricing?: any;
-  initial_unit_cost?: number;
-  parentId?: string | null;
-  variantName?: string | null;
-  assembly_recipe?: { productId: string; productName: string; quantity: number }[] | null;
-};
+import type { FormattedProduct } from '@/types';
+import { getStockStatus } from '@/types';
 
-export type FormattedProduct = Product & {
-    status: { text: 'In Stock' | 'Low Stock' | 'Out of Stock'; variant: 'outline' | 'default' | 'destructive'; };
-    price: string;
-    image: string;
-    shelfLocation?: string;
-    supplierPricing?: any[];
-    children?: FormattedProduct[];
-    reservedStock?: number;
-    packedStock?: number;
-    installment_price?: number;
-    assembly_recipe?: any[] | null;
-}
+// Re-export for any components that still import FormattedProduct from this page
+export type { FormattedProduct } from '@/types';
 
-const getStatus = (stock: number | undefined | null): { text: 'In Stock' | 'Low Stock' | 'Out of Stock'; variant: 'outline' | 'default' | 'destructive' } => {
-  const currentStock = stock ?? 0;
-  if (currentStock <= 0) {
-    return { text: 'Out of Stock', variant: 'destructive' };
-  }
-  if (currentStock <= 10) {
-    return { text: 'Low Stock', variant: 'default' };
-  }
-  return { text: 'In Stock', variant: 'outline' };
-};
 
 export default function ProductsPage() {
   const supabase = useSupabase();
@@ -195,7 +159,7 @@ export default function ProductsPage() {
       return {
         ...p,
         quantityOnHand: p.quantityOnHand ?? 0,
-        status: getStatus(p.quantityOnHand),
+        status: getStockStatus(p.quantityOnHand),
         price: `₱${(Number(p.sellingPrice) || 0).toFixed(2)}`,
         image: p.images?.[0] || 'https://placehold.co/64x64',
         shelfLocation: p.shelf_location || "",
@@ -277,12 +241,32 @@ export default function ProductsPage() {
         }
 
         const { error } = await supabase.from('products').delete().eq('id', productToDelete.id);
-        if (error) throw error;
+        if (error) {
+            if (error.code === '23503') {
+                // Archive instead
+                const { error: archiveError } = await supabase.from('products').update({
+                    name: productToDelete.name.startsWith('[DELETED]') ? productToDelete.name : '[DELETED] ' + productToDelete.name,
+                    category: 'Archived',
+                    stock_level: 0
+                }).eq('id', productToDelete.id);
+                
+                if (archiveError) throw archiveError;
+                
+                toast({
+                  title: "Product Archived",
+                  description: `"${productToDelete.name}" is part of existing orders and was archived instead of deleted.`,
+                });
+                refetch();
+                return;
+            }
+            throw error;
+        }
 
         toast({
           title: "Product Deleted",
           description: `"${productToDelete.name}" has been removed from your catalog.`,
         });
+        refetch();
     } catch (error: any) {
         console.error("Error deleting product:", error);
         toast({
@@ -328,12 +312,35 @@ export default function ProductsPage() {
 
         // 2. Delete rows
         const { error } = await supabase.from('products').delete().in('id', idsToDelete);
-        if (error) throw error;
+        
+        if (error) {
+            if (error.code === '23503') {
+                // Some or all are tied to orders, archive them instead
+                for (const id of idsToDelete) {
+                    const prod = rawFormattedProducts.find(p => p.id === id);
+                    if (prod) {
+                        await supabase.from('products').update({
+                            name: prod.name.startsWith('[DELETED]') ? prod.name : '[DELETED] ' + prod.name,
+                            category: 'Archived',
+                            stock_level: 0
+                        }).eq('id', id);
+                    }
+                }
+                toast({
+                  title: "Products Archived",
+                  description: `Some products were part of existing orders and were archived instead of permanently deleted.`,
+                });
+                refetch();
+                return;
+            }
+            throw error;
+        }
 
         toast({
           title: "Bulk Deletion Complete",
           description: `${idsToDelete.length} products have been successfully deleted.`,
         });
+        refetch();
     } catch (error) {
         console.error("Bulk delete error", error);
         toast({
@@ -493,8 +500,8 @@ export default function ProductsPage() {
                     </TableCell>
                     <TableCell>
                       {product.children && product.children.length > 0 ? (
-                          <Badge variant={getStatus(product.children.reduce((acc, c) => acc + (c.quantityOnHand || 0), 0)).variant}>
-                              {getStatus(product.children.reduce((acc, c) => acc + (c.quantityOnHand || 0), 0)).text}
+                          <Badge variant={getStockStatus(product.children.reduce((acc, c) => acc + (c.quantityOnHand || 0), 0)).variant}>
+                              {getStockStatus(product.children.reduce((acc, c) => acc + (c.quantityOnHand || 0), 0)).text}
                           </Badge>
                       ) : (
                           <Badge variant={product.status.variant}>{product.status.text}</Badge>
