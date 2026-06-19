@@ -164,35 +164,37 @@ export default function SPXRemittancesPage() {
              continue;
           }
 
-          if (totalCod > 0) {
+          if (totalCod > 0 || totalShippingFee !== 0) {
             try {
-              // Update order
-              const newAmountPaid = (order.amount_paid || 0) + totalCod;
-              const newBalanceDue = Math.max(0, (order.balance_due || 0) - totalCod);
-              const { error: orderError } = await supabase
-                .from('orders')
-                .update({
-                  amount_paid: newAmountPaid,
-                  balance_due: newBalanceDue,
-                  status: newBalanceDue <= 0 ? 'Payment Received (COD)' : order.status
-                })
-                .eq('id', order.id);
+              // Update order and payments only if COD was actually collected
+              if (totalCod > 0) {
+                const newAmountPaid = (order.amount_paid || 0) + totalCod;
+                const newBalanceDue = Math.max(0, (order.balance_due || 0) - totalCod);
+                const { error: orderError } = await supabase
+                  .from('orders')
+                  .update({
+                    amount_paid: newAmountPaid,
+                    balance_due: newBalanceDue,
+                    status: newBalanceDue <= 0 ? 'Payment Received (COD)' : order.status
+                  })
+                  .eq('id', order.id);
 
-              if (orderError) throw orderError;
+                if (orderError) throw orderError;
 
-              // Insert payment
-              const { error: paymentError } = await supabase
-                .from('payments')
-                .insert({
-                  order_id: order.id,
-                  amount: totalCod,
-                  payment_date: new Date().toISOString(),
-                  payment_method: 'SPX COD Remittance',
-                  notes: `Auto-synced from SPX Remittance file`,
-                  status: 'Verified'
-                });
+                // Insert payment
+                const { error: paymentError } = await supabase
+                  .from('payments')
+                  .insert({
+                    order_id: order.id,
+                    amount: totalCod,
+                    payment_date: new Date().toISOString(),
+                    payment_method: 'SPX COD Remittance',
+                    notes: `Auto-synced from SPX Remittance file`,
+                    status: 'Verified'
+                  });
 
-              if (paymentError) throw paymentError;
+                if (paymentError) throw paymentError;
+              }
 
               // Calculate actual courier fee if the Excel file didn't explicitly list it
               // The courier fee is the difference between the COD Collected and the Order Total
@@ -224,7 +226,7 @@ export default function SPXRemittancesPage() {
                 codAmount: totalCod,
                 shippingFee: -finalShippingFee, // Store as negative for display consistency
                 category: 'success',
-                message: 'Payment verified and expenses recorded.'
+                message: totalCod > 0 ? 'Payment verified and expenses recorded.' : 'Courier fee deducted for zero-COD order.'
               });
 
             } catch (err: any) {
