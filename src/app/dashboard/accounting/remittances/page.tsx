@@ -83,18 +83,19 @@ export default function SPXRemittancesPage() {
         }
 
         const trackingNo = row.getCell(trackingCol).value?.toString().trim();
-        const type = row.getCell(typeCol).value?.toString().toLowerCase().trim();
+        const type = row.getCell(typeCol).value?.toString().toLowerCase().trim() || '';
         const amount = parseFloat(row.getCell(amountCol).value?.toString().replace(/,/g, '') || '0');
 
         if (trackingNo && type) {
           if (!trackingData[trackingNo]) {
-            trackingData[trackingNo] = { cod: 0, shippingFee: 0 };
+            trackingData[trackingNo] = { cod: 0, shippingFee: 0, processingFee: 0 };
           }
           if (type.includes('cod')) {
             trackingData[trackingNo].cod += amount;
-          } else if (type.includes('shipping fee') || type.includes('processing fee') || amount < 0) {
-            // Usually negative in the sheet, let's keep it negative
+          } else if (type.includes('shipping fee')) {
             trackingData[trackingNo].shippingFee += amount;
+          } else if (amount < 0) {
+            trackingData[trackingNo].processingFee += amount;
           }
         }
       });
@@ -131,6 +132,7 @@ export default function SPXRemittancesPage() {
           .filter(Boolean);
         let totalCod = 0;
         let totalShippingFee = 0;
+        let totalProcessingFee = 0;
         let matchedTrackingNos: string[] = [];
         let matched = false;
 
@@ -138,6 +140,7 @@ export default function SPXRemittancesPage() {
           if (trackingData[t]) {
             totalCod += trackingData[t].cod;
             totalShippingFee += trackingData[t].shippingFee;
+            totalProcessingFee += trackingData[t].processingFee;
             matchedTrackingNos.push(t);
             processedTracking.add(t);
             matched = true;
@@ -157,14 +160,14 @@ export default function SPXRemittancesPage() {
                trackingNumber: joinedTracking,
                orderId: shortOrderId,
                codAmount: totalCod,
-               shippingFee: totalShippingFee,
+               shippingFee: totalShippingFee + totalProcessingFee,
                category: 'already_paid',
                message: 'Order COD has already been synced or is fully paid.'
              });
              continue;
           }
 
-          if (totalCod > 0 || totalShippingFee !== 0) {
+          if (totalCod > 0 || totalShippingFee !== 0 || totalProcessingFee !== 0) {
             try {
               // Update order and payments only if COD was actually collected
               if (totalCod > 0) {
@@ -199,31 +202,47 @@ export default function SPXRemittancesPage() {
               // Calculate actual courier fee if the Excel file didn't explicitly list it
               // The courier fee is the difference between the COD Collected and the Order Total
               let finalShippingFee = Math.abs(totalShippingFee);
+              let finalProcessingFee = Math.abs(totalProcessingFee);
               
               const orderTotal = (order.balance_due || 0) + (order.amount_paid || 0);
-              if (finalShippingFee === 0 && totalCod > orderTotal && orderTotal > 0) {
-                finalShippingFee = totalCod - orderTotal;
+              const netRemittance = totalCod - finalShippingFee - finalProcessingFee;
+              
+              if (netRemittance < orderTotal && orderTotal > 0) {
+                // If there's still a missing difference, it's a hidden processing fee
+                finalProcessingFee += (orderTotal - netRemittance);
               }
 
-              // Insert expense
+              // Insert explicit Shipping Fee
               if (finalShippingFee > 0) {
-                const { error: expenseError } = await supabase
+                const { error: shipError } = await supabase
                   .from('expenses')
                   .insert({
                     amount: finalShippingFee,
+                    category: 'Shipping Fee',
+                    expense_date: new Date().toISOString(),
+                    description: `SPX Shipping Fee for Order #${shortOrderId}`
+                  });
+                if (shipError) throw shipError;
+              }
+
+              // Insert Processing/Courier Fee
+              if (finalProcessingFee > 0) {
+                const { error: procError } = await supabase
+                  .from('expenses')
+                  .insert({
+                    amount: finalProcessingFee,
                     category: 'Processing Fee',
                     expense_date: new Date().toISOString(),
                     description: `SPX Courier Fee for Order #${shortOrderId}`
                   });
-
-                if (expenseError) throw expenseError;
+                if (procError) throw procError;
               }
 
               syncResults.push({
                 trackingNumber: joinedTracking,
                 orderId: shortOrderId,
                 codAmount: totalCod,
-                shippingFee: -finalShippingFee, // Store as negative for display consistency
+                shippingFee: -(finalShippingFee + finalProcessingFee), // Store total deductions as negative for display consistency
                 category: 'success',
                 message: totalCod > 0 ? 'Payment verified and expenses recorded.' : 'Courier fee deducted for zero-COD order.'
               });

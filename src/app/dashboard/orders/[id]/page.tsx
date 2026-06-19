@@ -52,17 +52,25 @@ export default function OrderDetailPage() {
   const [isMarkShippedOpen, setIsMarkShippedOpen] = useState(false);
   const [isWaybillOpen, setIsWaybillOpen] = useState(false);
 
-  // Courier fee (if COD)
-  const [courierFee, setCourierFee] = useState<number>(0);
+  // Expenses (Shipping and Processing)
+  const [shippingFee, setShippingFee] = useState<number>(0);
+  const [processingFee, setProcessingFee] = useState<number>(0);
 
   useEffect(() => {
     if (!supabase || !orderId) return;
     supabase.from('expenses')
-      .select('amount')
+      .select('amount, category')
       .ilike('description', `%${orderId.substring(0, 7).toUpperCase()}%`)
       .then(({ data }) => {
         if (data && data.length > 0) {
-          setCourierFee(data.reduce((sum: number, d: any) => sum + d.amount, 0));
+          let ship = 0;
+          let proc = 0;
+          data.forEach((d: any) => {
+            if (d.category === 'Shipping Fee') ship += d.amount;
+            else proc += d.amount;
+          });
+          setShippingFee(ship);
+          setProcessingFee(proc);
         }
       });
   }, [supabase, orderId]);
@@ -266,17 +274,25 @@ export default function OrderDetailPage() {
               <span className="text-muted-foreground">Amount Paid</span>
               <span>₱{(order.amountPaid || 0).toFixed(2)}</span>
             </div>
-            {courierFee > 0 && (() => {
-              const netRemittance = (order.amountPaid || 0) - courierFee;
+            {(shippingFee > 0 || processingFee > 0) && (() => {
+              const totalDeductions = shippingFee + processingFee;
+              const netRemittance = (order.amountPaid || 0) - totalDeductions;
               const difference = netRemittance - (order.totalAmount || 0);
               return (
                 <div className="bg-muted/30 p-2 rounded-md mt-1 mb-2">
                   <div className="flex justify-between text-muted-foreground text-xs">
                     <span>COD Collected</span><span>₱{(order.amountPaid || 0).toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between text-destructive text-xs">
-                    <span>Courier Fee</span><span>- ₱{courierFee.toFixed(2)}</span>
-                  </div>
+                  {shippingFee > 0 && (
+                    <div className="flex justify-between text-destructive text-xs">
+                      <span>Shipping Fee</span><span>- ₱{shippingFee.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {processingFee > 0 && (
+                    <div className="flex justify-between text-destructive text-xs">
+                      <span>Courier / Processing Fee</span><span>- ₱{processingFee.toFixed(2)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-primary text-xs font-semibold mt-1 pt-1 border-t">
                     <span>Net Remittance</span><span>₱{netRemittance.toFixed(2)}</span>
                   </div>
