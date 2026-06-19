@@ -86,8 +86,8 @@ async function scanVision() {
       }
 
       const updates = {};
-      if (newRef !== payment.reference_number && newRef !== null) updates.reference_number = newRef;
-      if (newAmount !== payment.ocr_amount && newAmount !== null) updates.ocr_amount = newAmount;
+      if (newRef !== payment.reference_number) updates.reference_number = newRef;
+      if (newAmount !== payment.ocr_amount) updates.ocr_amount = newAmount;
 
       if (Object.keys(updates).length > 0) {
         console.log(` Updating Database...`);
@@ -105,7 +105,7 @@ async function scanVision() {
         console.log(' No new data found for this image.');
       }
       
-      // Sleep for a moment to avoid rate limits
+      // Sleep for a moment to avoid rate limits (if any)
       await new Promise(r => setTimeout(r, 500));
       
     } catch (err) {

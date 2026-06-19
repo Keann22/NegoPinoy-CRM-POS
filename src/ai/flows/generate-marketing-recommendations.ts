@@ -58,7 +58,7 @@ const generateMarketingRecommendationsFlow = ai.defineFlow(
     inputSchema: GenerateMarketingRecommendationsInputSchema,
     outputSchema: GenerateMarketingRecommendationsOutputSchema,
   },
-  async input => {
+  async (input: GenerateMarketingRecommendationsInput) => {
     const {output} = await prompt(input);
     return output!;
   }

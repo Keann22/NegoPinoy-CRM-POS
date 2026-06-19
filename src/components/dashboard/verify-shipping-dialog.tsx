@@ -259,7 +259,7 @@ export function VerifyShippingDialog({ order, open, onOpenChange, onSuccess }: V
               <Select value={barangay} disabled={!city} onValueChange={setBarangay}>
                 <SelectTrigger><SelectValue placeholder="Select Barangay" /></SelectTrigger>
                 <SelectContent>
-                  {barangayOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+                  {barangayOptions.map((opt: { value: string; label: string }) => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

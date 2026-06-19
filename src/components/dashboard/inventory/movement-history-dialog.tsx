@@ -1,4 +1,5 @@
 'use client';
+import React from 'react';
 
 import { useState, useEffect } from 'react';
 import { useSupabase, useUser } from '@/lib/supabase/hooks';
@@ -60,7 +61,7 @@ export function MovementHistoryDialog({ open, onOpenChange, movementId }: Moveme
   const renderChanges = (oldData: any, newData: any) => {
     if (!oldData || !newData) return <span>Initial Creation</span>;
     
-    const changes: JSX.Element[] = [];
+    const changes: React.ReactElement[] = [];
     Object.keys(newData).forEach(key => {
       if (oldData[key] !== newData[key]) {
         changes.push(

@@ -198,17 +198,19 @@ export function BulkUploadProductsDialog() {
             stock_level: quantityOnHand,
         };
 
-        const uploadPromise = supabase
-            .from('products')
-            .insert(productData)
-            .select('id')
-            .single()
-            .then(async ({ data: newProductData, error: insertError }) => {
+        const uploadPromise = (async () => {
+            try {
+                const { data: newProductData, error: insertError } = await supabase
+                    .from('products')
+                    .insert(productData)
+                    .select('id')
+                    .single();
+
                 if (insertError) {
                     console.error(`Failed to upload product with SKU ${sku}:`, insertError);
                     return;
                 }
-                
+
                 if (newProductData && quantityOnHand > 0) {
                     const movementError = await supabase
                         .from('inventory_movements')
@@ -219,15 +221,16 @@ export function BulkUploadProductsDialog() {
                             reason: 'Bulk upload',
                             cost_price_at_movement: initialUnitCost,
                         });
-                    
+
                     if (movementError.error) {
-                         console.error(`Failed to upload movement for SKU ${sku}:`, movementError.error);
+                        console.error(`Failed to upload movement for SKU ${sku}:`, movementError.error);
                     }
                 }
                 successfulUploads++;
-            }).catch(err => {
+            } catch (err) {
                 console.error(`Unexpected error for product SKU ${sku}:`, err);
-            });
+            }
+        })();
         
         uploadPromises.push(uploadPromise);
     }

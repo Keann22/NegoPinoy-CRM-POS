@@ -1,280 +1,99 @@
 'use client';
 
-import { MoreHorizontal, Calendar as CalendarIcon, FilterX, Search, Upload } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar } from '@/components/ui/calendar';
+import { useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { endOfDay, format, isValid } from 'date-fns';
 import { DateRange } from 'react-day-picker';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Skeleton } from '@/components/ui/skeleton';
-import { AddOrderDialog } from '@/components/dashboard/order-dialog';
-import { format, isValid, endOfDay } from 'date-fns';
-import { cn } from '@/lib/utils';
-import { useMemo, useState, useEffect } from 'react';
+import { Upload } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { useUserProfile } from '@/hooks/useUserProfile';
+import { useSupabase } from '@/lib/supabase/hooks';
+
+import { AddOrderDialog } from '@/components/dashboard/order-dialog';
 import { LogPaymentDialog } from '@/components/dashboard/log-payment-dialog';
 import { CompleteCodPaymentDialog } from '@/components/dashboard/complete-cod-payment-dialog';
 import { EditPaymentTermsDialog } from '@/components/dashboard/edit-payment-terms-dialog';
 import { SetDueDateDialog } from '@/components/dashboard/set-due-date-dialog';
 import { MarkShippedDialog } from '@/components/dashboard/mark-shipped-dialog';
 import { WaybillSummaryDialog } from '@/components/dashboard/waybill-summary-dialog';
-import { 
-  useUser, 
-  useSupabase,
-} from '@/lib/supabase/hooks';
 
-import { Progress } from '@/components/ui/progress';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useUserProfile } from '@/hooks/useUserProfile';
+import { OrdersFilterBar } from '@/components/dashboard/orders/OrdersFilterBar';
+import { OrdersTable } from '@/components/dashboard/orders/OrdersTable';
+import { useOrders } from '@/hooks/useOrders';
 
+import type { FormattedOrder, Order, OrderStatus } from '@/types';
+import { ORDER_STATUSES } from '@/types';
 
-// Matches the Firestore document structure for an order
-export type Order = {
-  id: string;
-  customerId: string;
-  orderDate: string; // ISO string
-  subtotal: number;
-  totalDiscount: number;
-  totalAmount: number;
-  amountPaid: number;
-  balanceDue: number;
-  orderStatus: 'Pending Payment' | 'Processing' | 'Packed' | 'For Shipping' | 'For Pick-up' | 'Shipped' | 'Completed' | 'Cancelled' | 'Returned' | 'Payment Received (COD)';
-  paymentType: 'Full Payment' | 'Lay-away' | 'Installment' | 'COD' | 'Pending';
-  installmentMonths?: number;
-  monthlyPayment?: number;
-  insurance_fee?: number;
-  tracking_number?: string;
-  salesPersonName?: string;
-  spx_sync_data?: any;
-  boxes_config?: any;
-};
-
-type Customer = {
-  id: string;
-  firstName: string;
-  lastName: string;
-};
-
-type FormattedOrder = Order & {
-    customerName: string;
-    formattedDate: string;
-    formattedTotal: string;
-};
-
-
-const getStatusVariant = (status: Order['orderStatus']) => {
-  switch (status) {
-    case 'Shipped':
-    case 'Completed':
-    case 'Payment Received (COD)':
-      return 'outline';
-    case 'Packed':
-      return 'secondary';
-    case 'For Shipping':
-    case 'For Pick-up':
-      return 'outline';
-    case 'Processing':
-      return 'secondary';
-    case 'Cancelled':
-    case 'Returned':
-        return 'destructive';
-    case 'Pending Payment':
-    default:
-      return 'default';
-  }
-}
-
-const statuses: Order['orderStatus'][] = ['Pending Payment', 'Processing', 'Packed', 'For Shipping', 'For Pick-up', 'Shipped', 'Completed', 'Payment Received (COD)', 'Returned', 'Cancelled'];
+// Re-export for files that import Order from this page during transition
+export type { Order } from '@/types';
 
 export default function OrdersPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { toast } = useToast();
+  const supabase = useSupabase();
+  const { userProfile } = useUserProfile();
+
+  // ── Domain hook ────────────────────────────────────────────────────────────
+  const { orders, customerMap, isLoading, refetch } = useOrders();
+
+  // ── Role gates ─────────────────────────────────────────────────────────────
+  const isInventoryOnly = !!(userProfile?.roles.includes('Inventory') && !userProfile?.roles.includes('Sales') && !userProfile?.roles.includes('Admin') && !userProfile?.roles.includes('Owner'));
+  const canCreateOrder = !!(userProfile?.roles.some(r => ['Sales', 'Admin', 'Owner'].includes(r)));
+  const isAdminOrOwner = !!(userProfile?.roles.some(r => ['Admin', 'Owner'].includes(r)));
+  const canSyncCourier = !!(userProfile?.roles?.some(r => ['Admin', 'Owner', 'Inventory'].includes(r)));
+
+  // ── Dialog state ───────────────────────────────────────────────────────────
   const [logPaymentOrder, setLogPaymentOrder] = useState<Order | null>(null);
   const [codPaymentOrder, setCodPaymentOrder] = useState<Order | null>(null);
   const [editPaymentOrder, setEditPaymentOrder] = useState<Order | null>(null);
   const [dueDateOrder, setDueDateOrder] = useState<Order | null>(null);
   const [markShippedOrder, setMarkShippedOrder] = useState<Order | null>(null);
   const [viewWaybillOrder, setViewWaybillOrder] = useState<Order | null>(null);
+
+  // ── Filter/selection state ─────────────────────────────────────────────────
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [date, setDate] = useState<DateRange | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState(searchParams?.get('search') || '');
-  const { toast } = useToast();
-  const supabase = useSupabase();
-  const { user } = useUser();
-  const { userProfile } = useUserProfile();
-
-  const isInventoryOnly = useMemo(() => userProfile?.roles.includes('Inventory') && !userProfile?.roles.includes('Sales') && !userProfile?.roles.includes('Admin') && !userProfile?.roles.includes('Owner'), [userProfile]);
-  const canCreateOrder = useMemo(() => userProfile?.roles.some(r => ['Sales', 'Admin', 'Owner'].includes(r)), [userProfile]);
-  const isAdminOrOwner = useMemo(() => userProfile?.roles.some(r => ['Admin', 'Owner'].includes(r)), [userProfile]);
-  const canSyncCourier = useMemo(() => userProfile?.roles?.some(r => ['Admin', 'Owner', 'Inventory'].includes(r)), [userProfile]);
-
-  const [orders, setOrders] = useState<Order[] | null>(null);
-  const [isLoadingOrders, setIsLoadingOrders] = useState(true);
-  const [refetchTrigger, setRefetchTrigger] = useState(0);
-  const refetch = () => setRefetchTrigger(n => n + 1);
-
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [date, statusFilter, typeFilter, searchQuery]);
 
-  useEffect(() => {
-    if (!supabase || !user || !userProfile) return;
-    const fetchOrders = async () => {
-      setIsLoadingOrders(true);
-      try {
-        const isSalesOnly = !userProfile.roles.some((r: string) => ['Admin', 'Owner', 'Inventory'].includes(r));
-        let q = supabase
-          .from('orders')
-          .select('*')
-          .order('order_date', { ascending: false });
-        if (isSalesOnly) q = q.eq('sales_person_id', userProfile.id);
-        const { data, error } = await q;
-        if (error) throw error;
-        // Map snake_case DB columns to the Order type
-        setOrders((data || []).map((o: any) => ({
-          ...o,
-          customerId: o.customer_id,
-          orderDate: o.order_date,
-          totalAmount: o.total_amount,
-          amountPaid: o.amount_paid,
-          balanceDue: o.balance_due,
-          orderStatus: o.status,
-          paymentType: o.payment_method,
-          installmentMonths: o.installment_months,
-          monthlyPayment: o.monthly_payment,
-          salesPersonName: o.sales_person_name,
-          totalDiscount: o.total_discount,
-        })));
-      } catch (err) {
-        console.error('Error fetching orders:', err);
-      } finally {
-        setIsLoadingOrders(false);
-      }
-    };
-    fetchOrders();
-  }, [supabase, user, userProfile, refetchTrigger]);
-
-  const [customerMap, setCustomerMap] = useState<Map<string, string>>(new Map());
-  const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
-
-  useEffect(() => {
-    if (!orders || orders.length === 0 || !supabase) return;
-
-    const fetchCustomers = async () => {
-      setIsLoadingCustomers(true);
-      try {
-        const customerIds = Array.from(new Set(orders.map(o => o.customerId)));
-        const map = new Map<string, string>();
-        
-        const { data, error } = await supabase
-          .from('customers')
-          .select('id, full_name')
-          .in('id', customerIds);
-          
-        if (error) throw error;
-        
-        if (data) {
-          data.forEach(c => {
-             map.set(c.id, c.full_name || 'Unknown Customer');
-          });
-        }
-        setCustomerMap(map);
-      } catch (err) {
-        console.error('Error fetching customers for orders:', err);
-      } finally {
-        setIsLoadingCustomers(false);
-      }
-    };
-    
-    fetchCustomers();
-  }, [orders, supabase]);
-  
-  const isLoading = isLoadingOrders || isLoadingCustomers;
-
-
-
-
+  // ── Derived: filtered + formatted orders ───────────────────────────────────
   const formattedOrders: FormattedOrder[] = useMemo(() => {
     if (!orders) return [];
-
     let filtered = [...orders];
-
-    if (statusFilter !== 'all') {
-        filtered = filtered.filter(o => o.orderStatus === statusFilter);
-    }
-    if (typeFilter !== 'all') {
-        filtered = filtered.filter(o => o.paymentType === typeFilter);
-    }
+    if (statusFilter !== 'all') filtered = filtered.filter(o => o.orderStatus === statusFilter);
+    if (typeFilter !== 'all') filtered = filtered.filter(o => o.paymentType === typeFilter);
     if (searchQuery.trim() !== '') {
-        const query = searchQuery.toLowerCase().trim();
-        filtered = filtered.filter(o => 
-            (o.id || '').toLowerCase().includes(query) ||
-            (customerMap.get(o.customerId) || '').toLowerCase().includes(query)
-        );
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(o =>
+        (o.id || '').toLowerCase().includes(query) ||
+        (customerMap.get(o.customerId) || '').toLowerCase().includes(query)
+      );
     }
     if (date?.from) {
-        const fromTime = date.from.getTime();
-        const toTime = date.to ? endOfDay(date.to).getTime() : endOfDay(date.from).getTime();
-        filtered = filtered.filter(o => {
-            const t = new Date(o.orderDate).getTime();
-            return t >= fromTime && t <= toTime;
-        });
+      const fromTime = date.from.getTime();
+      const toTime = date.to ? endOfDay(date.to).getTime() : endOfDay(date.from).getTime();
+      filtered = filtered.filter(o => {
+        const t = new Date(o.orderDate).getTime();
+        return t >= fromTime && t <= toTime;
+      });
     }
-
-    const sortedOrders = filtered.sort((a, b) => {
-        const aPending = ['Pending Payment', 'Processing'].includes(a.orderStatus) ? 0 : 1;
-        const bPending = ['Pending Payment', 'Processing'].includes(b.orderStatus) ? 0 : 1;
-        
-        if (aPending !== bPending) return aPending - bPending;
-        
-        const timeA = new Date(a.orderDate).getTime();
-        const timeB = new Date(b.orderDate).getTime();
-
-        if (aPending === 0) {
-           return timeA - timeB; // pending orders: oldest first
-        } else {
-           return timeB - timeA; // completed orders: newest first
-        }
+    const sorted = filtered.sort((a, b) => {
+      const aPending = ['Pending Payment', 'Processing'].includes(a.orderStatus) ? 0 : 1;
+      const bPending = ['Pending Payment', 'Processing'].includes(b.orderStatus) ? 0 : 1;
+      if (aPending !== bPending) return aPending - bPending;
+      const timeA = new Date(a.orderDate).getTime();
+      const timeB = new Date(b.orderDate).getTime();
+      return aPending === 0 ? timeA - timeB : timeB - timeA;
     });
-
-    return sortedOrders.map(order => {
+    return sorted.map(order => {
       const d = order.orderDate ? new Date(order.orderDate) : null;
       return {
         ...order,
@@ -284,15 +103,15 @@ export default function OrdersPage() {
       };
     });
   }, [orders, customerMap, date, statusFilter, typeFilter, searchQuery]);
-  
+
   const totalPages = Math.ceil((formattedOrders?.length || 0) / rowsPerPage) || 1;
   const paginatedOrders = useMemo(() => {
     const startIndex = (currentPage - 1) * rowsPerPage;
     return formattedOrders.slice(startIndex, startIndex + rowsPerPage);
   }, [formattedOrders, currentPage, rowsPerPage]);
-  
 
-  const handleStatusChange = async (orderId: string, newStatus: Order['orderStatus']) => {
+  // ── Mutations ──────────────────────────────────────────────────────────────
+  const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
     if (!supabase) return;
     try {
       const updatePayload: any = { status: newStatus };
@@ -301,25 +120,16 @@ export default function OrdersPage() {
       } else {
         updatePayload.completed_at = null;
       }
-
-      const { error } = await supabase
-        .from('orders')
-        .update(updatePayload)
-        .eq('id', orderId);
-        
+      const { error } = await supabase.from('orders').update(updatePayload).eq('id', orderId);
       if (error) throw error;
-      
-      toast({
-          title: 'Order Status Updated',
-          description: `Order has been set to "${newStatus}".`,
-      });
+      toast({ title: 'Order Status Updated', description: `Order has been set to "${newStatus}".` });
+      refetch();
     } catch (error: any) {
-      console.error("Failed to update status:", error);
       toast({ variant: 'destructive', title: 'Update failed', description: error.message });
     }
   };
 
-  const handleBulkStatusChange = async (newStatus: Order['orderStatus']) => {
+  const handleBulkStatusChange = async (newStatus: OrderStatus) => {
     if (!supabase || selectedOrderIds.length === 0) return;
     try {
       const updatePayload: any = { status: newStatus };
@@ -328,22 +138,12 @@ export default function OrdersPage() {
       } else {
         updatePayload.completed_at = null;
       }
-
-      const { error } = await supabase
-        .from('orders')
-        .update(updatePayload)
-        .in('id', selectedOrderIds);
-        
+      const { error } = await supabase.from('orders').update(updatePayload).in('id', selectedOrderIds);
       if (error) throw error;
-      
-      toast({
-          title: 'Bulk Update Successful',
-          description: `${selectedOrderIds.length} orders updated to "${newStatus}".`,
-      });
+      toast({ title: 'Bulk Update Successful', description: `${selectedOrderIds.length} orders updated to "${newStatus}".` });
       setSelectedOrderIds([]);
       refetch();
     } catch (error: any) {
-      console.error("Failed to bulk update status:", error);
       toast({ variant: 'destructive', title: 'Update failed', description: error.message });
     }
   };
@@ -354,359 +154,100 @@ export default function OrdersPage() {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle className="font-headline">Orders</CardTitle>
-            <CardDescription>
-              View and manage customer sales orders.
-            </CardDescription>
+            <CardDescription>View and manage customer sales orders.</CardDescription>
           </div>
           <div className="flex items-center gap-2">
-              {canSyncCourier && (
-                  <Button variant="outline" onClick={() => router.push('/dashboard/orders/courier-sync')}>
-                      <Upload className="mr-2 h-4 w-4" />
-                      Courier Sync
-                  </Button>
-              )}
-              {canCreateOrder && <AddOrderDialog onOrderAdded={refetch} />}
+            {canSyncCourier && (
+              <Button variant="outline" onClick={() => router.push('/dashboard/orders/courier-sync')}>
+                <Upload className="mr-2 h-4 w-4" /> Courier Sync
+              </Button>
+            )}
+            {canCreateOrder && <AddOrderDialog onOrderAdded={refetch} />}
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap items-center gap-4 mb-6">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Search name or ID..."
-                className="w-full bg-background pl-8 md:w-[200px] lg:w-[300px]"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant={"outline"} className={cn("w-[240px] justify-start text-left font-normal", !date && "text-muted-foreground")}>
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date?.from ? (date.to ? <>{format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}</> : format(date.from, "LLL dd, y")) : <span>Filter by date</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar initialFocus mode="range" defaultMonth={date?.from} selected={date} onSelect={setDate} numberOfMonths={2} />
-              </PopoverContent>
-            </Popover>
-
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                {statuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-              </SelectContent>
-            </Select>
-
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="Full Payment">Full Payment</SelectItem>
-                <SelectItem value="Lay-away">Lay-away</SelectItem>
-                <SelectItem value="Installment">Installment</SelectItem>
-                <SelectItem value="COD">COD</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {(date || statusFilter !== 'all' || typeFilter !== 'all' || searchQuery.trim() !== '') && (
-              <Button variant="ghost" onClick={() => { setDate(undefined); setStatusFilter('all'); setTypeFilter('all'); setSearchQuery(''); }} className="text-muted-foreground hover:text-foreground">
-                <FilterX className="mr-2 h-4 w-4" /> Clear Filters
-              </Button>
-            )}
-
-            {selectedOrderIds.length > 0 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="secondary">
-                    Update Status ({selectedOrderIds.length})
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuLabel>Bulk Update Status</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {statuses.map(status => (
-                    <DropdownMenuItem 
-                      key={status} 
-                      onClick={() => handleBulkStatusChange(status)}
-                    >
-                      {status}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[50px]">
-                  <Checkbox 
-                    checked={paginatedOrders.length > 0 && paginatedOrders.every(o => selectedOrderIds.includes(o.id))}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        const newSelection = new Set([...selectedOrderIds, ...paginatedOrders.map(o => o.id)]);
-                        setSelectedOrderIds(Array.from(newSelection));
-                      } else {
-                        const visibleIds = new Set(paginatedOrders.map(o => o.id));
-                        setSelectedOrderIds(selectedOrderIds.filter(id => !visibleIds.has(id)));
-                      }
-                    }}
-                    aria-label="Select all"
-                  />
-                </TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead className="hidden sm:table-cell">Type</TableHead>
-                <TableHead className="hidden sm:table-cell">Status</TableHead>
-                <TableHead className="hidden md:table-cell">Date</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead>
-                  <span className="sr-only">Actions</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading && Array.from({ length: 5 }).map((_, i) => (
-                   <TableRow key={i}>
-                      <TableCell><Skeleton className="h-4 w-4" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                      <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
-                      <TableCell className="hidden sm:table-cell"><Skeleton className="h-6 w-28 rounded-full" /></TableCell>
-                      <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
-                      <TableCell className="text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
-                      <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
-                   </TableRow>
-              ))}
-                {paginatedOrders && paginatedOrders.map((order) => (
-                <TableRow key={order.id || Math.random().toString()}>
-                  <TableCell>
-                    <Checkbox 
-                      checked={selectedOrderIds.includes(order.id)}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedOrderIds(prev => [...prev, order.id]);
-                        } else {
-                          setSelectedOrderIds(prev => prev.filter(id => id !== order.id));
-                        }
-                      }}
-                      aria-label={`Select order ${order.id}`}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <div className="font-medium">{order.customerName}</div>
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">
-                    {order.paymentType}
-                    {order.paymentType === 'Installment' && (
-                      <span className="text-muted-foreground text-xs ml-1">({order.installmentMonths || 'N/A'} mos)</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">
-                    <Badge variant={getStatusVariant(order.orderStatus)}>
-                      {order.orderStatus}
-                    </Badge>
-                    {order.paymentType === 'Installment' && (Number(order.totalAmount) || 0) > 0 && (
-                        <div className="mt-2 w-24">
-                            <Progress value={((Number(order.amountPaid) || 0) / (Number(order.totalAmount) || 1)) * 100} className="h-1" />
-                            {order.installmentMonths && order.monthlyPayment && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    ₱{Number(order.monthlyPayment).toFixed(2)} / mo. for {order.installmentMonths} mos.
-                                </p>
-                            )}
-                        </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    {order.formattedDate}
-                  </TableCell>
-                  <TableCell className="text-right">{order.formattedTotal}</TableCell>
-                  <TableCell>
-                    <div className='flex justify-end'>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            aria-haspopup="true"
-                            size="icon"
-                            variant="ghost"
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Toggle menu</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => router.push(`/dashboard/orders/${order.id}`)}>
-                            View Details
-                          </DropdownMenuItem>
-                          {(order.orderStatus === 'For Pick-up' || order.orderStatus === 'Shipped' || order.orderStatus === 'Completed') && order.spx_sync_data && (
-                            <DropdownMenuItem onClick={() => setViewWaybillOrder(order)}>
-                              View Waybill
-                            </DropdownMenuItem>
-                          )}
-                          
-                          {(() => {
-                            const isCompletedOrShipped = order.orderStatus === 'Completed' || order.orderStatus === 'Shipped';
-                            const canEditOrder = isAdminOrOwner || userProfile?.roles?.includes('Sales') || !isCompletedOrShipped;
-                            
-                            return (
-                              <>
-                                {!isInventoryOnly && canEditOrder && (
-                                  <>
-                                      <DropdownMenuItem onClick={() => setLogPaymentOrder(order)}>
-                                          Log Payment
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem onClick={() => setEditPaymentOrder(order)}>
-                                          Edit Payment Terms
-                                      </DropdownMenuItem>
-                                  </>
-                                )}
-                                {(order.orderStatus === 'Shipped' || order.orderStatus === 'Processing') && (
-                                    <DropdownMenuItem onClick={() => setMarkShippedOrder(order)}>
-                                        {order.orderStatus === 'Shipped' ? 'Update Tracking' : 'Mark Shipped'}
-                                    </DropdownMenuItem>
-                                )}
-                                <DropdownMenuSeparator />
-                                <DropdownMenuSub>
-                                  <DropdownMenuSubTrigger disabled={!canEditOrder && !isInventoryOnly}>
-                                    <span>Update Status</span>
-                                  </DropdownMenuSubTrigger>
-                                  <DropdownMenuSubContent>
-                              <DropdownMenuRadioGroup
-                                value={order.orderStatus}
-                                onValueChange={(newStatus) => {
-                                  if (newStatus !== order.orderStatus) {
-                                      if (newStatus === 'Payment Received (COD)') {
-                                          setCodPaymentOrder(order);
-                                      } else if (newStatus === 'Completed' && (order.paymentType === 'Installment' || order.paymentType === 'Lay-away') && order.balanceDue > 0) {
-                                          setDueDateOrder(order);
-                                      } else if (newStatus === 'Shipped') {
-                                          setMarkShippedOrder(order);
-                                      } else {
-                                          handleStatusChange(order.id, newStatus as Order['orderStatus']);
-                                      }
-                                  }
-                                }}
-                              >
-                                {statuses.map((status) => (
-                                  <DropdownMenuRadioItem key={status} value={status} disabled={order.orderStatus === status}>
-                                    {status}
-                                  </DropdownMenuRadioItem>
-                                ))}
-                                </DropdownMenuRadioGroup>
-                              </DropdownMenuSubContent>
-                            </DropdownMenuSub>
-                            {!isInventoryOnly && canEditOrder && (
-                              <>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                      className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                                      onClick={() => handleStatusChange(order.id, 'Cancelled')}
-                                      disabled={order.orderStatus === 'Cancelled' || order.orderStatus === 'Returned'}
-                                  >
-                                      Cancel Order
-                                  </DropdownMenuItem>
-                              </>
-                            )}
-                          </>
-                        )
-                      })()}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <OrdersFilterBar
+            searchQuery={searchQuery} onSearchChange={(q) => { setSearchQuery(q); setCurrentPage(1); }}
+            statusFilter={statusFilter} onStatusChange={(s) => { setStatusFilter(s); setCurrentPage(1); }}
+            typeFilter={typeFilter} onTypeChange={(t) => { setTypeFilter(t); setCurrentPage(1); }}
+            date={date} onDateChange={(d) => { setDate(d); setCurrentPage(1); }}
+            selectedOrderIds={selectedOrderIds} onBulkStatusChange={handleBulkStatusChange}
+          />
+          <OrdersTable
+            orders={paginatedOrders}
+            isLoading={isLoading}
+            selectedOrderIds={selectedOrderIds}
+            onSelectAll={(checked) => {
+              if (checked) {
+                const newSel = new Set([...selectedOrderIds, ...paginatedOrders.map(o => o.id)]);
+                setSelectedOrderIds(Array.from(newSel));
+              } else {
+                const visible = new Set(paginatedOrders.map(o => o.id));
+                setSelectedOrderIds(selectedOrderIds.filter(id => !visible.has(id)));
+              }
+            }}
+            onSelectOne={(id, checked) =>
+              setSelectedOrderIds(prev => checked ? [...prev, id] : prev.filter(x => x !== id))
+            }
+            onViewDetails={(order) => router.push(`/dashboard/orders/${order.id}`)}
+            onLogPayment={setLogPaymentOrder}
+            onEditPaymentTerms={setEditPaymentOrder}
+            onMarkShipped={setMarkShippedOrder}
+            onViewWaybill={setViewWaybillOrder}
+            onCodPayment={setCodPaymentOrder}
+            onDueDate={setDueDateOrder}
+            onStatusChange={handleStatusChange}
+            isAdminOrOwner={isAdminOrOwner}
+            isInventoryOnly={isInventoryOnly}
+            canCreateOrder={canCreateOrder}
+            userRoles={userProfile?.roles ?? []}
+          />
           {!isLoading && (!formattedOrders || formattedOrders.length === 0) && (
-              <div className="flex flex-col items-center justify-center text-center border-2 border-dashed rounded-lg p-12 mt-4">
-                  <p className="text-lg font-semibold">No orders found</p>
-                  <p className="text-muted-foreground mt-2">
-                      {canCreateOrder ? 'Click "New Order" to get started.' : 'No orders matched your criteria.'}
-                  </p>
-              </div>
+            <div className="flex flex-col items-center justify-center text-center border-2 border-dashed rounded-lg p-12 mt-4">
+              <p className="text-lg font-semibold">No orders found</p>
+              <p className="text-muted-foreground mt-2">
+                {canCreateOrder ? 'Click "New Order" to get started.' : 'No orders matched your criteria.'}
+              </p>
+            </div>
           )}
         </CardContent>
-         {formattedOrders && formattedOrders.length > 0 && (
+        {formattedOrders && formattedOrders.length > 0 && (
           <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-2">
-              <div className="text-sm text-muted-foreground">
-                Showing <strong>{(currentPage - 1) * rowsPerPage + 1}-{Math.min(currentPage * rowsPerPage, formattedOrders.length)}</strong> of <strong>{formattedOrders.length}</strong> orders
+            <div className="text-sm text-muted-foreground">
+              Showing <strong>{(currentPage - 1) * rowsPerPage + 1}-{Math.min(currentPage * rowsPerPage, formattedOrders.length)}</strong> of <strong>{formattedOrders.length}</strong> orders
+            </div>
+            <div className="flex items-center gap-2">
+              <Select value={rowsPerPage.toString()} onValueChange={(val) => { setRowsPerPage(Number(val)); setCurrentPage(1); }}>
+                <SelectTrigger className="w-[70px] h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="flex items-center border rounded-md h-9 px-1">
+                <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Prev</Button>
+                <span className="text-sm mx-2 min-w-[3rem] text-center">{currentPage} / {totalPages}</span>
+                <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Next</Button>
               </div>
-              <div className="flex items-center gap-2">
-                <Select value={rowsPerPage.toString()} onValueChange={(val) => { setRowsPerPage(Number(val)); setCurrentPage(1); }}>
-                  <SelectTrigger className="w-[70px] h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="20">20</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                  </SelectContent>
-                </Select>
-                <div className="flex items-center border rounded-md h-9 px-1">
-                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Prev</Button>
-                  <span className="text-sm mx-2 min-w-[3rem] text-center">{currentPage} / {totalPages}</span>
-                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Next</Button>
-                </div>
-              </div>
+            </div>
           </CardFooter>
         )}
       </Card>
+
       {logPaymentOrder && (
-        <LogPaymentDialog 
-            order={logPaymentOrder}
-            open={!!logPaymentOrder}
-            onOpenChange={(isOpen) => !isOpen && setLogPaymentOrder(null)}
-        />
+        <LogPaymentDialog order={logPaymentOrder} open={!!logPaymentOrder} onOpenChange={(isOpen) => !isOpen && setLogPaymentOrder(null)} />
       )}
-      <CompleteCodPaymentDialog 
-        order={codPaymentOrder} 
-        open={!!codPaymentOrder} 
-        onOpenChange={(open) => !open && setCodPaymentOrder(null)} 
-        onSuccess={() => { refetch(); setCodPaymentOrder(null); }}
-      />
-      <EditPaymentTermsDialog
-        order={editPaymentOrder}
-        open={!!editPaymentOrder}
-        onOpenChange={(open) => !open && setEditPaymentOrder(null)}
-        onSuccess={() => { refetch(); setEditPaymentOrder(null); }}
-      />
+      <CompleteCodPaymentDialog order={codPaymentOrder} open={!!codPaymentOrder} onOpenChange={(open) => !open && setCodPaymentOrder(null)} onSuccess={() => { refetch(); setCodPaymentOrder(null); }} />
+      <EditPaymentTermsDialog order={editPaymentOrder} open={!!editPaymentOrder} onOpenChange={(open) => !open && setEditPaymentOrder(null)} onSuccess={() => { refetch(); setEditPaymentOrder(null); }} />
       {dueDateOrder && (
-        <SetDueDateDialog
-            open={!!dueDateOrder}
-            onOpenChange={(open) => !open && setDueDateOrder(null)}
-            orderId={dueDateOrder.id}
-            onSuccess={() => { refetch(); setDueDateOrder(null); }}
-        />
+        <SetDueDateDialog open={!!dueDateOrder} onOpenChange={(open) => !open && setDueDateOrder(null)} orderId={dueDateOrder.id} onSuccess={() => { refetch(); setDueDateOrder(null); }} />
       )}
       {markShippedOrder && (
-        <MarkShippedDialog
-            open={!!markShippedOrder}
-            onOpenChange={(isOpen) => {
-                if (!isOpen) setMarkShippedOrder(null);
-            }}
-            orderId={markShippedOrder.id}
-            currentTrackingNumber={markShippedOrder.tracking_number || ''}
-            onSuccess={() => {
-                refetch();
-                setMarkShippedOrder(null);
-            }}
-        />
+        <MarkShippedDialog open={!!markShippedOrder} onOpenChange={(isOpen) => { if (!isOpen) setMarkShippedOrder(null); }} orderId={markShippedOrder.id} currentTrackingNumber={markShippedOrder.tracking_number || ''} onSuccess={() => { refetch(); setMarkShippedOrder(null); }} />
       )}
       {viewWaybillOrder && (
-        <WaybillSummaryDialog
-            open={!!viewWaybillOrder}
-            onOpenChange={(isOpen) => {
-                if (!isOpen) setViewWaybillOrder(null);
-            }}
-            order={viewWaybillOrder}
-        />
+        <WaybillSummaryDialog open={!!viewWaybillOrder} onOpenChange={(isOpen) => { if (!isOpen) setViewWaybillOrder(null); }} order={viewWaybillOrder} />
       )}
     </>
   );

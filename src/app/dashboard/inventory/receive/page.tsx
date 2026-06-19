@@ -24,6 +24,7 @@ const shipmentItemSchema = z.object({
   productName: z.string(),
   quantity: z.coerce.number().positive(),
   unitCost: z.coerce.number().min(0),
+  supplierName: z.string().optional(),
 });
 
 const shipmentSchema = z.object({

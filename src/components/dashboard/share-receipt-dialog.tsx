@@ -128,7 +128,7 @@ export function ShareReceiptDialog({ open, onOpenChange, order, customer, orderI
                 <>
                     <div className="flex justify-between">
                         <span className="text-gray-500">Subtotal</span>
-                        <span>₱{order.subtotal.toFixed(2)}</span>
+                        <span>₱{(order.subtotal ?? 0).toFixed(2)}</span>
                     </div>
                     
                     {order.totalDiscount && order.totalDiscount > 0 ? (

@@ -6,4 +6,5 @@ export const ai = {
   generate: async () => { throw new Error('AI is not available in this context.'); },
   defineFlow: (config: any, fn: any) => fn,
   defineTool: (config: any, fn: any) => fn,
+  definePrompt: (_config: any) => async (_input: any) => ({ output: null }),
 };

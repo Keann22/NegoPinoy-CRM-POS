@@ -72,8 +72,8 @@ function ProductSearch({ rowIndex, form, onAddNewProduct }: { rowIndex: number; 
             try {
               const supabase = createClient();
               let query = supabase.from('products').select('id, name, sku');
-              const searchWords = search.split(' ').filter(w => w.trim() !== '');
-              searchWords.forEach(w => {
+              const searchWords = search.split(' ').filter((w: string) => w.trim() !== '');
+              searchWords.forEach((w: string) => {
                   query = query.or(`name.ilike.%${w}%,variant_name.ilike.%${w}%`);
               });
               const { data, error } = await query.limit(10);

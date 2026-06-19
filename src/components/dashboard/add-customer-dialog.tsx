@@ -160,7 +160,7 @@ export function AddCustomerDialog(props: AddCustomerDialogProps) {
   }, [open, props.initialName, form]);
 
   async function onSubmit(values: z.infer<typeof customerSchema>) {
-    setOpen(false);
+    setOpen?.(false);
 
     toast({
       title: props.customerToEdit ? "Updating Customer..." : "Adding Customer...",
@@ -421,7 +421,7 @@ export function AddCustomerDialog(props: AddCustomerDialogProps) {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {barangayOptions.map(option => (
+                        {barangayOptions.map((option: any) => (
                           <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                         ))}
                       </SelectContent>
@@ -460,7 +460,7 @@ export function AddCustomerDialog(props: AddCustomerDialogProps) {
               />
             </div>
             <DialogFooter className="mt-6 flex gap-2">
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={() => setOpen?.(false)}>Cancel</Button>
               <Button type="submit">{props.customerToEdit ? "Save Changes" : "Save Customer"}</Button>
             </DialogFooter>
           </form>

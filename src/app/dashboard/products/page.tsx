@@ -32,7 +32,7 @@ import { AddProductDialog } from '@/components/dashboard/product-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BulkUploadProductsDialog } from '@/components/dashboard/bulk-upload-products-dialog';
 import { ReservedStockDialog } from '@/components/dashboard/reserved-stock-dialog';
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -52,16 +52,15 @@ import { ViewProductHistoryDialog } from '@/components/dashboard/view-product-hi
 import { ViewProductDetailsDialog } from '@/components/dashboard/view-product-details-dialog';
 import { useUserProfile } from '@/hooks/useUserProfile';
 
-import type { FormattedProduct, Product } from '@/types';
+import type { FormattedProduct } from '@/types';
 import { getStockStatus } from '@/types';
+import { useProducts } from '@/hooks/useProducts';
 
 // Re-export for any components that still import FormattedProduct from this page
 export type { FormattedProduct } from '@/types';
 
-
 export default function ProductsPage() {
   const supabase = useSupabase();
-  const { user } = useUser();
   const { userProfile } = useUserProfile();
   const [deletingProduct, setDeletingProduct] = useState<FormattedProduct | null>(null);
   const [editingProduct, setEditingProduct] = useState<FormattedProduct | null>(null);
@@ -82,99 +81,16 @@ export default function ProductsPage() {
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
   const [viewingReservedProduct, setViewingReservedProduct] = useState<{ id: string; name: string } | null>(null);
   const [viewingPackedProduct, setViewingPackedProduct] = useState<{ id: string; name: string } | null>(null);
-  const [reservedStockMap, setReservedStockMap] = useState<Record<string, number>>({});
-  const [packedStockMap, setPackedStockMap] = useState<Record<string, number>>({});
 
-  useEffect(() => {
-    const fetchReserved = async () => {
-      if (!supabase) return;
-      try {
-        const { data, error } = await supabase
-          .from('order_items')
-          .select('product_id, quantity, orders!inner(status)')
-          .in('orders.status', ['Pending Payment', 'Processing', 'Packed']);
-        
-        if (error) throw error;
-        
-        const map: Record<string, number> = {};
-        const packedMap: Record<string, number> = {};
-        data?.forEach((item: any) => {
-          if (item.orders.status === 'Packed') {
-             packedMap[item.product_id] = (packedMap[item.product_id] || 0) + item.quantity;
-          } else {
-             map[item.product_id] = (map[item.product_id] || 0) + item.quantity;
-          }
-        });
-        setReservedStockMap(map);
-        setPackedStockMap(packedMap);
-      } catch (err) {
-        console.error("Failed to fetch reserved stock", err);
-      }
-    };
-    fetchReserved();
-  }, [supabase]);
+  // ── Domain hook ────────────────────────────────────────────────────────────
+  const { products: rawProducts, isLoading, refetch } = useProducts();
 
   const isManagement = useMemo(() => userProfile?.roles?.some(r => ['Admin', 'Owner'].includes(r)), [userProfile]);
 
-  const [products, setProducts] = useState<Product[] | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [refetchTrigger, setRefetchTrigger] = useState(0);
-  const refetch = () => setRefetchTrigger(n => n + 1);
-
-  useEffect(() => {
-    if (!supabase || !user) return;
-    const fetchProducts = async () => {
-      setIsLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('products')
-          .select('*')
-          .order('name', { ascending: true });
-        if (error) throw error;
-        setProducts((data || []).map((p: any) => ({
-          ...p,
-          categoryId: p.category,
-          sellingPrice: p.selling_price,
-          quantityOnHand: p.stock_level ?? 0,
-          parentId: p.parent_id,
-          variantName: p.variant_name,
-          installment_price: p.installment_price,
-        })));
-      } catch (err) {
-        console.error('Error fetching products:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchProducts();
-  }, [supabase, user, refetchTrigger]);
-
-  const rawFormattedProducts: FormattedProduct[] = useMemo(() => {
-    if (!products) return [];
-    return products.map(p => {
-      let sp = p.supplier_pricing || [];
-      if (sp.length === 0 && p.initial_unit_cost) {
-          sp = [{ supplierName: 'Initial Stock', unitCost: p.initial_unit_cost }];
-      }
-      return {
-        ...p,
-        quantityOnHand: p.quantityOnHand ?? 0,
-        status: getStockStatus(p.quantityOnHand),
-        price: `₱${(Number(p.sellingPrice) || 0).toFixed(2)}`,
-        image: p.images?.[0] || 'https://placehold.co/64x64',
-        shelfLocation: p.shelf_location || "",
-        supplierPricing: sp,
-        reservedStock: reservedStockMap[p.id] || 0,
-        packedStock: packedStockMap[p.id] || 0,
-      };
-    });
-  }, [products, reservedStockMap, packedStockMap]);
-
   const formattedProducts: FormattedProduct[] = useMemo(() => {
-    if (!rawFormattedProducts) return [];
-    const parents = rawFormattedProducts.filter(p => !p.parent_id);
-    const children = rawFormattedProducts.filter(p => p.parent_id);
-
+    if (!rawProducts || rawProducts.length === 0) return [];
+    const parents = rawProducts.filter(p => !p.parent_id);
+    const children = rawProducts.filter(p => p.parent_id);
     return parents.map(parent => {
         const productChildren = children.filter(c => c.parent_id === parent.id);
         return {
@@ -182,7 +98,7 @@ export default function ProductsPage() {
             children: productChildren.length > 0 ? productChildren : undefined
         };
     });
-  }, [rawFormattedProducts]);
+  }, [rawProducts]);
 
   const filteredProducts = useMemo(() => {
     let results = formattedProducts.filter(p => !p.name.startsWith('[DELETED]'));
@@ -317,7 +233,7 @@ export default function ProductsPage() {
             if (error.code === '23503') {
                 // Some or all are tied to orders, archive them instead
                 for (const id of idsToDelete) {
-                    const prod = rawFormattedProducts.find(p => p.id === id);
+                    const prod = rawProducts.find((p: FormattedProduct) => p.id === id);
                     if (prod) {
                         await supabase.from('products').update({
                             name: prod.name.startsWith('[DELETED]') ? prod.name : '[DELETED] ' + prod.name,

@@ -70,7 +70,7 @@ export default function ExpensesPage() {
 
   const isManagement = useMemo(() => userProfile?.roles.some(r => ['Admin', 'Owner'].includes(r)), [userProfile]);
 
-  const [expenses, setExpenses] = useState<Omit<Expense, 'id'>[] | null>(null);
+  const [expenses, setExpenses] = useState<Expense[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {

@@ -36,29 +36,68 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'No items provided' }, { status: 400 });
     }
 
-    // Create Draft Purchase Order (Staff Request)
-    const { data: po, error: poErr } = await supabase
+    // 1. Find existing STAFF_DRAFT
+    let poId = null;
+    const { data: existingPo, error: existErr } = await supabase
       .from('purchase_orders')
-      .insert({ status: 'pending_receipt', notes: 'STAFF_DRAFT' })
       .select('id')
+      .eq('notes', 'STAFF_DRAFT')
+      .eq('status', 'pending_receipt')
+      .order('created_at', { ascending: false })
+      .limit(1)
       .single();
 
-    if (poErr) throw poErr;
+    if (existingPo) {
+      poId = existingPo.id;
+    } else {
+      // Create new Draft Purchase Order
+      const { data: po, error: poErr } = await supabase
+        .from('purchase_orders')
+        .insert({ status: 'pending_receipt', notes: 'STAFF_DRAFT' })
+        .select('id')
+        .single();
+      if (poErr) throw poErr;
+      poId = po.id;
+    }
 
-    // Insert PO items
-    const itemsToInsert = requests.map((p: any) => ({
-      po_id: po.id,
-      product_id: p.productId,
-      expected_qty: p.requestedQty,
-      unit_cost: 0, // Staff doesn't know cost
-      status: 'pending_receipt'
-    }));
-
-    const { error: itemsErr } = await supabase
+    // 2. Fetch existing items for this PO
+    const { data: existingItems, error: itemsErrFetch } = await supabase
       .from('purchase_order_items')
-      .insert(itemsToInsert);
+      .select('id, product_id, expected_qty')
+      .eq('po_id', poId);
+    
+    if (itemsErrFetch) throw itemsErrFetch;
 
-    if (itemsErr) throw itemsErr;
+    const existingMap = new Map(existingItems?.map(i => [i.product_id, i]) || []);
+
+    const itemsToInsert = [];
+    
+    for (const p of requests) {
+      if (existingMap.has(p.productId)) {
+        // Update existing item
+        const existingItem = existingMap.get(p.productId);
+        await supabase
+          .from('purchase_order_items')
+          .update({ expected_qty: existingItem.expected_qty + p.requestedQty })
+          .eq('id', existingItem.id);
+      } else {
+        // Insert new item
+        itemsToInsert.push({
+          po_id: poId,
+          product_id: p.productId,
+          expected_qty: p.requestedQty,
+          unit_cost: 0,
+          status: 'pending_receipt'
+        });
+      }
+    }
+
+    if (itemsToInsert.length > 0) {
+      const { error: itemsErr } = await supabase
+        .from('purchase_order_items')
+        .insert(itemsToInsert);
+      if (itemsErr) throw itemsErr;
+    }
 
     return NextResponse.json({ success: true, poId: po.id });
   } catch (error: any) {

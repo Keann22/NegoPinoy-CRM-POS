@@ -161,7 +161,7 @@ export function CashFlowReport() {
                                                 <p className="text-sm text-muted-foreground">No expenses for this period.</p>
                                             ) : (
                                                 <Accordion type="multiple" className="w-full">
-                                                    {Object.entries(reportData.expensesByCategory).map(([category, data], i) => (
+                                                    {Object.entries(reportData.expensesByCategory || {}).map(([category, data], i) => (
                                                         <AccordionItem value={`cat-${i}`} key={category} className="border-b-0">
                                                             <AccordionTrigger className="hover:no-underline py-2 text-sm font-normal">
                                                                 <div className="flex justify-between w-full pr-4">

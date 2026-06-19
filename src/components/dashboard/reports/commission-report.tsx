@@ -109,7 +109,7 @@ export function CommissionReport() {
       return acc;
     }, {} as Record<string, CommissionData>);
     
-    return Object.values(grouped).sort((a, b) => b.totalShippedAmount - a.totalShippedAmount);
+    return (Object.values(grouped) as CommissionData[]).sort((a, b) => b.totalShippedAmount - a.totalShippedAmount);
   }, [allEligibleOrders, date, userMap]);
 
   const grandTotal = useMemo(() => commissionData.reduce((sum, item) => sum + item.totalShippedAmount, 0), [commissionData]);

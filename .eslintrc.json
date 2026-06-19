@@ -1,0 +1,21 @@
+{
+  "extends": ["next/core-web-vitals", "next/typescript"],
+  "rules": {
+    "max-lines": [
+      "warn",
+      {
+        "max": 400,
+        "skipBlankLines": true,
+        "skipComments": true
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["src/components/ui/**/*.tsx"],
+      "rules": {
+        "max-lines": "off"
+      }
+    }
+  ]
+}

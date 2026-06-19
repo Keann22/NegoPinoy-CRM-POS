@@ -44,8 +44,8 @@ export function SalesSummaryReport() {
     const fetchSummary = async () => {
       setIsLoading(true);
       try {
-        const fromDate = date.from.toISOString();
-        const toDateObj = new Date(date.to);
+        const fromDate = date.from!.toISOString();
+        const toDateObj = new Date(date.to!);
         toDateObj.setHours(23, 59, 59, 999);
         const toDate = toDateObj.toISOString();
 

@@ -25,6 +25,7 @@ const restockSchema = z.object({
   quantity: z.coerce.number().positive('Quantity must be a positive number.'),
   unitCost: z.coerce.number().min(0, 'Unit cost cannot be negative.'),
   purchaseDate: z.date({ required_error: 'A purchase date is required.' }),
+  supplierName: z.string().optional(),
 });
 
 type RestockFormValues = z.infer<typeof restockSchema>;

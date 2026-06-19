@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { FileUpload } from "@/components/ui/file-upload";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import type { FormattedProduct } from '@/app/dashboard/products/page';
+import type { FormattedProduct } from '@/types';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -349,7 +349,7 @@ export function ProductDialog(props: ProductDialogProps) {
               <FormField control={form.control} name="images" render={({ field }) => (
                 <FormItem>
                   <FormLabel>{isEdit ? 'Add Product Images' : 'Product Images (Optional)'}</FormLabel>
-                  <FormControl><FileUpload value={field.value} onChange={field.onChange} /></FormControl>
+                  <FormControl><FileUpload value={field.value || []} onChange={field.onChange} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
@@ -568,7 +568,7 @@ export function ProductDialog(props: ProductDialogProps) {
                       <FormField control={form.control} name={`variations.${index}.sellingPrice`} render={({ field: f }) => (<FormItem><FormLabel>Price (₱)</FormLabel><FormControl><Input type="number" step="0.01" {...f} /></FormControl><FormMessage /></FormItem>)} />
                       <FormField control={form.control} name={`variations.${index}.unitCost`} render={({ field: f }) => (<FormItem><FormLabel>Unit Cost (Optional)</FormLabel><FormControl><Input type="number" step="0.01" {...f} /></FormControl><FormMessage /></FormItem>)} />
                       <FormField control={form.control} name={`variations.${index}.quantityOnHand`} render={({ field: f }) => (<FormItem><FormLabel>Initial Stock</FormLabel><FormControl><Input type="number" {...f} /></FormControl><FormMessage /></FormItem>)} />
-                      <FormField control={form.control} name={`variations.${index}.images`} render={({ field: f }) => (<FormItem className="col-span-2"><FormLabel>Variation Image (Optional)</FormLabel><FormControl><FileUpload value={f.value} onChange={f.onChange} /></FormControl><FormMessage /></FormItem>)} />
+                      <FormField control={form.control} name={`variations.${index}.images`} render={({ field: f }) => (<FormItem className="col-span-2"><FormLabel>Variation Image (Optional)</FormLabel><FormControl><FileUpload value={f.value || []} onChange={f.onChange} /></FormControl><FormMessage /></FormItem>)} />
                     </div>
                   </div>
                 ))}

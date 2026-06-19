@@ -61,6 +61,9 @@ export default function PackedOrdersPage() {
           customerId: o.customer_id,
           orderDate: o.order_date,
           status: o.status,
+          orderStatus: o.status, // map DB status to typed orderStatus
+          subtotal: o.subtotal || o.total_amount || 0,
+          totalDiscount: o.discount_amount || 0,
           totalAmount: o.total_amount,
           discountAmount: o.discount_amount,
           paymentMethod: o.payment_method,

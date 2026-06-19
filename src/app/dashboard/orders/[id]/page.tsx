@@ -7,69 +7,32 @@ import { useSupabase } from '@/lib/supabase/hooks';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
-import { type Order } from '@/app/dashboard/orders/page';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Share2, Edit, CheckCircle, FileText } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Edit, FileText, Share2, Truck } from 'lucide-react';
 import { ShareReceiptDialog } from '@/components/dashboard/share-receipt-dialog';
 import { EditOrderDialog } from '@/components/dashboard/order-dialog';
 import { MarkShippedDialog } from '@/components/dashboard/mark-shipped-dialog';
 import { WaybillSummaryDialog } from '@/components/dashboard/waybill-summary-dialog';
 import { useUserProfile } from '@/hooks/useUserProfile';
-import { Truck } from 'lucide-react';
+import { useOrderDetail } from '@/hooks/useOrderDetail';
+import type { Order, OrderStatus } from '@/types';
 
-type Customer = {
-  id: string;
-  fullName: string;
-  email: string;
-  address?: string;
-};
+type StatusVariant = 'outline' | 'secondary' | 'destructive' | 'default';
 
-type Product = {
-    id: string;
-    name: string;
-}
-
-type OrderItem = {
-    id: string;
-    orderId: string;
-    productId: string;
-    productName?: string;
-    quantity: number;
-    costPriceAtSale: number;
-    sellingPriceAtSale: number;
-    discount?: number;
-    shelfLocation?: string;
-}
-
-type Payment = {
-  id: string;
-  orderId: string;
-  paymentDate: string;
-  amount: number;
-  paymentMethod: string;
-  notes?: string;
-  proofUrl?: string;
-}
-
-const getStatusVariant = (status: Order['orderStatus']) => {
-    switch (status) {
-      case 'Shipped':
-      case 'Completed':
-        return 'outline';
-      case 'For Pick-up':
-        return 'outline';
-      case 'Processing':
-        return 'secondary';
-      case 'Cancelled':
-      case 'Returned':
-          return 'destructive';
-      case 'Pending Payment':
-      default:
-        return 'default';
-    }
+function getStatusVariant(status: OrderStatus): StatusVariant {
+  switch (status) {
+    case 'Shipped': case 'Completed': case 'For Pick-up':
+      return 'outline';
+    case 'Processing':
+      return 'secondary';
+    case 'Cancelled': case 'Returned':
+      return 'destructive';
+    default:
+      return 'default';
   }
+}
 
 export default function OrderDetailPage() {
   const params = useParams();
@@ -78,250 +41,64 @@ export default function OrderDetailPage() {
   const orderId = params.id as string;
   const supabase = useSupabase();
 
-  const [order, setOrder] = useState<Order | null>(null);
-  const [isLoadingOrder, setIsLoadingOrder] = useState(true);
+  const { order, customer, orderItems: rawItems, payments: rawPayments, isLoading, refetch } = useOrderDetail(orderId);
+  const { userProfile } = useUserProfile();
 
-  const [customer, setCustomer] = useState<Customer | null>(null);
-  const [isLoadingCustomer, setIsLoadingCustomer] = useState(false);
-
-  const [allOrderItems, setAllOrderItems] = useState<OrderItem[]>([]);
-  const [isLoadingOrderItems, setIsLoadingOrderItems] = useState(true);
-
-  const [allPayments, setAllPayments] = useState<Payment[]>([]);
-  const [isLoadingPayments, setIsLoadingPayments] = useState(true);
-
-  // Fetch order
-  useEffect(() => {
-    if (!supabase || !orderId) return;
-    const fetch = async () => {
-      setIsLoadingOrder(true);
-      try {
-        const { data, error } = await supabase.from('orders').select('*').eq('id', orderId).single();
-        if (error) throw error;
-        if (data) {
-          setOrder({
-            id: data.id,
-            customerId: data.customer_id,
-            orderDate: data.order_date,
-            orderStatus: data.status,
-            totalAmount: data.total_amount,
-            balanceDue: data.balance_due,
-            amountPaid: data.amount_paid,
-            subtotal: data.subtotal,
-            totalDiscount: data.total_discount,
-            paymentType: data.payment_type,
-            installmentMonths: data.installment_months,
-            monthlyPayment: data.monthly_payment,
-            salesPersonName: data.sales_person_name,
-            salesRepId: data.sales_rep_id,
-            insurance_fee: data.insurance_fee,
-            tracking_number: data.tracking_number,
-            spx_sync_data: data.spx_sync_data,
-          } as any);
-        }
-      } catch (err) { console.error('Order fetch error:', err); }
-      finally { setIsLoadingOrder(false); }
-    };
-    fetch();
-  }, [supabase, orderId]);
-
-  // Fetch customer when order is loaded
-  useEffect(() => {
-    if (!supabase || !order?.customerId) return;
-    const fetch = async () => {
-      setIsLoadingCustomer(true);
-      try {
-        const { data, error } = await supabase
-          .from('customers')
-          .select('id, full_name, email, address_line, region, province, city, barangay, postal_code, street_address')
-          .eq('id', order.customerId)
-          .single();
-        if (error) throw error;
-        
-        if (data) {
-          let address = '';
-          if (data.region || data.province) {
-             const parts = [];
-             if (data.street_address) parts.push(data.street_address);
-             if (data.barangay) parts.push(data.barangay);
-             if (data.city) parts.push(data.city);
-             if (data.province) parts.push(data.province);
-             address = parts.join(', ');
-          } else if (data.address_line) {
-             address = data.address_line;
-          }
-          
-          setCustomer({ id: data.id, fullName: data.full_name, email: data.email, address });
-        }
-      } catch (err) { console.error('Customer fetch error:', err); }
-      finally { setIsLoadingCustomer(false); }
-    };
-    fetch();
-  }, [supabase, order?.customerId]);
-
-  // Fetch order items
-  useEffect(() => {
-    if (!supabase || !orderId) return;
-    const fetch = async () => {
-      setIsLoadingOrderItems(true);
-      try {
-        const { data, error } = await supabase
-          .from('order_items')
-          .select('*')
-          .eq('order_id', orderId);
-        if (error) throw error;
-        setAllOrderItems((data || []).map((item: any) => ({
-          id: item.id,
-          orderId: item.order_id,
-          productId: item.product_id,
-          productName: item.product_name,
-          quantity: item.quantity,
-          costPriceAtSale: item.cost_price_at_sale,
-          sellingPriceAtSale: item.selling_price_at_sale,
-          discount: item.discount,
-          shelfLocation: item.shelf_location,
-        })));
-      } catch (err) { console.error('Order items fetch error:', err); }
-      finally { setIsLoadingOrderItems(false); }
-    };
-    fetch();
-  }, [supabase, orderId]);
-
-  // Fetch payments
-  useEffect(() => {
-    if (!supabase || !orderId) return;
-    const fetch = async () => {
-      setIsLoadingPayments(true);
-      try {
-        const { data, error } = await supabase
-          .from('payments')
-          .select('*')
-          .eq('order_id', orderId);
-        if (error) throw error;
-        setAllPayments((data || []).map((p: any) => ({
-          id: p.id,
-          orderId: p.order_id,
-          paymentDate: p.payment_date,
-          amount: p.amount,
-          paymentMethod: p.payment_method,
-          notes: p.notes,
-          proofUrl: p.proof_url,
-        })));
-      } catch (err) { console.error('Payments fetch error:', err); }
-      finally { setIsLoadingPayments(false); }
-    };
-    fetch();
-  }, [supabase, orderId]);
-
-  const [productMap, setProductMap] = useState<Map<string, { name: string, location: string }>>(new Map());
-  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+  // Dialog state
   const [isShareReceiptOpen, setIsShareReceiptOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isMarkShippedOpen, setIsMarkShippedOpen] = useState(false);
-
-  const { userProfile } = useUserProfile();
-
-  const [courierFee, setCourierFee] = useState<number>(0);
   const [isWaybillOpen, setIsWaybillOpen] = useState(false);
+
+  // Courier fee (if COD)
+  const [courierFee, setCourierFee] = useState<number>(0);
+
   useEffect(() => {
     if (!supabase || !orderId) return;
     supabase.from('expenses')
       .select('amount')
-      .ilike('description', `%${orderId.substring(0,7).toUpperCase()}%`)
-      .then(({data}) => {
-         if (data && data.length > 0) {
-            setCourierFee(data.reduce((sum, d) => sum + d.amount, 0));
-         }
+      .ilike('description', `%${orderId.substring(0, 7).toUpperCase()}%`)
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setCourierFee(data.reduce((sum: number, d: any) => sum + d.amount, 0));
+        }
       });
   }, [supabase, orderId]);
 
-  useEffect(() => {
-    if (!allOrderItems || allOrderItems.length === 0 || !supabase) return;
-    
-    const fetchProducts = async () => {
-      setIsLoadingProducts(true);
-      try {
-        const productIds = Array.from(new Set(allOrderItems.map(item => item.productId)));
-        const map = new Map<string, string>();
-        
-        const { data, error } = await supabase
-          .from('products')
-          .select('id, name, shelf_location')
-          .in('id', productIds);
-          
-        if (error) throw error;
-        
-        if (data) {
-          data.forEach(p => {
-             map.set(p.id, { name: p.name || 'Unknown Product', location: p.shelf_location || '' });
-          });
-        }
-        setProductMap(map);
-      } catch (err) {
-        console.error('Error fetching products for order items:', err);
-      } finally {
-        setIsLoadingProducts(false);
-      }
-    };
-    
-    fetchProducts();
-  }, [allOrderItems, supabase]);
-
   // Auto-open share receipt if URL has ?share=true
   useEffect(() => {
-    const shareParam = searchParams.get('share');
-    if (shareParam === 'true' && order) {
-        setIsShareReceiptOpen(true);
-        // Clean up URL without triggering a full page navigation
-        window.history.replaceState(null, '', `/dashboard/orders/${order.id}`);
+    if (searchParams.get('share') === 'true' && order) {
+      setIsShareReceiptOpen(true);
+      window.history.replaceState(null, '', `/dashboard/orders/${order.id}`);
     }
   }, [searchParams, order]);
 
-  const isLoading = isLoadingOrder || isLoadingCustomer || isLoadingOrderItems || isLoadingPayments || isLoadingProducts;
+  // Sorted payments
+  const payments = useMemo(() =>
+    [...rawPayments].sort((a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()),
+    [rawPayments]
+  );
 
-  const orderItems = useMemo(() => {
-    if (!allOrderItems || !orderId) return [];
-    return allOrderItems
-        .map(item => {
-            const productData = productMap.get(item.productId) || { name: 'Unknown Product', location: '' };
-            return {
-                ...item,
-                productName: productData.name,
-                shelfLocation: productData.location
-            };
-        });
-  }, [allOrderItems, orderId, productMap]);
+  const canEdit = userProfile?.roles?.some(r => ['Admin', 'Owner', 'Sales'].includes(r)) ||
+    (order?.orderStatus !== 'Completed' && order?.orderStatus !== 'Shipped');
 
-  const payments = useMemo(() => {
-    if (!allPayments || !orderId) return [];
-    return [...allPayments].sort((a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime());
-  }, [allPayments, orderId]);
-
-  const canEdit = userProfile?.roles?.includes('Admin') || 
-                  userProfile?.roles?.includes('Owner') || 
-                  userProfile?.roles?.includes('Sales') ||
-                  (order?.orderStatus !== 'Completed' && order?.orderStatus !== 'Shipped');
-
-  if (isLoading) {
-    return null; // Handled by loading.tsx
-  }
+  if (isLoading) return null;
 
   if (!order) {
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Order Not Found</CardTitle>
-                <CardDescription>The requested order could not be found.</CardDescription>
-            </CardHeader>
-        </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Order Not Found</CardTitle>
+          <CardDescription>The requested order could not be found.</CardDescription>
+        </CardHeader>
+      </Card>
     );
   }
-  
+
   return (
     <div className="space-y-6">
-       <Button variant="outline" onClick={() => router.back()}>
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        Back to Orders
+      <Button variant="outline" onClick={() => router.back()}>
+        <ArrowLeft className="mr-2 h-4 w-4" /> Back to Orders
       </Button>
 
       <Card>
@@ -329,59 +106,49 @@ export default function OrderDetailPage() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <CardTitle className="text-2xl font-headline">Order #{order.id.substring(0, 7).toUpperCase()}</CardTitle>
-              <CardDescription>
-                Placed on {format(new Date(order.orderDate), 'PPP')}
-              </CardDescription>
+              <CardDescription>Placed on {format(new Date(order.orderDate), 'PPP')}</CardDescription>
             </div>
             <div className="flex flex-wrap items-center gap-2 mt-4 sm:mt-0">
-                {(order.orderStatus === 'Processing' || order.orderStatus === 'Pending Payment' || order.orderStatus === 'Shipped') && (
-                    <Button variant="secondary" size="sm" onClick={() => setIsMarkShippedOpen(true)}>
-                        <Truck className="mr-2 h-4 w-4" />
-                        {order.orderStatus === 'Shipped' ? 'Update Tracking' : 'Mark Shipped'}
-                    </Button>
-                )}
-                {(order.orderStatus === 'Shipped') && (
-                    <Button variant="default" size="sm" onClick={async () => {
-                        const { error } = await supabase.from('orders').update({ status: 'Completed', completed_at: new Date().toISOString() }).eq('id', order.id);
-                        if (!error) window.location.reload();
-                    }}>
-                        <CheckCircle className="mr-2 h-4 w-4" />
-                        Mark as Completed
-                    </Button>
-                )}
-                {canEdit && (
-                    <Button variant="outline" size="sm" onClick={() => setIsEditOpen(true)}>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit Order
-                    </Button>
-                )}
-                {(order.orderStatus === 'For Pick-up' || order.orderStatus === 'Shipped' || order.orderStatus === 'Completed') && order.spx_sync_data && (
-                    <Button variant="outline" size="sm" onClick={() => setIsWaybillOpen(true)}>
-                        <FileText className="mr-2 h-4 w-4" />
-                        View Waybill
-                    </Button>
-                )}
-                <Button variant="outline" size="sm" onClick={() => setIsShareReceiptOpen(true)}>
-                    <Share2 className="mr-2 h-4 w-4" />
-                    Share Receipt
+              {(order.orderStatus === 'Processing' || order.orderStatus === 'Pending Payment' || order.orderStatus === 'Shipped') && (
+                <Button variant="secondary" size="sm" onClick={() => setIsMarkShippedOpen(true)}>
+                  <Truck className="mr-2 h-4 w-4" />
+                  {order.orderStatus === 'Shipped' ? 'Update Tracking' : 'Mark Shipped'}
                 </Button>
-                <Badge variant={getStatusVariant(order.orderStatus)} className="text-base">
-                    {order.orderStatus}
-                </Badge>
+              )}
+              {order.orderStatus === 'Shipped' && (
+                <Button variant="default" size="sm" onClick={async () => {
+                  const { error } = await supabase.from('orders').update({ status: 'Completed', completed_at: new Date().toISOString() }).eq('id', order.id);
+                  if (!error) window.location.reload();
+                }}>
+                  <CheckCircle className="mr-2 h-4 w-4" /> Mark as Completed
+                </Button>
+              )}
+              {canEdit && (
+                <Button variant="outline" size="sm" onClick={() => setIsEditOpen(true)}>
+                  <Edit className="mr-2 h-4 w-4" /> Edit Order
+                </Button>
+              )}
+              {(order.orderStatus === 'For Pick-up' || order.orderStatus === 'Shipped' || order.orderStatus === 'Completed') && order.spx_sync_data && (
+                <Button variant="outline" size="sm" onClick={() => setIsWaybillOpen(true)}>
+                  <FileText className="mr-2 h-4 w-4" /> View Waybill
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={() => setIsShareReceiptOpen(true)}>
+                <Share2 className="mr-2 h-4 w-4" /> Share Receipt
+              </Button>
+              <Badge variant={getStatusVariant(order.orderStatus)} className="text-base">{order.orderStatus}</Badge>
             </div>
           </div>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-3">
           <div>
             <p className="text-sm font-medium text-muted-foreground">Customer</p>
-            {isLoadingCustomer ? (
-                <p className="font-semibold">Loading...</p>
-            ) : customer ? (
-                <Link href={`/dashboard/customers/${customer.id}`} className="font-semibold text-primary hover:underline block">
-                    {customer.fullName}
-                </Link>
+            {customer ? (
+              <Link href={`/dashboard/customers/${customer.id}`} className="font-semibold text-primary hover:underline block">
+                {customer.fullName}
+              </Link>
             ) : (
-                <p className="font-semibold">{order.spx_sync_data ? 'Shopee Customer' : 'Walk-in / Unknown'}</p>
+              <p className="font-semibold">{order.spx_sync_data ? 'Shopee Customer' : 'Walk-in / Unknown'}</p>
             )}
             <p className="text-sm text-muted-foreground">{customer?.email}</p>
           </div>
@@ -389,12 +156,10 @@ export default function OrderDetailPage() {
             <p className="text-sm font-medium text-muted-foreground">Payment Type</p>
             <p className="font-semibold">{order.paymentType}</p>
             {order.paymentType === 'Installment' && (
-                <div className="text-sm text-muted-foreground mt-1">
-                    <p>{order.installmentMonths} months</p>
-                    {order.monthlyPayment != null && (
-                        <p>₱{order.monthlyPayment.toFixed(2)} / month</p>
-                    )}
-                </div>
+              <div className="text-sm text-muted-foreground mt-1">
+                <p>{order.installmentMonths} months</p>
+                {order.monthlyPayment != null && <p>₱{order.monthlyPayment.toFixed(2)} / month</p>}
+              </div>
             )}
           </div>
           {order.tracking_number && (
@@ -413,7 +178,6 @@ export default function OrderDetailPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Product</TableHead>
-                <TableHead>Location</TableHead>
                 <TableHead className="text-center">Qty</TableHead>
                 <TableHead className="text-right">Price</TableHead>
                 <TableHead className="text-right">Discount</TableHead>
@@ -421,163 +185,120 @@ export default function OrderDetailPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {orderItems.length > 0 ? orderItems.map(item => (
+              {rawItems.length > 0 ? rawItems.map(item => (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">{item.productName}</TableCell>
-                  <TableCell className="text-muted-foreground text-sm">{item.shelfLocation || '-'}</TableCell>
                   <TableCell className="text-center">{item.quantity}</TableCell>
                   <TableCell className="text-right">₱{(item.sellingPriceAtSale || 0).toFixed(2)}</TableCell>
                   <TableCell className="text-right text-destructive">- ₱{(item.discount || 0).toFixed(2)}</TableCell>
                   <TableCell className="text-right font-medium">₱{(((item.sellingPriceAtSale || 0) - (item.discount || 0)) * (item.quantity || 1)).toFixed(2)}</TableCell>
                 </TableRow>
               )) : (
-                <TableRow><TableCell colSpan={6} className="h-24 text-center">No items found for this order.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="h-24 text-center">No items found for this order.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
-      
+
       <div className="grid gap-6 md:grid-cols-5">
         <Card className="md:col-span-3">
-            <CardHeader><CardTitle>Payment History</CardTitle></CardHeader>
-            <CardContent>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Date</TableHead>
-                            <TableHead>Method</TableHead>
-                            <TableHead className="text-right">Amount</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {payments.length > 0 ? payments.map(p => (
-                            <TableRow key={p.id}>
-                                <TableCell>
-                                    {format(new Date(p.paymentDate), 'PPp')}
-                                    {p.proofUrl && (
-                                        <div className="mt-1">
-                                            <a href={p.proofUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline inline-flex items-center gap-1">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
-                                                View Proof
-                                            </a>
-                                        </div>
-                                    )}
-                                </TableCell>
-                                <TableCell>{p.paymentMethod}</TableCell>
-                                <TableCell className="text-right font-medium">₱{(p.amount || 0).toFixed(2)}</TableCell>
-                            </TableRow>
-                        )) : (
-                            <TableRow><TableCell colSpan={3} className="h-24 text-center">No payments logged yet.</TableCell></TableRow>
-                        )}
-                    </TableBody>
-                </Table>
-            </CardContent>
+          <CardHeader><CardTitle>Payment History</CardTitle></CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Method</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {payments.length > 0 ? payments.map(p => (
+                  <TableRow key={p.id}>
+                    <TableCell>
+                      {format(new Date(p.paymentDate), 'PPp')}
+                      {p.proofUrl && (
+                        <div className="mt-1">
+                          <a href={p.proofUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline inline-flex items-center gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            View Proof
+                          </a>
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>{p.paymentMethod}</TableCell>
+                    <TableCell className="text-right font-medium">₱{(p.amount || 0).toFixed(2)}</TableCell>
+                  </TableRow>
+                )) : (
+                  <TableRow><TableCell colSpan={3} className="h-24 text-center">No payments logged yet.</TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
         </Card>
 
         <Card className="md:col-span-2">
-            <CardHeader><CardTitle>Financial Summary</CardTitle></CardHeader>
-            <CardContent className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                    <span className="text-muted-foreground">Subtotal</span>
-                    <span>₱{(order.subtotal || 0).toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                    <span className="text-muted-foreground">Discount</span>
-                    <span className="text-destructive">- ₱{(order.totalDiscount || 0).toFixed(2)}</span>
-                </div>
-                {order.insurance_fee ? (
-                    <div className="flex justify-between">
-                        <span className="text-muted-foreground">Insurance Fee (1%)</span>
-                        <span>+ ₱{order.insurance_fee.toFixed(2)}</span>
+          <CardHeader><CardTitle>Financial Summary</CardTitle></CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Subtotal</span>
+              <span>₱{(order.subtotal ?? 0).toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Discount</span>
+              <span className="text-destructive">- ₱{(order.totalDiscount ?? 0).toFixed(2)}</span>
+            </div>
+            {!!order.insurance_fee && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Insurance Fee (1%)</span>
+                <span>+ ₱{order.insurance_fee.toFixed(2)}</span>
+              </div>
+            )}
+            <Separator />
+            <div className="flex justify-between font-bold text-base">
+              <span>Total</span>
+              <span>₱{(order.totalAmount || 0).toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Amount Paid</span>
+              <span>₱{(order.amountPaid || 0).toFixed(2)}</span>
+            </div>
+            {courierFee > 0 && (() => {
+              const netRemittance = (order.amountPaid || 0) - courierFee;
+              const difference = netRemittance - (order.totalAmount || 0);
+              return (
+                <div className="bg-muted/30 p-2 rounded-md mt-1 mb-2">
+                  <div className="flex justify-between text-muted-foreground text-xs">
+                    <span>COD Collected</span><span>₱{(order.amountPaid || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-destructive text-xs">
+                    <span>Courier Fee</span><span>- ₱{courierFee.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-primary text-xs font-semibold mt-1 pt-1 border-t">
+                    <span>Net Remittance</span><span>₱{netRemittance.toFixed(2)}</span>
+                  </div>
+                  {difference !== 0 && (
+                    <div className={`flex justify-between text-xs font-semibold mt-1 pt-1 border-t ${difference > 0 ? 'text-emerald-600' : 'text-destructive'}`}>
+                      <span>{difference > 0 ? 'Additional Shipping Profit' : 'Shipping Loss / Extra Fee'}</span>
+                      <span>{difference > 0 ? '+' : '-'} ₱{Math.abs(difference).toFixed(2)}</span>
                     </div>
-                ) : null}
-                {order.paymentType === 'Installment' && order.totalAmount > ((order.subtotal || 0) - (order.totalDiscount || 0) + (order.insurance_fee || 0)) && (
-                    <div className="flex justify-between">
-                        <span className="text-muted-foreground">System Adjustment</span>
-                        <span className="text-muted-foreground">+ ₱{(order.totalAmount - ((order.subtotal || 0) - (order.totalDiscount || 0) + (order.insurance_fee || 0))).toFixed(2)}</span>
-                    </div>
-                )}
-                <Separator />
-                <div className="flex justify-between font-bold text-base">
-                    <span>Total</span>
-                    <span>₱{(order.totalAmount || 0).toFixed(2)}</span>
+                  )}
                 </div>
-                <div className="flex justify-between">
-                    <span className="text-muted-foreground">Amount Paid</span>
-                    <span>₱{(order.amountPaid || 0).toFixed(2)}</span>
-                </div>
-                {courierFee > 0 && (() => {
-                    const netRemittance = (order.amountPaid || 0) - courierFee;
-                    const difference = netRemittance - (order.totalAmount || 0);
-                    
-                    return (
-                        <div className="bg-muted/30 p-2 rounded-md mt-1 mb-2">
-                          <div className="flex justify-between text-muted-foreground text-xs">
-                              <span>COD Collected</span>
-                              <span>₱{(order.amountPaid || 0).toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between text-destructive text-xs">
-                              <span>Courier Fee</span>
-                              <span>- ₱{courierFee.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between text-primary text-xs font-semibold mt-1 pt-1 border-t">
-                              <span>Net Remittance</span>
-                              <span>₱{netRemittance.toFixed(2)}</span>
-                          </div>
-                          {difference !== 0 && (
-                              <div className={`flex justify-between text-xs font-semibold mt-1 pt-1 border-t ${difference > 0 ? 'text-emerald-600' : 'text-destructive'}`}>
-                                  <span>{difference > 0 ? 'Additional Shipping Profit' : 'Shipping Loss / Extra Fee'}</span>
-                                  <span>{difference > 0 ? '+' : '-'} ₱{Math.abs(difference).toFixed(2)}</span>
-                              </div>
-                          )}
-                        </div>
-                    );
-                })()}
-                 <div className="flex justify-between font-semibold text-base">
-                    <span>Balance Due</span>
-                    <span>₱{(order.balanceDue || 0).toFixed(2)}</span>
-                </div>
-            </CardContent>
+              );
+            })()}
+            <div className="flex justify-between font-semibold text-base">
+              <span>Balance Due</span>
+              <span>₱{(order.balanceDue || 0).toFixed(2)}</span>
+            </div>
+          </CardContent>
         </Card>
       </div>
 
-      {order && (
-        <ShareReceiptDialog
-          open={isShareReceiptOpen}
-          onOpenChange={setIsShareReceiptOpen}
-          order={order}
-          customer={customer ? { fullName: customer.fullName, address: customer.address } : null}
-          orderItems={orderItems}
-          payments={payments}
-        />
-      )}
-      {order && (
-        <MarkShippedDialog
-          open={isMarkShippedOpen}
-          onOpenChange={setIsMarkShippedOpen}
-          orderId={order.id}
-          currentTrackingNumber={order.tracking_number || ''}
-          onSuccess={() => {
-            setIsMarkShippedOpen(false);
-          }}
-        />
-      )}
-      {order && (
-        <EditOrderDialog 
-            open={isEditOpen} 
-            onOpenChange={setIsEditOpen} 
-            order={order} 
-            orderItems={orderItems} 
-        />
-      )}
-      {order && (
-        <WaybillSummaryDialog
-            open={isWaybillOpen}
-            onOpenChange={setIsWaybillOpen}
-            order={order}
-        />
-      )}
+      {order && <ShareReceiptDialog open={isShareReceiptOpen} onOpenChange={setIsShareReceiptOpen} order={order} customer={customer ? { fullName: customer.fullName, address: customer.address } : null} orderItems={rawItems} />}
+      {order && <MarkShippedDialog open={isMarkShippedOpen} onOpenChange={setIsMarkShippedOpen} orderId={order.id} currentTrackingNumber={order.tracking_number || ''} onSuccess={() => setIsMarkShippedOpen(false)} />}
+      {order && <EditOrderDialog open={isEditOpen} onOpenChange={setIsEditOpen} order={order} orderItems={rawItems} />}
+      {order && <WaybillSummaryDialog open={isWaybillOpen} onOpenChange={setIsWaybillOpen} order={order} />}
     </div>
   );
 }

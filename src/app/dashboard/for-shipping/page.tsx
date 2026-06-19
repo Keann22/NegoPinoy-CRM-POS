@@ -24,6 +24,7 @@ type ShippingOrder = {
   paymentType: string;
   totalAmount: number;
   amountPaid: number;
+  balanceDue: number;
   paymentMethod?: string;
   monthlyPayment?: number;
   installmentMonths?: number;
@@ -35,6 +36,17 @@ type ShippingOrder = {
   height: number | null;
   deliveryInstructions: string | null;
   boxesConfig: any;
+};
+
+type OrderUpdate = {
+  tracking_numbers: string[];
+  cod_amount: number;
+  estimated_shipping_fee: number;
+  basic_shipping_fee: number;
+  insurance_fee: number;
+  cod_service_fee: number;
+  scheduled_pickup_time: string;
+  payment_role: string;
 };
 
 export default function ForShippingPage() {
@@ -61,6 +73,7 @@ export default function ForShippingPage() {
           boxes_config,
           total_amount,
           amount_paid,
+          balance_due,
           shipping_name,
           shipping_phone,
           shipping_payment_type,
@@ -92,6 +105,7 @@ export default function ForShippingPage() {
         paymentType: item.shipping_payment_type || '',
         totalAmount: item.total_amount || 0,
         amountPaid: item.amount_paid || 0,
+        balanceDue: item.balance_due || 0,
         paymentMethod: item.payment_method,
         monthlyPayment: item.monthly_payment,
         installmentMonths: item.installment_months,
@@ -130,13 +144,7 @@ export default function ForShippingPage() {
       await workbook.xlsx.load(await file.arrayBuffer());
       const worksheet = workbook.worksheets[0];
       
-      const orderUpdates: Record<string, {
-         tracking_numbers: string[],
-         cod_amount: number,
-         estimated_shipping_fee: number,
-         scheduled_pickup_time: string,
-         payment_role: string,
-      }> = {};
+      const orderUpdates: Record<string, OrderUpdate> = {};
       
       let trackingCol = -1;
       let refCol = -1;

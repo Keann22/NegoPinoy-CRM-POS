@@ -352,7 +352,7 @@ export default function PendingCostsPage() {
                         onChange={(e) => setCosts({ ...costs, [m.id]: e.target.value })}
                         className="h-8 text-sm"
                       />
-                      {m.products.initial_unit_cost > 0 && (
+                      {(m.products.initial_unit_cost ?? 0) > 0 && (
                           <div className="text-[10px] text-muted-foreground mt-1">Last: ₱{m.products.initial_unit_cost}</div>
                       )}
                     </TableCell>

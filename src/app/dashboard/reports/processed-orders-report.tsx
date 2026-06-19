@@ -503,7 +503,7 @@ export function ProcessedOrdersReport() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {order.items.map((item, i) => (
+                                        {(order.items ?? []).map((item, i) => (
                                             <tr key={item.id}>
                                                 <td className="py-1 px-2 align-top">{i + 1}</td>
                                                 <td className="py-1 px-2 align-top">{item.productName}</td>
