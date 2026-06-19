@@ -168,6 +168,28 @@ export function PendingPurchases({ onReceiveComplete }: { onReceiveComplete: () 
     }
   };
 
+  const handleCancel = async (item: any) => {
+      if (!confirm(`Are you sure you want to cancel the request for ${item.productName}?`)) return;
+      
+      setSubmittingId(item.id);
+      try {
+        const res = await fetch("/api/inventory/receive/pending-pos/cancel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ itemId: item.id })
+        });
+        
+        if (!res.ok) throw new Error(await res.text());
+        
+        toast({ title: 'Request Cancelled', description: `Successfully removed ${item.productName} from the pending list.` });
+        fetchPending();
+      } catch (e: any) {
+        toast({ variant: 'destructive', title: 'Error', description: e.message });
+      } finally {
+        setSubmittingId(null);
+      }
+  };
+
   const handleReceive = async () => {
     // filter out items that have receivedQty entered
     const toReceive = items.filter(i => i.receivedQty && Number(i.receivedQty) > 0).map(i => ({
@@ -324,6 +346,17 @@ export function PendingPurchases({ onReceiveComplete }: { onReceiveComplete: () 
                                 disabled={submittingId === item.id}
                             >
                                 {submittingId === item.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
+                            </Button>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 px-2"
+                                onClick={() => handleCancel(item)}
+                                disabled={submittingId === item.id}
+                                title="Cancel this request"
+                            >
+                                <Trash2 className="h-4 w-4" />
                             </Button>
                           </td>
                         </tr>
