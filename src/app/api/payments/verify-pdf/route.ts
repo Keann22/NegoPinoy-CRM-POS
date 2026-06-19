@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import pdfParse from 'pdf-parse';
 
 // Use Node.js runtime so we can use pdfjs-dist
 export const runtime = 'nodejs';
@@ -25,23 +26,14 @@ export async function POST(request: Request) {
     const arrayBuffer = await file.arrayBuffer();
     const data = new Uint8Array(arrayBuffer);
 
-    // Statically import the older legacy build that is 100% Node compatible without DOMMatrix
-    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.js');
-
-    const loadingTask = pdfjsLib.getDocument({
-      data: data,
-      password: password || undefined,
-    });
-
-    const pdfDocument = await loadingTask.promise;
+    // pdf-parse expects a buffer
+    const buffer = Buffer.from(arrayBuffer);
     
-    let fullText = '';
-    for (let i = 1; i <= pdfDocument.numPages; i++) {
-      const page = await pdfDocument.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items.map((item: any) => item.str).join(' ');
-      fullText += pageText + '\n';
-    }
+    // Handle password protected PDFs
+    const options = password ? { password } as any : undefined;
+    
+    const parsedData = await pdfParse(buffer, options);
+    const fullText = parsedData.text;
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;

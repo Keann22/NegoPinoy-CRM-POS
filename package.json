@@ -9,7 +9,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "exit 0"
+    "typecheck": "tsc --noEmit",
+    "check:lines": "node -e \"const fs=require('fs'),path=require('path');function walk(dir){const files=fs.readdirSync(dir,{withFileTypes:true});for(const f of files){if(f.name==='node_modules'||f.name==='.next')continue;const p=path.join(dir,f.name);if(f.isDirectory())walk(p);else if(p.match(/\\.(tsx?|jsx?)$/)){const lines=fs.readFileSync(p,'utf8').split('\\n').length;if(lines>400)console.log(lines+'\\t'+p);}}}walk('./src');\" | sort -rn"
   },
   "dependencies": {
     "@genkit-ai/google-genai": "^1.20.0",
@@ -52,6 +53,7 @@
     "lucide-react": "^0.475.0",
     "next": "15.5.9",
     "patch-package": "^8.0.0",
+    "pdf-parse": "^1.1.1",
     "pdfjs-dist": "^3.11.174",
     "puppeteer": "^25.1.0",
     "qrcode.react": "^4.2.0",
@@ -71,6 +73,7 @@
   "devDependencies": {
     "@types/file-saver": "^2.0.7",
     "@types/node": "^20",
+    "@types/pdf-parse": "^1.1.5",
     "@types/react": "^19.2.1",
     "@types/react-dom": "^19.2.1",
     "dotenv": "^17.4.2",
