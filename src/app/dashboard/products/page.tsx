@@ -80,6 +80,8 @@ export type FormattedProduct = Product & {
     children?: FormattedProduct[];
     reservedStock?: number;
     packedStock?: number;
+    installment_price?: number;
+    assembly_recipe?: any[] | null;
 }
 
 const getStatus = (stock: number | undefined | null): { text: 'In Stock' | 'Low Stock' | 'Out of Stock'; variant: 'outline' | 'default' | 'destructive' } => {
@@ -219,7 +221,7 @@ export default function ProductsPage() {
   }, [rawFormattedProducts]);
 
   const filteredProducts = useMemo(() => {
-    let results = formattedProducts;
+    let results = formattedProducts.filter(p => !p.name.startsWith('[DELETED]'));
 
     // Filter by stock status
     if (stockFilter === 'in-stock') {
@@ -337,7 +339,7 @@ export default function ProductsPage() {
         toast({
             variant: "destructive",
             title: "Bulk Deletion Failed",
-            description: `There was an error deleting the products. ${error?.message || ''}`,
+            description: `There was an error deleting the products. ${(error as Error)?.message || ''}`,
         });
     }
   };
