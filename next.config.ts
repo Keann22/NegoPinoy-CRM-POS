@@ -36,7 +36,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  serverExternalPackages: ['genkit', '@genkit-ai/google-genai', '@genkit-ai/googleai', 'pdfjs-dist', 'canvas'],
+  serverExternalPackages: ['genkit', '@genkit-ai/google-genai', '@genkit-ai/googleai', 'pdfjs-dist', 'canvas', 'pdf-parse'],
   webpack: (config) => {
     config.resolve.alias.canvas = false;
     return config;

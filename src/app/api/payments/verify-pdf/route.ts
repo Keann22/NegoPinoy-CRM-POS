@@ -28,7 +28,8 @@ export async function POST(request: Request) {
     // pdf-parse expects a buffer
     const buffer = Buffer.from(arrayBuffer);
     
-    const pdfParse = (await import('pdf-parse')).default || require('pdf-parse');
+    // Bypass the index.js bug in pdf-parse which tries to read test files
+    const pdfParse = require('pdf-parse/lib/pdf-parse.js');
     
     // Handle password protected PDFs
     const options = password ? { password } as any : undefined;
