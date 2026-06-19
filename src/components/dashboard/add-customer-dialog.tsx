@@ -88,7 +88,7 @@ export function AddCustomerDialog(props: AddCustomerDialogProps) {
               lastName = cust.lastName || cust.last_name || '';
               
               if (!firstName && !lastName) {
-                  const parts = (cust.full_name || '').trim().split(' ');
+                  const parts = (cust.full_name || cust.fullName || '').trim().split(' ');
                   firstName = parts[0] || '';
                   lastName = parts.slice(1).join(' ') || '';
               }

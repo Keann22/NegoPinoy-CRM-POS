@@ -16,8 +16,7 @@ import { Pencil } from 'lucide-react';
 
 type Customer = {
   id: string;
-  firstName: string;
-  lastName: string;
+  fullName: string;
   email: string;
   mobileNumber?: string;
   addressLine?: string;
@@ -70,6 +69,8 @@ export default function CustomerDetailPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const [refreshKey, setRefreshKey] = useState(0);
+
   useEffect(() => {
     if (!supabase || !customerId) return;
     const fetchAll = async () => {
@@ -85,8 +86,7 @@ export default function CustomerDetailPage() {
         if (custData) {
           setCustomer({
             id: custData.id,
-            firstName: custData.first_name,
-            lastName: custData.last_name,
+            fullName: custData.full_name,
             email: custData.email,
             mobileNumber: custData.mobile_number,
             addressLine: custData.address_line,
@@ -156,7 +156,7 @@ export default function CustomerDetailPage() {
       }
     };
     fetchAll();
-  }, [supabase, customerId]);
+  }, [supabase, customerId, refreshKey]);
 
   const { totalBalanceOwed, outstandingOrders } = useMemo(() => {
     if (!orders) return { totalBalanceOwed: 0, outstandingOrders: [] };
@@ -187,10 +187,10 @@ export default function CustomerDetailPage() {
         <Card>
           <CardHeader className="flex flex-row items-center gap-4">
             <Avatar className="h-16 w-16">
-              <AvatarFallback className="text-2xl">{(customer.firstName?.[0] || '')}{(customer.lastName?.[0] || '')}</AvatarFallback>
+              <AvatarFallback className="text-2xl">{(customer.fullName?.[0] || 'U').toUpperCase()}</AvatarFallback>
             </Avatar>
             <div className="flex-1">
-              <CardTitle className="text-3xl font-headline">{customer.firstName} {customer.lastName}</CardTitle>
+              <CardTitle className="text-3xl font-headline">{customer.fullName || 'Unnamed Customer'}</CardTitle>
               <div className="flex flex-col gap-1 mt-2 mb-4 text-sm text-muted-foreground">
                 {customer.email && <div className="flex items-center gap-2"><span>✉️</span> {customer.email}</div>}
                 {customer.mobileNumber && <div className="flex items-center gap-2"><span>📱</span> {customer.mobileNumber}</div>}
@@ -242,7 +242,10 @@ export default function CustomerDetailPage() {
             open={!!editingCustomer}
             onOpenChange={(open) => !open && setEditingCustomer(null)}
             customerToEdit={editingCustomer}
-            onSuccess={() => setEditingCustomer(null)}
+            onSuccess={() => {
+                setEditingCustomer(null);
+                setRefreshKey(prev => prev + 1);
+            }}
           />
         )}
         
@@ -354,6 +357,10 @@ export default function CustomerDetailPage() {
             order={logPaymentOrder}
             open={!!logPaymentOrder}
             onOpenChange={(isOpen) => !isOpen && setLogPaymentOrder(null)}
+            onSuccess={() => {
+                setLogPaymentOrder(null);
+                setRefreshKey(prev => prev + 1);
+            }}
         />
       )}
     </>

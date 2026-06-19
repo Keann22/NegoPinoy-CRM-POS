@@ -44,11 +44,13 @@ interface LogPaymentDialogProps {
   order: Order;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void;
 }
 
 const paymentMethods = ["GCash", "Shopee Platform Payouts", "Cash", "Bank Transfer", "COD Payed", "Credit Card", "Other"];
 
-export function LogPaymentDialog({ order, open, onOpenChange }: LogPaymentDialogProps) {
+export function LogPaymentDialog(props: LogPaymentDialogProps) {
+  const { order, open, onOpenChange } = props;
   const supabase = useSupabase();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -78,7 +80,6 @@ export function LogPaymentDialog({ order, open, onOpenChange }: LogPaymentDialog
 
   function onSubmit(values: PaymentFormValues) {
     setIsSubmitting(true);
-    onOpenChange(false);
     
     toast({
       title: "Processing Payment...",
@@ -197,6 +198,9 @@ export function LogPaymentDialog({ order, open, onOpenChange }: LogPaymentDialog
                 description: `₱${values.amount.toFixed(2)} has been logged.`,
             });
         }
+        
+        if (props.onSuccess) props.onSuccess();
+        props.onOpenChange(false);
       } catch (error: any) {
           console.error("Payment logging failed:", error);
           toast({
@@ -213,7 +217,9 @@ export function LogPaymentDialog({ order, open, onOpenChange }: LogPaymentDialog
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={props.open} onOpenChange={(open) => {
+        if (!isSubmitting) props.onOpenChange(open);
+    }}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Log Payment for Order</DialogTitle>
