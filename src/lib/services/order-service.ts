@@ -1,4 +1,3 @@
-'use server';
 
 /**
  * order-service.ts
