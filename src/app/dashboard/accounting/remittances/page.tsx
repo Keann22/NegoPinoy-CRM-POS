@@ -90,10 +90,10 @@ export default function SPXRemittancesPage() {
           if (!trackingData[trackingNo]) {
             trackingData[trackingNo] = { cod: 0, shippingFee: 0 };
           }
-          if (type.includes('COD')) {
+          if (type.toUpperCase().includes('COD') && amount > 0) {
             trackingData[trackingNo].cod += amount;
-          } else if (type.includes('Shipping Fee') || type.includes('Processing Fee')) {
-            // Usually negative in the sheet, let's keep it negative
+          } else if (amount < 0) {
+            // Any negative amount for the same tracking number is a deduction (shipping/processing fee)
             trackingData[trackingNo].shippingFee += amount;
           }
         }
