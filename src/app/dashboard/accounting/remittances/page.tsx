@@ -434,13 +434,14 @@ export default function SPXRemittancesPage() {
                         <TableHead>Tracking No.</TableHead>
                         <TableHead>Order ID</TableHead>
                         <TableHead className="text-right">COD Collected</TableHead>
+                        <TableHead className="text-right">Courier Fee</TableHead>
                         <TableHead>Message</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {paginatedAlreadyPaid.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                          <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
                             No skipped payments found.
                           </TableCell>
                         </TableRow>
@@ -450,6 +451,7 @@ export default function SPXRemittancesPage() {
                             <TableCell className="font-medium">{res.trackingNumber}</TableCell>
                             <TableCell className="font-mono text-muted-foreground">{res.orderId}</TableCell>
                             <TableCell className="text-right font-medium">₱{res.codAmount.toLocaleString()}</TableCell>
+                            <TableCell className="text-right text-destructive font-medium">₱{Math.abs(res.shippingFee).toLocaleString()}</TableCell>
                             <TableCell className="text-muted-foreground">{res.message}</TableCell>
                           </TableRow>
                         ))
