@@ -31,11 +31,14 @@ export default function ProcurementRequestPage() {
     const handler = setTimeout(async () => {
       setIsLoadingProducts(true);
       try {
-        let query = supabase.from('products').select('id, name, variant_name');
+        let query = supabase.from('products').select('id, name, variant_name').not('name', 'ilike', '[DELETED]%');
         const searchWords = productSearch.split(' ').filter(w => w.trim() !== '');
-        searchWords.forEach(w => {
-            query = query.or(`name.ilike.%${w}%,variant_name.ilike.%${w}%`);
-        });
+        if (searchWords.length > 0) {
+            const orConditions = searchWords.map(w => `name.ilike.%${w}%,variant_name.ilike.%${w}%`).join(',');
+            searchWords.forEach(w => {
+                query = query.or(`name.ilike.%${w}%,variant_name.ilike.%${w}%`);
+            });
+        }
         const { data, error } = await query.order('name').limit(10);
         if (error) throw error;
         setProductResults(data || []);
