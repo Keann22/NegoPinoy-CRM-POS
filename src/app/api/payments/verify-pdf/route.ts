@@ -24,8 +24,13 @@ export async function POST(request: Request) {
 
     const arrayBuffer = await file.arrayBuffer();
     
+    // Force Vercel's Node File Trace (NFT) to bundle the worker file
+    require('pdfjs-dist/legacy/build/pdf.worker.js');
+    
     // Use the native pdfjs-dist library which properly supports password decryption
     const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.js');
+    
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/legacy/build/pdf.worker.js';
     
     const loadingTask = pdfjsLib.getDocument({
       data: new Uint8Array(arrayBuffer),
