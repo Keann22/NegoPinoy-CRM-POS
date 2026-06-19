@@ -23,6 +23,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
     }
 
+    const arrayBuffer = await file.arrayBuffer();
+    
     // pdf-parse expects a buffer
     const buffer = Buffer.from(arrayBuffer);
     
