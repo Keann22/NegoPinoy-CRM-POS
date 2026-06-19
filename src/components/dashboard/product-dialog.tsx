@@ -18,6 +18,8 @@ import { FileUpload } from "@/components/ui/file-upload";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import type { FormattedProduct } from '@/types';
+import { ProductSupplierSection } from './products/ProductSupplierSection';
+import { ProductVariationsSection } from './products/ProductVariationsSection';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -411,52 +413,19 @@ export function ProductDialog(props: ProductDialogProps) {
                 </div>
               )}
 
-              {/* Suppliers */}
+              {/* Suppliers (management, no-children edit) */}
               {isManagement && (!isEdit || !(displayProduct as FormattedProduct)?.children?.length) && (
-                <div className="space-y-4 rounded-lg border p-4">
-                  <FormLabel className="text-base">Suppliers &amp; Pricing</FormLabel>
-                  <div className="space-y-2">
-                    {supplierFields.map((field, index) => (
-                      <div key={field.id} className="p-3 bg-muted/50 rounded-md border space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-semibold">{field.supplierName}</span>
-                          <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeSupplier(index)}><Trash2 className="h-3.5 w-3.5" /></Button>
-                        </div>
-                        {isEdit && (
-                          <FormField control={form.control} name={`supplierPricing.${index}.supplierCode`} render={({ field: cf }) => (
-                            <FormItem><FormLabel className="text-xs text-muted-foreground">Supplier's Product Code</FormLabel><FormControl><Input placeholder="e.g. WK-32-SS" className="h-8" {...cf} /></FormControl></FormItem>
-                          )} />
-                        )}
-                        <FormField control={form.control} name={`supplierPricing.${index}.unitCost`} render={({ field: cf }) => (
-                          <FormItem className={isEdit ? '' : 'w-24'}>
-                            {isEdit && <FormLabel className="text-xs text-muted-foreground">Unit Cost (₱)</FormLabel>}
-                            <FormControl><Input type="number" step="0.01" className="h-8 text-right" {...cf} /></FormControl>
-                          </FormItem>
-                        )} />
-                      </div>
-                    ))}
-                  </div>
-                  <Command className="rounded-lg border">
-                    <CommandInput placeholder="Search to add a supplier..." value={supplierSearch} onValueChange={setSupplierSearch} />
-                    {supplierSearch.length > 0 && (
-                      <CommandList>
-                        {isLoadingSuppliers && <CommandItem disabled>Searching...</CommandItem>}
-                        {supplierResults && supplierResults.length > 0 && (
-                          <CommandGroup>
-                            {supplierResults.map(s => (
-                              <CommandItem key={s.id} value={s.name}
-                                onMouseDown={e => { e.preventDefault(); e.stopPropagation(); }}
-                                onSelect={() => { if (!supplierFields.some(f => f.supplierId === s.id)) appendSupplier({ supplierId: s.id, supplierName: s.name, unitCost: 0 }); setSupplierSearch(''); }}>
-                                {s.name}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        )}
-                        {!isLoadingSuppliers && !supplierResults?.length && supplierSearch.length > 1 && <CommandEmpty>No suppliers found.</CommandEmpty>}
-                      </CommandList>
-                    )}
-                  </Command>
-                </div>
+                <ProductSupplierSection
+                  form={form}
+                  supplierFields={supplierFields}
+                  appendSupplier={appendSupplier}
+                  removeSupplier={removeSupplier}
+                  supplierSearch={supplierSearch}
+                  onSupplierSearchChange={setSupplierSearch}
+                  supplierResults={supplierResults}
+                  isLoadingSuppliers={isLoadingSuppliers}
+                  isEdit={isEdit}
+                />
               )}
 
               {/* Assembly Recipe (edit only, management only) */}
@@ -537,47 +506,15 @@ export function ProductDialog(props: ProductDialogProps) {
                 </div>
               )}
 
-              {/* Existing variations list (edit only) */}
-              {isEdit && displayProduct && (displayProduct as FormattedProduct).children && (displayProduct as FormattedProduct).children!.length > 0 && (
-                <div className="pt-4 border-t space-y-3">
-                  <FormLabel className="text-base font-semibold">Existing Variations</FormLabel>
-                  <DialogDescription>To edit a variation, expand the parent row on the Products table and click Edit on the specific variation.</DialogDescription>
-                  <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
-                    {(displayProduct as FormattedProduct).children!.map(child => (
-                      <div key={child.id} className="flex justify-between items-center bg-muted/30 p-2 rounded-md border text-sm">
-                        <span className="font-medium text-foreground">{child.variantName || child.name}</span>
-                        <span className="text-muted-foreground">{child.price} &bull; Stock: {child.quantityOnHand ?? 0}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Variations form (both modes) */}
-              <div className="pt-4 border-t space-y-4">
-                {isEdit && <FormLabel className="text-base font-semibold">Create New Variations</FormLabel>}
-                {isEdit && <DialogDescription>Create new variations (e.g. "5L", "Red") based on this product's details.</DialogDescription>}
-                {variationFields.map((field, index) => (
-                  <div key={field.id} className="p-4 border rounded-lg bg-muted/20 relative space-y-4">
-                    <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => removeVariation(index)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <FormField control={form.control} name={`variations.${index}.nameSuffix`} render={({ field: f }) => (<FormItem><FormLabel>Variation Name (e.g., 5L, Red)</FormLabel><FormControl><Input {...f} /></FormControl><FormMessage /></FormItem>)} />
-                      <FormField control={form.control} name={`variations.${index}.sku`} render={({ field: f }) => (<FormItem><FormLabel>SKU (Optional)</FormLabel><FormControl><Input {...f} /></FormControl><FormMessage /></FormItem>)} />
-                      <FormField control={form.control} name={`variations.${index}.sellingPrice`} render={({ field: f }) => (<FormItem><FormLabel>Price (₱)</FormLabel><FormControl><Input type="number" step="0.01" {...f} /></FormControl><FormMessage /></FormItem>)} />
-                      <FormField control={form.control} name={`variations.${index}.unitCost`} render={({ field: f }) => (<FormItem><FormLabel>Unit Cost (Optional)</FormLabel><FormControl><Input type="number" step="0.01" {...f} /></FormControl><FormMessage /></FormItem>)} />
-                      <FormField control={form.control} name={`variations.${index}.quantityOnHand`} render={({ field: f }) => (<FormItem><FormLabel>Initial Stock</FormLabel><FormControl><Input type="number" {...f} /></FormControl><FormMessage /></FormItem>)} />
-                      <FormField control={form.control} name={`variations.${index}.images`} render={({ field: f }) => (<FormItem className="col-span-2"><FormLabel>Variation Image (Optional)</FormLabel><FormControl><FileUpload value={f.value || []} onChange={f.onChange} /></FormControl><FormMessage /></FormItem>)} />
-                    </div>
-                  </div>
-                ))}
-                {(!isEdit ? hasVariations : true) && (
-                  <Button type="button" variant="outline" size="sm" className="w-full mt-2" onClick={() => appendVariation({ nameSuffix: '', sku: '', sellingPrice: 0, unitCost: undefined, quantityOnHand: 0, images: [] })}>
-                    <Plus className="mr-2 h-4 w-4" />{isEdit ? 'Add New Variation' : 'Add Variation'}
-                  </Button>
-                )}
-              </div>
+              {/* Variations section (both modes) */}
+              <ProductVariationsSection
+                form={form}
+                variationFields={variationFields}
+                appendVariation={appendVariation}
+                removeVariation={removeVariation}
+                isEdit={isEdit}
+                displayProduct={displayProduct}
+              />
             </div>
 
             <DialogFooter>

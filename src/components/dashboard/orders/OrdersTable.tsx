@@ -21,9 +21,9 @@ type StatusVariant = 'outline' | 'secondary' | 'destructive' | 'default';
 
 function getStatusVariant(status: OrderStatus): StatusVariant {
   switch (status) {
-    case 'Shipped': case 'Completed': case 'Payment Received (COD)': case 'For Shipping': case 'For Pick-up':
+    case 'Shipped': case 'Completed': case 'Payment Received (COD)': case 'For Shipping': case 'For Pick-up': case 'Waiting for Stock':
       return 'outline';
-    case 'Packed': case 'Processing':
+    case 'Packed': case 'Processing': case 'On-Hold':
       return 'secondary';
     case 'Cancelled': case 'Returned':
       return 'destructive';

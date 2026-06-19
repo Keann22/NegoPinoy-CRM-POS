@@ -19,7 +19,7 @@ export const orderSchema = z.object({
   paymentType: z.enum(["Full Payment", "Lay-away", "Installment", "COD", "Pending"], { required_error: "You need to select a payment type." }),
   installmentMonths: z.coerce.number().positive("Must be a positive number.").optional(),
   monthlyPayment: z.coerce.number().positive("Must be a positive number.").optional(),
-  orderStatus: z.enum(["Pending Payment", "Processing", "Shipped", "Completed", "Cancelled", "Payment Received (COD)"]),
+  orderStatus: z.enum(["Pending Payment", "Processing", "Shipped", "Completed", "Cancelled", "Payment Received (COD)", "On-Hold", "Waiting for Stock"]),
   amountPaid: z.coerce.number().min(0).optional(),
   isDownpaymentCOD: z.boolean().default(false),
   shippingDetails: z.string().optional(),

@@ -28,6 +28,7 @@ import { useRouter } from "next/navigation";
 import { orderSchema, type OrderFormValues, type Customer, type Product } from "@/lib/schemas/order";
 import { OrderLeftPanel } from "./orders/OrderLeftPanel";
 import { OrderItemsPanel } from "./orders/OrderItemsPanel";
+import { VariantSelectionDialog } from "./orders/VariantSelectionDialog";
 import { createOrder, editOrder } from "@/lib/services/order-service";
 
 // ---------------------------------------------------------------------------
@@ -472,44 +473,14 @@ export function OrderDialog(props: OrderDialogProps) {
         }}
       />
     </Dialog>
-      <Dialog open={!!variantSelectionProduct} onOpenChange={(open) => !open && setVariantSelectionProduct(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Select Variant for {variantSelectionProduct?.name}</DialogTitle>
-            <DialogDescription>Choose a variant to add to the order.</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-2 py-4">
-            {variantSelectionOptions.map((v) => (
-              <Button
-                key={v.id}
-                variant="outline"
-                className="justify-between h-auto py-3"
-                onClick={() => {
-                  const isAlreadyAdded = fields.some(item => item.productId === v.id);
-                  if (isAlreadyAdded) {
-                    toast({ variant: "default", title: "Variant already in order", description: `${v.variant_name} is already in this order. You can adjust the quantity above.` });
-                  } else {
-                    const costPriceAtSale = v.stock_batches?.length > 0 ? v.stock_batches[0].unitCost : (v.initial_unit_cost || 0);
-                    append({ productId: v.id, productName: v.name, quantity: 1, costPriceAtSale, sellingPriceAtSale: v.selling_price, discount: 0 });
-                  }
-                  setVariantSelectionProduct(null);
-                  setProductSearch('');
-                }}
-              >
-                <span>{v.variant_name || v.name}</span>
-                <div className="flex gap-4">
-                  <span className="text-muted-foreground text-sm font-normal">Stock: {v.stock_level}</span>
-                  <span>₱{(v.selling_price || 0).toFixed(2)}</span>
-                </div>
-              </Button>
-            ))}
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setVariantSelectionProduct(null)}>Cancel</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+    <VariantSelectionDialog
+      parentProduct={variantSelectionProduct}
+      options={variantSelectionOptions}
+      existingProductIds={fields.map(f => f.productId)}
+      onSelect={(item) => append(item)}
+      onClose={() => { setVariantSelectionProduct(null); setProductSearch(''); }}
+    />
+  </>
   );
 }
 

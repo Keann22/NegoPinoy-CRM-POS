@@ -1,59 +1,27 @@
 'use client';
 
-import Image from 'next/image';
-import { MoreHorizontal, ChevronDown, ChevronRight } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
+  Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle,
 } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { useUser, useSupabase } from '@/lib/supabase/hooks';
-import { AddProductDialog } from '@/components/dashboard/product-dialog';
-import { Skeleton } from '@/components/ui/skeleton';
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
+import { useSupabase } from '@/lib/supabase/hooks';
+import { AddProductDialog, EditProductDialog } from '@/components/dashboard/product-dialog';
 import { BulkUploadProductsDialog } from '@/components/dashboard/bulk-upload-products-dialog';
 import { ReservedStockDialog } from '@/components/dashboard/reserved-stock-dialog';
-import React, { useState, useMemo } from 'react';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { useToast } from '@/hooks/use-toast';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { EditProductDialog } from '@/components/dashboard/product-dialog';
 import { ViewProductHistoryDialog } from '@/components/dashboard/view-product-history-dialog';
 import { ViewProductDetailsDialog } from '@/components/dashboard/view-product-details-dialog';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { ProductsTable } from '@/components/dashboard/products/ProductsTable';
+import { useState, useMemo } from 'react';
 
 import type { FormattedProduct } from '@/types';
-import { getStockStatus } from '@/types';
 import { useProducts } from '@/hooks/useProducts';
 
 // Re-export for any components that still import FormattedProduct from this page
@@ -318,288 +286,35 @@ export default function ProductsPage() {
                 </Button>
             )}
           </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[50px]">
-                  <Checkbox
-                    onCheckedChange={(checked) => {
-                        if (checked) {
-                            setSelectedProductIds(prev => Array.from(new Set([...prev, ...paginatedProducts.map(p => p.id)])));
-                        } else {
-                            const paginatedIds = new Set(paginatedProducts.map(p => p.id));
-                            setSelectedProductIds(prev => prev.filter(id => !paginatedIds.has(id)));
-                        }
-                    }}
-                    checked={paginatedProducts.length > 0 && paginatedProducts.every(p => selectedProductIds.includes(p.id))}
-                    aria-label="Select all"
-                  />
-                </TableHead>
-                <TableHead className="hidden w-[100px] sm:table-cell">
-                  <span className="sr-only">Image</span>
-                </TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Price</TableHead>
-                <TableHead className="hidden md:table-cell">Location</TableHead>
-                <TableHead className="hidden md:table-cell">
-                  Inventory
-                </TableHead>
-                <TableHead>
-                  <span className="sr-only">Actions</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading && Array.from({ length: 10 }).map((_, i) => (
-                  <TableRow key={i}>
-                      <TableCell><Skeleton className="h-4 w-4" /></TableCell>
-                      <TableCell className="hidden sm:table-cell"><Skeleton className="aspect-square rounded-md h-16 w-16" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-48" /></TableCell>
-                      <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                      <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-16" /></TableCell>
-                      <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-12" /></TableCell>
-                      <TableCell><Skeleton className="h-8 w-8" /></TableCell>
-                  </TableRow>
-              ))}
-              {paginatedProducts && paginatedProducts.map((product) => (
-                <React.Fragment key={product.id}>
-                  <TableRow data-state={selectedProductIds.includes(product.id) ? 'selected' : undefined}>
-                    <TableCell>
-                      <Checkbox
-                          onCheckedChange={(checked) => {
-                              setSelectedProductIds((prevIds) =>
-                              checked
-                                  ? [...prevIds, product.id]
-                                  : prevIds.filter((id) => id !== product.id)
-                              );
-                          }}
-                          checked={selectedProductIds.includes(product.id)}
-                          aria-label={`Select product ${product.name}`}
-                      />
-                    </TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      <Image
-                        alt="Product image"
-                        className="aspect-square rounded-md object-cover"
-                        height="64"
-                        src={product.image}
-                        width="64"
-                        data-ai-hint="product image"
-                      />
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                          {product.children && product.children.length > 0 && (
-                              <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-6 w-6" 
-                                  onClick={() => {
-                                      setExpandedParents(prev => {
-                                          const next = new Set(prev);
-                                          if (next.has(product.id)) next.delete(product.id);
-                                          else next.add(product.id);
-                                          return next;
-                                      });
-                                  }}
-                              >
-                                  {expandedParents.has(product.id) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                              </Button>
-                          )}
-                          {product.name}
-                          {product.children && product.children.length > 0 && (
-                              <Badge variant="secondary" className="ml-2">{product.children.length} variations</Badge>
-                          )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {product.children && product.children.length > 0 ? (
-                          <Badge variant={getStockStatus(product.children.reduce((acc, c) => acc + (c.quantityOnHand || 0), 0)).variant}>
-                              {getStockStatus(product.children.reduce((acc, c) => acc + (c.quantityOnHand || 0), 0)).text}
-                          </Badge>
-                      ) : (
-                          <Badge variant={product.status.variant}>{product.status.text}</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {product.children && product.children.length > 0 ? (
-                        <span className="text-muted-foreground">-</span>
-                      ) : (
-                        product.price
-                      )}
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">{product.shelfLocation || '-'}</TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      {product.children && product.children.length > 0 ? (
-                          <div className="space-y-1 text-sm">
-                              <p className="font-medium text-foreground">
-                                  Physical: {(product.children.reduce((acc, c) => acc + (c.quantityOnHand || 0), 0)) + (product.children.reduce((acc, c) => acc + (c.reservedStock || 0), 0))}
-                              </p>
-                              <p className="text-muted-foreground">
-                                  Available: {product.children.reduce((acc, c) => acc + (c.quantityOnHand || 0), 0)}
-                              </p>
-                              {product.children.reduce((acc, c) => acc + (c.reservedStock || 0), 0) > 0 && (
-                                <p 
-                                  className="text-amber-600 dark:text-amber-400 cursor-pointer hover:underline"
-                                  onClick={() => setViewingReservedProduct({ id: product.id, name: product.name })}
-                                >
-                                    Reserved: {product.children.reduce((acc, c) => acc + (c.reservedStock || 0), 0)}
-                                </p>
-                              )}
-                              {product.children.reduce((acc, c) => acc + (c.packedStock || 0), 0) > 0 && (
-                                <p 
-                                  className="text-blue-600 dark:text-blue-400 cursor-pointer hover:underline"
-                                  onClick={() => setViewingPackedProduct({ id: product.id, name: product.name })}
-                                >
-                                    Packed: {product.children.reduce((acc, c) => acc + (c.packedStock || 0), 0)}
-                                </p>
-                              )}
-                          </div>
-                      ) : (
-                          <div className="space-y-1 text-sm">
-                              <p className="font-medium text-foreground">
-                                  Physical: {(product.quantityOnHand ?? 0) + (product.reservedStock || 0)}
-                              </p>
-                              <p className="text-muted-foreground">
-                                  Available: {product.quantityOnHand ?? 0}
-                              </p>
-                              {(product.reservedStock || 0) > 0 && (
-                                <p 
-                                  className="text-amber-600 dark:text-amber-400 cursor-pointer hover:underline"
-                                  onClick={() => setViewingReservedProduct({ id: product.id, name: product.name })}
-                                >
-                                    Reserved: {product.reservedStock}
-                                </p>
-                              )}
-                              {(product.packedStock || 0) > 0 && (
-                                <p 
-                                  className="text-blue-600 dark:text-blue-400 cursor-pointer hover:underline"
-                                  onClick={() => setViewingPackedProduct({ id: product.id, name: product.name })}
-                                >
-                                    Packed: {product.packedStock}
-                                </p>
-                              )}
-                          </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button aria-haspopup="true" size="icon" variant="ghost">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Toggle menu</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => setViewingDetailsProduct(product)}>View Details</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setEditingProduct(product)}>Edit</DropdownMenuItem>
-                          {isManagement && <DropdownMenuItem>Duplicate</DropdownMenuItem>}
-                          <DropdownMenuItem onClick={() => setViewingHistoryProduct(product)}>View History</DropdownMenuItem>
-                          {isManagement && (
-                              <DropdownMenuItem
-                              className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                              onClick={() => setDeletingProduct(product)}
-                              >
-                              Delete
-                              </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                  
-                  {expandedParents.has(product.id) && product.children?.map(child => (
-                    <TableRow key={child.id} className="bg-muted/30" data-state={selectedProductIds.includes(child.id) ? 'selected' : undefined}>
-                        <TableCell>
-                          <Checkbox
-                              onCheckedChange={(checked) => {
-                                  setSelectedProductIds((prevIds) =>
-                                  checked
-                                      ? [...prevIds, child.id]
-                                      : prevIds.filter((id) => id !== child.id)
-                                  );
-                              }}
-                              checked={selectedProductIds.includes(child.id)}
-                              aria-label={`Select product ${child.name}`}
-                          />
-                        </TableCell>
-                        <TableCell className="hidden sm:table-cell">
-                          <Image
-                            alt="Product image"
-                            className="aspect-square rounded-md object-cover"
-                            height="64"
-                            src={child.image}
-                            width="64"
-                            data-ai-hint="product image"
-                          />
-                        </TableCell>
-                        <TableCell className="font-medium pl-10">
-                            └ {child.variantName || child.name}
-                        </TableCell>
-                        <TableCell>
-                            <Badge variant={child.status.variant}>{child.status.text}</Badge>
-                        </TableCell>
-                        <TableCell>{child.price}</TableCell>
-                        <TableCell className="hidden md:table-cell">{child.shelfLocation || '-'}</TableCell>
-                        <TableCell className="hidden md:table-cell">
-                            <div className="space-y-1 text-sm">
-                                <p className="font-medium text-foreground">
-                                    Physical: {(child.quantityOnHand ?? 0) + (child.reservedStock || 0)}
-                                </p>
-                                <p className="text-muted-foreground">
-                                    Available: {child.quantityOnHand ?? 0}
-                                </p>
-                                {(child.reservedStock || 0) > 0 && (
-                                    <p 
-                                      className="text-amber-600 dark:text-amber-400 cursor-pointer hover:underline"
-                                      onClick={() => setViewingReservedProduct({ id: child.id, name: child.variantName || child.name })}
-                                    >
-                                        Reserved: {child.reservedStock}
-                                    </p>
-                                )}
-                                {(child.packedStock || 0) > 0 && (
-                                    <p 
-                                      className="text-blue-600 dark:text-blue-400 cursor-pointer hover:underline"
-                                      onClick={() => setViewingPackedProduct({ id: child.id, name: child.variantName || child.name })}
-                                    >
-                                        Packed: {child.packedStock}
-                                    </p>
-                                )}
-                            </div>
-                        </TableCell>
-                        <TableCell>
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button aria-haspopup="true" size="icon" variant="ghost">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                    <span className="sr-only">Toggle menu</span>
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                  <DropdownMenuItem onClick={() => setViewingDetailsProduct(child)}>View Details</DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => setEditingProduct(child)}>Edit</DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => setViewingHistoryProduct(child)}>View History</DropdownMenuItem>
-                                  {isManagement && (
-                                      <DropdownMenuItem
-                                      className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                                      onClick={() => setDeletingProduct(child)}
-                                      >
-                                      Delete
-                                      </DropdownMenuItem>
-                                  )}
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                        </TableCell>
-                    </TableRow>
-                  ))}
-                </React.Fragment>
-              ))}
-            </TableBody>
-          </Table>
+          <ProductsTable
+            products={paginatedProducts}
+            isLoading={isLoading}
+            selectedProductIds={selectedProductIds}
+            expandedParents={expandedParents}
+            isManagement={isManagement}
+            onSelectAll={(checked) => {
+              if (checked) {
+                setSelectedProductIds(prev => Array.from(new Set([...prev, ...paginatedProducts.map(p => p.id)])));
+              } else {
+                const paginatedIds = new Set(paginatedProducts.map(p => p.id));
+                setSelectedProductIds(prev => prev.filter(id => !paginatedIds.has(id)));
+              }
+            }}
+            onSelectOne={(id, checked) =>
+              setSelectedProductIds(prev => checked ? [...prev, id] : prev.filter(x => x !== id))
+            }
+            onToggleExpand={(id) => setExpandedParents(prev => {
+              const next = new Set(prev);
+              if (next.has(id)) next.delete(id); else next.add(id);
+              return next;
+            })}
+            onViewDetails={setViewingDetailsProduct}
+            onEdit={setEditingProduct}
+            onViewHistory={setViewingHistoryProduct}
+            onDelete={setDeletingProduct}
+            onViewReserved={setViewingReservedProduct}
+            onViewPacked={setViewingPackedProduct}
+          />
           {!isLoading && filteredProducts.length === 0 && (
               <div className="flex flex-col items-center justify-center text-center border-2 border-dashed rounded-lg p-12 mt-4">
                   <p className="text-lg font-semibold">No products found</p>

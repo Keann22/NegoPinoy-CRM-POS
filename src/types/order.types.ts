@@ -17,7 +17,9 @@ export type OrderStatus =
   | 'Completed'
   | 'Cancelled'
   | 'Returned'
-  | 'Payment Received (COD)';
+  | 'Payment Received (COD)'
+  | 'On-Hold'
+  | 'Waiting for Stock';
 
 export type PaymentType =
   | 'Full Payment'
@@ -103,5 +105,5 @@ export type OrderWithItems = Order & {
 export const ORDER_STATUSES: OrderStatus[] = [
   'Pending Payment', 'Processing', 'Packed', 'For Shipping',
   'For Pick-up', 'Shipped', 'Completed', 'Payment Received (COD)',
-  'Returned', 'Cancelled',
+  'Returned', 'Cancelled', 'On-Hold', 'Waiting for Stock'
 ];

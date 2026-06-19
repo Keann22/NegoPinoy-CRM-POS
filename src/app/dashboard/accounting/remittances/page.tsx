@@ -190,12 +190,21 @@ export default function SPXRemittancesPage() {
 
               if (paymentError) throw paymentError;
 
-              // Insert expense (shipping fee is negative, so we store the absolute value as expense amount)
-              if (totalShippingFee !== 0) {
+              // Calculate actual courier fee if the Excel file didn't explicitly list it
+              // The courier fee is the difference between the COD Collected and the Order Total
+              let finalShippingFee = Math.abs(totalShippingFee);
+              
+              const orderTotal = (order.balance_due || 0) + (order.amount_paid || 0);
+              if (finalShippingFee === 0 && totalCod > orderTotal && orderTotal > 0) {
+                finalShippingFee = totalCod - orderTotal;
+              }
+
+              // Insert expense
+              if (finalShippingFee > 0) {
                 const { error: expenseError } = await supabase
                   .from('expenses')
                   .insert({
-                    amount: Math.abs(totalShippingFee),
+                    amount: finalShippingFee,
                     category: 'Processing Fee',
                     expense_date: new Date().toISOString(),
                     description: `SPX Courier Fee for Order #${shortOrderId}`,
@@ -209,7 +218,7 @@ export default function SPXRemittancesPage() {
                 trackingNumber: joinedTracking,
                 orderId: shortOrderId,
                 codAmount: totalCod,
-                shippingFee: totalShippingFee,
+                shippingFee: -finalShippingFee, // Store as negative for display consistency
                 category: 'success',
                 message: 'Payment verified and expenses recorded.'
               });

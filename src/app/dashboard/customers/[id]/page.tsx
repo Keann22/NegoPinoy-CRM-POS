@@ -43,8 +43,10 @@ const getStatusVariant = (status: Order['orderStatus']) => {
     switch (status) {
       case 'Shipped':
       case 'Completed':
+      case 'Waiting for Stock':
         return 'outline';
       case 'Processing':
+      case 'On-Hold':
         return 'secondary';
       case 'Cancelled':
       case 'Returned':
