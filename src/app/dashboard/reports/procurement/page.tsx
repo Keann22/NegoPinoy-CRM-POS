@@ -403,7 +403,7 @@ export default function ProcurementSheet() {
                       <input type="checkbox" onChange={() => toggleGroupSelection(group.items)} checked={group.items.length > 0 && group.items.every((i: any) => selectedItems[i.productId])} className="w-5 h-5 cursor-pointer accent-indigo-600" />
                     </th>
                     <th className="p-3 text-left w-1/3">Product</th>
-                    <th className="p-3 text-center">System Qty</th>
+                    <th className="p-3 text-center">Current Stock</th>
                     <th className="p-3 text-center">Staff Req.</th>
                     <th className="p-3 text-center w-32">Unit Cost</th>
                     <th className="p-3 text-center w-28">Buy Action</th>
@@ -458,7 +458,7 @@ export default function ProcurementSheet() {
                             </div>
                           )}
                         </td>
-                        <td className="p-3 font-bold text-slate-500 text-center text-lg">{item.systemQty}</td>
+                        <td className="p-3 font-bold text-slate-500 text-center text-lg">{item.currentStock}</td>
                         <td className={`p-3 font-bold text-center text-lg ${hasDiscrepancy ? "text-orange-600" : "text-green-600"}`}>
                             {item.staffRequestedQty !== null ? item.staffRequestedQty : <span className="text-xs text-slate-400 font-normal">Pending</span>}
                         </td>

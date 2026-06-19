@@ -71,6 +71,7 @@ export async function GET(req: Request) {
         productName: displayName,
         neededQty: draft ? draft.expected_qty : systemQty, // Default to Staff request if exists, else system
         systemQty: systemQty,
+        currentStock: p.stock_level,
         staffRequestedQty: draft ? draft.expected_qty : null,
         draftItemId: draft ? draft.id : null,
         supplierId: p.supplier_id,
