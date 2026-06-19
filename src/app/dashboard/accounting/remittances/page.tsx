@@ -83,17 +83,17 @@ export default function SPXRemittancesPage() {
         }
 
         const trackingNo = row.getCell(trackingCol).value?.toString().trim();
-        const type = row.getCell(typeCol).value?.toString().trim();
+        const type = row.getCell(typeCol).value?.toString().toLowerCase().trim();
         const amount = parseFloat(row.getCell(amountCol).value?.toString().replace(/,/g, '') || '0');
 
         if (trackingNo && type) {
           if (!trackingData[trackingNo]) {
             trackingData[trackingNo] = { cod: 0, shippingFee: 0 };
           }
-          if (type.toUpperCase().includes('COD') && amount > 0) {
+          if (type.includes('cod')) {
             trackingData[trackingNo].cod += amount;
-          } else if (amount < 0) {
-            // Any negative amount for the same tracking number is a deduction (shipping/processing fee)
+          } else if (type.includes('shipping fee') || type.includes('processing fee') || amount < 0) {
+            // Usually negative in the sheet, let's keep it negative
             trackingData[trackingNo].shippingFee += amount;
           }
         }
@@ -165,12 +165,13 @@ export default function SPXRemittancesPage() {
             try {
               // Update order
               const newAmountPaid = (order.amount_paid || 0) + totalCod;
+              const newBalanceDue = Math.max(0, (order.balance_due || 0) - totalCod);
               const { error: orderError } = await supabase
                 .from('orders')
                 .update({
                   amount_paid: newAmountPaid,
-                  balance_due: 0, // Force balance to 0 as requested
-                  status: 'Payment Received (COD)'
+                  balance_due: newBalanceDue,
+                  status: newBalanceDue <= 0 ? 'Payment Received (COD)' : order.status
                 })
                 .eq('id', order.id);
 
