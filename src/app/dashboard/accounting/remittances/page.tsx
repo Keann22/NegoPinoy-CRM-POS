@@ -213,8 +213,7 @@ export default function SPXRemittancesPage() {
                     amount: finalShippingFee,
                     category: 'Processing Fee',
                     expense_date: new Date().toISOString(),
-                    description: `SPX Courier Fee for Order #${shortOrderId}`,
-                    notes: `Auto-synced from SPX Remittance file`
+                    description: `SPX Courier Fee for Order #${shortOrderId}`
                   });
 
                 if (expenseError) throw expenseError;
