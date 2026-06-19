@@ -124,8 +124,11 @@ export default function SPXRemittancesPage() {
       for (const order of allOrders || []) {
         if (!order.tracking_number) continue;
 
-        // An order can have multiple tracking numbers split by comma
-        const trackingList = order.tracking_number.split(',').map((t: string) => t.trim());
+        // An order can have multiple tracking numbers split by comma, slash, or space
+        const trackingList = order.tracking_number
+          .split(/[\s,\/]+/)
+          .map((t: string) => t.trim())
+          .filter(Boolean);
         let totalCod = 0;
         let totalShippingFee = 0;
         let matchedTrackingNos: string[] = [];
