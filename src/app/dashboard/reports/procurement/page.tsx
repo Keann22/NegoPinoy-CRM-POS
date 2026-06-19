@@ -40,8 +40,7 @@ export default function ProcurementSheet() {
   const [pendingSupplier, setPendingSupplier] = useState<Record<string, string>>({});
 
   const [selectedItems, setSelectedItems] = useState<Record<string, boolean>>({});
-
-  // Dialog state for Single Item Buy
+  const [editedCosts, setEditedCosts] = useState<Record<string, string>>({});  // Dialog state for Single Item Buy
   const [buyDialogOpen, setBuyDialogOpen] = useState(false);
   const [buyItem, setBuyItem] = useState<any>(null);
   const [buyForm, setBuyForm] = useState({ qty: '', cost: '', supplierId: '' });
@@ -116,11 +115,11 @@ export default function ProcurementSheet() {
   };
 
   const openBuyDialog = (item: any, groupId: string | null) => {
-    setBuyItem({ ...item, groupId });
-    setBuyForm({
-      qty: item.staffRequestedQty !== null ? String(item.staffRequestedQty) : String(item.systemQty),
-      cost: item.unitCost ? String(item.unitCost) : '',
-      supplierId: item.supplierId || groupId || ''
+    setBuyItem(item);
+    setBuyForm({ 
+      qty: item.staffRequestedQty !== null ? item.staffRequestedQty.toString() : item.systemQty.toString(), 
+      cost: editedCosts[item.productId] !== undefined ? editedCosts[item.productId] : (item.unitCost ? item.unitCost.toString() : ''), 
+      supplierId: groupId || item.supplierId || '' 
     });
     setBuyDialogOpen(true);
   };
@@ -171,7 +170,7 @@ export default function ProcurementSheet() {
       const purchases = bulkBuyItems.map((item: any) => ({
         productId: item.productId,
         qty: item.staffRequestedQty !== null ? item.staffRequestedQty : item.systemQty,
-        cost: Number(item.unitCost || 0),
+        cost: editedCosts[item.productId] !== undefined ? Number(editedCosts[item.productId]) : Number(item.unitCost || 0),
         supplierId: item.supplierId || bulkBuyGroup.id || null,
         draftItemId: item.draftItemId
       }));
@@ -406,6 +405,7 @@ export default function ProcurementSheet() {
                     <th className="p-3 text-left w-1/3">Product</th>
                     <th className="p-3 text-center">System Qty</th>
                     <th className="p-3 text-center">Staff Req.</th>
+                    <th className="p-3 text-center w-32">Unit Cost</th>
                     <th className="p-3 text-center w-28">Buy Action</th>
                     <th className="p-3 text-center w-12"></th>
                   </tr>
@@ -461,6 +461,18 @@ export default function ProcurementSheet() {
                         <td className="p-3 font-bold text-slate-500 text-center text-lg">{item.systemQty}</td>
                         <td className={`p-3 font-bold text-center text-lg ${hasDiscrepancy ? "text-orange-600" : "text-green-600"}`}>
                             {item.staffRequestedQty !== null ? item.staffRequestedQty : <span className="text-xs text-slate-400 font-normal">Pending</span>}
+                        </td>
+                        <td className="p-3 text-center">
+                          <div className="relative flex items-center justify-center">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">₱</span>
+                            <input 
+                              type="number"
+                              className="w-24 pl-7 pr-2 py-1.5 border rounded-md text-right focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                              value={editedCosts[item.productId] !== undefined ? editedCosts[item.productId] : (item.unitCost || '')}
+                              onChange={(e) => setEditedCosts(prev => ({...prev, [item.productId]: e.target.value}))}
+                              placeholder="0.00"
+                            />
+                          </div>
                         </td>
                         <td className="p-3 text-center">
                           <Button 

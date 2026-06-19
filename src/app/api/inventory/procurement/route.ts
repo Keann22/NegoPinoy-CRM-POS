@@ -123,6 +123,8 @@ export async function POST(req: Request) {
     if (poErr) throw poErr;
 
     for (const p of purchases) {
+      const parsedCost = Number(p.cost) || 0;
+      
       if (p.draftItemId) {
         // Update existing draft item
         const { error: updErr } = await supabase
@@ -131,7 +133,7 @@ export async function POST(req: Request) {
             po_id: po.id,
             supplier_id: p.supplierId || null,
             expected_qty: p.qty,
-            unit_cost: p.cost || 0,
+            unit_cost: parsedCost,
             status: 'pending_receipt'
           })
           .eq('id', p.draftItemId);
@@ -145,10 +147,18 @@ export async function POST(req: Request) {
             product_id: p.productId,
             supplier_id: p.supplierId || null,
             expected_qty: p.qty,
-            unit_cost: p.cost || 0,
+            unit_cost: parsedCost,
             status: 'pending_receipt'
           });
         if (insErr) throw insErr;
+      }
+
+      // Update unit cost system-wide (initial_unit_cost)
+      if (parsedCost > 0) {
+        await supabase
+          .from('products')
+          .update({ initial_unit_cost: parsedCost })
+          .eq('id', p.productId);
       }
     }
     
