@@ -23,11 +23,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
     }
 
-    const arrayBuffer = await file.arrayBuffer();
-    const data = new Uint8Array(arrayBuffer);
-
     // pdf-parse expects a buffer
     const buffer = Buffer.from(arrayBuffer);
+    
+    const pdfParse = (await import('pdf-parse')).default || require('pdf-parse');
     
     // Handle password protected PDFs
     const options = password ? { password } as any : undefined;
