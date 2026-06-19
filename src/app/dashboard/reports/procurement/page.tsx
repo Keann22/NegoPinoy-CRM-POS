@@ -262,13 +262,13 @@ export default function ProcurementSheet() {
     }
   };
 
-  const handleAssignSupplier = async (productId: string, newSupplierId: string) => {
+  const handleAssignSupplier = async (productId: string, newSupplierId: string, unitCost?: string | number) => {
     if (!newSupplierId) return;
     try {
       const res = await fetch("/api/inventory/procurement", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId, newSupplierId })
+        body: JSON.stringify({ productId, newSupplierId, unitCost })
       });
       if (!res.ok) throw new Error(await res.text());
       
@@ -448,7 +448,7 @@ export default function ProcurementSheet() {
                                   size="sm" 
                                   className="h-7 px-2 text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
                                   onClick={() => {
-                                    handleAssignSupplier(item.productId, pendingSupplier[item.productId]);
+                                    handleAssignSupplier(item.productId, pendingSupplier[item.productId], editedCosts[item.productId] !== undefined ? editedCosts[item.productId] : item.unitCost);
                                     setPendingSupplier(prev => { const n = {...prev}; delete n[item.productId]; return n; });
                                   }}
                                 >

@@ -186,13 +186,36 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-    const { productId, newSupplierId } = await req.json();
+    const { productId, newSupplierId, unitCost } = await req.json();
 
     if (!productId || !newSupplierId) {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
     }
 
-    const { error } = await supabase.from('products').update({ supplier_id: newSupplierId }).eq('id', productId);
+    const { data: currentProduct } = await supabase.from('products').select('supplier_pricing, initial_unit_cost').eq('id', productId).single();
+    let newPricing = currentProduct?.supplier_pricing || [];
+    
+    const { data: sup } = await supabase.from('suppliers').select('name').eq('id', newSupplierId).single();
+    const supplierName = sup?.name || 'Unknown Supplier';
+
+    const parsedCost = Number(unitCost) || currentProduct?.initial_unit_cost || 0;
+
+    const existingIdx = newPricing.findIndex((sp: any) => sp.supplierId === newSupplierId);
+    if (existingIdx >= 0) {
+      if (unitCost !== undefined) newPricing[existingIdx].unitCost = parsedCost;
+    } else {
+      newPricing.push({ supplierId: newSupplierId, supplierName, unitCost: parsedCost });
+    }
+
+    const updatePayload: any = { 
+      supplier_id: newSupplierId, 
+      supplier_pricing: newPricing 
+    };
+    if (unitCost !== undefined && parsedCost > 0) {
+      updatePayload.initial_unit_cost = parsedCost;
+    }
+
+    const { error } = await supabase.from('products').update(updatePayload).eq('id', productId);
     if (error) throw error;
 
     return NextResponse.json({ success: true });
