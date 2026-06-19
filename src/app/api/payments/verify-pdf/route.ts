@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import pdfParse from 'pdf-parse';
 
 // Use Node.js runtime so we can use pdfjs-dist
 export const runtime = 'nodejs';
@@ -25,17 +24,23 @@ export async function POST(request: Request) {
 
     const arrayBuffer = await file.arrayBuffer();
     
-    // pdf-parse expects a buffer
-    const buffer = Buffer.from(arrayBuffer);
+    // Use the native pdfjs-dist library which properly supports password decryption
+    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.js');
     
-    // Bypass the index.js bug in pdf-parse which tries to read test files
-    const pdfParse = require('pdf-parse/lib/pdf-parse.js');
+    const loadingTask = pdfjsLib.getDocument({
+      data: new Uint8Array(arrayBuffer),
+      password: password || undefined,
+    });
+
+    const pdfDocument = await loadingTask.promise;
     
-    // Handle password protected PDFs
-    const options = password ? { password } as any : undefined;
-    
-    const parsedData = await pdfParse(buffer, options);
-    const fullText = parsedData.text;
+    let fullText = '';
+    for (let i = 1; i <= pdfDocument.numPages; i++) {
+      const page = await pdfDocument.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items.map((item: any) => item.str).join(' ');
+      fullText += pageText + '\n';
+    }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
