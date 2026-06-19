@@ -21,6 +21,7 @@ import { Order } from '@/app/dashboard/orders/page';
 type PackedOrder = Order & {
   customerName: string;
   daysPacked: number;
+  packedDate: string;
 };
 
 export default function PackedOrdersPage() {
@@ -84,6 +85,7 @@ export default function PackedOrdersPage() {
           salesPersonName: o.sales_person_name,
           not_for_shipping_reason: o.not_for_shipping_reason,
           boxes_config: o.boxes_config,
+          packedDate: o.packed_at || o.order_date,
         })));
       } catch (err) { console.error('Packed orders fetch error:', err); }
       finally { setIsLoadingOrders(false); }
@@ -137,7 +139,8 @@ export default function PackedOrdersPage() {
     return filtered.map(order => ({
       ...order,
       customerName: customerMap.get(order.customerId) || 'Unknown Customer',
-      daysPacked: differenceInDays(new Date(), new Date(order.orderDate))
+      daysPacked: differenceInDays(new Date(), new Date((order as any).packedDate)),
+      packedDate: (order as any).packedDate
     }));
   }, [rawOrders, customerMap, searchQuery, filterSalesPerson]);
 
@@ -158,6 +161,7 @@ export default function PackedOrdersPage() {
           <TableHead>Order ID</TableHead>
           <TableHead>Customer</TableHead>
           <TableHead>Sales Rep</TableHead>
+          <TableHead>Order Date</TableHead>
           <TableHead>Packed Date</TableHead>
           {isWaitingTab && <TableHead>Reason</TableHead>}
           <TableHead className="text-right">Actions</TableHead>
@@ -170,13 +174,14 @@ export default function PackedOrdersPage() {
             <TableCell><Skeleton className="h-4 w-32" /></TableCell>
             <TableCell><Skeleton className="h-4 w-24" /></TableCell>
             <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
             {isWaitingTab && <TableCell><Skeleton className="h-4 w-48" /></TableCell>}
             <TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
           </TableRow>
         ))}
         {!isLoading && ordersToRender.length === 0 && (
           <TableRow>
-            <TableCell colSpan={isWaitingTab ? 6 : 5} className="text-center py-12 text-muted-foreground">
+            <TableCell colSpan={isWaitingTab ? 7 : 6} className="text-center py-12 text-muted-foreground">
               No orders found in this category.
             </TableCell>
           </TableRow>
@@ -189,6 +194,14 @@ export default function PackedOrdersPage() {
             <TableCell>
               <div className="flex flex-col">
                 <span>{format(new Date(order.orderDate), 'MMM d, yyyy')}</span>
+                <span className="text-xs text-muted-foreground">
+                  {format(new Date(order.orderDate), 'p')}
+                </span>
+              </div>
+            </TableCell>
+            <TableCell>
+              <div className="flex flex-col">
+                <span>{format(new Date(order.packedDate), 'MMM d, yyyy')}</span>
                 <span className={order.daysPacked > 3 ? 'text-amber-600 text-xs font-semibold' : 'text-xs text-muted-foreground'}>
                   {order.daysPacked} days ago
                 </span>

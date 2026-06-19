@@ -257,6 +257,7 @@ export default function PackerApp() {
         .from('orders')
         .update({
           status: 'Packed',
+          packed_at: new Date().toISOString(),
           boxes_config: boxesConfig,
           // We can leave package_* null or set to first box for legacy support
           package_length: Number(boxes[0].length) || null,
