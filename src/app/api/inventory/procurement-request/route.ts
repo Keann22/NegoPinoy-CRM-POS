@@ -99,7 +99,7 @@ export async function POST(req: Request) {
       if (itemsErr) throw itemsErr;
     }
 
-    return NextResponse.json({ success: true, poId: po.id });
+    return NextResponse.json({ success: true, poId: poId });
   } catch (error: any) {
     console.error('Error in procurement-request POST:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
