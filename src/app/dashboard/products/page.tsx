@@ -52,7 +52,7 @@ import { ViewProductHistoryDialog } from '@/components/dashboard/view-product-hi
 import { ViewProductDetailsDialog } from '@/components/dashboard/view-product-details-dialog';
 import { useUserProfile } from '@/hooks/useUserProfile';
 
-import type { FormattedProduct } from '@/types';
+import type { FormattedProduct, Product } from '@/types';
 import { getStockStatus } from '@/types';
 
 // Re-export for any components that still import FormattedProduct from this page
@@ -172,11 +172,11 @@ export default function ProductsPage() {
 
   const formattedProducts: FormattedProduct[] = useMemo(() => {
     if (!rawFormattedProducts) return [];
-    const parents = rawFormattedProducts.filter(p => !p.parentId);
-    const children = rawFormattedProducts.filter(p => p.parentId);
+    const parents = rawFormattedProducts.filter(p => !p.parent_id);
+    const children = rawFormattedProducts.filter(p => p.parent_id);
 
     return parents.map(parent => {
-        const productChildren = children.filter(c => c.parentId === parent.id);
+        const productChildren = children.filter(c => c.parent_id === parent.id);
         return {
             ...parent,
             children: productChildren.length > 0 ? productChildren : undefined
