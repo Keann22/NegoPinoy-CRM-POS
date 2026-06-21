@@ -83,6 +83,7 @@ export function useProducts() {
     }
     return {
       ...p,
+      variantName: p.variant_name,
       quantityOnHand: p.quantityOnHand ?? p.stock_level ?? 0,
       status: getStockStatus(p.stock_level ?? p.quantityOnHand),
       price: `₱${(Number(p.selling_price ?? p.sellingPrice) || 0).toFixed(2)}`,
