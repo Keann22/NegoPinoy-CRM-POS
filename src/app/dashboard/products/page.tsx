@@ -58,7 +58,7 @@ export default function ProductsPage() {
   const formattedProducts: FormattedProduct[] = useMemo(() => {
     if (!rawProducts || rawProducts.length === 0) return [];
     const parents = rawProducts.filter(p => !p.parent_id);
-    const children = rawProducts.filter(p => p.parent_id);
+    const children = rawProducts.filter(p => p.parent_id && !p.name.startsWith('[DELETED]'));
     return parents.map(parent => {
         const productChildren = children.filter(c => c.parent_id === parent.id);
         return {
