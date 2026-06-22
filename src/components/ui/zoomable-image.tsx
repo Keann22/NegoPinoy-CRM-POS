@@ -16,37 +16,46 @@ export function ZoomableImage({ useStandardImg, className, alt, ...props }: Zoom
 
   return (
     <>
-      <div 
-        className={cn('cursor-zoom-in relative overflow-hidden', className)} 
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setIsOpen(true);
-        }}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
+      {useStandardImg ? (
+        <img 
+          src={props.src as string} 
+          alt={alt || 'Image'} 
+          className={cn('cursor-zoom-in w-full h-full object-cover', className)} 
+          style={props.style}
+          onClick={(e) => {
             e.preventDefault();
+            e.stopPropagation();
             setIsOpen(true);
-          }
-        }}
-      >
-        {useStandardImg ? (
-          <img 
-            src={props.src as string} 
-            alt={alt || 'Image'} 
-            className="w-full h-full object-cover" 
-            style={props.style}
-          />
-        ) : (
-          <Image 
-            alt={alt || 'Image'} 
-            className="object-cover"
-            {...props} 
-          />
-        )}
-      </div>
+          }}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setIsOpen(true);
+            }
+          }}
+        />
+      ) : (
+        <Image 
+          alt={alt || 'Image'} 
+          className={cn('cursor-zoom-in object-cover', className)}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsOpen(true);
+          }}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setIsOpen(true);
+            }
+          }}
+          {...props} 
+        />
+      )}
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="max-w-[95vw] sm:max-w-[90vw] max-h-[95vh] p-0 border-none bg-transparent shadow-none flex items-center justify-center">
