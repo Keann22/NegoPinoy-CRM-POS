@@ -312,6 +312,7 @@ export function OrderDialog(props: OrderDialogProps) {
     try {
       await editOrder(supabase, values, {
         userProfileId: userProfile.id,
+        userProfileName: `${userProfile.firstName} ${userProfile.lastName}`.trim() || userProfile.email,
         orderId: order.id,
         originalOrderDate: order.orderDate,
         originalAmountPaid: order.amountPaid || 0,

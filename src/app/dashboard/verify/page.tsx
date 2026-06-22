@@ -106,7 +106,27 @@ export default function VerifyApp() {
         newWarnings.push('This order is ON-HOLD. Do not proceed unless resolved.');
       }
 
+      // Check if order was edited since picked
+      const { data: logs, error: logsError } = await supabase
+        .from('order_logs')
+        .select('created_at, status')
+        .eq('order_id', orderId)
+        .in('status', ['Picked', 'Picked (with issue)', 'Order Edited'])
+        .order('created_at', { ascending: false });
 
+      if (!logsError && logs && logs.length > 0) {
+        const latestPicked = logs.find((l: any) => l.status === 'Picked' || l.status === 'Picked (with issue)');
+        const latestEdited = logs.find((l: any) => l.status === 'Order Edited');
+
+        if (latestPicked && latestEdited) {
+          const pickedAt = new Date(latestPicked.created_at).getTime();
+          const editedAt = new Date(latestEdited.created_at).getTime();
+          
+          if (editedAt > pickedAt) {
+            newWarnings.push('This order was edited AFTER it was picked. Please double-check if the customer added items or changed the order.');
+          }
+        }
+      }
 
       setWarnings(newWarnings);
 

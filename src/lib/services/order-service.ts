@@ -139,6 +139,7 @@ export async function createOrder(
 
 export interface EditOrderContext {
   userProfileId: string;
+  userProfileName: string;
   orderId: string;
   originalOrderDate: string;
   originalAmountPaid: number;
@@ -269,6 +270,17 @@ export async function editOrder(
     } catch (e) {
       console.error("Failed to deduct from procurement:", e);
     }
+  }
+
+  // Log the edit
+  try {
+    await supabase.from('order_logs').insert({
+      order_id: context.orderId,
+      status: 'Order Edited',
+      user_name: context.userProfileName
+    });
+  } catch (e) {
+    console.error("Failed to log order edit:", e);
   }
 
   // -- On-Hold Issue Creation --

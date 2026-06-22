@@ -137,7 +137,27 @@ export default function PackerApp() {
         newWarnings.push('This order is ON-HOLD. Do not pack unless resolved.');
       }
 
+      // Check if order was edited since photo/picked
+      const { data: logs, error: logsError } = await supabase
+        .from('order_logs')
+        .select('created_at, status')
+        .eq('order_id', orderId)
+        .in('status', ['Photo', 'Picked', 'Picked (with issue)', 'Order Edited'])
+        .order('created_at', { ascending: false });
 
+      if (!logsError && logs && logs.length > 0) {
+        const latestChecked = logs.find((l: any) => ['Photo', 'Picked', 'Picked (with issue)'].includes(l.status));
+        const latestEdited = logs.find((l: any) => l.status === 'Order Edited');
+
+        if (latestChecked && latestEdited) {
+          const checkedAt = new Date(latestChecked.created_at).getTime();
+          const editedAt = new Date(latestEdited.created_at).getTime();
+          
+          if (editedAt > checkedAt) {
+            newWarnings.push('This order was edited AFTER it was picked or checked. Please double-check if the customer added items or changed the order.');
+          }
+        }
+      }
 
       setWarnings(newWarnings);
 
