@@ -18,7 +18,19 @@ export function ZoomableImage({ useStandardImg, className, alt, ...props }: Zoom
     <>
       <div 
         className={cn('cursor-zoom-in relative overflow-hidden', className)} 
-        onClick={() => setIsOpen(true)}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsOpen(true);
+        }}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsOpen(true);
+          }
+        }}
       >
         {useStandardImg ? (
           <img 
@@ -37,13 +49,16 @@ export function ZoomableImage({ useStandardImg, className, alt, ...props }: Zoom
       </div>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-[90vw] max-h-[90vh] w-fit h-fit p-0 border-none bg-transparent shadow-none overflow-hidden flex items-center justify-center">
+        <DialogContent className="max-w-[95vw] sm:max-w-[90vw] max-h-[95vh] p-0 border-none bg-transparent shadow-none flex items-center justify-center">
           <VisuallyHidden>
             <DialogTitle>Enlarged Image</DialogTitle>
             <DialogDescription>A larger view of the selected image.</DialogDescription>
           </VisuallyHidden>
           
-          <div className="relative flex items-center justify-center w-full h-full max-h-[90vh] max-w-[90vw]">
+          <div 
+            className="relative flex items-center justify-center w-full h-full cursor-zoom-out"
+            onClick={() => setIsOpen(false)}
+          >
             {useStandardImg ? (
               <img 
                 src={props.src as string} 
@@ -54,7 +69,7 @@ export function ZoomableImage({ useStandardImg, className, alt, ...props }: Zoom
               <img 
                 src={typeof props.src === 'string' ? props.src : (props.src as any)?.src || props.src} 
                 alt={alt || 'Enlarged Image'} 
-                className="max-w-full max-h-[90vh] object-contain rounded-md" 
+                className="max-w-full max-h-[90vh] object-contain rounded-md bg-black/50" 
               />
             )}
           </div>
