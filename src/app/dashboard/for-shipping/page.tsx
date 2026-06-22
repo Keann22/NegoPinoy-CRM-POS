@@ -4,12 +4,13 @@ import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Download, Truck, Upload } from 'lucide-react';
+import { Download, Truck, Upload, RotateCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useSupabase } from '@/lib/supabase/hooks';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { MarkShippedDialog } from '@/components/dashboard/mark-shipped-dialog';
+import { RevertPendingDialog } from '@/components/dashboard/revert-pending-dialog';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
@@ -56,6 +57,7 @@ export default function ForShippingPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [markShippedOrder, setMarkShippedOrder] = useState<{id: string, tracking_number: string} | null>(null);
+  const [revertOrder, setRevertOrder] = useState<any>(null);
 
   const fetchForShippingOrders = async () => {
     if (!supabase) return;
@@ -498,9 +500,14 @@ export default function ForShippingPage() {
                   <TableCell className="capitalize">{order.paymentType}</TableCell>
                   <TableCell className="text-right">₱{order.shippingAmount.toFixed(2)}</TableCell>
                   <TableCell className="text-right">
-                    <Button variant="outline" size="sm" onClick={() => setMarkShippedOrder({ id: order.id, tracking_number: '' })}>
-                      <Truck className="h-4 w-4 mr-1" /> Mark Shipped
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setRevertOrder(order)} title="Revert to Pending">
+                        <RotateCcw className="h-4 w-4 mr-1" /> Revert
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => setMarkShippedOrder({ id: order.id, tracking_number: '' })}>
+                        <Truck className="h-4 w-4 mr-1" /> Mark Shipped
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -546,6 +553,15 @@ export default function ForShippingPage() {
             }}
         />
       )}
+      <RevertPendingDialog
+        order={revertOrder}
+        open={!!revertOrder}
+        onOpenChange={(open) => !open && setRevertOrder(null)}
+        onSuccess={() => {
+          fetchForShippingOrders();
+          setRevertOrder(null);
+        }}
+      />
     </>
   );
 }
