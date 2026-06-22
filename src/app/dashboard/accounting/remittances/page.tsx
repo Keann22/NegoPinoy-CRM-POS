@@ -138,9 +138,36 @@ export default function SPXRemittancesPage() {
 
         for (const t of trackingList) {
           if (trackingData[t]) {
-            totalCod += trackingData[t].cod;
-            totalShippingFee += trackingData[t].shippingFee;
-            totalProcessingFee += trackingData[t].processingFee;
+            // Distribute COD up to the order's balance due
+            const balanceNeeded = Math.max(0, (order.balance_due || 0) - totalCod);
+            const availableCod = trackingData[t].cod;
+            
+            // If this is the last order or the only order, we might want to dump the excess COD here, 
+            // but to be safe, we just take what we need unless the balance is 0 and we have excess.
+            // Actually, we'll take up to balanceNeeded, and if there's still COD left, we leave it in trackingData[t] for the next matched order.
+            // If balanceNeeded is 0 (already paid), we take 0.
+            let codToApply = 0;
+            if (balanceNeeded > 0) {
+                codToApply = Math.min(balanceNeeded, availableCod);
+            } else if (order.status !== 'Payment Received (COD)' && availableCod > 0) {
+                // If it needs payment but balance is 0? That shouldn't happen.
+                // Just in case, if it's the only order, we might overpay, but let's stick to balanceNeeded.
+                codToApply = availableCod; // Take it all if we somehow don't know the balance
+            }
+
+            // Always take all the shipping and processing fees on the first order that matches
+            const shippingFeeToApply = trackingData[t].shippingFee;
+            const processingFeeToApply = trackingData[t].processingFee;
+
+            totalCod += codToApply;
+            totalShippingFee += shippingFeeToApply;
+            totalProcessingFee += processingFeeToApply;
+
+            // Deduct what we took so the next order sharing this tracking gets the remainder
+            trackingData[t].cod -= codToApply;
+            trackingData[t].shippingFee = 0;
+            trackingData[t].processingFee = 0;
+
             matchedTrackingNos.push(t);
             processedTracking.add(t);
             matched = true;
