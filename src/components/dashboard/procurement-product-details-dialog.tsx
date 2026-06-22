@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { useSupabase, useUser } from "@/lib/supabase/hooks";
 import { useState, useEffect } from "react";
 import Image from "next/image";
+import { ZoomableImage } from "@/components/ui/zoomable-image";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -86,7 +87,7 @@ export function ProcurementProductDetailsDialog({ product, open, onOpenChange }:
             <div className="flex gap-4 items-start">
                 <div className="h-32 w-32 shrink-0 bg-muted rounded-md overflow-hidden flex items-center justify-center border">
                     {displayImage ? (
-                        <Image 
+                        <ZoomableImage 
                             src={displayImage} 
                             alt={product.name} 
                             width={128} 

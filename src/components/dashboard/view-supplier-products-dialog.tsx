@@ -4,6 +4,7 @@ import { useSupabase } from "@/lib/supabase/hooks";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";
+import { ZoomableImage } from "@/components/ui/zoomable-image";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
@@ -200,7 +201,7 @@ export function ViewSupplierProductsDialog({ supplier, open, onOpenChange }: Vie
                       >
                         <div className="relative w-10 h-10 border rounded-md bg-muted flex items-center justify-center overflow-hidden shrink-0">
                           {product.images && product.images.length > 0 ? (
-                            <Image src={product.images[0]} alt={product.name} fill className="object-cover" />
+                            <ZoomableImage src={product.images[0]} alt={product.name} fill className="object-cover" />
                           ) : (
                             <span className="text-xs text-muted-foreground">No img</span>
                           )}
@@ -246,7 +247,7 @@ export function ViewSupplierProductsDialog({ supplier, open, onOpenChange }: Vie
           <div className="flex flex-col items-center gap-4 py-4 text-center">
             <div className="relative w-48 h-48 border rounded-lg bg-muted flex items-center justify-center overflow-hidden">
               {selectedProduct.images && selectedProduct.images.length > 0 ? (
-                <Image src={selectedProduct.images[0]} alt={selectedProduct.name} fill className="object-cover" />
+                <ZoomableImage src={selectedProduct.images[0]} alt={selectedProduct.name} fill className="object-cover" />
               ) : (
                 <span className="text-muted-foreground">No image available</span>
               )}

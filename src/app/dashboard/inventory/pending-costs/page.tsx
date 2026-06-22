@@ -12,6 +12,7 @@ import { Loader2, PhilippinePeso, Pencil, Check, Trash2 } from 'lucide-react';
 import { useRoleCheck } from '@/hooks/useRoleCheck';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import Image from 'next/image';
+import { ZoomableImage } from '@/components/ui/zoomable-image';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator } from '@/components/ui/select';
 import { AddSupplierDialog } from '@/components/dashboard/add-supplier-dialog';
 
@@ -396,7 +397,7 @@ export default function PendingCostsPage() {
             <div className="flex gap-2 overflow-x-auto pb-2">
                 {selectedProduct.images.filter(img => !img.includes('placehold.co')).map((img, i) => (
                     <div key={i} className="relative w-24 h-24 shrink-0 rounded-md overflow-hidden border">
-                        <Image src={img} alt={`${selectedProduct.name} ${i+1}`} fill className="object-cover" />
+                        <ZoomableImage src={img} alt={`${selectedProduct.name} ${i+1}`} fill className="object-cover" />
                     </div>
                 ))}
             </div>

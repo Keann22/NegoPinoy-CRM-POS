@@ -3,7 +3,7 @@
 import { Upload, X } from 'lucide-react';
 import React from 'react';
 import { Button } from './button';
-import Image from 'next/image';
+import { ZoomableImage } from './zoomable-image';
 import { Input } from './input';
 import { Label } from './label';
 import { cn } from '@/lib/utils';
@@ -49,11 +49,11 @@ export function FileUpload({ value, onChange, className, multiple = false }: Fil
             const objectUrl = URL.createObjectURL(file);
             return (
                 <div key={i} className="relative aspect-square rounded-md overflow-hidden">
-                <Image
+                <ZoomableImage
                     src={objectUrl}
                     alt={file.name}
                     fill
-                    className="object-cover"
+                    className="object-cover rounded-md"
                     onLoad={() => URL.revokeObjectURL(objectUrl)}
                 />
                 <Button

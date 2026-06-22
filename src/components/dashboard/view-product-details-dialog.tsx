@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import type { FormattedProduct } from '@/app/dashboard/products/page';
 import Image from "next/image";
 import { format } from "date-fns";
+import { ZoomableImage } from "@/components/ui/zoomable-image";
 
 interface ViewProductDetailsDialogProps {
   product: FormattedProduct | null;
@@ -29,7 +30,7 @@ export function ViewProductDetailsDialog({ product, open, onOpenChange }: ViewPr
             <div className="flex gap-2 overflow-x-auto pb-2">
                 {product.images.filter(img => !img.includes('placehold.co')).map((img, i) => (
                     <div key={i} className="relative w-24 h-24 shrink-0 rounded-md overflow-hidden border">
-                        <Image src={img} alt={`${product.name} ${i+1}`} fill className="object-cover" />
+                        <ZoomableImage src={img} alt={`${product.name} ${i+1}`} fill className="object-cover" />
                     </div>
                 ))}
             </div>

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Image from 'next/image';
+import { ZoomableImage } from '@/components/ui/zoomable-image';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -183,7 +184,7 @@ export function ProductsTable({
                 />
               </TableCell>
               <TableCell className="hidden sm:table-cell">
-                <Image alt="Product image" className="aspect-square rounded-md object-cover" height={64} src={product.image} width={64} data-ai-hint="product image" />
+                <ZoomableImage alt="Product image" className="aspect-square rounded-md object-cover" height={64} src={product.image} width={64} data-ai-hint="product image" />
               </TableCell>
               <TableCell className="font-medium">
                 <div className="flex items-center gap-2">
@@ -235,7 +236,7 @@ export function ProductsTable({
                   />
                 </TableCell>
                 <TableCell className="hidden sm:table-cell">
-                  <Image alt="Product image" className="aspect-square rounded-md object-cover" height={64} src={child.image} width={64} data-ai-hint="product image" />
+                  <ZoomableImage alt="Product image" className="aspect-square rounded-md object-cover" height={64} src={child.image} width={64} data-ai-hint="product image" />
                 </TableCell>
                 <TableCell className="font-medium pl-10">└ {child.variantName || child.name}</TableCell>
                 <TableCell><Badge variant={child.status.variant}>{child.status.text}</Badge></TableCell>

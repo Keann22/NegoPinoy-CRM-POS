@@ -17,8 +17,10 @@ import { useToast } from '@/hooks/use-toast';
 import { CalendarIcon, Loader2, Trash2, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Image from 'next/image';
+import { ZoomableImage } from "@/components/ui/zoomable-image";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { parseReceipt } from '@/ai/flows/parse-receipt-flow';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@/components/ui/command';
 import { Separator } from '@/components/ui/separator';
@@ -343,7 +345,7 @@ export default function ScanReceiptPage() {
                                     receiptImageUrl && "border-solid"
                                 )}>
                                     {receiptImageUrl ? (
-                                        <Image src={receiptImageUrl} alt="Receipt preview" width={400} height={400} className="max-h-full w-auto object-contain rounded-md" />
+                                        <ZoomableImage src={receiptImageUrl} alt="Receipt preview" width={400} height={400} className="max-h-full w-auto object-contain rounded-md" />
                                     ) : (
                                         <div className="flex flex-col items-center space-y-2 text-center">
                                             <Upload className="w-8 h-8 text-muted-foreground" />
