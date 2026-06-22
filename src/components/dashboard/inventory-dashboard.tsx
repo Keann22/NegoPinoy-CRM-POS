@@ -7,7 +7,7 @@ import { useSupabase, useUser } from "@/lib/supabase/hooks";
 import { AlertTriangle, Package, ArrowDownToLine, ArrowUpRight, ClipboardList, Settings2, PackageSearch } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ProcurementIssues } from "@/components/dashboard/procurement-issues";
+import { OrderIssues } from "@/components/dashboard/order-issues";
 import { useRoleCheck } from "@/hooks/useRoleCheck";
 
 export function InventoryDashboard() {
@@ -67,7 +67,7 @@ export function InventoryDashboard() {
         <p className="text-muted-foreground">Overview of your warehouse stock and quick actions.</p>
       </div>
 
-      <ProcurementIssues isAdmin={isManagement} />
+      <OrderIssues isAdmin={isManagement} />
 
       <div className="grid gap-4 md:grid-cols-3 mt-8">
         <Card>

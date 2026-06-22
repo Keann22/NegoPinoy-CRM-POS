@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Package, ScanLine, X, Check, Plus, Trash2 } from 'lucide-react';
+import { Loader2, Package, ScanLine, X, Check, Plus, Trash2, AlertTriangle, AlertCircle } from 'lucide-react';
+import { useUserProfile } from '@/hooks/useUserProfile';
 
 type OrderItem = {
   id: string;
@@ -35,6 +36,8 @@ export default function PackerApp() {
   const [orderDetails, setOrderDetails] = useState<any>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [warnings, setWarnings] = useState<string[]>([]);
+  const { userProfile } = useUserProfile();
 
   const [boxes, setBoxes] = useState<BoxData[]>([]);
 
@@ -44,6 +47,7 @@ export default function PackerApp() {
     setOrderDetails(null);
     setOrderItems([]);
     setBoxes([]);
+    setWarnings([]);
 
     const { Html5QrcodeScanner } = await import('html5-qrcode');
 
@@ -92,7 +96,7 @@ export default function PackerApp() {
     try {
       const { data, error } = await supabase
         .from('orders')
-        .select('id, status, customer_id, sales_person_name, customers(full_name), order_items(id, product_name, quantity)')
+        .select('id, status, customer_id, sales_person_name, updated_at, customers(full_name), order_items(id, product_name, quantity)')
         .eq('id', orderId)
         .single();
         
@@ -125,6 +129,33 @@ export default function PackerApp() {
           items: initialItems
         }
       ]);
+
+      const newWarnings: string[] = [];
+
+      // Check if order is On-Hold
+      if (data.status === 'On-Hold') {
+        newWarnings.push('This order is ON-HOLD. Do not pack unless resolved.');
+      }
+
+      // Check if order was updated since photo
+      const { data: logs, error: logsError } = await supabase
+        .from('order_logs')
+        .select('created_at, status')
+        .eq('order_id', orderId)
+        .in('status', ['Photo', 'Picked', 'Picked (with issue)'])
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (!logsError && logs && logs.length > 0) {
+        const pickedAt = new Date(logs[0].created_at).getTime();
+        const updatedAt = new Date(data.updated_at).getTime();
+        
+        if (updatedAt > pickedAt + 5000) {
+          newWarnings.push('This order was updated AFTER it was picked or checked. Please double-check if the customer added items or changed the order.');
+        }
+      }
+
+      setWarnings(newWarnings);
 
       if (['Packed', 'For Shipping', 'For Pick-up'].includes(data.status)) {
         toast({ 
@@ -217,6 +248,11 @@ export default function PackerApp() {
     e.preventDefault();
     if (!supabase || !scannedOrderId) return;
     
+    if (orderDetails?.status === 'On-Hold' || orderDetails?.status?.includes('issue')) {
+      toast({ title: 'Cannot Proceed', description: 'Please resolve the issue before packing.', variant: 'destructive' });
+      return;
+    }
+    
     // Validate that ALL items are fully assigned to boxes
     for (const item of orderItems) {
       let assignedQty = 0;
@@ -274,6 +310,13 @@ export default function PackerApp() {
         .eq('id', scannedOrderId);
 
       if (error) throw error;
+
+      const userName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : 'Unknown Staff';
+      await supabase.from('order_logs').insert({
+        order_id: scannedOrderId,
+        status: 'Packed',
+        user_name: userName
+      });
 
       if (orderDetails?.sales_person_name) {
         await supabase.from('notifications').insert({
@@ -358,6 +401,21 @@ export default function PackerApp() {
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-6">
+            
+            {warnings.length > 0 && (
+              <div className="mb-6 space-y-3">
+                {warnings.map((warn, idx) => (
+                  <div key={idx} className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-md flex items-start gap-3">
+                    <AlertTriangle className="h-6 w-6 shrink-0 text-amber-500 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-amber-900">Attention Required</p>
+                      <p className="text-sm mt-1">{warn}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <form onSubmit={handlePackOrder} className="space-y-6">
               
               <div className="space-y-4">
@@ -457,12 +515,19 @@ export default function PackerApp() {
 
               </div>
 
-              <div className="pt-4 flex gap-3 border-t mt-6">
+              {orderDetails?.status?.includes('issue') && (
+                <div className="bg-destructive/10 text-destructive border border-destructive/20 rounded-md p-4 space-y-2 mb-4">
+                  <div className="font-semibold flex items-center gap-2"><AlertCircle className="w-5 h-5"/> Unresolved Issue</div>
+                  <p className="text-sm">This order has an open issue. Please resolve it on the dashboard before submitting verification.</p>
+                </div>
+              )}
+
+              <div className="pt-6 flex gap-3 border-t mt-6">
                 <Button type="button" variant="outline" className="flex-1" onClick={() => setScannedOrderId(null)}>
                   Cancel
                 </Button>
-                <Button type="submit" className="flex-1" disabled={loading}>
-                  {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
+                <Button type="submit" className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white" disabled={loading || orderDetails?.status === 'On-Hold' || orderDetails?.status?.includes('issue')}>
+                  {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Package className="mr-2 h-4 w-4" />}
                   Confirm Packed
                 </Button>
               </div>

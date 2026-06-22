@@ -20,6 +20,7 @@ import { EditPaymentTermsDialog } from '@/components/dashboard/edit-payment-term
 import { SetDueDateDialog } from '@/components/dashboard/set-due-date-dialog';
 import { MarkShippedDialog } from '@/components/dashboard/mark-shipped-dialog';
 import { WaybillSummaryDialog } from '@/components/dashboard/waybill-summary-dialog';
+import { OnHoldReasonDialog } from '@/components/dashboard/on-hold-reason-dialog';
 
 import { OrdersFilterBar } from '@/components/dashboard/orders/OrdersFilterBar';
 import { OrdersTable } from '@/components/dashboard/orders/OrdersTable';
@@ -54,6 +55,7 @@ export default function OrdersPage() {
   const [dueDateOrder, setDueDateOrder] = useState<Order | null>(null);
   const [markShippedOrder, setMarkShippedOrder] = useState<Order | null>(null);
   const [viewWaybillOrder, setViewWaybillOrder] = useState<Order | null>(null);
+  const [onHoldOrder, setOnHoldOrder] = useState<Order | null>(null);
 
   // ── Filter/selection state ─────────────────────────────────────────────────
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
@@ -150,11 +152,18 @@ export default function OrdersPage() {
 
   return (
     <>
+      <OnHoldReasonDialog
+        open={!!onHoldOrder}
+        onOpenChange={(open) => !open && setOnHoldOrder(null)}
+        order={onHoldOrder}
+        onSuccess={() => refetch()}
+      />
+
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="font-headline">Orders</CardTitle>
-            <CardDescription>View and manage customer sales orders.</CardDescription>
+           <div>
+             <CardTitle className="font-headline">Orders</CardTitle>
+             <CardDescription>View and manage customer sales orders.</CardDescription>
           </div>
           <div className="flex items-center gap-2">
             {canSyncCourier && (
@@ -196,10 +205,17 @@ export default function OrdersPage() {
             onViewWaybill={setViewWaybillOrder}
             onCodPayment={setCodPaymentOrder}
             onDueDate={setDueDateOrder}
-            onStatusChange={handleStatusChange}
-            isAdminOrOwner={isAdminOrOwner}
+            onStatusChange={(id, newStatus) => {
+              if (newStatus === 'On-Hold') {
+                const order = orders?.find(o => o.id === id);
+                if (order) setOnHoldOrder(order);
+              } else {
+                handleStatusChange(id, newStatus);
+              }
+            }}
             isInventoryOnly={isInventoryOnly}
             canCreateOrder={canCreateOrder}
+            isAdminOrOwner={isAdminOrOwner}
             userRoles={userProfile?.roles ?? []}
           />
           {!isLoading && (!formattedOrders || formattedOrders.length === 0) && (

@@ -15,11 +15,11 @@ export async function POST(req: Request) {
     }
 
     const { error } = await supabase
-      .from('procurement_issue_messages')
+      .from('order_issue_messages')
       .insert({
         issue_id: issueId,
         sender_role: senderRole,
-        sender_name: senderName || (senderRole === 'sales' ? 'Sales' : 'Procurement'),
+        sender_name: senderName || (senderRole === 'sales' ? 'Sales' : 'Picker'),
         message: message
       });
 

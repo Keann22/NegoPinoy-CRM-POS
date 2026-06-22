@@ -27,6 +27,8 @@ import {
   History,
   PhilippinePeso,
   FileText,
+  ClipboardList,
+  ShieldCheck,
 } from 'lucide-react';
 import { useAuth, useUser } from '@/lib/supabase/hooks';
 import { usePathname, useRouter } from 'next/navigation';
@@ -88,6 +90,8 @@ export default function DashboardLayout({
     }
 
     links.push({ href: '/dashboard/products', label: 'Products', icon: Package });
+    links.push({ href: '/dashboard/pick', label: 'Picker App', icon: ClipboardList });
+    links.push({ href: '/dashboard/verify', label: 'Second Check', icon: ShieldCheck });
     links.push({ href: '/dashboard/pack', label: 'Packer App', icon: Package });
     
     if (isManagement || isInventory) {

@@ -10,6 +10,9 @@
 export type OrderStatus =
   | 'Pending Payment'
   | 'Processing'
+  | 'Picked'
+  | 'Picked (with issue)'
+  | 'Photo'
   | 'Packed'
   | 'For Shipping'
   | 'For Pick-up'
@@ -103,7 +106,7 @@ export type OrderWithItems = Order & {
 
 /** All valid order statuses as a runtime array — use for filter dropdowns. */
 export const ORDER_STATUSES: OrderStatus[] = [
-  'Pending Payment', 'Processing', 'Packed', 'For Shipping',
+  'Pending Payment', 'Processing', 'Picked', 'Picked (with issue)', 'Photo', 'Packed', 'For Shipping',
   'For Pick-up', 'Shipped', 'Completed', 'Payment Received (COD)',
   'Returned', 'Cancelled', 'On-Hold', 'Waiting for Stock'
 ];

@@ -10,11 +10,12 @@ import { format } from 'date-fns';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, CheckCircle, Edit, FileText, Share2, Truck } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Edit, FileText, Share2, Truck, Activity } from 'lucide-react';
 import { ShareReceiptDialog } from '@/components/dashboard/share-receipt-dialog';
 import { EditOrderDialog } from '@/components/dashboard/order-dialog';
 import { MarkShippedDialog } from '@/components/dashboard/mark-shipped-dialog';
 import { WaybillSummaryDialog } from '@/components/dashboard/waybill-summary-dialog';
+import { OrderTrailDialog } from '@/components/dashboard/order-trail-dialog';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useOrderDetail } from '@/hooks/useOrderDetail';
 import type { Order, OrderStatus } from '@/types';
@@ -51,6 +52,7 @@ export default function OrderDetailPage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isMarkShippedOpen, setIsMarkShippedOpen] = useState(false);
   const [isWaybillOpen, setIsWaybillOpen] = useState(false);
+  const [isTrailOpen, setIsTrailOpen] = useState(false);
 
   // Expenses (Shipping and Processing)
   const [shippingFee, setShippingFee] = useState<number>(0);
@@ -143,6 +145,9 @@ export default function OrderDetailPage() {
                   <FileText className="mr-2 h-4 w-4" /> View Waybill
                 </Button>
               )}
+              <Button variant="outline" size="sm" onClick={() => setIsTrailOpen(true)}>
+                <Activity className="mr-2 h-4 w-4" /> View Trail
+              </Button>
               <Button variant="outline" size="sm" onClick={() => setIsShareReceiptOpen(true)}>
                 <Share2 className="mr-2 h-4 w-4" /> Share Receipt
               </Button>
@@ -317,6 +322,7 @@ export default function OrderDetailPage() {
       {order && <MarkShippedDialog open={isMarkShippedOpen} onOpenChange={setIsMarkShippedOpen} orderId={order.id} currentTrackingNumber={order.tracking_number || ''} onSuccess={() => setIsMarkShippedOpen(false)} />}
       {order && <EditOrderDialog open={isEditOpen} onOpenChange={setIsEditOpen} order={order} orderItems={rawItems} />}
       {order && <WaybillSummaryDialog open={isWaybillOpen} onOpenChange={setIsWaybillOpen} order={order} />}
+      {order && <OrderTrailDialog open={isTrailOpen} onOpenChange={setIsTrailOpen} orderId={order.id} />}
     </div>
   );
 }

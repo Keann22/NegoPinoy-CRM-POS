@@ -7,17 +7,16 @@ import { Input } from "@/components/ui/input";
 import { useUser } from "@/lib/supabase/hooks";
 import { useUserProfile } from "@/hooks/useUserProfile";
 
-export function ProcurementIssues({ isAdmin }: { isAdmin?: boolean }) {
+export function OrderIssues({ isAdmin }: { isAdmin?: boolean }) {
   const [issues, setIssues] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedIssue, setSelectedIssue] = useState<any | null>(null);
-  const [affectedOrders, setAffectedOrders] = useState<any[]>([]);
-  const [isLoadingOrders, setIsLoadingOrders] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [isSending, setIsSending] = useState(false);
   
   const { user } = useUser();
   const { userProfile } = useUserProfile();
+  const canResolve = userProfile?.roles?.some(r => ['Admin', 'Owner', 'Sales'].includes(r));
 
   const fetchIssues = async () => {
     try {
@@ -51,20 +50,6 @@ export function ProcurementIssues({ isAdmin }: { isAdmin?: boolean }) {
       }
     } catch (e) {
       console.error("Failed to load full issue", e);
-    }
-
-    // Fetch affected orders
-    try {
-      setIsLoadingOrders(true);
-      const res = await fetch(`/api/inventory/issues/orders?productId=${issue.product_id}`);
-      if (res.ok) {
-        const data = await res.json();
-        setAffectedOrders(data.orders || []);
-      }
-    } catch (e) {
-      console.error("Failed to load affected orders", e);
-    } finally {
-      setIsLoadingOrders(false);
     }
   };
 
@@ -128,7 +113,7 @@ export function ProcurementIssues({ isAdmin }: { isAdmin?: boolean }) {
         <CardHeader>
           <CardTitle className="text-amber-800 flex items-center gap-2">
             <AlertCircle className="w-5 h-5" />
-            Procurement Issues ({issues.length})
+            Order Issues ({issues.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -137,7 +122,9 @@ export function ProcurementIssues({ isAdmin }: { isAdmin?: boolean }) {
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {issues.map(issue => {
-                const reporter = issue.procurement_issue_messages?.[0]?.sender_name || 'Unknown';
+                const reporter = issue.reported_by_name || issue.order_issue_messages?.[0]?.sender_name || 'Unknown';
+                const orderTitle = issue.orders ? `Order #${issue.orders.id.substring(0,7).toUpperCase()}` : 'Unknown Order';
+                const customerName = issue.orders?.customers?.full_name || '';
                 return (
                 <div 
                   key={issue.id} 
@@ -146,12 +133,14 @@ export function ProcurementIssues({ isAdmin }: { isAdmin?: boolean }) {
                 >
                   <div>
                     <h4 className="font-semibold text-slate-900 text-sm line-clamp-2">
-                      {issue.products?.name} {issue.products?.variant_name ? `[${issue.products.variant_name}]` : ''}
+                      {orderTitle}
                     </h4>
+                    {customerName && <p className="text-xs text-slate-600 font-medium">{customerName}</p>}
+                    <p className="text-xs text-red-600 font-medium mt-1">Missing: {issue.products?.name || 'Unknown Item'}</p>
                     <div className="text-xs text-slate-500 mt-2 space-y-1">
                       <p className="flex items-center gap-1">
                         <MessageSquare className="w-3 h-3" />
-                        {issue.procurement_issue_messages?.length || 0} messages
+                        {issue.order_issue_messages?.length || 0} messages
                       </p>
                       <p className="flex items-center gap-1 text-slate-600">
                         Reported by: <span className="font-medium text-slate-800">{reporter}</span>
@@ -174,26 +163,29 @@ export function ProcurementIssues({ isAdmin }: { isAdmin?: boolean }) {
             <div>
               <DialogTitle className="flex items-center gap-2 text-xl">
                 <AlertCircle className="text-amber-600 w-6 h-6" />
-                Procurement Issue: {selectedIssue?.products?.name}
+                Order Issue: #{selectedIssue?.orders?.id?.substring(0,7).toUpperCase() || 'Unknown'}
               </DialogTitle>
-              <p className="text-sm text-slate-500 mt-1 pl-8">
-                Reported by: <span className="font-medium text-slate-700">{selectedIssue?.procurement_issue_messages?.[0]?.sender_name || 'Unknown'}</span>
+              <p className="text-sm text-slate-600 mt-1 pl-8">
+                Missing Item: <span className="font-medium text-slate-800">{selectedIssue?.products?.name || 'Unknown Item'}</span>
+              </p>
+              <p className="text-xs text-slate-500 mt-1 pl-8">
+                Reported by: <span className="font-medium text-slate-700">{selectedIssue?.reported_by_name || 'Unknown'}</span>
               </p>
             </div>
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Left side: Chat */}
-            <div className="flex flex-col h-[50vh] md:h-auto border rounded-lg bg-slate-50 overflow-hidden">
+            <div className="flex flex-col h-[50vh] md:h-[60vh] border rounded-lg bg-slate-50 overflow-hidden">
               <div className="p-3 bg-slate-200/50 font-semibold text-slate-700 text-sm border-b">
                 Discussion
               </div>
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {selectedIssue?.procurement_issue_messages?.map((msg: any) => {
+                {selectedIssue?.order_issue_messages?.map((msg: any) => {
                   const isSales = msg.sender_role === 'sales';
                   return (
                     <div key={msg.id} className={`flex flex-col ${isSales ? 'items-end' : 'items-start'}`}>
-                      <span className="text-xs text-slate-500 mb-1">{msg.sender_name || (isSales ? 'Sales' : 'Procurement')}</span>
+                      <span className="text-xs text-slate-500 mb-1">{msg.sender_name || (isSales ? 'Sales' : 'Picker')}</span>
                       <div className={`p-3 rounded-lg max-w-[85%] text-sm whitespace-pre-wrap shadow-sm ${isSales ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white border rounded-tl-none text-slate-800'}`}>
                         {msg.message}
                       </div>
@@ -214,38 +206,46 @@ export function ProcurementIssues({ isAdmin }: { isAdmin?: boolean }) {
               </div>
             </div>
 
-            {/* Right side: Affected Orders */}
-            <div className="flex flex-col h-[50vh] md:h-auto border rounded-lg overflow-hidden bg-white">
+            {/* Right side: Order Information */}
+            <div className="flex flex-col h-[50vh] md:h-[60vh] border rounded-lg overflow-hidden bg-white">
               <div className="p-3 bg-slate-100 font-semibold text-slate-700 text-sm border-b flex items-center justify-between">
-                <span className="flex items-center gap-2"><PackageOpen className="w-4 h-4"/> Affected Active Orders</span>
-                <span className="bg-indigo-100 text-indigo-800 text-xs px-2 py-0.5 rounded-full">{affectedOrders.length}</span>
+                <span className="flex items-center gap-2"><PackageOpen className="w-4 h-4"/> Order Details</span>
               </div>
-              <div className="flex-1 overflow-y-auto p-0">
-                {isLoadingOrders ? (
-                  <div className="p-4 text-center text-sm text-slate-500">Loading affected orders...</div>
-                ) : affectedOrders.length === 0 ? (
-                  <div className="p-8 text-center text-sm text-slate-500">No active orders found waiting for this item.</div>
+              <div className="flex-1 overflow-y-auto p-4">
+                {selectedIssue?.orders ? (
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-xs text-slate-500">Customer</p>
+                      <p className="font-semibold">{selectedIssue.orders.customers?.full_name || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500">Sales Person</p>
+                      <p className="font-medium">{selectedIssue.orders.sales_person_name || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500">Status</p>
+                      <p className="font-medium">{selectedIssue.orders.status}</p>
+                    </div>
+                    <div className="mt-4 pt-4 border-t">
+                      <p className="text-xs text-slate-500 mb-2">Order Items</p>
+                      <ul className="space-y-2">
+                        {selectedIssue.orders.order_items?.map((item: any) => (
+                          <li key={item.id} className="text-sm flex justify-between">
+                            <span>{item.product_name}</span>
+                            <span className="font-bold">x{item.quantity}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
                 ) : (
-                  <ul className="divide-y">
-                    {affectedOrders.map((order, idx) => (
-                      <li key={idx} className="p-4 hover:bg-slate-50">
-                        <div className="flex justify-between items-start mb-1">
-                          <span className="font-semibold text-sm text-slate-900">{order.customerName}</span>
-                          <span className="bg-orange-100 text-orange-800 text-xs font-bold px-2 py-0.5 rounded">Waiting for {order.quantityNeeded}</span>
-                        </div>
-                        <div className="text-xs text-slate-500 flex justify-between">
-                          <span>Processed by: <span className="font-medium text-slate-700">{order.salesPerson}</span></span>
-                          <span className="capitalize">{order.status.replace('_', ' ')}</span>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="p-4 text-center text-sm text-slate-500">No order details found.</div>
                 )}
               </div>
             </div>
           </div>
 
-          {isAdmin && (
+          {canResolve && (
             <div className="p-4 border-t bg-slate-50 flex justify-end shrink-0">
               <Button onClick={handleResolve} variant="outline" className="border-amber-600 text-amber-700 hover:bg-amber-50 gap-2">
                 <CheckCircle2 className="w-4 h-4" /> Resolve & Close Issue

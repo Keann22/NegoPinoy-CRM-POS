@@ -13,13 +13,14 @@ export async function GET(req: Request) {
     const id = url.searchParams.get('id');
 
     if (id) {
-      // Get specific issue with messages and product info
+      // Get specific issue with messages and order/product info
       const { data, error } = await supabase
-        .from('procurement_issues')
+        .from('order_issues')
         .select(`
           *,
           products(name, variant_name, images),
-          procurement_issue_messages(*)
+          orders(id, status, sales_person_name, customers(full_name), order_items(*)),
+          order_issue_messages(*)
         `)
         .eq('id', id)
         .single();
@@ -27,8 +28,8 @@ export async function GET(req: Request) {
       if (error) throw error;
       
       // Order messages by created_at
-      if (data && data.procurement_issue_messages) {
-        data.procurement_issue_messages.sort((a: any, b: any) => 
+      if (data && data.order_issue_messages) {
+        data.order_issue_messages.sort((a: any, b: any) => 
           new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         );
       }
@@ -37,11 +38,12 @@ export async function GET(req: Request) {
     } else {
       // Get all open issues
       const { data, error } = await supabase
-        .from('procurement_issues')
+        .from('order_issues')
         .select(`
           *,
           products(name, variant_name, images),
-          procurement_issue_messages(id, sender_name, created_at)
+          orders(id, customers(full_name)),
+          order_issue_messages(id, sender_name, created_at)
         `)
         .eq('status', 'open')
         .order('created_at', { ascending: false });
@@ -50,8 +52,8 @@ export async function GET(req: Request) {
       
       if (data) {
         data.forEach((issue: any) => {
-          if (issue.procurement_issue_messages) {
-            issue.procurement_issue_messages.sort((a: any, b: any) => 
+          if (issue.order_issue_messages) {
+            issue.order_issue_messages.sort((a: any, b: any) => 
               new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
             );
           }
@@ -68,16 +70,16 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { productId, note } = await req.json();
+    const { orderId, productId, note, reportedByName } = await req.json();
 
-    if (!productId || !note) {
-      return NextResponse.json({ error: 'Missing productId or note' }, { status: 400 });
+    if (!orderId || !productId || !note) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
     // 1. Create the issue
     const { data: issue, error: issueErr } = await supabase
-      .from('procurement_issues')
-      .insert({ product_id: productId, status: 'open' })
+      .from('order_issues')
+      .insert({ order_id: orderId, product_id: productId, status: 'open', reported_by_name: reportedByName })
       .select('id')
       .single();
 
@@ -85,11 +87,11 @@ export async function POST(req: Request) {
 
     // 2. Add the initial message
     const { error: msgErr } = await supabase
-      .from('procurement_issue_messages')
+      .from('order_issue_messages')
       .insert({
         issue_id: issue.id,
-        sender_role: 'procurement',
-        sender_name: 'Procurement',
+        sender_role: 'picker',
+        sender_name: reportedByName || 'Picker',
         message: note
       });
 
@@ -111,7 +113,7 @@ export async function PATCH(req: Request) {
     }
 
     const { error } = await supabase
-      .from('procurement_issues')
+      .from('order_issues')
       .update({ status: 'resolved' })
       .eq('id', issueId);
 

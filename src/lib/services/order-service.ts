@@ -217,4 +217,94 @@ export async function editOrder(
 
   const { error } = await supabase.rpc('process_order_transaction', { payload });
   if (error) throw error;
+
+  // -- Auto-deduct from Procurement Sheet --
+  const oldMap = new Map<string, number>();
+  for (const item of context.originalOrderItems) {
+    oldMap.set(item.productId, (oldMap.get(item.productId) || 0) + item.quantity);
+  }
+  const newMap = new Map<string, number>();
+  for (const item of values.orderItems) {
+    newMap.set(item.productId, (newMap.get(item.productId) || 0) + item.quantity);
+  }
+
+  const deductions: { productId: string; deductQty: number }[] = [];
+  for (const [productId, oldQty] of Array.from(oldMap.entries())) {
+    const newQty = newMap.get(productId) || 0;
+    if (newQty < oldQty) {
+      deductions.push({ productId, deductQty: oldQty - newQty });
+    }
+  }
+
+  if (deductions.length > 0) {
+    try {
+      const { data: draftPo } = await supabase
+        .from('purchase_orders')
+        .select('id')
+        .eq('notes', 'STAFF_DRAFT')
+        .eq('status', 'pending_receipt')
+        .limit(1)
+        .maybeSingle();
+
+      if (draftPo) {
+        for (const deduction of deductions) {
+          const { data: item } = await supabase
+            .from('purchase_order_items')
+            .select('id, expected_qty')
+            .eq('po_id', draftPo.id)
+            .eq('product_id', deduction.productId)
+            .limit(1)
+            .maybeSingle();
+
+          if (item) {
+            const newExpectedQty = item.expected_qty - deduction.deductQty;
+            if (newExpectedQty <= 0) {
+              await supabase.from('purchase_order_items').delete().eq('id', item.id);
+            } else {
+              await supabase.from('purchase_order_items').update({ expected_qty: newExpectedQty }).eq('id', item.id);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Failed to deduct from procurement:", e);
+    }
+  }
+
+  // -- On-Hold Issue Creation --
+  if (finalOrderStatus === 'On-Hold') {
+    try {
+      const { data: existingIssue } = await supabase
+        .from('order_issues')
+        .select('id')
+        .eq('order_id', context.orderId)
+        .eq('status', 'open')
+        .limit(1)
+        .maybeSingle();
+
+      if (!existingIssue) {
+        const { data: newIssue } = await supabase
+          .from('order_issues')
+          .insert({
+            order_id: context.orderId,
+            status: 'open',
+            reported_by_name: 'System (Auto)'
+          })
+          .select('id')
+          .single();
+        
+        if (newIssue) {
+          await supabase.from('order_issue_messages').insert({
+            issue_id: newIssue.id,
+            sender_role: 'sales',
+            sender_name: 'System',
+            message: 'Order was placed On-Hold manually. Please review.'
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Failed to create issue for On-Hold order:", e);
+    }
+  }
 }
+
