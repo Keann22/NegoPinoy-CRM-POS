@@ -126,8 +126,14 @@ export default function PackerApp() {
         }
       ]);
 
-      if (data.status === 'Packed') {
-        toast({ title: 'Already Packed', description: 'This order is already marked as packed.', variant: 'default' });
+      if (['Packed', 'For Shipping', 'For Pick-up'].includes(data.status)) {
+        toast({ 
+          title: 'Already Processed', 
+          description: `This order is already marked as ${data.status} and cannot be packed again.`, 
+          variant: 'destructive' 
+        });
+        setScannedOrderId(null);
+        return;
       }
 
     } catch (err) {
