@@ -179,6 +179,12 @@ export async function editOrder(
     balanceDue = 0;
   }
 
+  let finalOrderStatus = values.orderStatus;
+  // Auto-correct status if they previously logged a COD payment but then edited the order to Full Payment
+  if (balanceDue <= 0 && values.paymentType === 'Full Payment' && finalOrderStatus === 'Payment Received (COD)') {
+    finalOrderStatus = 'Completed';
+  }
+
   const wasOldOrder = new Date(context.originalOrderDate) < new Date('2026-06-01T00:00:00+08:00');
 
   // Construct payload for RPC
@@ -188,7 +194,7 @@ export async function editOrder(
     wasOldOrder,
     originalOrderItems: context.originalOrderItems,
     customerId: values.customerId,
-    orderStatus: values.orderStatus,
+    orderStatus: finalOrderStatus,
     totalAmount,
     paymentType: values.paymentType,
     shippingDetails: values.shippingDetails,
