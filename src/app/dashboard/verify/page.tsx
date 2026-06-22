@@ -84,7 +84,7 @@ export default function VerifyApp() {
       // Fetch order details
       const { data, error } = await supabase
         .from('orders')
-        .select('id, status, customer_id, sales_person_name, updated_at, customers(full_name), order_items(id, product_id, product_name, quantity)')
+        .select('id, status, customer_id, sales_person_name, customers(full_name), order_items(id, product_id, product_name, quantity)')
         .eq('id', orderId)
         .single();
         
@@ -106,24 +106,7 @@ export default function VerifyApp() {
         newWarnings.push('This order is ON-HOLD. Do not proceed unless resolved.');
       }
 
-      // Check if order was updated since picked
-      const { data: logs, error: logsError } = await supabase
-        .from('order_logs')
-        .select('created_at, status')
-        .eq('order_id', orderId)
-        .in('status', ['Picked', 'Picked (with issue)'])
-        .order('created_at', { ascending: false })
-        .limit(1);
 
-      if (!logsError && logs && logs.length > 0) {
-        const pickedAt = new Date(logs[0].created_at).getTime();
-        const updatedAt = new Date(data.updated_at).getTime();
-        
-        // If order was updated more than 5 seconds after picking, flag it
-        if (updatedAt > pickedAt + 5000) {
-          newWarnings.push('This order was updated AFTER it was picked. Please double-check if the customer added items or changed the order.');
-        }
-      }
 
       setWarnings(newWarnings);
 
