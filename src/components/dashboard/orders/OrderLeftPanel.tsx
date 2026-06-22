@@ -212,7 +212,7 @@ export function OrderLeftPanel({
       )}
 
       {/* Proof of payment */}
-      {(paymentType === 'Full Payment' || (amountPaid !== undefined && amountPaid! > 0 && !isDownpaymentCOD)) && (
+      {!isEditing && (paymentType === 'Full Payment' || (amountPaid !== undefined && amountPaid! > 0 && !isDownpaymentCOD)) && (
         <FormField control={control} name="proofOfPayment" render={({ field }) => (
           <FormItem>
             <FormLabel>Proof of Payment <span className="text-destructive">*</span></FormLabel>

@@ -162,6 +162,7 @@ export function OrderDialog(props: OrderDialogProps) {
         trackingNumber: order.tracking_number || "",
         includeInsurance: order.insurance_fee !== 0,
         platformFees: order.platformFees || 0,
+        proofOfPayment: order.amountPaid > 0 ? [new File(["dummy"], "existing_proof.jpg", { type: "image/jpeg" })] : [],
       });
 
       const fetchCust = async () => {
