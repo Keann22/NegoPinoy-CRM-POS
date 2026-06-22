@@ -258,6 +258,12 @@ export function OrderDialog(props: OrderDialogProps) {
       return;
     }
 
+    const actualAmount = values.isDownpaymentCOD ? 0 : (values.amountPaid ?? 0);
+    if (actualAmount > 0 && (!values.proofOfPayment || values.proofOfPayment.length === 0)) {
+      form.setError('proofOfPayment', { type: 'manual', message: 'Proof of payment is required for upfront payments.' });
+      return;
+    }
+
     handleOpenChange(false);
     toast({ title: "Creating Order...", description: "Your new order is being saved." });
 
