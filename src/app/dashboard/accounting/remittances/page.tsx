@@ -60,7 +60,7 @@ export default function SPXRemittancesPage() {
       const worksheet = workbook.worksheets[0];
 
       // We need to collect COD amounts and Shipping Fees per tracking number
-      const trackingData: Record<string, { cod: number, shippingFee: number }> = {};
+      const trackingData: Record<string, { cod: number, shippingFee: number, processingFee: number }> = {};
 
       let headersFound = false;
       let trackingCol = -1;
