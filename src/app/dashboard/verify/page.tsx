@@ -106,25 +106,54 @@ export default function VerifyApp() {
         newWarnings.push('This order is ON-HOLD. Do not proceed unless resolved.');
       }
 
-      // Check if order was edited since picked
-      const { data: logs, error: logsError } = await supabase
+      // Check if order was edited since picked by comparing item snapshot
+      const { data: pickLog } = await supabase
         .from('order_logs')
-        .select('created_at, status')
+        .select('snapshot_data')
         .eq('order_id', orderId)
-        .in('status', ['Picked', 'Picked (with issue)', 'Order Edited'])
-        .order('created_at', { ascending: false });
+        .in('status', ['Picked', 'Picked (with issue)'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-      if (!logsError && logs && logs.length > 0) {
-        const latestPicked = logs.find((l: any) => l.status === 'Picked' || l.status === 'Picked (with issue)');
-        const latestEdited = logs.find((l: any) => l.status === 'Order Edited');
+      if (pickLog?.snapshot_data?.items) {
+        const pickedItems: { product_name: string; quantity: number; product_id: string }[] = pickLog.snapshot_data.items;
+        const currentItems = data.order_items || [];
 
-        if (latestPicked && latestEdited) {
-          const pickedAt = new Date(latestPicked.created_at).getTime();
-          const editedAt = new Date(latestEdited.created_at).getTime();
-          
-          if (editedAt > pickedAt) {
-            newWarnings.push('This order was edited AFTER it was picked. Please double-check if the customer added items or changed the order.');
+        // Build maps for comparison
+        const pickedMap = new Map<string, { name: string; qty: number }>();
+        for (const item of pickedItems) {
+          pickedMap.set(item.product_id, { name: item.product_name, qty: item.quantity });
+        }
+        const currentMap = new Map<string, { name: string; qty: number }>();
+        for (const item of currentItems) {
+          currentMap.set(item.product_id, { name: item.product_name, qty: item.quantity });
+        }
+
+        const changes: string[] = [];
+
+        // Check for added or quantity-increased items
+        for (const [pid, cur] of Array.from(currentMap.entries())) {
+          const picked = pickedMap.get(pid);
+          if (!picked) {
+            changes.push(`ADDED: ${cur.name} (×${cur.qty})`);
+          } else if (cur.qty > picked.qty) {
+            changes.push(`INCREASED: ${cur.name} (${picked.qty} → ${cur.qty})`);
           }
+        }
+
+        // Check for removed or quantity-decreased items
+        for (const [pid, picked] of Array.from(pickedMap.entries())) {
+          const cur = currentMap.get(pid);
+          if (!cur) {
+            changes.push(`REMOVED: ${picked.name} (was ×${picked.qty})`);
+          } else if (cur.qty < picked.qty) {
+            changes.push(`DECREASED: ${cur.name} (${picked.qty} → ${cur.qty})`);
+          }
+        }
+
+        if (changes.length > 0) {
+          newWarnings.push(`This order was EDITED after picking. Changes detected:\n${changes.join('\n')}`);
         }
       }
 
@@ -260,7 +289,7 @@ export default function VerifyApp() {
                     <AlertTriangle className="h-6 w-6 shrink-0 text-amber-500 mt-0.5" />
                     <div>
                       <p className="font-bold text-amber-900">Attention Required</p>
-                      <p className="text-sm mt-1">{warn}</p>
+                      <p className="text-sm mt-1 whitespace-pre-line">{warn}</p>
                     </div>
                   </div>
                 ))}

@@ -145,11 +145,18 @@ export default function PickerApp() {
 
       const userName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : 'Unknown Staff';
 
-      // 2. Insert into order_logs
+      // 2. Insert into order_logs with item snapshot
+      const itemSnapshot = orderItems.map(item => ({
+        id: item.id,
+        product_id: item.product_id,
+        product_name: item.product_name,
+        quantity: item.quantity
+      }));
       await supabase.from('order_logs').insert({
         order_id: scannedOrderId,
         status: newStatus,
-        user_name: userName
+        user_name: userName,
+        snapshot_data: { items: itemSnapshot }
       });
 
       // 3. Handle Issues if any
