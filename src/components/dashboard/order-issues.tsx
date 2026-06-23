@@ -103,10 +103,6 @@ export function OrderIssues({ isAdmin }: { isAdmin?: boolean }) {
     }
   };
 
-  if (!isLoading && issues.length === 0) {
-    return null; // Don't show anything if there are no issues
-  }
-
   return (
     <>
       <Card className="col-span-4 lg:col-span-4 border-amber-200 bg-amber-50/30">
@@ -119,6 +115,10 @@ export function OrderIssues({ isAdmin }: { isAdmin?: boolean }) {
         <CardContent>
           {isLoading ? (
             <div className="text-sm text-slate-500">Checking for issues...</div>
+          ) : issues.length === 0 ? (
+            <div className="text-sm text-slate-500 py-4 text-center bg-white rounded border border-amber-100">
+              No active order issues at the moment.
+            </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {issues.map(issue => {
