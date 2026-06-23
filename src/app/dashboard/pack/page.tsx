@@ -96,7 +96,7 @@ export default function PackerApp() {
     try {
       const { data, error } = await supabase
         .from('orders')
-        .select('id, status, customer_id, sales_person_name, customers(full_name), order_items(id, product_name, quantity)')
+        .select('id, status, customer_id, sales_person_name, customers(full_name), order_items(id, product_name, quantity, product_id)')
         .eq('id', orderId)
         .single();
         
