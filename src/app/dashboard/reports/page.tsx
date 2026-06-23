@@ -14,6 +14,7 @@ import { SalesSummaryReport } from '@/components/dashboard/reports/sales-summary
 import { CommissionReport } from '@/components/dashboard/reports/commission-report';
 import { StaleReservationsReport } from '@/components/dashboard/reports/stale-reservations-report';
 import { PackedOrdersReport } from '@/components/dashboard/reports/packed-orders-report';
+import { DiscrepancyReport } from '@/components/dashboard/reports/discrepancy-report';
 import { useMemo } from 'react';
 
 export default function ReportsPage() {
@@ -58,6 +59,10 @@ export default function ReportsPage() {
           {(isManagement || isInventory) && (
             <TabsTrigger value="packed">Packed Orders</TabsTrigger>
           )}
+
+          {(isManagement || isInventory) && (
+            <TabsTrigger value="discrepancies">Auto-Adjustments</TabsTrigger>
+          )}
           
           {isManagement && (
             <>
@@ -100,6 +105,12 @@ export default function ReportsPage() {
       {(isManagement || isInventory) && (
         <TabsContent value="to-order">
           <ToOrderReport />
+        </TabsContent>
+      )}
+
+      {(isManagement || isInventory) && (
+        <TabsContent value="discrepancies">
+          <DiscrepancyReport />
         </TabsContent>
       )}
 

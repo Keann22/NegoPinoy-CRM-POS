@@ -99,6 +99,54 @@ export async function POST(req: Request) {
       if (itemsErr) throw itemsErr;
     }
 
+    // --- Option C: Auto-adjust Negative Inventory ---
+    // Fetch current stock levels for the requested products
+    const productIds = requests.map((r: any) => r.productId);
+    const { data: productsToAdjust, error: prodErr } = await supabase
+      .from('products')
+      .select('id, stock_level')
+      .in('id', productIds)
+      .lt('stock_level', 0); // Only auto-adjust if stock is negative
+
+    if (!prodErr && productsToAdjust && productsToAdjust.length > 0) {
+      for (const p of productsToAdjust) {
+        // Find the total expected qty for this product across existing + new requests
+        const reqItem = requests.find((r: any) => r.productId === p.id);
+        if (!reqItem) continue;
+        
+        let newTotalExpected = reqItem.requestedQty;
+        if (existingMap.has(p.id)) {
+           newTotalExpected += existingMap.get(p.id)!.expected_qty;
+        }
+
+        const targetStockLevel = -newTotalExpected;
+        const currentStockLevel = p.stock_level;
+        const discrepancy = targetStockLevel - currentStockLevel;
+
+        if (discrepancy !== 0) {
+          // Adjust product stock
+          await supabase
+            .from('products')
+            .update({ stock_level: targetStockLevel })
+            .eq('id', p.id);
+
+          // Log discrepancy to inventory_movements for Audit (Option C)
+          await supabase
+            .from('inventory_movements')
+            .insert({
+              product_id: p.id,
+              quantity: discrepancy,
+              type: 'adjustment',
+              reason: 'Procurement Auto-Adjustment (Audit)',
+              previous_stock: currentStockLevel,
+              new_stock: targetStockLevel,
+              user_id: null // System
+            });
+        }
+      }
+    }
+    // ------------------------------------------------
+
     return NextResponse.json({ success: true, poId: poId });
   } catch (error: any) {
     console.error('Error in procurement-request POST:', error);
