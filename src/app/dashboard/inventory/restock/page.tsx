@@ -209,7 +209,7 @@ export default function RestockPage() {
                       )}
                     </div>
                   ) : (
-                    <Command className="rounded-lg border">
+                    <Command className="rounded-lg border" shouldFilter={false}>
                       <CommandInput
                         placeholder="Search products by name..."
                         value={productSearch}

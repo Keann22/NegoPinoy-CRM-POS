@@ -446,7 +446,7 @@ export function ProductDialog(props: ProductDialogProps) {
                       </div>
                     ))}
                   </div>
-                  <Command className="rounded-lg border">
+                  <Command className="rounded-lg border" shouldFilter={false}>
                     <CommandInput placeholder="Search to add a component product..." value={componentSearch} onValueChange={setComponentSearch} />
                     {componentSearch.length > 0 && (
                       <CommandList>
@@ -455,7 +455,6 @@ export function ProductDialog(props: ProductDialogProps) {
                           <CommandGroup>
                             {componentResults.map(s => (
                               <CommandItem key={s.id} value={s.name}
-                                onMouseDown={e => { e.preventDefault(); e.stopPropagation(); }}
                                 onSelect={() => { if (!recipeFields.some(f => f.productId === s.id)) appendRecipe({ productId: s.id, productName: s.name, quantity: 1 }); setComponentSearch(''); }}>
                                 {s.name}
                               </CommandItem>

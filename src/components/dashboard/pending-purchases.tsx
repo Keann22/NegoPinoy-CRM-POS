@@ -50,7 +50,7 @@ function ProductSearch({ onProductSelect }: { onProductSelect: (product: any) =>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[300px] p-0" align="start">
-        <Command>
+        <Command shouldFilter={false}>
           <CommandInput
             placeholder="Search products..."
             value={search}

@@ -313,12 +313,12 @@ function SearchableSelect({ allProducts, value, onChange, getDisplayName, disabl
         placeholder="Type to search..."
         value={searchTerm}
         onChange={e => setSearchTerm(e.target.value)}
-        onBlur={() => setTimeout(() => setIsEditing(false), 200)}
+        onBlur={() => setTimeout(() => setIsEditing(false), 300)}
       />
       <div className="absolute z-10 w-full mt-1 bg-white border shadow-lg max-h-60 overflow-y-auto rounded-md">
         <div 
            className="p-2 text-sm hover:bg-slate-100 cursor-pointer text-slate-500"
-           onMouseDown={(e) => { e.preventDefault(); onChange(''); setIsEditing(false); }}
+           onPointerDown={(e) => { e.preventDefault(); onChange(''); setIsEditing(false); }}
         >
           -- Clear Selection --
         </div>
@@ -326,7 +326,7 @@ function SearchableSelect({ allProducts, value, onChange, getDisplayName, disabl
           <div 
             key={p.id} 
             className="p-2 text-sm hover:bg-indigo-50 cursor-pointer border-t"
-            onMouseDown={(e) => {
+            onPointerDown={(e) => {
               e.preventDefault();
               onChange(p.id);
               setIsEditing(false);

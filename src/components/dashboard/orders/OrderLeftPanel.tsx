@@ -69,7 +69,7 @@ export function OrderLeftPanel({
                 <Button type="button" variant="ghost" size="sm" onClick={onClearCustomer}>Change</Button>
               </div>
             ) : (
-              <Command className="rounded-lg border">
+              <Command className="rounded-lg border" shouldFilter={false}>
                 <CommandInput
                   placeholder="Search customers by first name..."
                   value={customerSearch}
@@ -84,7 +84,6 @@ export function OrderLeftPanel({
                           <CommandItem
                             key={c.id}
                             value={`${c.firstName} ${c.lastName}`}
-                            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
                             onSelect={() => onCustomerSelect(c)}
                           >
                             {c.firstName} {c.lastName}
@@ -96,7 +95,6 @@ export function OrderLeftPanel({
                       <CommandGroup>
                         <CommandItem
                           value={customerSearch + ' add_new'}
-                          onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
                           onSelect={onAddCustomerClick}
                           className="text-primary font-medium cursor-pointer"
                         >

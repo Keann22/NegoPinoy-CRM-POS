@@ -76,7 +76,7 @@ function ProductSearch({ onProductSelect }: { onProductSelect: (product: Product
         <Button variant="outline" className="w-full justify-start font-normal text-left">Select Product...</Button>
       </PopoverTrigger>
       <PopoverContent className="w-[300px] p-0" align="start">
-        <Command>
+        <Command shouldFilter={false}>
           <CommandInput
             placeholder="Search products..."
             value={search}

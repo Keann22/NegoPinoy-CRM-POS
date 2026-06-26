@@ -97,7 +97,7 @@ export function OrderItemsPanel({
       </div>
 
       {/* Product search */}
-      <Command className="rounded-lg border">
+      <Command className="rounded-lg border" shouldFilter={false}>
         <CommandInput placeholder="Search to add products..." value={productSearch} onValueChange={onProductSearchChange} />
         {productSearch.length > 0 && (
           <CommandList>
@@ -108,7 +108,6 @@ export function OrderItemsPanel({
                   <CommandItem
                     value={p.name}
                     key={p.id}
-                    onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
                     onSelect={() => onProductSelect(p)}
                   >
                     <div className="flex justify-between w-full">
@@ -123,7 +122,6 @@ export function OrderItemsPanel({
               <CommandGroup>
                 <CommandItem
                   value={productSearch + ' add_new'}
-                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
                   onSelect={onAddProductClick}
                   className="text-primary font-medium cursor-pointer"
                 >

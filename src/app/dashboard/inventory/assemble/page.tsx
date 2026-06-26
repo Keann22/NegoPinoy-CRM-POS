@@ -212,7 +212,7 @@ export default function AssembleKitPage() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                         {!selectedProduct ? (
-                            <Command className="rounded-lg border">
+                            <Command className="rounded-lg border" shouldFilter={false}>
                                 <CommandInput 
                                     placeholder="Search for a bundle (e.g. Wok with Takip)..." 
                                     value={productSearch} 
