@@ -61,34 +61,43 @@ export function OrderItemsPanel({
       <div>
         <FormLabel>Order Items</FormLabel>
         <div className="space-y-2 mt-2 rounded-lg border">
-          <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 p-2 font-medium text-muted-foreground text-sm">
-            <span>Product</span>
-            <span className="text-right">Qty</span>
-            <span className="text-right">Price</span>
-            <span className="text-right">Discount</span>
-            <span className="sr-only">Remove</span>
+          <div className="flex gap-2 p-2 font-medium text-muted-foreground text-sm items-center">
+            <span className="flex-1">Product</span>
+            <span className="w-20 text-right">Qty</span>
+            <span className="w-24 text-right">Price</span>
+            <span className="w-24 text-right">Discount</span>
+            <span className="w-8"></span>
           </div>
           {fields.map((field, index) => (
-            <div key={field.id} className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 items-center px-2 pb-2">
-              <p className="flex-1 text-sm font-medium truncate pr-2">{field.productName}</p>
-              <FormField control={control} name={`orderItems.${index}.quantity`} render={({ field: f }) => (
-                <FormItem><FormControl><Input type="number" className="h-8 w-20 text-right" {...f} /></FormControl></FormItem>
-              )} />
-              <FormField control={control} name={`orderItems.${index}.sellingPriceAtSale`} render={({ field: f }) => (
-                <FormItem><FormControl><Input type="number" step="0.01" className="h-8 w-24 text-right" {...f} /></FormControl></FormItem>
-              )} />
-              <FormField control={control} name={`orderItems.${index}.discount`} render={({ field: f }) => (
-                <FormItem>
-                  <FormControl>
-                    <Input type="number" step="0.01" className="h-8 w-24 text-right" placeholder="0.00"
-                      {...f} onChange={e => f.onChange(e.target.value === '' ? 0 : e.target.value)} value={f.value ?? 0} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => remove(index)}>
-                <Trash2 className="h-4 w-4" />
-              </Button>
+            <div key={field.id} className="flex gap-2 items-center px-2 pb-2">
+              <div className="flex-1 min-w-0 pr-2">
+                <p className="text-sm font-medium truncate">{field.productName}</p>
+              </div>
+              <div className="w-20 shrink-0">
+                <FormField control={control} name={`orderItems.${index}.quantity`} render={({ field: f }) => (
+                  <FormItem><FormControl><Input type="number" className="h-8 w-full text-right" {...f} /></FormControl></FormItem>
+                )} />
+              </div>
+              <div className="w-24 shrink-0">
+                <FormField control={control} name={`orderItems.${index}.sellingPriceAtSale`} render={({ field: f }) => (
+                  <FormItem><FormControl><Input type="number" step="0.01" className="h-8 w-full text-right" {...f} /></FormControl></FormItem>
+                )} />
+              </div>
+              <div className="w-24 shrink-0">
+                <FormField control={control} name={`orderItems.${index}.discount`} render={({ field: f }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input type="number" step="0.01" className="h-8 w-full text-right" placeholder="0.00"
+                        {...f} onChange={e => f.onChange(e.target.value === '' ? 0 : e.target.value)} value={f.value ?? 0} />
+                    </FormControl>
+                  </FormItem>
+                )} />
+              </div>
+              <div className="w-8 shrink-0 flex justify-end">
+                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => remove(index)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           ))}
           {fields.length === 0 && <p className="text-sm text-center text-muted-foreground py-8">No items added to order.</p>}
@@ -97,7 +106,7 @@ export function OrderItemsPanel({
       </div>
 
       {/* Product search */}
-      <Command className="rounded-lg border" shouldFilter={false}>
+      <Command className="rounded-lg border h-auto" shouldFilter={false}>
         <CommandInput placeholder="Search to add products..." value={productSearch} onValueChange={onProductSearchChange} />
         {productSearch.length > 0 && (
           <CommandList>
@@ -106,7 +115,7 @@ export function OrderItemsPanel({
               <CommandGroup>
                 {productResults.map((p) => (
                   <CommandItem
-                    value={p.name}
+                    value={p.name.toLowerCase()}
                     key={p.id}
                     onSelect={() => onProductSelect(p)}
                   >

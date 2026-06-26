@@ -60,7 +60,7 @@ export function ProductSupplierSection({
           </div>
         ))}
       </div>
-      <Command className="rounded-lg border" shouldFilter={false}>
+      <Command className="rounded-lg border h-auto" shouldFilter={false}>
         <CommandInput
           placeholder="Search to add a supplier..."
           value={supplierSearch}
@@ -74,7 +74,7 @@ export function ProductSupplierSection({
                 {supplierResults.map(s => (
                   <CommandItem
                     key={s.id}
-                    value={s.name}
+                    value={s.name.toLowerCase()}
                     onSelect={() => {
                       if (!supplierFields.some((f: any) => f.supplierId === s.id)) {
                         appendSupplier({ supplierId: s.id, supplierName: s.name, unitCost: 0 });

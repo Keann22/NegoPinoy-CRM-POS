@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sunday Challenge - Math Quiz!</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Confetti JS for gamification -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app" class="container">
+        <!-- Header / Progress -->
+        <header>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+            <div class="stats">
+                <span id="question-counter">Question 1 of 15</span>
+                <span id="score-counter">Score: 0</span>
+            </div>
+        </header>
+
+        <!-- Main Question Card -->
+        <main id="quiz-container">
+            <div class="question-card">
+                <h2 id="question-type" class="question-type">Type 1: Cake & Egg Logic</h2>
+                <p id="question-text" class="question-text">Loading question...</p>
+                
+                <div class="input-group">
+                    <input type="number" id="answer-input" placeholder="Answer" autocomplete="off" />
+                    <span id="answer-unit" class="answer-unit">cakes</span>
+                </div>
+                
+                <button id="submit-btn" class="primary-btn">Submit Answer</button>
+                <div id="feedback-msg" class="feedback"></div>
+            </div>
+        </main>
+
+        <!-- Summary Screen (Hidden initially) -->
+        <main id="summary-container" class="hidden">
+            <div class="summary-card">
+                <h2>Challenge Complete! 🎉</h2>
+                <p>You scored <span id="final-score">0</span> out of 15!</p>
+                <div class="summary-feedback" id="summary-feedback">Amazing job!</div>
+                
+                <!-- History / Review Section -->
+                <div class="history-section" id="history-section">
+                    <h3>Your Performance History</h3>
+                    <div class="history-list" id="history-list">
+                        <!-- History items will be injected here -->
+                    </div>
+                </div>
+
+                <button id="restart-btn" class="secondary-btn">Play Again</button>
+            </div>
+        </main>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>

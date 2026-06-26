@@ -15,7 +15,7 @@ const Command = React.forwardRef<
   <CommandPrimitive
     ref={ref}
     className={cn(
-      "flex w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground",
+      "flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground",
       className
     )}
     {...props}
@@ -23,9 +23,7 @@ const Command = React.forwardRef<
 ))
 Command.displayName = CommandPrimitive.displayName
 
-interface CommandDialogProps extends DialogProps {}
-
-const CommandDialog = ({ children, ...props }: CommandDialogProps) => {
+const CommandDialog = ({ children, ...props }: DialogProps) => {
   return (
     <Dialog {...props}>
       <DialogContent className="overflow-hidden p-0 shadow-lg">
@@ -113,33 +111,25 @@ CommandSeparator.displayName = CommandPrimitive.Separator.displayName
 const CommandItem = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Item>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.Item>
->(({ className, onSelect, value, ...props }, ref) => (
+>(({ className, onSelect, value, children, ...props }, ref) => (
   <CommandPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none aria-selected:bg-accent aria-selected:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none aria-selected:bg-accent aria-selected:text-accent-foreground data-[disabled]:opacity-50 pointer-events-auto",
       className
     )}
     value={value}
     onSelect={onSelect}
     onPointerDown={(e) => {
-      // 1. Prevent input blur which causes mobile keyboard to close and layout to shift.
-      //    (This layout shift is what normally cancels the synthetic click event on mobile).
+      // Prevent layout shift/blur on mobile by preventing focus loss on the input
       e.preventDefault();
-      
-      // 2. Since preventDefault cancels the native click event, cmdk's onClick 
-      //    will never fire. Therefore, we MUST forcefully trigger onSelect here.
-      //    Doing this on pointerdown guarantees instantaneous selection on both PC and mobile.
-      if (onSelect) {
-        onSelect(value || e.currentTarget.textContent || "");
-      }
-      
       props.onPointerDown?.(e);
     }}
     {...props}
-  />
+  >
+    {children}
+  </CommandPrimitive.Item>
 ))
-
 CommandItem.displayName = CommandPrimitive.Item.displayName
 
 const CommandShortcut = ({

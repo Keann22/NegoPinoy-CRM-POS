@@ -63,7 +63,7 @@ function ProductSearch({ onProductSelect }: { onProductSelect: (product: any) =>
                 {productResults.map((p) => (
                   <CommandItem
                     key={p.id}
-                    value={p.name}
+                    value={p.name.toLowerCase()}
                     onSelect={() => {
                       onProductSelect(p);
                       setOpen(false);

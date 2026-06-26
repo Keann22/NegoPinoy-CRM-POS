@@ -209,7 +209,7 @@ export default function RestockPage() {
                       )}
                     </div>
                   ) : (
-                    <Command className="rounded-lg border" shouldFilter={false}>
+                    <Command className="rounded-lg border h-auto" shouldFilter={false}>
                       <CommandInput
                         placeholder="Search products by name..."
                         value={productSearch}
@@ -223,7 +223,7 @@ export default function RestockPage() {
                               {productResults.map((p) => (
                                 <CommandItem
                                   key={p.id}
-                                  value={p.name}
+                                  value={p.name.toLowerCase()}
                                   onSelect={() => handleProductSelect(p)}
                                 >
                                   {p.name}

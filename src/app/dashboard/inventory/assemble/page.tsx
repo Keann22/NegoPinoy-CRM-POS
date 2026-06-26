@@ -212,7 +212,7 @@ export default function AssembleKitPage() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                         {!selectedProduct ? (
-                            <Command className="rounded-lg border" shouldFilter={false}>
+                            <Command className="rounded-lg border h-auto" shouldFilter={false}>
                                 <CommandInput 
                                     placeholder="Search for a bundle (e.g. Wok with Takip)..." 
                                     value={productSearch} 
@@ -226,7 +226,7 @@ export default function AssembleKitPage() {
                                             {searchResults.map((p) => (
                                                 <CommandItem
                                                     key={p.id}
-                                                    value={p.name}
+                                                    value={p.name.toLowerCase()}
                                                     onSelect={() => {
                                                         setSelectedProduct(p);
                                                         setProductSearch('');

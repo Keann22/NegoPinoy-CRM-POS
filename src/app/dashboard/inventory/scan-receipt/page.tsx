@@ -125,7 +125,7 @@ function ProductSearch({ rowIndex, form, onAddNewProduct }: { rowIndex: number; 
                     {productResults.map((p) => (
                         <CommandItem
                         key={p.id}
-                        value={p.name}
+                        value={p.name.toLowerCase()}
                         onSelect={() => {
                             form.setValue(`items.${rowIndex}.productId`, p.id);
                             form.setValue(`items.${rowIndex}.productName`, p.name);
@@ -142,6 +142,7 @@ function ProductSearch({ rowIndex, form, onAddNewProduct }: { rowIndex: number; 
                     <>
                         {productResults.length > 0 && <CommandSeparator />}
                         <CommandItem
+                            value={(search + ' add_new').toLowerCase()}
                             onSelect={() => {
                                 onAddNewProduct(search, rowIndex);
                                 setOpen(false);

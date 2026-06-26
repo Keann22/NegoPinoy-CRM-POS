@@ -69,7 +69,7 @@ export function OrderLeftPanel({
                 <Button type="button" variant="ghost" size="sm" onClick={onClearCustomer}>Change</Button>
               </div>
             ) : (
-              <Command className="rounded-lg border" shouldFilter={false}>
+              <Command className="rounded-lg border h-auto" shouldFilter={false}>
                 <CommandInput
                   placeholder="Search customers by first name..."
                   value={customerSearch}
@@ -83,7 +83,7 @@ export function OrderLeftPanel({
                         {customerResults.map((c) => (
                           <CommandItem
                             key={c.id}
-                            value={`${c.firstName} ${c.lastName}`}
+                            value={`${c.firstName} ${c.lastName}`.toLowerCase()}
                             onSelect={() => onCustomerSelect(c)}
                           >
                             {c.firstName} {c.lastName}
@@ -94,7 +94,7 @@ export function OrderLeftPanel({
                     {customerSearch.length > 0 && !isSearchingCustomers && (
                       <CommandGroup>
                         <CommandItem
-                          value={customerSearch + ' add_new'}
+                          value={(customerSearch + ' add_new').toLowerCase()}
                           onSelect={onAddCustomerClick}
                           className="text-primary font-medium cursor-pointer"
                         >
