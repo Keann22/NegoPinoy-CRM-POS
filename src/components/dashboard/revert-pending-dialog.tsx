@@ -25,7 +25,7 @@ export function RevertPendingDialog({ order, open, onOpenChange, onSuccess }: Re
       const { error } = await supabase
         .from('orders')
         .update({ 
-          status: 'Pending',
+          status: 'Processing',
           not_for_shipping_reason: null,
           boxes_config: null
         })
@@ -34,8 +34,8 @@ export function RevertPendingDialog({ order, open, onOpenChange, onSuccess }: Re
       if (error) throw error;
 
       toast({
-        title: 'Reverted to Pending',
-        description: 'Order sent back to the Packer App queue.',
+        title: 'Reverted to Processing',
+        description: 'Order sent back to the queue.',
       });
       onSuccess();
       onOpenChange(false);
@@ -51,15 +51,15 @@ export function RevertPendingDialog({ order, open, onOpenChange, onSuccess }: Re
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Revert to Pending</DialogTitle>
+          <DialogTitle>Revert to Processing</DialogTitle>
           <DialogDescription>
-            Are you sure you want to revert this order back to <strong>Pending</strong>? This will clear its packed boxes and send it back to the Packer App queue. Use this if the customer added items or you need to repack it.
+            Are you sure you want to revert this order back to <strong>Processing</strong>? This will clear its packed boxes and send it back to the queue. Use this if the customer added items or you need to repack it.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="mt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={isSubmitting} variant="destructive">
-            {isSubmitting ? 'Reverting...' : 'Yes, Revert to Pending'}
+            {isSubmitting ? 'Reverting...' : 'Yes, Revert to Processing'}
           </Button>
         </DialogFooter>
       </DialogContent>

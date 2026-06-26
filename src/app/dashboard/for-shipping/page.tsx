@@ -501,7 +501,7 @@ export default function ForShippingPage() {
                   <TableCell className="text-right">₱{order.shippingAmount.toFixed(2)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <Button variant="outline" size="sm" onClick={() => setRevertOrder(order)} title="Revert to Pending">
+                      <Button variant="outline" size="sm" onClick={() => setRevertOrder(order)} title="Revert to Processing">
                         <RotateCcw className="h-4 w-4 mr-1" /> Revert
                       </Button>
                       <Button variant="outline" size="sm" onClick={() => setMarkShippedOrder({ id: order.id, tracking_number: '' })}>

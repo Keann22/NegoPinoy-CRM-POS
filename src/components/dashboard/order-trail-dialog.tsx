@@ -12,17 +12,42 @@ export function OrderTrailDialog({ open, onOpenChange, orderId }: { open: boolea
   useEffect(() => {
     if (open && orderId && supabase) {
       setLoading(true);
-      supabase
-        .from('order_logs')
-        .select('*')
-        .eq('order_id', orderId)
-        .order('created_at', { ascending: false })
-        .then(({ data, error }) => {
-          if (!error && data) {
-            setLogs(data);
+      Promise.all([
+        supabase
+          .from('order_logs')
+          .select('*')
+          .eq('order_id', orderId)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('orders')
+          .select('created_at, sales_person_name')
+          .eq('id', orderId)
+          .single()
+      ]).then(([logsRes, orderRes]) => {
+        let combinedLogs: any[] = [];
+        if (!logsRes.error && logsRes.data) {
+          combinedLogs = [...logsRes.data];
+        }
+        
+        if (!orderRes.error && orderRes.data) {
+          // Check if there's already an initial creation log to prevent duplicates
+          const hasOrderPlacedLog = combinedLogs.some(
+            log => log.status === 'Order Placed' || log.status === 'Order Created'
+          );
+          
+          if (!hasOrderPlacedLog) {
+            combinedLogs.push({
+              id: 'initial_order_creation',
+              status: 'Order Placed',
+              created_at: orderRes.data.created_at,
+              user_name: orderRes.data.sales_person_name || 'System / Customer',
+            });
           }
-          setLoading(false);
-        });
+        }
+        
+        setLogs(combinedLogs);
+        setLoading(false);
+      });
     }
   }, [open, orderId, supabase]);
 

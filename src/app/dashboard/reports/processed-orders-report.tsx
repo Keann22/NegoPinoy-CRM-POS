@@ -168,14 +168,20 @@ export function ProcessedOrdersReport() {
         const orderIds = filteredOrders.map(o => o.id);
         const customerIds = Array.from(new Set(filteredOrders.map(o => o.customerId)));
 
-        // Fetch customers for these orders only
-        const { data: customersData } = await supabase
-          .from('customers')
-          .select('id, full_name, address_line, mobile_number')
-          .in('id', customerIds);
+        // Fetch customers for these orders only (Chunked)
+        const chunkSize = 150;
+        let customersData: any[] = [];
+        for (let i = 0; i < customerIds.length; i += chunkSize) {
+            const chunk = customerIds.slice(i, i + chunkSize);
+            const { data } = await supabase
+              .from('customers')
+              .select('id, full_name, address_line, mobile_number')
+              .in('id', chunk);
+            if (data) customersData = customersData.concat(data);
+        }
 
         const customerMap = new Map<string, any>();
-        (customersData || []).forEach((c: any) => {
+        customersData.forEach((c: any) => {
           customerMap.set(c.id, {
               name: c.full_name || 'Unknown Customer',
               address: c.address_line || '',
@@ -183,11 +189,16 @@ export function ProcessedOrdersReport() {
           });
         });
 
-        // Fetch order items for these orders only
-        const { data: itemsData } = await supabase
-          .from('order_items')
-          .select('id, order_id, quantity, selling_price_at_sale, product_id, products(name)')
-          .in('order_id', orderIds);
+        // Fetch order items for these orders only (Chunked)
+        let itemsData: any[] = [];
+        for (let i = 0; i < orderIds.length; i += chunkSize) {
+            const chunk = orderIds.slice(i, i + chunkSize);
+            const { data } = await supabase
+              .from('order_items')
+              .select('id, order_id, quantity, selling_price_at_sale, product_id, products(name)')
+              .in('order_id', chunk);
+            if (data) itemsData = itemsData.concat(data);
+        }
 
         // Group items by order_id
         const itemsMap = new Map<string, OrderItem[]>();

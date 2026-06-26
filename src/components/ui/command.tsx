@@ -113,13 +113,30 @@ CommandSeparator.displayName = CommandPrimitive.Separator.displayName
 const CommandItem = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Item>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.Item>
->(({ className, ...props }, ref) => (
+>(({ className, onSelect, value, ...props }, ref) => (
   <CommandPrimitive.Item
     ref={ref}
     className={cn(
       "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none aria-selected:bg-accent aria-selected:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       className
     )}
+    value={value}
+    onSelect={onSelect}
+    onPointerDown={(e) => {
+      // Prevent focus loss to keep the mobile keyboard open
+      // and prevent layout shifts that cancel click events.
+      e.preventDefault();
+      props.onPointerDown?.(e);
+    }}
+    onPointerUp={(e) => {
+      // Since we prevented default on pointer down, onClick might not fire.
+      // We manually trigger onSelect here. pointerup only fires if the user 
+      // hasn't started scrolling (which would fire pointercancel instead).
+      if (onSelect) {
+        onSelect(value || e.currentTarget.textContent || "");
+      }
+      props.onPointerUp?.(e);
+    }}
     {...props}
   />
 ))
