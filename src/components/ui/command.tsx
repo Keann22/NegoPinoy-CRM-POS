@@ -123,19 +123,18 @@ const CommandItem = React.forwardRef<
     value={value}
     onSelect={onSelect}
     onPointerDown={(e) => {
-      // Prevent focus loss to keep the mobile keyboard open
-      // and prevent layout shifts that cancel click events.
+      // 1. Prevent input blur which causes mobile keyboard to close and layout to shift.
+      //    (This layout shift is what normally cancels the synthetic click event on mobile).
       e.preventDefault();
-      props.onPointerDown?.(e);
-    }}
-    onPointerUp={(e) => {
-      // Since we prevented default on pointer down, onClick might not fire.
-      // We manually trigger onSelect here. pointerup only fires if the user 
-      // hasn't started scrolling (which would fire pointercancel instead).
+      
+      // 2. Since preventDefault cancels the native click event, cmdk's onClick 
+      //    will never fire. Therefore, we MUST forcefully trigger onSelect here.
+      //    Doing this on pointerdown guarantees instantaneous selection on both PC and mobile.
       if (onSelect) {
         onSelect(value || e.currentTarget.textContent || "");
       }
-      props.onPointerUp?.(e);
+      
+      props.onPointerDown?.(e);
     }}
     {...props}
   />
