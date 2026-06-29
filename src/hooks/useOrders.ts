@@ -78,13 +78,20 @@ export function useOrders() {
           return;
         }
 
-        const { data, error } = await supabase
-          .from('customers')
-          .select('id, full_name')
-          .in('id', customerIds);
-        if (error) throw error;
         const map = new Map<string, string>();
-        (data || []).forEach(c => map.set(c.id, c.full_name || 'Unknown Customer'));
+        const chunkSize = 150;
+        
+        for (let i = 0; i < customerIds.length; i += chunkSize) {
+          const chunk = customerIds.slice(i, i + chunkSize);
+          const { data, error } = await supabase
+            .from('customers')
+            .select('id, full_name')
+            .in('id', chunk);
+            
+          if (error) throw error;
+          (data || []).forEach(c => map.set(c.id, c.full_name || 'Unknown Customer'));
+        }
+        
         setCustomerMap(map);
       } catch (err) {
         console.error('Error fetching customers for orders:', err);
