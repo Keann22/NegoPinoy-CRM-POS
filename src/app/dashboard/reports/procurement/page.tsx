@@ -230,6 +230,37 @@ export default function ProcurementSheet() {
     }
   };
 
+  const handleSyncInventory = async (productId: string, staffRequestedQty: number) => {
+    try {
+      const targetStockLevel = -staffRequestedQty;
+      const { data: p } = await supabase.from('products').select('stock_level').eq('id', productId).single();
+      if (!p) throw new Error("Product not found");
+
+      const currentStockLevel = p.stock_level;
+      const discrepancy = targetStockLevel - currentStockLevel;
+
+      if (discrepancy !== 0) {
+        await supabase.from('products').update({ stock_level: targetStockLevel }).eq('id', productId);
+        await supabase.from('inventory_movements').insert({
+          product_id: productId,
+          quantity: discrepancy,
+          type: 'adjustment',
+          reason: 'Manual Procurement Auto-Adjustment (Dashboard Sync)',
+          previous_stock: currentStockLevel,
+          new_stock: targetStockLevel,
+          user_id: null
+        });
+        alert("Inventory synced successfully!");
+        fetchData();
+      } else {
+        alert("Inventory is already in sync!");
+        fetchData(); 
+      }
+    } catch (e: any) {
+      alert("Failed to sync inventory: " + e.message);
+    }
+  };
+
   const handleAddAdhocProduct = async (product: any) => {
     // Check if it's already in the list
     for (const group of groupedItems) {
@@ -429,8 +460,16 @@ export default function ProcurementSheet() {
                             {item.productName}
                           </button>
                           {hasDiscrepancy && (
-                              <div className="text-xs font-bold text-orange-600 mt-1">
-                                  ⚠️ Discrepancy detected.
+                              <div className="text-xs font-bold text-orange-600 mt-1 flex items-center gap-2">
+                                  <span>⚠️ Discrepancy detected.</span>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    className="h-6 px-2 text-[10px] border-orange-200 hover:bg-orange-100 hover:text-orange-700"
+                                    onClick={() => handleSyncInventory(item.productId, item.staffRequestedQty)}
+                                  >
+                                    Sync
+                                  </Button>
                               </div>
                           )}
                           {group.id === null && (
