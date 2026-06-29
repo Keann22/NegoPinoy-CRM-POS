@@ -61,6 +61,7 @@ export default function CourierSyncPage() {
       let orderCol = -1;
       let trackingCol = -1;
       let statusCol = -1;
+      let deliveryCol = -1;
       let headersFound = false;
 
       // Locate columns
@@ -75,6 +76,8 @@ export default function CourierSyncPage() {
               trackingCol = colNumber;
             } else if (statusCol === -1 && (val === 'status' || val === 'tracking status' || val === 'delivery status' || val === 'courier status')) {
               statusCol = colNumber;
+            } else if (deliveryCol === -1 && (val === 'delivery date' || val === 'date delivered' || val === 'completed time' || val === 'delivered date' || val === 'time of delivery')) {
+              deliveryCol = colNumber;
             }
           });
 
@@ -99,7 +102,7 @@ export default function CourierSyncPage() {
       // Fetch all orders to match against
       const { data: allOrders, error: fetchError } = await supabase
         .from('orders')
-        .select('id, status, tracking_number');
+        .select('id, status, tracking_number, payment_method, balance_due, next_due_date');
 
       if (fetchError) throw fetchError;
 
@@ -187,7 +190,13 @@ export default function CourierSyncPage() {
             return;
         }
 
-        if (matchedOrder.status === systemStatus) {
+        // Check if we need to update due date even if status hasn't changed
+        const needsDueDateUpdate = (systemStatus === 'Completed' || matchedOrder.status === 'Completed') 
+            && (matchedOrder.payment_method === 'Installment' || matchedOrder.payment_method === 'Lay-away') 
+            && matchedOrder.balance_due > 0 
+            && !matchedOrder.next_due_date;
+
+        if (matchedOrder.status === systemStatus && !needsDueDateUpdate) {
             syncResults.push({
                 orderId: matchedOrder.id.substring(0,7).toUpperCase(),
                 trackingNumber: rawTracking,
@@ -212,6 +221,24 @@ export default function CourierSyncPage() {
 
         if (['Shipped', 'Completed', 'Payment Received (COD)'].includes(systemStatus)) {
             updatePayload.completed_at = new Date().toISOString();
+        }
+
+        if (systemStatus === 'Completed' && (matchedOrder.payment_method === 'Installment' || matchedOrder.payment_method === 'Lay-away') && matchedOrder.balance_due > 0) {
+            let deliveryDateStr = '';
+            if (deliveryCol !== -1) {
+                const cell = row.getCell(deliveryCol);
+                if (cell.type === 4 && cell.value instanceof Date) {
+                    deliveryDateStr = cell.value.toISOString();
+                } else if (cell.value) {
+                    const parsedDate = new Date(cell.value.toString());
+                    if (!isNaN(parsedDate.getTime())) {
+                        deliveryDateStr = parsedDate.toISOString();
+                    }
+                }
+            }
+            if (deliveryDateStr) {
+                updatePayload.next_due_date = deliveryDateStr;
+            }
         }
 
         const updatePromise = supabase

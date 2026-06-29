@@ -151,6 +151,9 @@ export function OrdersTable({
                         <>
                           <DropdownMenuItem onClick={() => onLogPayment(order)}>Log Payment</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => onEditPaymentTerms(order)}>Edit Payment Terms</DropdownMenuItem>
+                          {((order.paymentType === 'Installment' || order.paymentType === 'Lay-away') && order.balanceDue > 0) && (
+                            <DropdownMenuItem onClick={() => onDueDate(order)}>Set Next Due Date</DropdownMenuItem>
+                          )}
                         </>
                       )}
 

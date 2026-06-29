@@ -71,7 +71,13 @@ export function useOrders() {
     const fetchCustomers = async () => {
       setIsLoadingCustomers(true);
       try {
-        const customerIds = Array.from(new Set(orders.map(o => o.customerId)));
+        const customerIds = Array.from(new Set(orders.map(o => o.customerId))).filter(Boolean);
+        
+        if (customerIds.length === 0) {
+          setCustomerMap(new Map());
+          return;
+        }
+
         const { data, error } = await supabase
           .from('customers')
           .select('id, full_name')

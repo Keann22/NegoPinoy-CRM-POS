@@ -73,10 +73,10 @@ export default function OrdersPage() {
     if (statusFilter !== 'all') filtered = filtered.filter(o => o.orderStatus === statusFilter);
     if (typeFilter !== 'all') filtered = filtered.filter(o => o.paymentType === typeFilter);
     if (searchQuery.trim() !== '') {
-      const query = searchQuery.toLowerCase().trim();
+      const query = searchQuery.toLowerCase().trim().replace(/\s+/g, ' ');
       filtered = filtered.filter(o =>
         (o.id || '').toLowerCase().includes(query) ||
-        (customerMap.get(o.customerId) || '').toLowerCase().includes(query)
+        (customerMap.get(o.customerId) || '').toLowerCase().replace(/\s+/g, ' ').includes(query)
       );
     }
     if (date?.from) {
