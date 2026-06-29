@@ -416,10 +416,21 @@ export function PendingPurchases({ onReceiveComplete }: { onReceiveComplete: () 
                   }
               }} />
           </div>
-          <Button onClick={handleReceive} disabled={isSubmitting} className="bg-indigo-600 hover:bg-indigo-700">
-            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Receive Checked Items
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => {
+                    setItems(items.map(i => ({ ...i, receivedQty: i.remainingQty.toString() })));
+                }}
+            >
+                Auto-Fill Expected
+            </Button>
+            <Button onClick={handleReceive} disabled={isSubmitting} className="bg-indigo-600 hover:bg-indigo-700">
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Receive Checked Items
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

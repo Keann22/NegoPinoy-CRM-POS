@@ -10,7 +10,7 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 export function OrderIssues({ isAdmin }: { isAdmin?: boolean }) {
   const [issues, setIssues] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedIssue, setSelectedIssue] = useState<any | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<any | null>(null);
   const [replyText, setReplyText] = useState("");
   const [isSending, setIsSending] = useState(false);
   
@@ -37,34 +37,68 @@ export function OrderIssues({ isAdmin }: { isAdmin?: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const openIssue = async (issue: any) => {
-    setSelectedIssue(issue);
+  const groupedIssues = Object.values(issues.reduce((acc, issue) => {
+    const orderId = issue.orders?.id || 'unknown';
+    if (!acc[orderId]) {
+      acc[orderId] = {
+        orderId,
+        orderTitle: issue.orders ? `Order #${issue.orders.id.substring(0,7).toUpperCase()}` : 'Unknown Order',
+        customerName: issue.orders?.customers?.full_name || '',
+        reporter: issue.reported_by_name || issue.order_issue_messages?.[0]?.sender_name || 'Unknown',
+        items: [],
+        messagesCount: 0,
+        issues: [],
+        orders: issue.orders
+      };
+    }
+    acc[orderId].items.push(issue.products?.name || 'Unknown Item');
+    acc[orderId].messagesCount += (issue.order_issue_messages?.length || 0);
+    acc[orderId].issues.push(issue);
+    return acc;
+  }, {} as Record<string, any>));
+
+  const openGroup = async (group: any) => {
+    setSelectedGroup(group);
     setReplyText("");
     
-    // Fetch detailed issue to get messages
+    // Fetch detailed issues to get all messages
     try {
-      const res = await fetch(`/api/inventory/issues?id=${issue.id}`);
-      if (res.ok) {
-        const fullIssue = await res.json();
-        setSelectedIssue(fullIssue);
-      }
+      const fullGroupIssues = await Promise.all(
+          group.issues.map((i: any) => fetch(`/api/inventory/issues?id=${i.id}`).then(res => res.json()))
+      );
+      
+      let allMessages: any[] = [];
+      fullGroupIssues.forEach(fullIssue => {
+          if (fullIssue.order_issue_messages) {
+              allMessages.push(...fullIssue.order_issue_messages);
+          }
+      });
+      allMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+      setSelectedGroup({
+         ...group,
+         issues: fullGroupIssues,
+         messages: allMessages
+      });
     } catch (e) {
-      console.error("Failed to load full issue", e);
+      console.error("Failed to load full issues", e);
     }
   };
 
   const handleResolve = async () => {
-    if (!selectedIssue) return;
-    if (!confirm("Are you sure you want to resolve this issue? This will remove it from the dashboard.")) return;
+    if (!selectedGroup) return;
+    if (!confirm("Are you sure you want to resolve ALL issues for this order? This will remove them from the dashboard.")) return;
     
     try {
-      const res = await fetch('/api/inventory/issues', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ issueId: selectedIssue.id, status: 'resolved' })
-      });
-      if (!res.ok) throw new Error("Failed to resolve issue");
-      setSelectedIssue(null);
+      for (const issue of selectedGroup.issues) {
+          const res = await fetch('/api/inventory/issues', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ issueId: issue.id, status: 'resolved' })
+          });
+          if (!res.ok) throw new Error("Failed to resolve an issue");
+      }
+      setSelectedGroup(null);
       fetchIssues();
     } catch (e: any) {
       alert("Error: " + e.message);
@@ -72,15 +106,16 @@ export function OrderIssues({ isAdmin }: { isAdmin?: boolean }) {
   };
 
   const handleSendReply = async () => {
-    if (!replyText.trim() || !selectedIssue) return;
+    if (!replyText.trim() || !selectedGroup) return;
     
     setIsSending(true);
     try {
+      // Send message attached to the first issue in the group
       const res = await fetch('/api/inventory/issues/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          issueId: selectedIssue.id,
+          issueId: selectedGroup.issues[0].id,
           senderRole: 'sales',
           senderName: userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : 'Sales Team',
           message: replyText.trim()
@@ -90,12 +125,8 @@ export function OrderIssues({ isAdmin }: { isAdmin?: boolean }) {
       if (!res.ok) throw new Error("Failed to send message");
       
       setReplyText("");
-      // Refresh just the messages for this issue
-      const refetch = await fetch(`/api/inventory/issues?id=${selectedIssue.id}`);
-      if (refetch.ok) {
-        const fullIssue = await refetch.json();
-        setSelectedIssue(fullIssue);
-      }
+      // Refresh the group
+      openGroup(selectedGroup);
     } catch (e: any) {
       alert("Error: " + e.message);
     } finally {
@@ -109,41 +140,45 @@ export function OrderIssues({ isAdmin }: { isAdmin?: boolean }) {
         <CardHeader>
           <CardTitle className="text-amber-800 flex items-center gap-2">
             <AlertCircle className="w-5 h-5" />
-            Order Issues ({issues.length})
+            Order Issues ({issues.length} items across {groupedIssues.length} orders)
           </CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <div className="text-sm text-slate-500">Checking for issues...</div>
-          ) : issues.length === 0 ? (
+          ) : groupedIssues.length === 0 ? (
             <div className="text-sm text-slate-500 py-4 text-center bg-white rounded border border-amber-100">
               No active order issues at the moment.
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {issues.map(issue => {
-                const reporter = issue.reported_by_name || issue.order_issue_messages?.[0]?.sender_name || 'Unknown';
-                const orderTitle = issue.orders ? `Order #${issue.orders.id.substring(0,7).toUpperCase()}` : 'Unknown Order';
-                const customerName = issue.orders?.customers?.full_name || '';
-                return (
+              {groupedIssues.map((group: any) => (
                 <div 
-                  key={issue.id} 
-                  onClick={() => openIssue(issue)}
+                  key={group.orderId} 
+                  onClick={() => openGroup(group)}
                   className="bg-white p-4 rounded-md border border-amber-200 shadow-sm cursor-pointer hover:border-amber-400 hover:shadow-md transition-all flex flex-col justify-between"
                 >
                   <div>
                     <h4 className="font-semibold text-slate-900 text-sm line-clamp-2">
-                      {orderTitle}
+                      {group.orderTitle}
                     </h4>
-                    {customerName && <p className="text-xs text-slate-600 font-medium">{customerName}</p>}
-                    <p className="text-xs text-red-600 font-medium mt-1">Missing: {issue.products?.name || 'Unknown Item'}</p>
-                    <div className="text-xs text-slate-500 mt-2 space-y-1">
+                    {group.customerName && <p className="text-xs text-slate-600 font-medium">{group.customerName}</p>}
+                    <div className="mt-2 space-y-1">
+                        <p className="text-xs font-semibold text-red-600">Missing Items ({group.items.length}):</p>
+                        <ul className="text-xs text-red-500 list-disc pl-4 space-y-0.5">
+                            {group.items.slice(0, 3).map((item: string, idx: number) => (
+                                <li key={idx} className="truncate">{item}</li>
+                            ))}
+                            {group.items.length > 3 && <li>+{group.items.length - 3} more</li>}
+                        </ul>
+                    </div>
+                    <div className="text-xs text-slate-500 mt-3 space-y-1 pt-3 border-t border-slate-100">
                       <p className="flex items-center gap-1">
                         <MessageSquare className="w-3 h-3" />
-                        {issue.order_issue_messages?.length || 0} messages
+                        {group.messagesCount} messages
                       </p>
                       <p className="flex items-center gap-1 text-slate-600">
-                        Reported by: <span className="font-medium text-slate-800">{reporter}</span>
+                        Reported by: <span className="font-medium text-slate-800">{group.reporter}</span>
                       </p>
                     </div>
                   </div>
@@ -151,25 +186,30 @@ export function OrderIssues({ isAdmin }: { isAdmin?: boolean }) {
                     View Details
                   </Button>
                 </div>
-              )})}
+              ))}
             </div>
           )}
         </CardContent>
       </Card>
 
-      <Dialog open={!!selectedIssue} onOpenChange={(open) => !open && setSelectedIssue(null)}>
+      <Dialog open={!!selectedGroup} onOpenChange={(open) => !open && setSelectedGroup(null)}>
         <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col overflow-hidden p-0">
           <DialogHeader className="p-6 border-b bg-slate-50 shrink-0">
             <div>
               <DialogTitle className="flex items-center gap-2 text-xl">
                 <AlertCircle className="text-amber-600 w-6 h-6" />
-                Order Issue: #{selectedIssue?.orders?.id?.substring(0,7).toUpperCase() || 'Unknown'}
+                Order Issue: {selectedGroup?.orderTitle}
               </DialogTitle>
-              <p className="text-sm text-slate-600 mt-1 pl-8">
-                Missing Item: <span className="font-medium text-slate-800">{selectedIssue?.products?.name || 'Unknown Item'}</span>
-              </p>
-              <p className="text-xs text-slate-500 mt-1 pl-8">
-                Reported by: <span className="font-medium text-slate-700">{selectedIssue?.reported_by_name || 'Unknown'}</span>
+              <div className="text-sm text-slate-600 mt-2 pl-8">
+                <span className="font-semibold text-slate-800">Missing Items:</span>
+                <ul className="list-disc pl-4 mt-1 space-y-0.5 text-red-600">
+                    {selectedGroup?.items?.map((item: string, idx: number) => (
+                        <li key={idx}>{item}</li>
+                    ))}
+                </ul>
+              </div>
+              <p className="text-xs text-slate-500 mt-2 pl-8">
+                Reported by: <span className="font-medium text-slate-700">{selectedGroup?.reporter || 'Unknown'}</span>
               </p>
             </div>
           </DialogHeader>
@@ -181,7 +221,7 @@ export function OrderIssues({ isAdmin }: { isAdmin?: boolean }) {
                 Discussion
               </div>
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {selectedIssue?.order_issue_messages?.map((msg: any) => {
+                {selectedGroup?.messages?.map((msg: any) => {
                   const isSales = msg.sender_role === 'sales';
                   return (
                     <div key={msg.id} className={`flex flex-col ${isSales ? 'items-end' : 'items-start'}`}>
@@ -192,6 +232,9 @@ export function OrderIssues({ isAdmin }: { isAdmin?: boolean }) {
                     </div>
                   );
                 })}
+                {selectedGroup?.messages?.length === 0 && (
+                    <div className="text-center text-slate-400 text-sm italic mt-4">No messages yet.</div>
+                )}
               </div>
               <div className="p-3 bg-white border-t flex gap-2">
                 <Input 
@@ -212,24 +255,24 @@ export function OrderIssues({ isAdmin }: { isAdmin?: boolean }) {
                 <span className="flex items-center gap-2"><PackageOpen className="w-4 h-4"/> Order Details</span>
               </div>
               <div className="flex-1 overflow-y-auto p-4">
-                {selectedIssue?.orders ? (
+                {selectedGroup?.orders ? (
                   <div className="space-y-4">
                     <div>
                       <p className="text-xs text-slate-500">Customer</p>
-                      <p className="font-semibold">{selectedIssue.orders.customers?.full_name || 'N/A'}</p>
+                      <p className="font-semibold">{selectedGroup.orders.customers?.full_name || 'N/A'}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-500">Sales Person</p>
-                      <p className="font-medium">{selectedIssue.orders.sales_person_name || 'N/A'}</p>
+                      <p className="font-medium">{selectedGroup.orders.sales_person_name || 'N/A'}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-500">Status</p>
-                      <p className="font-medium">{selectedIssue.orders.status}</p>
+                      <p className="font-medium">{selectedGroup.orders.status}</p>
                     </div>
                     <div className="mt-4 pt-4 border-t">
                       <p className="text-xs text-slate-500 mb-2">Order Items</p>
                       <ul className="space-y-2">
-                        {selectedIssue.orders.order_items?.map((item: any) => (
+                        {selectedGroup.orders.order_items?.map((item: any) => (
                           <li key={item.id} className="text-sm flex justify-between">
                             <span>{item.product_name}</span>
                             <span className="font-bold">x{item.quantity}</span>
@@ -248,7 +291,7 @@ export function OrderIssues({ isAdmin }: { isAdmin?: boolean }) {
           {canResolve && (
             <div className="p-4 border-t bg-slate-50 flex justify-end shrink-0">
               <Button onClick={handleResolve} variant="outline" className="border-amber-600 text-amber-700 hover:bg-amber-50 gap-2">
-                <CheckCircle2 className="w-4 h-4" /> Resolve & Close Issue
+                <CheckCircle2 className="w-4 h-4" /> Resolve ALL Missing Items
               </Button>
             </div>
           )}
