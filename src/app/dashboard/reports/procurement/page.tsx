@@ -232,30 +232,21 @@ export default function ProcurementSheet() {
 
   const handleSyncInventory = async (productId: string, staffRequestedQty: number) => {
     try {
-      const targetStockLevel = -staffRequestedQty;
-      const { data: p } = await supabase.from('products').select('stock_level').eq('id', productId).single();
-      if (!p) throw new Error("Product not found");
+      const res = await fetch('/api/inventory/procurement/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId, staffRequestedQty })
+      });
 
-      const currentStockLevel = p.stock_level;
-      const discrepancy = targetStockLevel - currentStockLevel;
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to sync");
 
-      if (discrepancy !== 0) {
-        await supabase.from('products').update({ stock_level: targetStockLevel }).eq('id', productId);
-        await supabase.from('inventory_movements').insert({
-          product_id: productId,
-          quantity: discrepancy,
-          type: 'adjustment',
-          reason: 'Manual Procurement Auto-Adjustment (Dashboard Sync)',
-          previous_stock: currentStockLevel,
-          new_stock: targetStockLevel,
-          user_id: null
-        });
+      if (data.discrepancy !== 0) {
         alert("Inventory synced successfully!");
-        fetchData();
       } else {
         alert("Inventory is already in sync!");
-        fetchData(); 
       }
+      fetchData();
     } catch (e: any) {
       alert("Failed to sync inventory: " + e.message);
     }
