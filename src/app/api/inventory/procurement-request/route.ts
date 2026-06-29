@@ -80,7 +80,10 @@ export async function POST(req: Request) {
         const existingItem = existingMap.get(p.productId)!;
         await supabase
           .from('purchase_order_items')
-          .update({ expected_qty: existingItem.expected_qty + p.requestedQty })
+          .update({ 
+            expected_qty: existingItem.expected_qty + p.requestedQty,
+            status: 'pending_receipt' 
+          })
           .eq('id', existingItem.id);
       } else {
         // Insert new item
