@@ -15,6 +15,7 @@ import { CommissionReport } from '@/components/dashboard/reports/commission-repo
 import { StaleReservationsReport } from '@/components/dashboard/reports/stale-reservations-report';
 import { PackedOrdersReport } from '@/components/dashboard/reports/packed-orders-report';
 import { DiscrepancyReport } from '@/components/dashboard/reports/discrepancy-report';
+import { ComplianceReport } from '@/components/dashboard/reports/compliance-report';
 import { useMemo } from 'react';
 
 export default function ReportsPage() {
@@ -70,6 +71,9 @@ export default function ReportsPage() {
                 <TabsTrigger value="ar-report">Accounts Receivable</TabsTrigger>
                 <TabsTrigger value="cashflow-report">Cash Flow</TabsTrigger>
             </>
+          )}
+          {isManagement && (
+            <TabsTrigger value="compliance">Agent Compliance</TabsTrigger>
           )}
         </TabsList>
       </div>
@@ -140,6 +144,11 @@ export default function ReportsPage() {
                 <CashFlowReport />
             </TabsContent>
         </>
+      )}
+      {isManagement && (
+        <TabsContent value="compliance">
+          <ComplianceReport />
+        </TabsContent>
       )}
     </Tabs>
     </div>

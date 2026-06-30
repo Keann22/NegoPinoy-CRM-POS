@@ -15,3 +15,4 @@ export * from './product.types';
 export * from './customer.types';
 export * from './supplier.types';
 export * from './accounting.types';
+export * from './agent.types';

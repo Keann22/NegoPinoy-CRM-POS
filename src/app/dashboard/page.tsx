@@ -25,6 +25,7 @@ import { CollectionsDueSoon } from '@/components/dashboard/collections-due-soon'
 import { OrderIssues } from '@/components/dashboard/order-issues';
 import { ProcurementIssues } from '@/components/dashboard/procurement-issues';
 import { InventoryDashboard } from '@/components/dashboard/inventory-dashboard';
+import { ComplianceWidget } from '@/components/dashboard/compliance-widget';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUserProfile } from '@/hooks/useUserProfile';
 
@@ -338,6 +339,11 @@ export default function DashboardPage() {
                 <TopProducts dateRange={dateRange} salespersonId={selectedSalesperson} />
               </CardContent>
             </Card>
+        </div>
+      )}
+      {(isManagement || isSales) && (
+        <div className="grid gap-4 md:gap-8 lg:grid-cols-2">
+          <ComplianceWidget />
         </div>
       )}
     </>

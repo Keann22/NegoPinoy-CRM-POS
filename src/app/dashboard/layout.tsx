@@ -29,6 +29,7 @@ import {
   FileText,
   ClipboardList,
   ShieldCheck,
+  CalendarCheck2,
 } from 'lucide-react';
 import { useAuth, useUser } from '@/lib/supabase/hooks';
 import { usePathname, useRouter } from 'next/navigation';
@@ -151,6 +152,11 @@ export default function DashboardLayout({
     }
 
     links.push({ href: '/dashboard/reports', label: 'Reports', icon: LineChart });
+
+    // Daily Log — visible to Sales and Management
+    if (isManagement || isSales) {
+      links.push({ href: '/dashboard/daily-log', label: 'Daily Task Log', icon: CalendarCheck2 });
+    }
 
     return links;
   }, [isManagement, isSales, isInventory, openInventory, openAccounting]);
