@@ -119,6 +119,19 @@ export default function SPXRemittancesPage() {
 
       if (fetchError) throw fetchError;
 
+      // Fetch existing SPX fee expenses so we never record the same courier fee twice
+      // if the same tracking number/order shows up again in a later (overlapping) upload.
+      const { data: existingFeeExpenses } = await supabase
+        .from('expenses')
+        .select('description')
+        .ilike('description', 'SPX%Fee for Order #%');
+
+      const feeAlreadyRecordedFor = new Set<string>();
+      (existingFeeExpenses || []).forEach((e: any) => {
+        const match = e.description?.match(/Order #(\w+)/);
+        if (match) feeAlreadyRecordedFor.add(match[1]);
+      });
+
       const syncResults: RemittanceResult[] = [];
       const processedTracking = new Set<string>();
 
@@ -131,6 +144,7 @@ export default function SPXRemittancesPage() {
           .map((t: string) => t.trim())
           .filter(Boolean);
         let totalCod = 0;
+        let totalAvailableCod = 0; // Real COD SPX collected, before capping to what the order still needs
         let totalShippingFee = 0;
         let totalProcessingFee = 0;
         let matchedTrackingNos: string[] = [];
@@ -148,7 +162,8 @@ export default function SPXRemittancesPage() {
             }
             
             const availableCod = trackingData[t].cod;
-            
+            totalAvailableCod += availableCod;
+
             // If this is the last order or the only order, we might want to dump the excess COD here, 
             // but to be safe, we just take what we need unless the balance is 0 and we have excess.
             // Actually, we'll take up to balanceNeeded, and if there's still COD left, we leave it in trackingData[t] for the next matched order.
@@ -194,13 +209,51 @@ export default function SPXRemittancesPage() {
             hasSpxPayment ||
             order.status === 'Payment Received (COD)'
           ) {
+             // The order's balance is already settled, so we don't touch amount_paid/balance_due.
+             // But SPX still deducted a real courier fee from the account for this tracking number,
+             // so record it as an expense (once) instead of silently dropping it.
+             let feeMessage = 'Order COD has already been synced or is fully paid.';
+             const explicitShippingFee = Math.abs(totalShippingFee);
+             const explicitProcessingFee = Math.abs(totalProcessingFee);
+
+             if ((explicitShippingFee > 0 || explicitProcessingFee > 0) && !feeAlreadyRecordedFor.has(shortOrderId)) {
+               try {
+                 if (explicitShippingFee > 0) {
+                   const { error: shipError } = await supabase
+                     .from('expenses')
+                     .insert({
+                       amount: explicitShippingFee,
+                       category: 'Shipping Fee',
+                       expense_date: new Date().toISOString(),
+                       description: `SPX Shipping Fee for Order #${shortOrderId}`
+                     });
+                   if (shipError) throw shipError;
+                 }
+                 if (explicitProcessingFee > 0) {
+                   const { error: procError } = await supabase
+                     .from('expenses')
+                     .insert({
+                       amount: explicitProcessingFee,
+                       category: 'Processing Fee',
+                       expense_date: new Date().toISOString(),
+                       description: `SPX Courier Fee for Order #${shortOrderId}`
+                     });
+                   if (procError) throw procError;
+                 }
+                 feeAlreadyRecordedFor.add(shortOrderId);
+                 feeMessage = 'Order already settled. Courier fee for this remittance was recorded as an expense.';
+               } catch (err: any) {
+                 feeMessage = `Order already settled, but failed to record courier fee: ${err.message || 'unknown error'}`;
+               }
+             }
+
              syncResults.push({
                trackingNumber: joinedTracking,
                orderId: shortOrderId,
-               codAmount: totalCod,
+               codAmount: totalAvailableCod,
                shippingFee: totalShippingFee + totalProcessingFee,
                category: 'already_paid',
-               message: 'Order COD has already been synced or is fully paid.'
+               message: feeMessage
              });
              continue;
           }
@@ -265,30 +318,37 @@ export default function SPXRemittancesPage() {
               }
 
 
-              // Insert explicit Shipping Fee
-              if (finalShippingFee > 0) {
-                const { error: shipError } = await supabase
-                  .from('expenses')
-                  .insert({
-                    amount: finalShippingFee,
-                    category: 'Shipping Fee',
-                    expense_date: new Date().toISOString(),
-                    description: `SPX Shipping Fee for Order #${shortOrderId}`
-                  });
-                if (shipError) throw shipError;
-              }
+              // Insert explicit Shipping Fee (skip if we already recorded a fee for this order,
+              // e.g. a previous zero-COD run that never created a payment to mark it as handled)
+              if (!feeAlreadyRecordedFor.has(shortOrderId)) {
+                if (finalShippingFee > 0) {
+                  const { error: shipError } = await supabase
+                    .from('expenses')
+                    .insert({
+                      amount: finalShippingFee,
+                      category: 'Shipping Fee',
+                      expense_date: new Date().toISOString(),
+                      description: `SPX Shipping Fee for Order #${shortOrderId}`
+                    });
+                  if (shipError) throw shipError;
+                }
 
-              // Insert Processing/Courier Fee
-              if (finalProcessingFee > 0) {
-                const { error: procError } = await supabase
-                  .from('expenses')
-                  .insert({
-                    amount: finalProcessingFee,
-                    category: 'Processing Fee',
-                    expense_date: new Date().toISOString(),
-                    description: `SPX Courier Fee for Order #${shortOrderId}`
-                  });
-                if (procError) throw procError;
+                // Insert Processing/Courier Fee
+                if (finalProcessingFee > 0) {
+                  const { error: procError } = await supabase
+                    .from('expenses')
+                    .insert({
+                      amount: finalProcessingFee,
+                      category: 'Processing Fee',
+                      expense_date: new Date().toISOString(),
+                      description: `SPX Courier Fee for Order #${shortOrderId}`
+                    });
+                  if (procError) throw procError;
+                }
+
+                if (finalShippingFee > 0 || finalProcessingFee > 0) {
+                  feeAlreadyRecordedFor.add(shortOrderId);
+                }
               }
 
               syncResults.push({
