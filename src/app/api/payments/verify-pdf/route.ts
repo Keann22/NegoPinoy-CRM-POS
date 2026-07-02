@@ -12,6 +12,37 @@ if (typeof globalThis.Path2D === 'undefined') {
   globalThis.Path2D = class Path2D { constructor() {} } as any;
 }
 
+/**
+ * pdfjs-dist's getTextContent() returns individually positioned text
+ * fragments, not visual rows - naively joining every item on a page with a
+ * single space collapses the entire page (every transaction row) into one
+ * giant string, so a reference-number match and an unrelated amount
+ * elsewhere on the page can look like they're "on the same line." Group
+ * items by Y position (row) and sort left-to-right within each row to
+ * reconstruct actual table rows, so ref/amount matching is scoped to a
+ * single real transaction.
+ */
+function extractRows(items: any[]): string[] {
+  const Y_TOLERANCE = 2;
+  const rows: { y: number; parts: { x: number; str: string }[] }[] = [];
+
+  for (const item of items) {
+    const y = item.transform[5];
+    const x = item.transform[4];
+    let row = rows.find((r) => Math.abs(r.y - y) <= Y_TOLERANCE);
+    if (!row) {
+      row = { y, parts: [] };
+      rows.push(row);
+    }
+    row.parts.push({ x, str: item.str });
+  }
+
+  rows.sort((a, b) => b.y - a.y);
+  return rows
+    .map((r) => r.parts.sort((a, b) => a.x - b.x).map((p) => p.str).join(' ').trim())
+    .filter(Boolean);
+}
+
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
@@ -39,12 +70,11 @@ export async function POST(request: Request) {
 
     const pdfDocument = await loadingTask.promise;
     
-    let fullText = '';
+    let lines: string[] = [];
     for (let i = 1; i <= pdfDocument.numPages; i++) {
       const page = await pdfDocument.getPage(i);
       const textContent = await page.getTextContent();
-      const pageText = textContent.items.map((item: any) => item.str).join(' ');
-      fullText += pageText + '\n';
+      lines = lines.concat(extractRows(textContent.items));
     }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -58,9 +88,18 @@ export async function POST(request: Request) {
 
     if (error) throw error;
 
-    let verifiedCount = 0;
-    const lines = fullText.split('\n');
+    // A single real transfer can legitimately be split across multiple payment
+    // rows (e.g. applied toward two different lay-away orders), each correctly
+    // tagged with the same real reference number. Checking each row against
+    // the full transaction amount individually means a legitimate split
+    // payment can never match. Group by reference number and compare the
+    // group's summed amount instead. A small tolerance accounts for minor
+    // OCR misreads on the amount digits (observed real matches differ by at
+    // most ~P2; observed wrong reference-number collisions differ by P60+,
+    // so there's a wide, safe gap to pick a threshold from).
+    const AMOUNT_TOLERANCE = 5;
 
+    const groups = new Map<string, typeof pendingPayments>();
     for (const payment of pendingPayments) {
       if (!payment.reference_number || !payment.amount) continue;
 
@@ -68,24 +107,28 @@ export async function POST(request: Request) {
       const digitsMatch = payment.reference_number.match(/\d{8,}/);
       if (!digitsMatch) continue;
       const refClean = digitsMatch[0];
-      const amountClean = Number(payment.amount).toFixed(2);
-      const amountString = payment.amount.toString();
+      if (refClean.length <= 5) continue;
 
-      let isMatch = false;
-      
-      for (const line of lines) {
-        const noSpaceLine = line.replace(/\s/g, '');
-        // Check if line has the reference number
-        if (refClean.length > 5 && noSpaceLine.includes(refClean)) {
-          // Check if line also has the amount
-          if (line.includes(amountClean) || line.includes(amountString)) {
-            isMatch = true;
-            break;
-          }
-        }
-      }
+      if (!groups.has(refClean)) groups.set(refClean, []);
+      groups.get(refClean)!.push(payment);
+    }
 
-      if (isMatch) {
+    let verifiedCount = 0;
+
+    for (const [refClean, payments] of groups) {
+      const matchingRow = lines.find((line) => line.replace(/\s/g, '').includes(refClean));
+      if (!matchingRow) continue;
+
+      const tokens = matchingRow.split(/\s+/);
+      const refIdx = tokens.findIndex((t) => t.replace(/\D/g, '') === refClean);
+      const rowAmountStr = refIdx !== -1 ? tokens[refIdx + 1] : undefined;
+      const rowAmount = rowAmountStr ? parseFloat(rowAmountStr.replace(/,/g, '')) : NaN;
+      if (isNaN(rowAmount)) continue;
+
+      const sum = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
+      if (Math.abs(sum - rowAmount) > AMOUNT_TOLERANCE) continue;
+
+      for (const payment of payments) {
         await supabase
           .from('payments')
           .update({ status: 'Verified' })
