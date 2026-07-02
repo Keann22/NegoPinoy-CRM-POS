@@ -69,7 +69,7 @@ async function run() {
   // 2. Fetch Orders from Supabase
   const { data: orders, error } = await supabase
     .from('orders')
-    .select('id, tracking_number, amount_paid, balance_due, status')
+    .select('id, tracking_number, amount_paid, balance_due, status, payments(id, payment_method)')
     .in('tracking_number', trackingNumbers);
 
   if (error) {
@@ -89,6 +89,14 @@ async function run() {
     const balanceDue = order.balance_due || 0;
     
     console.log(`\nProcessing Order #${order.id.substring(0,7).toUpperCase()} (Tracking: ${order.tracking_number})`);
+    
+    // Prevent double logging
+    const hasSpxPayment = order.payments?.some(p => p.payment_method === 'SPX COD Remittance');
+    if (hasSpxPayment) {
+      console.log(` - SKIPPED: SPX COD Remittance already recorded for this order.`);
+      continue;
+    }
+
     console.log(` - Expected Balance Due: ₱${balanceDue.toFixed(2)}`);
     console.log(` - SPX Collected (COD):  ₱${spxData.cod.toFixed(2)}`);
     console.log(` - SPX Shipping Fee:     ₱${spxData.shippingFee.toFixed(2)}`);

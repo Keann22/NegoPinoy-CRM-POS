@@ -280,13 +280,19 @@ export default function OrderDetailPage() {
               <span>₱{(order.amountPaid || 0).toFixed(2)}</span>
             </div>
             {(shippingFee > 0 || processingFee > 0) && (() => {
+              const codPayments = payments.filter(p => p.paymentMethod?.toLowerCase().includes('cod'));
+              const actualCodCollected = codPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+              const displayCod = actualCodCollected > 0 ? actualCodCollected : (order.amountPaid || 0);
+              
               const totalDeductions = shippingFee + processingFee;
-              const netRemittance = (order.amountPaid || 0) - totalDeductions;
+              const netRemittance = displayCod - totalDeductions;
               const difference = netRemittance - (order.totalAmount || 0);
+              const showDifference = difference !== 0 && order.paymentType === 'COD';
+              
               return (
                 <div className="bg-muted/30 p-2 rounded-md mt-1 mb-2">
                   <div className="flex justify-between text-muted-foreground text-xs">
-                    <span>COD Collected</span><span>₱{(order.amountPaid || 0).toFixed(2)}</span>
+                    <span>COD Collected</span><span>₱{displayCod.toFixed(2)}</span>
                   </div>
                   {shippingFee > 0 && (
                     <div className="flex justify-between text-destructive text-xs">
@@ -301,7 +307,7 @@ export default function OrderDetailPage() {
                   <div className="flex justify-between text-primary text-xs font-semibold mt-1 pt-1 border-t">
                     <span>Net Remittance</span><span>₱{netRemittance.toFixed(2)}</span>
                   </div>
-                  {difference !== 0 && (
+                  {showDifference && (
                     <div className={`flex justify-between text-xs font-semibold mt-1 pt-1 border-t ${difference > 0 ? 'text-emerald-600' : 'text-destructive'}`}>
                       <span>{difference > 0 ? 'Additional Shipping Profit' : 'Shipping Loss / Extra Fee'}</span>
                       <span>{difference > 0 ? '+' : '-'} ₱{Math.abs(difference).toFixed(2)}</span>

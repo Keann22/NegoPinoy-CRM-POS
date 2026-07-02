@@ -111,10 +111,10 @@ export default function SPXRemittancesPage() {
         return;
       }
 
-      // Fetch all orders that might match
+      // Fetch all orders that might match, including their payments to check for duplicates
       const { data: allOrders, error: fetchError } = await supabase
         .from('orders')
-        .select('id, tracking_number, balance_due, amount_paid, status')
+        .select('id, tracking_number, balance_due, amount_paid, status, payments(id, payment_method, amount)')
         .not('tracking_number', 'is', null);
 
       if (fetchError) throw fetchError;
@@ -179,9 +179,12 @@ export default function SPXRemittancesPage() {
           const shortOrderId = order.id.substring(0, 7).toUpperCase();
 
           // Check if already fully paid or if we should skip to prevent duplicate syncing
+          // We look for an existing SPX COD Remittance payment for this order
+          const hasSpxPayment = order.payments?.some((p: any) => p.payment_method === 'SPX COD Remittance');
+
           if (
-            order.status === 'Payment Received (COD)' || 
-            (order.amount_paid && order.amount_paid >= totalCod)
+            hasSpxPayment ||
+            order.status === 'Payment Received (COD)'
           ) {
              syncResults.push({
                trackingNumber: joinedTracking,
