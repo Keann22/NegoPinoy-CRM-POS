@@ -120,14 +120,24 @@ export async function createOrder(
   const { data: orderId, error } = await supabase.rpc('process_order_transaction', { payload });
   if (error) throw error;
 
-  // Trigger OCR in background (fire-and-forget)
-  // Note: we'd need paymentId, but since it's a legacy feature we can just pass the proofUrl
+  // Trigger OCR in background (fire-and-forget). The RPC inserts the payment row
+  // server-side and only returns the order id, so look up the payment id it created.
   if (proofUrl) {
-    fetch('/api/payments/extract-ocr', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ proofUrl, orderId }),
-    }).catch(err => console.error('OCR trigger failed:', err));
+    (async () => {
+      const { data: payment } = await supabase
+        .from('payments')
+        .select('id')
+        .eq('order_id', orderId)
+        .eq('proof_url', proofUrl)
+        .limit(1)
+        .maybeSingle();
+      if (!payment) return;
+      await fetch('/api/payments/extract-ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ proofUrl, paymentId: payment.id }),
+      });
+    })().catch((err: unknown) => console.error('OCR trigger failed:', err));
   }
 
   return orderId;
