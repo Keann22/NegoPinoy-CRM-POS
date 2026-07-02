@@ -209,12 +209,33 @@ A **separate Vite + React app** deployed independently.
 
 ## SPX Remittance Rules
 
-The Accounting module handles uploading SPX Excel remittances. There are specific rules regarding fees:
+**Location**: `src/app/dashboard/accounting/remittances/page.tsx`
+
+Staff upload SPX's "Account Transaction List" Excel export. For each tracking number in the file, the system matches it to an order and buckets it into one of two paths:
+
+- **Needs payment**: the order isn't yet marked as COD-received — the file's COD amount is applied toward the order's balance (capped at what's still owed), a payment record is created, and any leftover COD is used to offset shipping/processing fees.
+- **Already paid**: the order's balance is already settled (e.g. status is `Payment Received (COD)`, or an SPX remittance payment already exists) — the row is informational only (it doesn't touch `amount_paid` / `balance_due`), but the courier fee SPX actually deducted still gets recorded as an Expense.
+
+A duplicate-guard (matches existing Expense descriptions like `SPX ... Fee for Order #XXXXX`) prevents re-uploading an overlapping file from double-recording the same courier fee.
+
+There are also specific rules regarding fees:
 
 1. **Valuation Charge**: (1%) This is charged to the customer (part of the Order Total).
 2. **COD Fee**: (~0.5%) This is **not** charged to the customer. It is absorbed by the business as a "hidden fee".
 3. **Hidden Fee Calculation**: Since the SPX Excel file might not explicitly break down these fees in separate rows, the system automatically calculates the hidden courier fee by taking the **Expected Collection Amount** and subtracting the **Net Remittance** (COD collected minus any explicit shipping fees in the file).
 4. **Installment/Layaway Expected Collection**: For installment orders, the Expected Collection Amount is specifically the expected downpayment minus what has already been paid, **not** the full order total. This prevents the system from inflating courier fees for unpaid future installments.
+
+---
+
+## Payments Dashboard
+
+**Location**: `src/app/dashboard/accounting/payments/page.tsx`
+
+Shows all logged payments across three tabs (Pending / Verified / Rejected). Payments get created via two paths: the initial payment logged at order creation (`src/lib/services/order-service.ts`), and payments logged later against an existing order (`src/components/dashboard/log-payment-dialog.tsx`).
+
+**OCR auto-fill** (`src/app/api/payments/extract-ocr/route.ts`): when a payment has a proof-of-payment image, an async (non-blocking) request fires to this route right after the payment is created. It runs Tesseract.js first — free, runs in-process, no external API or key needed — to read the reference number and amount off the receipt. If Tesseract can't find one of those two fields, it retries with Google Cloud Vision (`GOOGLE_CLOUD_VISION_API_KEY` env var) as a paid fallback; Vision handles real camera photos (glare, angle, background clutter) far more reliably than Tesseract, which is strongest on clean in-app screenshots. Results populate the payment's `reference_number` / `ocr_amount` columns for staff to cross-check against the reported amount. Because Tesseract needs `worker_threads` and a `.wasm` core that Next's bundler/file-tracer won't pick up by default, `next.config.ts` lists `tesseract.js`/`tesseract.js-core` under `serverExternalPackages` and explicitly traces the `.wasm` files in via `outputFileTracingIncludes`.
+
+**Verify via Statement** (`src/app/api/payments/verify-pdf/route.ts`): staff upload a password-protected bank/GCash statement PDF. The route extracts transaction rows from the PDF by grouping `pdfjs-dist` text fragments by Y-position (naively joining all text on a page collapses every row into one string and breaks row boundaries), then matches each Pending payment's OCR'd reference number against a real transaction row. Since a single real transfer can legitimately be split across multiple payment rows (e.g. applied toward two different orders), matching is grouped by reference number and compares the *summed* amount across every payment sharing that reference against the real transaction amount, with a small (₱5) tolerance for minor OCR amount misreads. Matching payments get marked `Verified`.
 
 ---
 
@@ -230,6 +251,10 @@ The Accounting module handles uploading SPX Excel remittances. There are specifi
 | `src/lib/supabase/hooks.ts` | `useUser()`, `useAuth()`, `useSupabase()` |
 | `src/hooks/useUserProfile.ts` | `useUserProfile()` — builds user profile from auth metadata |
 | `src/types/index.ts` | Central type exports |
+| `src/app/dashboard/accounting/remittances/page.tsx` | SPX remittance Excel upload — see "SPX Remittance Rules" |
+| `src/app/dashboard/accounting/payments/page.tsx` | Payments Log — see "Payments Dashboard" |
+| `src/app/api/payments/extract-ocr/route.ts` | Tesseract + Google Vision fallback OCR on payment proof images |
+| `src/app/api/payments/verify-pdf/route.ts` | Bank/GCash statement PDF matching — see "Payments Dashboard" |
 
 ---
 
