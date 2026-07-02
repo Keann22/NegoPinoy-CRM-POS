@@ -162,13 +162,9 @@ export default function SPXRemittancesPage() {
                 codToApply = availableCod; // Take it all if we somehow don't know the balance
             }
 
-            // The excess COD collected is essentially shipping/extra fees paid by the customer.
-            // We apply it as an offset to the shipping fee expenses.
-            const excessCod = availableCod - codToApply;
-
-            // Always take all the shipping and processing fees on the first order that matches,
-            // offset by any excess COD collected from the customer.
-            const shippingFeeToApply = trackingData[t].shippingFee + excessCod;
+            // Take all the shipping and processing fees on the first order that matches.
+            // Do NOT add excessCod to shippingFee — the Excel file rows are already the source of truth.
+            const shippingFeeToApply = trackingData[t].shippingFee;
             const processingFeeToApply = trackingData[t].processingFee;
 
             totalCod += codToApply;
@@ -241,26 +237,31 @@ export default function SPXRemittancesPage() {
                 if (paymentError) throw paymentError;
               }
 
-              // Calculate actual courier fee if the Excel file didn't explicitly list it
-              // The hidden courier fee is the difference between what we expect to collect and the net remittance
+              // The Excel file already contains both the COD row (+) and the total deduction row (-)
+              // which covers shipping fee + COD fee + valuation charge combined.
+              // We ONLY add a hidden fee if the Excel had NO explicit negative charge row at all.
               let finalShippingFee = Math.abs(totalShippingFee);
               let finalProcessingFee = Math.abs(totalProcessingFee);
               
-              let expectedCollectionAmount = 0;
-              if (order.payment_method === 'Installment' || order.payment_method === 'Lay-away') {
-                const expectedDownpayment = (order.total_amount || 0) - ((order.installment_months || 0) * (order.monthly_payment || 0));
-                expectedCollectionAmount = Math.max(0, expectedDownpayment - (order.amount_paid || 0));
-              } else {
-                expectedCollectionAmount = order.balance_due || 0;
-              }
-
-              const netRemittance = totalCod - finalShippingFee - finalProcessingFee;
+              // Only try to calculate the hidden fee if the Excel file provided NO deduction row
+              // (i.e. processingFee and shippingFee from Excel were both zero)
+              const excelHadNoDeductions = totalShippingFee === 0 && totalProcessingFee === 0;
               
-              if (totalCod > 0 && netRemittance < expectedCollectionAmount && expectedCollectionAmount > 0) {
-                // If there's still a missing difference between what SPX remits and what they should have collected
-                // This accounts for the 1% valuation charge and ~0.5% COD fee
-                // We only do this if totalCod > 0, otherwise it's an RTS or non-COD order where we shouldn't assume the entire expected amount was a hidden fee
-                finalProcessingFee += (expectedCollectionAmount - netRemittance);
+              if (excelHadNoDeductions && totalCod > 0) {
+                // The Excel file only had the positive COD row. No deduction rows were listed.
+                // We know SPX charges approx 1.6% total (1% valuation + ~0.5% COD fee) as a hidden fee.
+                // Calculate it as: expected collection amount minus the net remittance from SPX.
+                let expectedCollectionAmount = 0;
+                if (order.payment_method === 'Installment' || order.payment_method === 'Lay-away') {
+                  const expectedDownpayment = (order.total_amount || 0) - ((order.installment_months || 0) * (order.monthly_payment || 0));
+                  expectedCollectionAmount = Math.max(0, expectedDownpayment - (order.amount_paid || 0));
+                } else {
+                  expectedCollectionAmount = order.balance_due || 0;
+                }
+                
+                if (expectedCollectionAmount > 0 && totalCod < expectedCollectionAmount) {
+                  finalProcessingFee = expectedCollectionAmount - totalCod;
+                }
               }
 
 
