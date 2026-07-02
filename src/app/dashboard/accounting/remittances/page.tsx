@@ -256,9 +256,10 @@ export default function SPXRemittancesPage() {
 
               const netRemittance = totalCod - finalShippingFee - finalProcessingFee;
               
-              if (netRemittance < expectedCollectionAmount && expectedCollectionAmount > 0) {
+              if (totalCod > 0 && netRemittance < expectedCollectionAmount && expectedCollectionAmount > 0) {
                 // If there's still a missing difference between what SPX remits and what they should have collected
                 // This accounts for the 1% valuation charge and ~0.5% COD fee
+                // We only do this if totalCod > 0, otherwise it's an RTS or non-COD order where we shouldn't assume the entire expected amount was a hidden fee
                 finalProcessingFee += (expectedCollectionAmount - netRemittance);
               }
 
