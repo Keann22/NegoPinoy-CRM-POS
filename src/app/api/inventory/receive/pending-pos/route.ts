@@ -98,6 +98,31 @@ export async function POST(req: Request) {
             unit_cost: poItem.unit_cost,
             reason: reason
           });
+
+        // Auto-resolve any open procurement issues for this product
+        const { data: issues } = await supabase
+          .from('procurement_issues')
+          .select('id')
+          .eq('product_id', poItem.product_id)
+          .eq('status', 'open');
+
+        if (issues && issues.length > 0) {
+          for (const issue of issues) {
+            await supabase
+              .from('procurement_issues')
+              .update({ status: 'resolved' })
+              .eq('id', issue.id);
+
+            await supabase
+              .from('procurement_issue_messages')
+              .insert({
+                issue_id: issue.id,
+                sender_role: 'system',
+                sender_name: 'System',
+                message: 'Issue automatically resolved because the item was accepted into inventory.'
+              });
+          }
+        }
       }
     }
 
@@ -122,6 +147,31 @@ export async function POST(req: Request) {
             unit_cost: item.unitCost || 0,
             reason: 'Unexpected Delivery Item'
           });
+
+        // Auto-resolve any open procurement issues for this product
+        const { data: issues } = await supabase
+          .from('procurement_issues')
+          .select('id')
+          .eq('product_id', item.productId)
+          .eq('status', 'open');
+
+        if (issues && issues.length > 0) {
+          for (const issue of issues) {
+            await supabase
+              .from('procurement_issues')
+              .update({ status: 'resolved' })
+              .eq('id', issue.id);
+
+            await supabase
+              .from('procurement_issue_messages')
+              .insert({
+                issue_id: issue.id,
+                sender_role: 'system',
+                sender_name: 'System',
+                message: 'Issue automatically resolved because the item was accepted into inventory.'
+              });
+          }
+        }
       }
     }
 

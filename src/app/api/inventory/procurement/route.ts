@@ -161,6 +161,31 @@ export async function POST(req: Request) {
           .update({ initial_unit_cost: parsedCost })
           .eq('id', p.productId);
       }
+
+      // Auto-resolve any open procurement issues for this product
+      const { data: issues } = await supabase
+        .from('procurement_issues')
+        .select('id')
+        .eq('product_id', p.productId)
+        .eq('status', 'open');
+
+      if (issues && issues.length > 0) {
+        for (const issue of issues) {
+          await supabase
+            .from('procurement_issues')
+            .update({ status: 'resolved' })
+            .eq('id', issue.id);
+
+          await supabase
+            .from('procurement_issue_messages')
+            .insert({
+              issue_id: issue.id,
+              sender_role: 'system',
+              sender_name: 'System',
+              message: 'Issue automatically resolved because the item was purchased.'
+            });
+        }
+      }
     }
     
     // Clean up any remaining STAFF_DRAFT POs that are now empty
