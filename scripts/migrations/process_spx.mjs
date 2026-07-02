@@ -69,7 +69,7 @@ async function run() {
   // 2. Fetch Orders from Supabase
   const { data: orders, error } = await supabase
     .from('orders')
-    .select('id, tracking_number, amount_paid, balance_due, status, payments(id, payment_method)')
+    .select('id, tracking_number, amount_paid, balance_due, status, total_amount, payment_method, installment_months, monthly_payment, payments(id, payment_method)')
     .in('tracking_number', trackingNumbers);
 
   if (error) {
@@ -86,7 +86,11 @@ async function run() {
     const spxData = byTracking[order.tracking_number];
     
     // Check for discrepancy between expected balance and what was collected
-    const balanceDue = order.balance_due || 0;
+    let balanceDue = order.balance_due || 0;
+    if (order.payment_method === 'Installment' || order.payment_method === 'Lay-away') {
+      const expectedDownpayment = (order.total_amount || 0) - ((order.installment_months || 0) * (order.monthly_payment || 0));
+      balanceDue = Math.max(0, expectedDownpayment - (order.amount_paid || 0));
+    }
     
     console.log(`\nProcessing Order #${order.id.substring(0,7).toUpperCase()} (Tracking: ${order.tracking_number})`);
     
@@ -112,28 +116,35 @@ async function run() {
     }
 
     if (!isDryRun) {
-      const newAmountPaid = (order.amount_paid || 0) + spxData.cod;
-      const newBalanceDue = Math.max(0, balanceDue - spxData.cod);
+      let codToApply = Math.min(balanceDue, spxData.cod);
+      const excessCod = spxData.cod - codToApply;
+      
+      const newAmountPaid = (order.amount_paid || 0) + codToApply;
+      const newBalanceDue = Math.max(0, (order.balance_due || 0) - codToApply);
       const newStatus = 'Payment Received (COD)';
 
       // Log Payment
-      if (spxData.cod > 0) {
+      if (codToApply > 0) {
         await supabase.from('payments').insert({
           order_id: order.id,
           payment_date: new Date().toISOString(),
-          amount: spxData.cod,
+          amount: codToApply,
           payment_method: 'SPX COD Remittance',
           notes: `SPX Tracking: ${order.tracking_number}`
         });
       }
 
       // Log Expense
-      if (spxData.shippingFee > 0) {
+      // Excess COD offsets the shipping fee (which is negative in spxData)
+      let effectiveShippingFee = spxData.shippingFee + excessCod;
+      if (effectiveShippingFee < 0) {
         await supabase.from('expenses').insert({
-          expense_date: new Date().toISOString(),
-          amount: spxData.shippingFee,
-          category: 'Processing Fee',
-          description: `SPX Courier Fee for Order #${order.id.substring(0, 7).toUpperCase()}`
+          amount: Math.abs(effectiveShippingFee),
+          category: 'Shipping Fee',
+          description: `Shipping Fee for SPX ${order.tracking_number}`,
+          date: new Date().toISOString(),
+          payment_method: 'SPX Balance Deduction',
+          recorded_by: null // script run
         });
       }
 

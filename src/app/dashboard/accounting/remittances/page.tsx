@@ -114,7 +114,7 @@ export default function SPXRemittancesPage() {
       // Fetch all orders that might match, including their payments to check for duplicates
       const { data: allOrders, error: fetchError } = await supabase
         .from('orders')
-        .select('id, tracking_number, balance_due, amount_paid, status, payments(id, payment_method, amount)')
+        .select('id, tracking_number, balance_due, amount_paid, status, total_amount, payment_method, installment_months, monthly_payment, payments(id, payment_method, amount)')
         .not('tracking_number', 'is', null);
 
       if (fetchError) throw fetchError;
@@ -138,8 +138,15 @@ export default function SPXRemittancesPage() {
 
         for (const t of trackingList) {
           if (trackingData[t]) {
-            // Distribute COD up to the order's balance due
-            const balanceNeeded = Math.max(0, (order.balance_due || 0) - totalCod);
+            // Determine how much COD should be applied to the order balance
+            let balanceNeeded = 0;
+            if (order.payment_method === 'Installment' || order.payment_method === 'Lay-away') {
+              const expectedDownpayment = (order.total_amount || 0) - ((order.installment_months || 0) * (order.monthly_payment || 0));
+              balanceNeeded = Math.max(0, expectedDownpayment - (order.amount_paid || 0));
+            } else {
+              balanceNeeded = Math.max(0, (order.balance_due || 0) - totalCod);
+            }
+            
             const availableCod = trackingData[t].cod;
             
             // If this is the last order or the only order, we might want to dump the excess COD here, 
@@ -155,8 +162,13 @@ export default function SPXRemittancesPage() {
                 codToApply = availableCod; // Take it all if we somehow don't know the balance
             }
 
-            // Always take all the shipping and processing fees on the first order that matches
-            const shippingFeeToApply = trackingData[t].shippingFee;
+            // The excess COD collected is essentially shipping/extra fees paid by the customer.
+            // We apply it as an offset to the shipping fee expenses.
+            const excessCod = availableCod - codToApply;
+
+            // Always take all the shipping and processing fees on the first order that matches,
+            // offset by any excess COD collected from the customer.
+            const shippingFeeToApply = trackingData[t].shippingFee + excessCod;
             const processingFeeToApply = trackingData[t].processingFee;
 
             totalCod += codToApply;
