@@ -207,6 +207,17 @@ A **separate Vite + React app** deployed independently.
 
 ---
 
+## SPX Remittance Rules
+
+The Accounting module handles uploading SPX Excel remittances. There are specific rules regarding fees:
+
+1. **Valuation Charge**: (1%) This is charged to the customer (part of the Order Total).
+2. **COD Fee**: (~0.5%) This is **not** charged to the customer. It is absorbed by the business as a "hidden fee".
+3. **Hidden Fee Calculation**: Since the SPX Excel file might not explicitly break down these fees in separate rows, the system automatically calculates the hidden courier fee by taking the **Expected Collection Amount** and subtracting the **Net Remittance** (COD collected minus any explicit shipping fees in the file).
+4. **Installment/Layaway Expected Collection**: For installment orders, the Expected Collection Amount is specifically the expected downpayment minus what has already been paid, **not** the full order total. This prevents the system from inflating courier fees for unpaid future installments.
+
+---
+
 ## Key Files to Know
 
 | File | Purpose |

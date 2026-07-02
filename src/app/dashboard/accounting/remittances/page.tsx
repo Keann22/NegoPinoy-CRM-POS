@@ -242,17 +242,26 @@ export default function SPXRemittancesPage() {
               }
 
               // Calculate actual courier fee if the Excel file didn't explicitly list it
-              // The courier fee is the difference between the COD Collected and the Order Total
+              // The hidden courier fee is the difference between what we expect to collect and the net remittance
               let finalShippingFee = Math.abs(totalShippingFee);
               let finalProcessingFee = Math.abs(totalProcessingFee);
               
-              const orderTotal = (order.balance_due || 0) + (order.amount_paid || 0);
+              let expectedCollectionAmount = 0;
+              if (order.payment_method === 'Installment' || order.payment_method === 'Lay-away') {
+                const expectedDownpayment = (order.total_amount || 0) - ((order.installment_months || 0) * (order.monthly_payment || 0));
+                expectedCollectionAmount = Math.max(0, expectedDownpayment - (order.amount_paid || 0));
+              } else {
+                expectedCollectionAmount = order.balance_due || 0;
+              }
+
               const netRemittance = totalCod - finalShippingFee - finalProcessingFee;
               
-              if (netRemittance < orderTotal && orderTotal > 0) {
-                // If there's still a missing difference, it's a hidden processing fee
-                finalProcessingFee += (orderTotal - netRemittance);
+              if (netRemittance < expectedCollectionAmount && expectedCollectionAmount > 0) {
+                // If there's still a missing difference between what SPX remits and what they should have collected
+                // This accounts for the 1% valuation charge and ~0.5% COD fee
+                finalProcessingFee += (expectedCollectionAmount - netRemittance);
               }
+
 
               // Insert explicit Shipping Fee
               if (finalShippingFee > 0) {
