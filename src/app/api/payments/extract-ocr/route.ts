@@ -4,6 +4,31 @@ import { createWorker } from 'tesseract.js';
 
 export const maxDuration = 60;
 
+/**
+ * Receipt apps commonly put a date/time on the same visual row as "Ref No."
+ * (label + first digit chunk on the left, date on the right), which
+ * Tesseract's flat text output interleaves into one line and splits the
+ * digit run in two. Anchor on the label and strip the date/time fragment
+ * before concatenating digits, falling back to a blind scan otherwise.
+ */
+function extractReferenceNumber(fullText: string): string | null {
+  const labelIdx = fullText.search(/ref\.?\s*no\.?/i);
+  if (labelIdx !== -1) {
+    const window = fullText.slice(labelIdx, labelIdx + 150);
+    const stripped = window.replace(
+      /\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\.?\s*\d{1,2},?\s*\d{4}(?:\s*\d{1,2}:\d{2}\s*(?:am|pm)?)?/gi,
+      ' '
+    );
+    const digits = stripped.replace(/\D/g, '');
+    if (digits.length >= 13) {
+      return digits.slice(0, 13);
+    }
+  }
+  const cleaned = fullText.replace(/[\s\-]/g, '');
+  const match = cleaned.match(/\d{13}/);
+  return match ? match[0] : null;
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -33,13 +58,9 @@ export async function POST(request: Request) {
     }
 
     if (fullText) {
-      const cleanedText = fullText.replace(/[\s\-]/g, '');
-
       // 1. Extract Reference Number (13 digits)
-      const refRegex = /\d{13}/g;
-      let refMatch;
-      if ((refMatch = refRegex.exec(cleanedText)) !== null) {
-        referenceNumber = refMatch[0];
+      referenceNumber = extractReferenceNumber(fullText);
+      if (referenceNumber) {
         console.log(`[OCR] Found Ref: ${referenceNumber}`);
       }
 
