@@ -239,6 +239,29 @@ Shows all logged payments across three tabs (Pending / Verified / Rejected). Pay
 
 ---
 
+## Cost of Goods Sold (COGS) & Just-In-Time Costing
+
+This business runs **just-in-time inventory** — a product is bought only after a customer orders it, so the real cost is not known at order-creation time. `order_items.cost_price_at_sale` is snapshotted from `products.initial_unit_cost` the moment an order is created (in the `process_order_transaction` Postgres RPC, defined in `update_order_func.sql` at the repo root) and **never updated automatically after that** — so for a JIT business this snapshot is usually `0` until something explicitly backfills it.
+
+**Where the real cost gets captured**: the Procurement Sheet (`src/app/dashboard/reports/procurement/page.tsx`, "Click 'Buy' to record items as you shop") is where staff enter what they actually paid. `POST /api/inventory/procurement` ([route.ts](src/app/api/inventory/procurement/route.ts)) does three things when a purchase is recorded:
+1. Updates `products.initial_unit_cost` (so *future* orders snapshot the right cost going forward).
+2. **Backfills `order_items.cost_price_at_sale`** for the orders that were actually waiting on this product — oldest first, only fully covering an order line if the purchased quantity can cover it entirely (a line's cost is never split across two purchases). Extra units bought beyond current demand aren't assigned to any order; they're already handled by the `initial_unit_cost` update, since the next order placed will snapshot that value.
+3. Auto-resolves any open `procurement_issues` for that product.
+
+Products that have genuinely never been purchased (no cost on file anywhere) can't be backfilled automatically — those need a real "Buy" action before their cost is known. **Known limitation**: there's no true FIFO/batch cost tracking (the `stock_batches` table exists in the schema but nothing ever writes to it — it's dead code, despite the "FIFO" naming that used to appear in the P&L report). If a product is bought at one price, then bought again later at a different price before the first batch sells through, a future order may get costed at whichever price was entered most recently rather than the price of the specific physical unit sold.
+
+**Where COGS gets consumed** — two independent implementations that must stay in sync:
+- Dashboard home (`src/app/dashboard/page.tsx`) — Net Profit widget, scoped to the selected date range at the query level.
+- P&L Statement report (`src/app/dashboard/reports/pnl-report.tsx`) — same calculation, its own date-range picker.
+
+Both sum `order_items.cost_price_at_sale × quantity` for non-void (`Cancelled`/`Returned` excluded) orders in the period, then subtract expenses (excluding category `"Cost of Goods Sold"`, to avoid double-counting the one-time COGS corrections some inventory screens create as Expense rows — see [pending-costs/page.tsx](src/app/dashboard/inventory/pending-costs/page.tsx)).
+
+**Gotcha worth remembering**: expense records use the column `expense_date`, not `date` or `created_at` (both of those were used by mistake in different files and either error outright or silently return nothing). Every `expenses` insert in the codebase writes to `expense_date` — filter by that column, always.
+
+**Gotcha for any query touching `order_items`, `orders`, or `expenses` in bulk**: an unfiltered `.select()` from the Supabase client silently caps at 1000 rows (PostgREST default) with no error — it just quietly returns an incomplete result. Always scope by date range (or another filter) at the query level, not by fetching everything and filtering client-side. If a query needs more rows than one call can safely return, chunk by ID in batches (see the `order_items` fetch pattern in `dashboard/page.tsx` and `pnl-report.tsx`).
+
+---
+
 ## Key Files to Know
 
 | File | Purpose |
@@ -255,6 +278,9 @@ Shows all logged payments across three tabs (Pending / Verified / Rejected). Pay
 | `src/app/dashboard/accounting/payments/page.tsx` | Payments Log — see "Payments Dashboard" |
 | `src/app/api/payments/extract-ocr/route.ts` | Tesseract + Google Vision fallback OCR on payment proof images |
 | `src/app/api/payments/verify-pdf/route.ts` | Bank/GCash statement PDF matching — see "Payments Dashboard" |
+| `src/app/api/inventory/procurement/route.ts` | Procurement "Buy" action — updates product cost + backfills COGS, see "Cost of Goods Sold" |
+| `src/app/dashboard/reports/pnl-report.tsx` | P&L Statement report — see "Cost of Goods Sold" |
+| `update_order_func.sql` | `process_order_transaction` Postgres RPC — where `cost_price_at_sale` gets snapshotted |
 
 ---
 
