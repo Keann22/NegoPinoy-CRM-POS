@@ -28,12 +28,25 @@ export function useProducts() {
     const fetchProducts = async () => {
       setIsLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('products')
-          .select('*')
-          .order('name', { ascending: true });
-        if (error) throw error;
-        setRawProducts(data || []);
+        // An unfiltered .select() silently caps at 1000 rows (PostgREST
+        // default), which was hiding every product past that point once the
+        // catalog grew beyond it. Page through in batches of 1000 until a
+        // page comes back short, so the full catalog always loads.
+        const pageSize = 1000;
+        let all: any[] = [];
+        let from = 0;
+        while (true) {
+          const { data, error } = await supabase
+            .from('products')
+            .select('*')
+            .order('name', { ascending: true })
+            .range(from, from + pageSize - 1);
+          if (error) throw error;
+          all = all.concat(data || []);
+          if (!data || data.length < pageSize) break;
+          from += pageSize;
+        }
+        setRawProducts(all);
       } catch (err) {
         console.error('Error fetching products:', err);
       } finally {
