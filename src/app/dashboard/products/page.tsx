@@ -19,7 +19,7 @@ import { ViewProductHistoryDialog } from '@/components/dashboard/view-product-hi
 import { ViewProductDetailsDialog } from '@/components/dashboard/view-product-details-dialog';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { ProductsTable } from '@/components/dashboard/products/ProductsTable';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 
 import type { FormattedProduct } from '@/types';
 import { useProducts } from '@/hooks/useProducts';
@@ -50,51 +50,35 @@ export default function ProductsPage() {
   const [viewingReservedProduct, setViewingReservedProduct] = useState<{ id: string; name: string } | null>(null);
   const [viewingPackedProduct, setViewingPackedProduct] = useState<{ id: string; name: string } | null>(null);
 
+  // Debounce the search box before it hits the database - otherwise every
+  // keystroke would fire a new query.
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => clearTimeout(handle);
+  }, [searchTerm]);
+
   // ── Domain hook ────────────────────────────────────────────────────────────
-  const { products: rawProducts, isLoading, refetch } = useProducts();
+  // Search, stock filter, and pagination all happen at the database query
+  // level - only the current page of products is ever fetched, so this
+  // scales regardless of catalog size (see ARCHITECTURE.md, "1000-row query cap").
+  const { products: paginatedProducts, totalCount, isLoading, refetch } = useProducts({
+    searchTerm: debouncedSearchTerm,
+    stockFilter,
+    page: currentPage,
+    pageSize: rowsPerPage,
+  });
 
   const isManagement = useMemo(() => userProfile?.roles?.some(r => ['Admin', 'Owner'].includes(r)), [userProfile]);
 
-  const formattedProducts: FormattedProduct[] = useMemo(() => {
-    if (!rawProducts || rawProducts.length === 0) return [];
-    const parents = rawProducts.filter(p => !p.parent_id);
-    const children = rawProducts.filter(p => p.parent_id && !p.name.startsWith('[DELETED]'));
-    return parents.map(parent => {
-        const productChildren = children.filter(c => c.parent_id === parent.id);
-        return {
-            ...parent,
-            children: productChildren.length > 0 ? productChildren : undefined
-        };
-    });
-  }, [rawProducts]);
-
-  const filteredProducts = useMemo(() => {
-    let results = formattedProducts.filter(p => !p.name.startsWith('[DELETED]'));
-
-    // Filter by stock status
-    if (stockFilter === 'in-stock') {
-      results = results.filter(product => (product.quantityOnHand ?? 0) > 0);
-    } else if (stockFilter === 'no-stock') {
-      results = results.filter(product => (product.quantityOnHand ?? 0) === 0);
-    } else if (stockFilter === 'negative-stock') {
-        results = results.filter(product => (product.quantityOnHand ?? 0) < 0);
-    }
-
-    // Filter by search term
-    if (searchTerm) {
-      results = results.filter(product =>
-        product.name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-    
-    return results;
-  }, [formattedProducts, searchTerm, stockFilter]);
-
-  const totalPages = Math.ceil(filteredProducts.length / rowsPerPage) || 1;
-  const paginatedProducts = filteredProducts.slice(
-    (currentPage - 1) * rowsPerPage,
-    currentPage * rowsPerPage
+  // Flat view of everything currently loaded (this page's parents + their
+  // variants) - used for lookups like the archive-rename fallback below.
+  const allVisibleProducts = useMemo(
+    () => paginatedProducts.flatMap(p => [p, ...(p.children || [])]),
+    [paginatedProducts]
   );
+
+  const totalPages = Math.ceil(totalCount / rowsPerPage) || 1;
 
 
   const handleDeleteConfirm = async () => {
@@ -201,7 +185,7 @@ export default function ProductsPage() {
             if (error.code === '23503') {
                 // Some or all are tied to orders, archive them instead
                 for (const id of idsToDelete) {
-                    const prod = rawProducts.find((p: FormattedProduct) => p.id === id);
+                    const prod = allVisibleProducts.find((p: FormattedProduct) => p.id === id);
                     if (prod) {
                         await supabase.from('products').update({
                             name: prod.name.startsWith('[DELETED]') ? prod.name : '[DELETED] ' + prod.name,
@@ -315,7 +299,7 @@ export default function ProductsPage() {
             onViewReserved={setViewingReservedProduct}
             onViewPacked={setViewingPackedProduct}
           />
-          {!isLoading && filteredProducts.length === 0 && (
+          {!isLoading && totalCount === 0 && (
               <div className="flex flex-col items-center justify-center text-center border-2 border-dashed rounded-lg p-12 mt-4">
                   <p className="text-lg font-semibold">No products found</p>
                   <p className="text-muted-foreground mt-2">
@@ -324,10 +308,10 @@ export default function ProductsPage() {
               </div>
           )}
         </CardContent>
-        {filteredProducts && filteredProducts.length > 0 && (
+        {totalCount > 0 && (
           <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-2">
               <div className="text-sm text-muted-foreground">
-                Showing <strong>{(currentPage - 1) * rowsPerPage + 1}-{Math.min(currentPage * rowsPerPage, filteredProducts.length)}</strong> of <strong>{filteredProducts.length}</strong> items
+                Showing <strong>{(currentPage - 1) * rowsPerPage + 1}-{Math.min(currentPage * rowsPerPage, totalCount)}</strong> of <strong>{totalCount}</strong> items
               </div>
               <div className="flex items-center gap-2">
                 <Select value={rowsPerPage.toString()} onValueChange={(val) => { setRowsPerPage(Number(val)); setCurrentPage(1); }}>

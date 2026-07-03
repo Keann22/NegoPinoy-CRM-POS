@@ -5,48 +5,130 @@ import { useSupabase, useUser } from '@/lib/supabase/hooks';
 import type { FormattedProduct } from '@/types';
 import { getStockStatus } from '@/types';
 
+interface UseProductsParams {
+  searchTerm: string;
+  stockFilter: string;
+  page: number;
+  pageSize: number;
+}
+
+function formatProduct(
+  p: any,
+  reservedStockMap: Record<string, number>,
+  packedStockMap: Record<string, number>
+): FormattedProduct {
+  let sp = p.supplier_pricing || [];
+  if (sp.length === 0 && p.initial_unit_cost) {
+    sp = [{ supplierName: 'Initial Stock', unitCost: p.initial_unit_cost }];
+  }
+  return {
+    ...p,
+    variantName: p.variant_name,
+    quantityOnHand: p.quantityOnHand ?? p.stock_level ?? 0,
+    status: getStockStatus(p.stock_level ?? p.quantityOnHand),
+    price: `₱${(Number(p.selling_price ?? p.sellingPrice) || 0).toFixed(2)}`,
+    sellingPrice: p.selling_price ?? p.sellingPrice ?? 0,
+    image: p.images?.[0] || 'https://placehold.co/64x64',
+    shelfLocation: p.shelf_location || '',
+    supplierPricing: sp,
+    reservedStock: reservedStockMap[p.id] || 0,
+    packedStock: packedStockMap[p.id] || 0,
+  };
+}
+
 /**
  * useProducts
- * Fetches the full product list + calculates reserved/packed stock quantities.
- * Extracted from products/page.tsx (lines 89–171).
+ * Server-side search, stock filter, and pagination — only the current page's
+ * products (and their variants) are ever fetched. A previous version loaded
+ * the entire catalog client-side, which silently dropped everything past
+ * Supabase's 1000-row default cap once the catalog grew past it (see
+ * ARCHITECTURE.md, "The 1000-row query cap").
  */
-export function useProducts() {
+export function useProducts({ searchTerm, stockFilter, page, pageSize }: UseProductsParams) {
   const supabase = useSupabase();
   const { user } = useUser();
 
-  const [rawProducts, setRawProducts] = useState<any[] | null>(null);
-  const [reservedStockMap, setReservedStockMap] = useState<Record<string, number>>({});
-  const [packedStockMap, setPackedStockMap] = useState<Record<string, number>>({});
+  const [products, setProducts] = useState<FormattedProduct[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [refetchTrigger, setRefetchTrigger] = useState(0);
 
   const refetch = useCallback(() => setRefetchTrigger(n => n + 1), []);
 
-  // Fetch products
   useEffect(() => {
     if (!supabase || !user) return;
     const fetchProducts = async () => {
       setIsLoading(true);
       try {
-        // An unfiltered .select() silently caps at 1000 rows (PostgREST
-        // default), which was hiding every product past that point once the
-        // catalog grew beyond it. Page through in batches of 1000 until a
-        // page comes back short, so the full catalog always loads.
-        const pageSize = 1000;
-        let all: any[] = [];
-        let from = 0;
-        while (true) {
-          const { data, error } = await supabase
+        let query = supabase
+          .from('products')
+          .select('*', { count: 'exact' })
+          .is('parent_id', null)
+          .not('name', 'ilike', '[DELETED]%');
+
+        if (searchTerm) {
+          query = query.ilike('name', `%${searchTerm}%`);
+        }
+        if (stockFilter === 'in-stock') {
+          query = query.gt('stock_level', 0);
+        } else if (stockFilter === 'no-stock') {
+          query = query.eq('stock_level', 0);
+        } else if (stockFilter === 'negative-stock') {
+          query = query.lt('stock_level', 0);
+        }
+
+        const from = (page - 1) * pageSize;
+        const { data: parents, error, count } = await query
+          .order('name', { ascending: true })
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+
+        setTotalCount(count || 0);
+
+        const parentIds = (parents || []).map((p: any) => p.id);
+        let children: any[] = [];
+        if (parentIds.length > 0) {
+          const { data: childData, error: childError } = await supabase
             .from('products')
             .select('*')
-            .order('name', { ascending: true })
-            .range(from, from + pageSize - 1);
-          if (error) throw error;
-          all = all.concat(data || []);
-          if (!data || data.length < pageSize) break;
-          from += pageSize;
+            .in('parent_id', parentIds)
+            .not('name', 'ilike', '[DELETED]%');
+          if (childError) throw childError;
+          children = childData || [];
         }
-        setRawProducts(all);
+
+        // Reserved/packed stock only needs to cover this page's products +
+        // their variants - a small, safe set regardless of catalog size.
+        const allIds = [...parentIds, ...children.map(c => c.id)];
+        const reserved: Record<string, number> = {};
+        const packed: Record<string, number> = {};
+        if (allIds.length > 0) {
+          const { data: itemsData, error: itemsError } = await supabase
+            .from('order_items')
+            .select('product_id, quantity, orders!inner(status)')
+            .in('product_id', allIds)
+            .in('orders.status', ['Processing', 'Packed', 'For Shipping', 'For Pick-up']);
+          if (itemsError) throw itemsError;
+          (itemsData || []).forEach((item: any) => {
+            const status = item.orders?.status;
+            if (status === 'Packed' || status === 'For Shipping' || status === 'For Pick-up') {
+              packed[item.product_id] = (packed[item.product_id] || 0) + item.quantity;
+            } else {
+              reserved[item.product_id] = (reserved[item.product_id] || 0) + item.quantity;
+            }
+          });
+        }
+
+        const formattedChildren = children.map(c => formatProduct(c, reserved, packed));
+        const formatted = (parents || []).map((p: any) => {
+          const productChildren = formattedChildren.filter(c => c.parent_id === p.id);
+          return {
+            ...formatProduct(p, reserved, packed),
+            children: productChildren.length > 0 ? productChildren : undefined,
+          };
+        });
+
+        setProducts(formatted);
       } catch (err) {
         console.error('Error fetching products:', err);
       } finally {
@@ -54,60 +136,7 @@ export function useProducts() {
       }
     };
     fetchProducts();
-  }, [supabase, user, refetchTrigger]);
+  }, [supabase, user, searchTerm, stockFilter, page, pageSize, refetchTrigger]);
 
-  // Fetch reserved/packed stock from active order_items
-  useEffect(() => {
-    if (!supabase || !rawProducts || rawProducts.length === 0) return;
-    const fetchReservedStock = async () => {
-      try {
-        const productIds = rawProducts.map(p => p.id);
-        const { data, error } = await supabase
-          .from('order_items')
-          .select('product_id, quantity, orders!inner(status)')
-          .in('product_id', productIds)
-          .in('orders.status', ['Processing', 'Packed', 'For Shipping', 'For Pick-up']);
-        if (error) throw error;
-
-        const reserved: Record<string, number> = {};
-        const packed: Record<string, number> = {};
-        (data || []).forEach((item: any) => {
-          const status = item.orders?.status;
-          if (status === 'Packed' || status === 'For Shipping' || status === 'For Pick-up') {
-            packed[item.product_id] = (packed[item.product_id] || 0) + item.quantity;
-          } else {
-            reserved[item.product_id] = (reserved[item.product_id] || 0) + item.quantity;
-          }
-        });
-        setReservedStockMap(reserved);
-        setPackedStockMap(packed);
-      } catch (err) {
-        console.error('Error fetching reserved stock:', err);
-      }
-    };
-    fetchReservedStock();
-  }, [supabase, rawProducts]);
-
-  // Map to FormattedProduct shape
-  const products: FormattedProduct[] = (rawProducts || []).map(p => {
-    let sp = p.supplier_pricing || [];
-    if (sp.length === 0 && p.initial_unit_cost) {
-      sp = [{ supplierName: 'Initial Stock', unitCost: p.initial_unit_cost }];
-    }
-    return {
-      ...p,
-      variantName: p.variant_name,
-      quantityOnHand: p.quantityOnHand ?? p.stock_level ?? 0,
-      status: getStockStatus(p.stock_level ?? p.quantityOnHand),
-      price: `₱${(Number(p.selling_price ?? p.sellingPrice) || 0).toFixed(2)}`,
-      sellingPrice: p.selling_price ?? p.sellingPrice ?? 0,
-      image: p.images?.[0] || 'https://placehold.co/64x64',
-      shelfLocation: p.shelf_location || '',
-      supplierPricing: sp,
-      reservedStock: reservedStockMap[p.id] || 0,
-      packedStock: packedStockMap[p.id] || 0,
-    };
-  });
-
-  return { products, isLoading, refetch };
+  return { products, totalCount, isLoading, refetch };
 }
