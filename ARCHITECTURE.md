@@ -176,6 +176,17 @@ import { createClient } from '@/lib/supabase/server';
 const supabase = await createClient();
 ```
 
+### ⚠️ The 1000-row query cap (recurring bug source)
+
+An unfiltered `.select()` from the Supabase client **silently caps at 1000 rows** (PostgREST default) — no error, it just quietly returns an incomplete result. This has caused real, confirmed production bugs twice already:
+- `useProducts.ts` fetched the whole `products` table unfiltered, ordered by name — once the catalog passed 1000 rows, every product alphabetically past the cutoff (e.g. anything starting with "Ti" onward) was completely invisible in the UI, including newly-added ones. Staff kept re-adding products they couldn't find, creating duplicates.
+- `pnl-report.tsx` and `dashboard/page.tsx` fetched all `order_items`/`orders`/`expenses` unfiltered — with 1000+ order_items in the table, this silently zeroed out Cost of Goods Sold and Net Profit for whichever periods landed past the cutoff.
+
+**Rule going forward**: never fetch a full table unfiltered and rely on it being complete.
+- If the data is naturally scoped (by date range, by a set of IDs), filter **at the query level** — see `dashboard/page.tsx`'s date-range-scoped `orders` query.
+- If the full table genuinely needs to load (e.g. a catalog/list page), page through it explicitly with `.range()` in a loop until a page comes back short — see `useProducts.ts`.
+- Never fetch everything and filter/paginate client-side in JS; that's what silently breaks once a table crosses 1000 rows.
+
 ---
 
 ## AI Layer (Genkit)
@@ -258,7 +269,7 @@ Both sum `order_items.cost_price_at_sale × quantity` for non-void (`Cancelled`/
 
 **Gotcha worth remembering**: expense records use the column `expense_date`, not `date` or `created_at` (both of those were used by mistake in different files and either error outright or silently return nothing). Every `expenses` insert in the codebase writes to `expense_date` — filter by that column, always.
 
-**Gotcha for any query touching `order_items`, `orders`, or `expenses` in bulk**: an unfiltered `.select()` from the Supabase client silently caps at 1000 rows (PostgREST default) with no error — it just quietly returns an incomplete result. Always scope by date range (or another filter) at the query level, not by fetching everything and filtering client-side. If a query needs more rows than one call can safely return, chunk by ID in batches (see the `order_items` fetch pattern in `dashboard/page.tsx` and `pnl-report.tsx`).
+**Gotcha**: this data is exactly what tripped the 1000-row query cap described under "Supabase Client Usage" — always scope these queries by date range at the query level, never fetch-everything-then-filter.
 
 ---
 
@@ -281,6 +292,7 @@ Both sum `order_items.cost_price_at_sale × quantity` for non-void (`Cancelled`/
 | `src/app/api/inventory/procurement/route.ts` | Procurement "Buy" action — updates product cost + backfills COGS, see "Cost of Goods Sold" |
 | `src/app/dashboard/reports/pnl-report.tsx` | P&L Statement report — see "Cost of Goods Sold" |
 | `update_order_func.sql` | `process_order_transaction` Postgres RPC — where `cost_price_at_sale` gets snapshotted |
+| `src/hooks/useProducts.ts` | Products list — paginated fetch, see "1000-row query cap" |
 
 ---
 
