@@ -166,7 +166,7 @@ export function ProcessedOrdersReport() {
       setIsLoadingDetails(true);
       try {
         const orderIds = filteredOrders.map(o => o.id);
-        const customerIds = Array.from(new Set(filteredOrders.map(o => o.customerId)));
+        const customerIds = Array.from(new Set(filteredOrders.map(o => o.customerId).filter(Boolean)));
 
         // Fetch customers for these orders only (Chunked)
         const chunkSize = 150;
