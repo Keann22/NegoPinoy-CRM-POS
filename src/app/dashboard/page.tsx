@@ -156,15 +156,16 @@ export default function DashboardPage() {
 
                     let expenseQuery = supabase.from('expenses').select('amount, category');
                     if (dateRange?.from) {
-                        expenseQuery = expenseQuery.gte('date', dateRange.from.toISOString());
+                        expenseQuery = expenseQuery.gte('expense_date', dateRange.from.toISOString());
                     }
                     if (dateRange?.to) {
                         const toDate = new Date(dateRange.to);
                         toDate.setHours(23, 59, 59, 999);
-                        expenseQuery = expenseQuery.lte('date', toDate.toISOString());
+                        expenseQuery = expenseQuery.lte('expense_date', toDate.toISOString());
                     }
 
-                    const { data: expensesData } = await expenseQuery;
+                    const { data: expensesData, error: expensesError } = await expenseQuery;
+                    if (expensesError) console.error('Dashboard expenses fetch error:', expensesError);
                     const operatingExpenses = (expensesData || []).reduce((sum: number, expense: any) => {
                         if (expense.category?.toLowerCase() !== 'cost of goods sold') {
                             return sum + Number(expense.amount || 0);
