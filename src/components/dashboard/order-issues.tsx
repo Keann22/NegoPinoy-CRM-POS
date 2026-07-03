@@ -51,7 +51,8 @@ export function OrderIssues({ isAdmin }: { isAdmin?: boolean }) {
         orders: issue.orders
       };
     }
-    acc[orderId].items.push(issue.products?.name || 'Unknown Item');
+    const itemLabel = issue.products?.name || 'Unknown Item';
+    acc[orderId].items.push(issue.out_of_stock_qty ? `${itemLabel} (x${issue.out_of_stock_qty})` : itemLabel);
     acc[orderId].messagesCount += (issue.order_issue_messages?.length || 0);
     acc[orderId].issues.push(issue);
     return acc;

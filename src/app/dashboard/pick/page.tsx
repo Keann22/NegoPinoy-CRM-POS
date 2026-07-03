@@ -26,7 +26,7 @@ export default function PickerApp() {
   const [scannedOrderId, setScannedOrderId] = useState<string | null>(null);
   const [orderDetails, setOrderDetails] = useState<any>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
-  const [outOfStockItems, setOutOfStockItems] = useState<Set<string>>(new Set());
+  const [outOfStockQty, setOutOfStockQty] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(false);
 
   const startScanner = async () => {
@@ -34,7 +34,7 @@ export default function PickerApp() {
     setScannedOrderId(null);
     setOrderDetails(null);
     setOrderItems([]);
-    setOutOfStockItems(new Set());
+    setOutOfStockQty(new Map());
 
     const { Html5QrcodeScanner } = await import('html5-qrcode');
 
@@ -115,14 +115,21 @@ export default function PickerApp() {
     }
   };
 
-  const toggleOutOfStock = (itemId: string) => {
-    const nextSet = new Set(outOfStockItems);
-    if (nextSet.has(itemId)) {
-      nextSet.delete(itemId);
+  const toggleOutOfStock = (itemId: string, fullQty: number) => {
+    const next = new Map(outOfStockQty);
+    if (next.has(itemId)) {
+      next.delete(itemId);
     } else {
-      nextSet.add(itemId);
+      next.set(itemId, fullQty);
     }
-    setOutOfStockItems(nextSet);
+    setOutOfStockQty(next);
+  };
+
+  const setItemOutOfStockQty = (itemId: string, qty: number, fullQty: number) => {
+    const clamped = Math.min(Math.max(1, qty || 1), fullQty);
+    const next = new Map(outOfStockQty);
+    next.set(itemId, clamped);
+    setOutOfStockQty(next);
   };
 
   const handleSubmitPicking = async (e: React.FormEvent) => {
@@ -132,7 +139,7 @@ export default function PickerApp() {
     setLoading(true);
 
     try {
-      const hasIssues = outOfStockItems.size > 0;
+      const hasIssues = outOfStockQty.size > 0;
       const newStatus = hasIssues ? 'Picked (with issue)' : 'Picked';
 
       // 1. Update order status
@@ -164,18 +171,19 @@ export default function PickerApp() {
         const issuesToInsert = [];
         const procurementRequests = [];
 
-        for (const itemId of Array.from(outOfStockItems)) {
+        for (const [itemId, missingQty] of Array.from(outOfStockQty.entries())) {
           const item = orderItems.find(i => i.id === itemId);
           if (item) {
             issuesToInsert.push({
               order_id: scannedOrderId,
               product_id: item.product_id,
               status: 'open',
-              reported_by_name: userName
+              reported_by_name: userName,
+              out_of_stock_qty: missingQty
             });
             procurementRequests.push({
               productId: item.product_id,
-              requestedQty: item.quantity
+              requestedQty: missingQty
             });
           }
         }
@@ -192,11 +200,15 @@ export default function PickerApp() {
             const initialMessages = insertedIssues.map(issue => {
               const item = orderItems.find(i => i.product_id === issue.product_id);
               const productName = item ? item.product_name : 'this item';
+              const missingQty = item ? outOfStockQty.get(item.id) : undefined;
+              const qtyNote = item && missingQty && missingQty < item.quantity
+                ? ` (${missingQty} of ${item.quantity} units)`
+                : '';
               return {
                 issue_id: issue.id,
                 sender_role: 'picker',
                 sender_name: userName,
-                message: `Picker reported ${productName} as out of stock.`
+                message: `Picker reported ${productName} as out of stock${qtyNote}.`
               };
             });
             
@@ -234,7 +246,7 @@ export default function PickerApp() {
 
       setScannedOrderId(null);
       setOrderDetails(null);
-      setOutOfStockItems(new Set());
+      setOutOfStockQty(new Map());
 
     } catch (err) {
       console.error(err);
@@ -314,11 +326,14 @@ export default function PickerApp() {
                         <th className="p-3 font-medium text-muted-foreground">Item Name</th>
                         <th className="p-3 font-medium text-muted-foreground text-center">Qty</th>
                         <th className="p-3 font-medium text-muted-foreground text-center">Out of Stock</th>
+                        <th className="p-3 font-medium text-muted-foreground text-center">Missing Qty</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {orderItems.map(item => (
-                        <tr key={item.id} className={`border-b last:border-0 ${outOfStockItems.has(item.id) ? 'bg-red-50' : ''}`}>
+                      {orderItems.map(item => {
+                        const isFlagged = outOfStockQty.has(item.id);
+                        return (
+                        <tr key={item.id} className={`border-b last:border-0 ${isFlagged ? 'bg-red-50' : ''}`}>
                           <td className="p-3">
                             <span className="font-medium text-slate-800">{item.product_name}</span>
                           </td>
@@ -326,19 +341,32 @@ export default function PickerApp() {
                             <span className="font-bold">{item.quantity}</span>
                           </td>
                           <td className="p-3 text-center">
-                            <Checkbox 
-                              checked={outOfStockItems.has(item.id)}
-                              onCheckedChange={() => toggleOutOfStock(item.id)}
+                            <Checkbox
+                              checked={isFlagged}
+                              onCheckedChange={() => toggleOutOfStock(item.id, item.quantity)}
                             />
                           </td>
+                          <td className="p-3 text-center">
+                            {isFlagged && (
+                              <input
+                                type="number"
+                                min={1}
+                                max={item.quantity}
+                                value={outOfStockQty.get(item.id)}
+                                onChange={(e) => setItemOutOfStockQty(item.id, parseInt(e.target.value, 10), item.quantity)}
+                                className="w-16 text-center border rounded-md px-1 py-1 text-sm"
+                              />
+                            )}
+                          </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               </div>
 
-              {outOfStockItems.size > 0 && (
+              {outOfStockQty.size > 0 && (
                 <div className="bg-red-50 text-red-800 p-3 rounded-md flex items-start gap-2 text-sm">
                   <AlertCircle className="h-5 w-5 shrink-0 text-red-500 mt-0.5" />
                   <p>
@@ -351,7 +379,7 @@ export default function PickerApp() {
                 <Button type="button" variant="outline" className="flex-1" onClick={() => setScannedOrderId(null)}>
                   Cancel
                 </Button>
-                <Button type="submit" className="flex-1" variant={outOfStockItems.size > 0 ? "destructive" : "default"} disabled={loading}>
+                <Button type="submit" className="flex-1" variant={outOfStockQty.size > 0 ? "destructive" : "default"} disabled={loading}>
                   {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
                   Submit Picking
                 </Button>
