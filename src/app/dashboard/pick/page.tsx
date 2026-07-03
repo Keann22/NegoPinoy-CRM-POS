@@ -27,6 +27,7 @@ export default function PickerApp() {
   const [orderDetails, setOrderDetails] = useState<any>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [outOfStockQty, setOutOfStockQty] = useState<Map<string, number>>(new Map());
+  const [qtyDrafts, setQtyDrafts] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(false);
 
   const startScanner = async () => {
@@ -35,6 +36,7 @@ export default function PickerApp() {
     setOrderDetails(null);
     setOrderItems([]);
     setOutOfStockQty(new Map());
+    setQtyDrafts(new Map());
 
     const { Html5QrcodeScanner } = await import('html5-qrcode');
 
@@ -116,20 +118,43 @@ export default function PickerApp() {
   };
 
   const toggleOutOfStock = (itemId: string, fullQty: number) => {
-    const next = new Map(outOfStockQty);
-    if (next.has(itemId)) {
-      next.delete(itemId);
+    const nextQty = new Map(outOfStockQty);
+    const nextDrafts = new Map(qtyDrafts);
+    if (nextQty.has(itemId)) {
+      nextQty.delete(itemId);
+      nextDrafts.delete(itemId);
     } else {
-      next.set(itemId, fullQty);
+      nextQty.set(itemId, fullQty);
+      nextDrafts.set(itemId, String(fullQty));
     }
-    setOutOfStockQty(next);
+    setOutOfStockQty(nextQty);
+    setQtyDrafts(nextDrafts);
   };
 
-  const setItemOutOfStockQty = (itemId: string, qty: number, fullQty: number) => {
-    const clamped = Math.min(Math.max(1, qty || 1), fullQty);
-    const next = new Map(outOfStockQty);
-    next.set(itemId, clamped);
-    setOutOfStockQty(next);
+  // Keep the draft text free-form while typing (so the field can be cleared
+  // and re-typed) and only sync a valid parsed value into outOfStockQty.
+  // Clamping to [1, fullQty] happens on blur, in commitOutOfStockQty.
+  const handleQtyDraftChange = (itemId: string, rawValue: string) => {
+    const nextDrafts = new Map(qtyDrafts);
+    nextDrafts.set(itemId, rawValue);
+    setQtyDrafts(nextDrafts);
+
+    const parsed = parseInt(rawValue, 10);
+    if (!isNaN(parsed) && parsed > 0) {
+      const nextQty = new Map(outOfStockQty);
+      nextQty.set(itemId, parsed);
+      setOutOfStockQty(nextQty);
+    }
+  };
+
+  const commitOutOfStockQty = (itemId: string, fullQty: number) => {
+    const clamped = Math.min(Math.max(1, outOfStockQty.get(itemId) || 1), fullQty);
+    const nextQty = new Map(outOfStockQty);
+    nextQty.set(itemId, clamped);
+    setOutOfStockQty(nextQty);
+    const nextDrafts = new Map(qtyDrafts);
+    nextDrafts.set(itemId, String(clamped));
+    setQtyDrafts(nextDrafts);
   };
 
   const handleSubmitPicking = async (e: React.FormEvent) => {
@@ -247,6 +272,7 @@ export default function PickerApp() {
       setScannedOrderId(null);
       setOrderDetails(null);
       setOutOfStockQty(new Map());
+      setQtyDrafts(new Map());
 
     } catch (err) {
       console.error(err);
@@ -352,8 +378,9 @@ export default function PickerApp() {
                                 type="number"
                                 min={1}
                                 max={item.quantity}
-                                value={outOfStockQty.get(item.id)}
-                                onChange={(e) => setItemOutOfStockQty(item.id, parseInt(e.target.value, 10), item.quantity)}
+                                value={qtyDrafts.get(item.id) ?? ''}
+                                onChange={(e) => handleQtyDraftChange(item.id, e.target.value)}
+                                onBlur={() => commitOutOfStockQty(item.id, item.quantity)}
                                 className="w-16 text-center border rounded-md px-1 py-1 text-sm"
                               />
                             )}
