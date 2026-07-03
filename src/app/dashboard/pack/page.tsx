@@ -341,6 +341,14 @@ export default function PackerApp() {
 
       if (error) throw error;
 
+      // Packing confirms every item was physically available, so any
+      // out-of-stock issue reported earlier for this order is resolved by now.
+      await supabase
+        .from('order_issues')
+        .update({ status: 'resolved' })
+        .eq('order_id', scannedOrderId)
+        .eq('status', 'open');
+
       const userName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : 'Unknown Staff';
       await supabase.from('order_logs').insert({
         order_id: scannedOrderId,
