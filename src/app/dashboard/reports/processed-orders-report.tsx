@@ -1,15 +1,8 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
-import { DateRange } from 'react-day-picker';
-import {
-  startOfMonth,
-  endOfMonth,
-  format,
-  isValid,
-} from 'date-fns';
+import { useState, useEffect } from 'react';
+import { format, isValid } from 'date-fns';
 import { Calendar as CalendarIcon, Printer, CheckCircle, Check, Undo2, Search } from 'lucide-react';
-import { QRCodeCanvas } from 'qrcode.react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,253 +29,36 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useUser, useSupabase } from '@/lib/supabase/hooks';
-
-type Order = {
-  id: string;
-  customerId: string;
-  orderDate: string;
-  totalAmount: number;
-  orderStatus: string;
-  paymentType: string;
-  shippingDetails?: string;
-  customerName?: string;
-  customerAddress?: string;
-  customerMobile?: string;
-  salesPersonName?: string;
-  isPrinted?: boolean;
-  items?: OrderItem[];
-};
-
-type OrderItem = {
-    id: string;
-    orderId: string;
-    productName: string;
-    quantity: number;
-    sellingPriceAtSale?: number;
-}
+import { useProcessedOrders } from '@/hooks/useProcessedOrders';
+import { ProcessedOrdersPrintLayout } from '@/components/dashboard/reports/processed-orders-print-layout';
 
 export function ProcessedOrdersReport() {
-  const [date, setDate] = useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date()),
-  });
-  const [activeTab, setActiveTab] = useState<'to-print' | 'printed'>('to-print');
-  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
-  const [searchTerm, setSearchTerm] = useState('');
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
-  // Clear selection when tab changes
-  useEffect(() => {
-    setSelectedOrderIds(new Set());
-  }, [activeTab]);
-
-  const toggleSelectAll = () => {
-      if (selectedOrderIds.size === orders.length) {
-          setSelectedOrderIds(new Set());
-      } else {
-          setSelectedOrderIds(new Set(orders.map(o => o.id)));
-      }
-  };
-
-  const toggleSelect = (id: string) => {
-      const next = new Set(selectedOrderIds);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      setSelectedOrderIds(next);
-  };
-
-
-
-  const supabase = useSupabase();
-  const { user } = useUser();
-
-  const [allOrders, setAllOrders] = useState<Order[]>([]);
-  const [isLoadingOrders, setIsLoadingOrders] = useState(true);
-  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
-  const [enrichedOrders, setEnrichedOrders] = useState<Order[]>([]);
-
-  // Step 1: Load all orders
-  useEffect(() => {
-    if (!supabase || !user) return;
-    const fetchOrders = async () => {
-      setIsLoadingOrders(true);
-      try {
-        const { data, error } = await supabase
-          .from('orders')
-          .select('id, customer_id, created_at, status, payment_method, total_amount, notes, sales_person_name, is_printed')
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-
-        const mapped = (data || []).map((o: any) => ({
-          id: o.id,
-          customerId: o.customer_id,
-          orderDate: o.created_at,
-          orderStatus: o.status,
-          paymentType: o.payment_method,
-          totalAmount: Number(o.total_amount),
-          shippingDetails: o.notes,
-          salesPersonName: o.sales_person_name || null,
-          isPrinted: o.is_printed || false,
-        }));
-        setAllOrders(mapped);
-      } catch (err) {
-        console.error('Error fetching orders:', err);
-      } finally {
-        setIsLoadingOrders(false);
-      }
-    };
-    fetchOrders();
-  }, [supabase, user]);
-
-  // Step 2: Filter orders by date range and status
-  const filteredOrders = useMemo(() => {
-    if (!allOrders || !date?.from || !date?.to) return [];
-    const fromTime = date.from.getTime();
-    const toDate = new Date(date.to);
-    toDate.setHours(23, 59, 59, 999);
-    const toTime = toDate.getTime();
-
-    const filtered = allOrders.filter(order => {
-      const orderTime = new Date(order.orderDate).getTime();
-      const withinDate = orderTime >= fromTime && orderTime <= toTime;
-      const validStatus = order.orderStatus !== 'Cancelled' && order.orderStatus !== 'Returned';
-      const matchesTab = activeTab === 'to-print' ? !order.isPrinted : !!order.isPrinted;
-      
-      return withinDate && validStatus && matchesTab;
-    });
-
-    return filtered;
-  }, [allOrders, date, activeTab]);
-
-  // Step 3: Enrich filtered orders with customer names and order items
-  useEffect(() => {
-    if (!supabase || filteredOrders.length === 0) {
-      setEnrichedOrders(filteredOrders.map(o => ({ ...o, customerName: 'Unknown Customer', items: [] })));
-      return;
-    }
-
-    const enrich = async () => {
-      setIsLoadingDetails(true);
-      try {
-        const orderIds = filteredOrders.map(o => o.id);
-        const customerIds = Array.from(new Set(filteredOrders.map(o => o.customerId).filter(Boolean)));
-
-        // Fetch customers for these orders only (Chunked)
-        const chunkSize = 150;
-        let customersData: any[] = [];
-        for (let i = 0; i < customerIds.length; i += chunkSize) {
-            const chunk = customerIds.slice(i, i + chunkSize);
-            const { data } = await supabase
-              .from('customers')
-              .select('id, full_name, address_line, mobile_number')
-              .in('id', chunk);
-            if (data) customersData = customersData.concat(data);
-        }
-
-        const customerMap = new Map<string, any>();
-        customersData.forEach((c: any) => {
-          customerMap.set(c.id, {
-              name: c.full_name || 'Unknown Customer',
-              address: c.address_line || '',
-              mobile: c.mobile_number || ''
-          });
-        });
-
-        // Fetch order items for these orders only (Chunked)
-        let itemsData: any[] = [];
-        for (let i = 0; i < orderIds.length; i += chunkSize) {
-            const chunk = orderIds.slice(i, i + chunkSize);
-            const { data } = await supabase
-              .from('order_items')
-              .select('id, order_id, quantity, selling_price_at_sale, product_id, products(name)')
-              .in('order_id', chunk);
-            if (data) itemsData = itemsData.concat(data);
-        }
-
-        // Group items by order_id
-        const itemsMap = new Map<string, OrderItem[]>();
-        (itemsData || []).forEach((item: any) => {
-          const existing = itemsMap.get(item.order_id) || [];
-          existing.push({
-            id: item.id,
-            orderId: item.order_id,
-            productName: item.products?.name || 'Unknown Product',
-            quantity: item.quantity,
-            sellingPriceAtSale: item.selling_price_at_sale,
-          });
-          itemsMap.set(item.order_id, existing);
-        });
-
-        const enriched = filteredOrders.map(order => {
-          const cust = customerMap.get(order.customerId) || { name: 'Unknown Customer', address: '', mobile: '' };
-          return {
-            ...order,
-            customerName: cust.name,
-            customerAddress: cust.address,
-            customerMobile: cust.mobile,
-            items: itemsMap.get(order.id) || [],
-          };
-        });
-
-        // Sort: 1. Unshipped first, 2. Alphabetical by Customer Name
-        enriched.sort((a, b) => {
-            const aPending = ['Pending Payment', 'Processing'].includes(a.orderStatus) ? 0 : 1;
-            const bPending = ['Pending Payment', 'Processing'].includes(b.orderStatus) ? 0 : 1;
-            
-            if (aPending !== bPending) return aPending - bPending;
-            
-            return (a.customerName || '').localeCompare(b.customerName || '');
-        });
-
-        setEnrichedOrders(enriched);
-      } catch (err) {
-        console.error('Error enriching orders:', err);
-      } finally {
-        setIsLoadingDetails(false);
-      }
-    };
-
-    enrich();
-  }, [filteredOrders, supabase]);
-
-  const isLoading = isLoadingOrders || isLoadingDetails;
-  const orders = useMemo(() => {
-    if (!searchTerm) return enrichedOrders;
-    const lower = searchTerm.toLowerCase();
-    return enrichedOrders.filter(o => 
-        o.customerName?.toLowerCase().includes(lower) || 
-        o.id.toLowerCase().includes(lower)
-    );
-  }, [enrichedOrders, searchTerm]);
-
-
+  const {
+    date,
+    setDate,
+    activeTab,
+    setActiveTab,
+    selectedOrderIds,
+    searchTerm,
+    setSearchTerm,
+    orders,
+    isLoading,
+    handleMarkBatchPrinted,
+    togglePrintStatus,
+    toggleSelectAll,
+    toggleSelect
+  } = useProcessedOrders();
 
   const handlePrint = () => {
     window.print();
   };
 
-  const handleMarkBatchPrinted = async () => {
-    if (!supabase || orders.length === 0) return;
-    try {
-        const orderIds = selectedOrderIds.size > 0 ? Array.from(selectedOrderIds) : orders.map(o => o.id);
-        await supabase.from('orders').update({ is_printed: true }).in('id', orderIds);
-        setAllOrders(prev => prev.map(o => orderIds.includes(o.id) ? { ...o, isPrinted: true } : o));
-        setSelectedOrderIds(new Set());
-    } catch (err) {
-        console.error('Error marking batch as printed:', err);
-    }
-  };
-
-  const togglePrintStatus = async (orderId: string, currentStatus: boolean) => {
-    if (!supabase) return;
-    try {
-        await supabase.from('orders').update({ is_printed: !currentStatus }).eq('id', orderId);
-        setAllOrders(prev => prev.map(o => o.id === orderId ? { ...o, isPrinted: !currentStatus } : o));
-    } catch (err) {
-        console.error('Error toggling print status:', err);
-    }
-  };
+  if (!mounted) {
+    return <div className="p-8 text-center text-muted-foreground animate-pulse">Loading orders...</div>;
+  }
 
   return (
     <Card className="print:shadow-none print:border-none">
@@ -420,144 +196,11 @@ export function ProcessedOrdersReport() {
         </div>
 
         {/* --- PRINT ONLY CONTENT --- */}
-        <div id="print-area" className="hidden print:block w-full bg-white printable-area">
-            {(() => {
-                const printOrders = selectedOrderIds.size > 0 ? orders.filter(o => selectedOrderIds.has(o.id)) : orders;
-                
-                return (
-                    <>
-                        {activeTab === 'to-print' && (
-                        <div className="mb-8">
-                            <div className="flex justify-between items-center mb-4 border-b-2 border-black pb-2">
-                                <h1 className="text-2xl font-bold uppercase">Order Batch Summary</h1>
-                                <div className="text-right text-sm">
-                                    <p>Date Printed: {format(new Date(), 'PPPP p')}</p>
-                                    <p>Total Orders: {printOrders.length}</p>
-                                </div>
-                            </div>
-                            <table className="w-full border-collapse border border-black">
-                                <thead>
-                                    <tr className="bg-gray-100">
-                                        <th className="border border-black px-2 py-1 text-left text-xs uppercase w-[15%]">Order ID</th>
-                                        <th className="border border-black px-2 py-1 text-left text-xs uppercase w-[25%]">Customer Name</th>
-                                        <th className="border border-black px-2 py-1 text-left text-xs uppercase w-[15%]">Status</th>
-                                        <th className="border border-black px-2 py-1 text-left text-xs uppercase w-[45%]">Notes / Shipping Details</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {printOrders.map(order => (
-                                        <tr key={order.id}>
-                                            <td className="border border-black px-2 py-1 text-sm font-mono">{order.id.substring(0, 7).toUpperCase()}</td>
-                                            <td className="border border-black px-2 py-1 text-sm font-bold">{order.customerName}</td>
-                                            <td className="border border-black px-2 py-1 text-xs font-semibold">{order.orderStatus}</td>
-                                            <td className="border border-black px-2 py-1 text-xs">{order.shippingDetails || '—'}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                            <div className="page-break-after" />
-                        </div>
-                        )}
-
-                        <div className="font-sans text-sm pb-10">
-                            {printOrders.map((order, idx, arr) => (
-                    <div key={order.id} className="mb-4 break-inside-avoid">
-                        <div className="border-2 border-black flex flex-col">
-                            <div className="flex border-b-2 border-black">
-                                <div className="flex-1 flex flex-col border-r-2 border-black">
-                                    {/* Header Section */}
-                                    <div className="flex border-b-2 border-black items-center">
-                                        <div className="flex-1 p-2 border-r-2 border-black">
-                                            <div className="font-bold">Negosyanteng Pinoy PH</div>
-                                            <div className="text-xs">http://facebook.com/NegoPinoyPH</div>
-                                        </div>
-                                        <div className="flex-1 p-2 text-xs">
-                                            <div className="font-bold text-base">Order #{order.id.substring(0, 7).toUpperCase()}</div>
-                                            <div>Created At: {order.orderDate && isValid(new Date(order.orderDate)) ? format(new Date(order.orderDate), 'MM/dd/yyyy') : '—'}</div>
-                                        </div>
-                                    </div>
-                                    
-                                    {/* Recipient Section */}
-                                    <div className="flex flex-col p-2">
-                                        <div className="flex">
-                                            <span className="mr-1">Recipient:</span>
-                                            <div className="flex-1">
-                                                <div className="font-bold">{order.customerName}</div>
-                                            </div>
-                                        </div>
-                                        {order.customerMobile && (
-                                            <div className="text-xs mt-1">
-                                                <span className="font-semibold">Contact: </span>{order.customerMobile}
-                                            </div>
-                                        )}
-                                        {order.customerAddress && (
-                                            <div className="text-xs">
-                                                <span className="font-semibold">Address: </span>{order.customerAddress}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="p-2 flex justify-center items-center w-[166px]">
-                                    <QRCodeCanvas value={order.id} size={150} />
-                                </div>
-                            </div>
-                            
-                            {/* Items Table */}
-                            <div className="min-h-[120px] pb-2">
-                                <table className="w-full text-xs">
-                                    <thead>
-                                        <tr className="border-b-2 border-black text-left">
-                                            <th className="py-1 px-2 font-normal w-8">#</th>
-                                            <th className="py-1 px-2 font-normal">Product</th>
-                                            <th className="py-1 px-2 font-normal text-right w-12">Qty</th>
-                                            <th className="py-1 px-2 font-normal text-right w-24">Amount</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {(order.items ?? []).map((item, i) => (
-                                            <tr key={item.id}>
-                                                <td className="py-1 px-2 align-top">{i + 1}</td>
-                                                <td className="py-1 px-2 align-top">{item.productName}</td>
-                                                <td className="py-1 px-2 align-top text-right">{item.quantity}</td>
-                                                <td className="py-1 px-2 align-top text-right whitespace-nowrap font-semibold">
-                                                    ₱ {(item.sellingPriceAtSale ?? 0) * item.quantity}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                            
-                            {/* Footer Section */}
-                            <div className="flex border-t-2 border-black">
-                                <div className="w-2/3 p-2 border-r-2 border-black text-xs whitespace-pre-wrap min-h-[70px]">
-                                    <div className="font-bold uppercase mb-1">{order.paymentType}</div>
-                                    {order.shippingDetails && (
-                                        <div>
-                                            <span className="font-semibold">Notes: </span>
-                                            <span>{order.shippingDetails}</span>
-                                        </div>
-                                    )}
-                                    {order.salesPersonName && (
-                                        <div className="mt-1 text-gray-500">Processed by: <span className="font-semibold text-black">{order.salesPersonName}</span></div>
-                                    )}
-                                </div>
-                                <div className="w-1/3 p-2 text-sm flex items-center">
-                                    <div>Collection (COD): <span className="font-bold whitespace-nowrap">₱ {order.totalAmount}</span></div>
-                                </div>
-                            </div>
-                        </div>
-                        {/* Dashed separator between orders, except after the last one */}
-                        {idx < arr.length - 1 && (
-                            <div className="mt-4 border-b-[3px] border-dashed border-gray-600 w-full" />
-                        )}
-                    </div>
-                ))}
-            </div>
-            </>
-            );
-            })()}
-        </div>
+        <ProcessedOrdersPrintLayout 
+          orders={orders} 
+          selectedOrderIds={selectedOrderIds} 
+          activeTab={activeTab} 
+        />
       </CardContent>
       <style>{`
         @media print {

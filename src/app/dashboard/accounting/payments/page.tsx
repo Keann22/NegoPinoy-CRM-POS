@@ -28,8 +28,9 @@ import { Button } from '@/components/ui/button';
 import { MoreHorizontal, Eye, FileUp, FileSearch, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { VerifyStatementDialog } from '@/components/dashboard/accounting/verify-statement-dialog';
+import { PaymentHistoryTable } from '@/components/dashboard/accounting/payment-history-table';
 
 type Payment = {
   id: string;
@@ -268,173 +269,23 @@ export default function PaymentsPage() {
               </TabsList>
             </Tabs>
 
-            <Dialog open={isVerifyDialogOpen} onOpenChange={setIsVerifyDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="secondary">
-                  <FileSearch className="mr-2 h-4 w-4" />
-                  Verify via Statement
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Upload Bank Statement</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleVerifySubmit} className="space-y-4 pt-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Bank Statement PDF</label>
-                    <Input 
-                      type="file" 
-                      accept=".pdf" 
-                      onChange={(e) => setVerifyFile(e.target.files?.[0] || null)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Document Password (Optional)</label>
-                    <Input 
-                      type="password" 
-                      placeholder="Enter PDF password if protected"
-                      value={verifyPassword}
-                      onChange={(e) => setVerifyPassword(e.target.value)}
-                    />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={isVerifying || !verifyFile}>
-                    {isVerifying ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Scanning PDF...
-                      </>
-                    ) : (
-                      <>
-                        <FileUp className="mr-2 h-4 w-4" />
-                        Upload & Verify
-                      </>
-                    )}
-                  </Button>
-                </form>
-              </DialogContent>
-            </Dialog>
+            <VerifyStatementDialog
+              isOpen={isVerifyDialogOpen}
+              onOpenChange={setIsVerifyDialogOpen}
+              verifyFile={verifyFile}
+              setVerifyFile={setVerifyFile}
+              verifyPassword={verifyPassword}
+              setVerifyPassword={setVerifyPassword}
+              isVerifying={isVerifying}
+              onSubmit={handleVerifySubmit}
+            />
           </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Order</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Processor</TableHead>
-                <TableHead>Method</TableHead>
-                <TableHead>Ref No.</TableHead>
-                <TableHead>Proof</TableHead>
-                <TableHead>Notes</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="text-right">OCR Amount</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading && Array.from({ length: 5 }).map((_, i) => (
-                   <TableRow key={i}>
-                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-8 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                      <TableCell className="text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
-                      <TableCell className="text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
-                      <TableCell><Skeleton className="h-6 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
-                   </TableRow>
-              ))}
-              {!isLoading && paginatedData.map((payment) => {
-                const orderInfo = orderMap.get(payment.order_id);
-                const d = new Date(payment.payment_date);
-                const isDateValid = isValid(d);
-
-                return (
-                  <TableRow key={payment.id}>
-                    <TableCell className="whitespace-nowrap">
-                      {isDateValid ? format(d, 'MMM d, yyyy h:mm a') : 'Unknown'}
-                    </TableCell>
-                    <TableCell>
-                      <Link href={`/dashboard/orders/${payment.order_id}`} className="font-semibold text-primary hover:underline">
-                        #{payment.order_id.substring(0, 7).toUpperCase()}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {orderInfo?.customerName || 'Loading...'}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground whitespace-nowrap">
-                      {orderInfo?.salesPersonName || 'Unknown'}
-                    </TableCell>
-                    <TableCell>{payment.payment_method}</TableCell>
-                    <TableCell>{payment.reference_number || '-'}</TableCell>
-                    <TableCell>
-                      {payment.proof_url ? (
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button variant="outline" size="sm">
-                              <Eye className="h-4 w-4 mr-2" />
-                              View
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-3xl">
-                            <DialogHeader>
-                              <DialogTitle>Payment Proof</DialogTitle>
-                            </DialogHeader>
-                            <div className="flex items-center justify-center p-4">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img 
-                                src={payment.proof_url} 
-                                alt="Payment Proof" 
-                                className="max-h-[70vh] object-contain rounded-md" 
-                              />
-                            </div>
-                          </DialogContent>
-                        </Dialog>
-                      ) : '-'}
-                    </TableCell>
-                    <TableCell className="max-w-[200px] truncate" title={payment.notes}>
-                      {payment.notes || '-'}
-                    </TableCell>
-                    <TableCell className="text-right font-semibold">
-                      ₱{(Number(payment.amount) || 0).toFixed(2)}
-                    </TableCell>
-                    <TableCell className={`text-right font-semibold ${payment.ocr_amount && payment.ocr_amount !== payment.amount ? 'text-destructive' : ''}`}>
-                      {payment.ocr_amount ? `₱${(Number(payment.ocr_amount)).toFixed(2)}` : '-'}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusVariant(payment.status || 'Pending')}>
-                        {payment.status || 'Pending'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuRadioGroup 
-                            value={payment.status || 'Pending'}
-                            onValueChange={(val) => handleStatusChange(payment.id, val)}
-                          >
-                            <DropdownMenuRadioItem value="Pending">Pending</DropdownMenuRadioItem>
-                            <DropdownMenuRadioItem value="Verified">Verified</DropdownMenuRadioItem>
-                            <DropdownMenuRadioItem value="Rejected">Rejected</DropdownMenuRadioItem>
-                          </DropdownMenuRadioGroup>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+          <PaymentHistoryTable 
+            isLoading={isLoading} 
+            paginatedData={paginatedData} 
+            orderMap={orderMap} 
+            handleStatusChange={handleStatusChange} 
+          />
           {!isLoading && filteredPayments.length === 0 && (
               <div className="flex flex-col items-center justify-center text-center border-2 border-dashed rounded-lg p-12 mt-4">
                   <p className="text-lg font-semibold">No payments found</p>

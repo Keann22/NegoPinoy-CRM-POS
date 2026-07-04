@@ -30,6 +30,8 @@ import {
   ClipboardList,
   ShieldCheck,
   CalendarCheck2,
+  Undo2,
+  Printer,
 } from 'lucide-react';
 import { useAuth, useUser } from '@/lib/supabase/hooks';
 import { usePathname, useRouter } from 'next/navigation';
@@ -102,11 +104,13 @@ export default function DashboardLayout({
     if (isManagement || isInventory) {
       const inventorySubItems = [
         { href: '/dashboard/inventory/procurement-request', label: 'Procurement Request', icon: ListChecks },
+        { href: '/dashboard/inventory/print-list', label: 'Print Inventory List', icon: Printer },
         { href: '/dashboard/inventory/audit', label: 'Out of Stock Audit', icon: ListChecks },
         { href: '/dashboard/inventory/receive', label: 'Bulk Receive', icon: Truck },
         { href: '/dashboard/inventory/restock', label: 'Restock / Purchase', icon: ArrowDownUp },
         { href: '/dashboard/inventory/batches', label: 'Stock Batch List', icon: ListChecks },
-        { href: '/dashboard/inventory/movements', label: 'Inventory History', icon: History }
+        { href: '/dashboard/inventory/movements', label: 'Inventory History', icon: History },
+        { href: '/dashboard/inventory/returns', label: 'Returns', icon: Undo2 }
       ];
 
       if (isManagement) {
@@ -180,7 +184,8 @@ export default function DashboardLayout({
         router.push('/');
       });
     }
-  }, [user, isUserLoading, router, auth]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, isUserLoading, router]);
 
   const handleLogout = () => {
     auth.signOut();

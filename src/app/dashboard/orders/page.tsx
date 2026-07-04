@@ -21,10 +21,12 @@ import { SetDueDateDialog } from '@/components/dashboard/set-due-date-dialog';
 import { MarkShippedDialog } from '@/components/dashboard/mark-shipped-dialog';
 import { WaybillSummaryDialog } from '@/components/dashboard/waybill-summary-dialog';
 import { OnHoldReasonDialog } from '@/components/dashboard/on-hold-reason-dialog';
+import { ProcessReturnDialog } from '@/components/dashboard/process-return-dialog';
 
 import { OrdersFilterBar } from '@/components/dashboard/orders/OrdersFilterBar';
 import { OrdersTable } from '@/components/dashboard/orders/OrdersTable';
 import { useOrders } from '@/hooks/useOrders';
+import { restoreStockForCancelledOrder, deductStockForUncancelledOrder } from '@/lib/services/order-service';
 
 import type { FormattedOrder, Order, OrderStatus } from '@/types';
 import { ORDER_STATUSES } from '@/types';
@@ -56,6 +58,7 @@ export default function OrdersPage() {
   const [markShippedOrder, setMarkShippedOrder] = useState<Order | null>(null);
   const [viewWaybillOrder, setViewWaybillOrder] = useState<Order | null>(null);
   const [onHoldOrder, setOnHoldOrder] = useState<Order | null>(null);
+  const [processReturnOrder, setProcessReturnOrder] = useState<Order | null>(null);
 
   // ── Filter/selection state ─────────────────────────────────────────────────
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
@@ -113,17 +116,35 @@ export default function OrdersPage() {
   }, [formattedOrders, currentPage, rowsPerPage]);
 
   // ── Mutations ──────────────────────────────────────────────────────────────
+  /**
+   * Applies the stock side-effect (if any) for a status transition, then updates the order row.
+   * Cancelling restores previously-deducted stock; un-cancelling re-deducts it, since stock
+   * is taken out immediately at order creation rather than at pick/pack/ship.
+   */
+  const applyOrderStatusChange = async (orderId: string, currentStatus: OrderStatus | undefined, newStatus: OrderStatus) => {
+    if (!supabase || currentStatus === newStatus) return;
+
+    if (newStatus === 'Cancelled' && currentStatus !== 'Cancelled') {
+      await restoreStockForCancelledOrder(supabase, orderId);
+    } else if (currentStatus === 'Cancelled' && newStatus !== 'Cancelled') {
+      await deductStockForUncancelledOrder(supabase, orderId);
+    }
+
+    const updatePayload: any = { status: newStatus };
+    if (['Shipped', 'Completed', 'Payment Received (COD)'].includes(newStatus)) {
+      updatePayload.completed_at = new Date().toISOString();
+    } else {
+      updatePayload.completed_at = null;
+    }
+    const { error } = await supabase.from('orders').update(updatePayload).eq('id', orderId);
+    if (error) throw error;
+  };
+
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
     if (!supabase) return;
     try {
-      const updatePayload: any = { status: newStatus };
-      if (['Shipped', 'Completed', 'Payment Received (COD)'].includes(newStatus)) {
-        updatePayload.completed_at = new Date().toISOString();
-      } else {
-        updatePayload.completed_at = null;
-      }
-      const { error } = await supabase.from('orders').update(updatePayload).eq('id', orderId);
-      if (error) throw error;
+      const currentStatus = orders?.find(o => o.id === orderId)?.orderStatus;
+      await applyOrderStatusChange(orderId, currentStatus, newStatus);
       toast({ title: 'Order Status Updated', description: `Order has been set to "${newStatus}".` });
       refetch();
     } catch (error: any) {
@@ -133,15 +154,15 @@ export default function OrdersPage() {
 
   const handleBulkStatusChange = async (newStatus: OrderStatus) => {
     if (!supabase || selectedOrderIds.length === 0) return;
+    if (newStatus === 'Returned') {
+      toast({ variant: 'destructive', title: 'Cannot bulk-return', description: 'Process returns individually so the item, quantity, and reason can be captured.' });
+      return;
+    }
     try {
-      const updatePayload: any = { status: newStatus };
-      if (['Shipped', 'Completed', 'Payment Received (COD)'].includes(newStatus)) {
-        updatePayload.completed_at = new Date().toISOString();
-      } else {
-        updatePayload.completed_at = null;
+      for (const orderId of selectedOrderIds) {
+        const currentStatus = orders?.find(o => o.id === orderId)?.orderStatus;
+        await applyOrderStatusChange(orderId, currentStatus, newStatus);
       }
-      const { error } = await supabase.from('orders').update(updatePayload).in('id', selectedOrderIds);
-      if (error) throw error;
       toast({ title: 'Bulk Update Successful', description: `${selectedOrderIds.length} orders updated to "${newStatus}".` });
       setSelectedOrderIds([]);
       refetch();
@@ -156,6 +177,13 @@ export default function OrdersPage() {
         open={!!onHoldOrder}
         onOpenChange={(open) => !open && setOnHoldOrder(null)}
         order={onHoldOrder}
+        onSuccess={() => refetch()}
+      />
+
+      <ProcessReturnDialog
+        open={!!processReturnOrder}
+        onOpenChange={(open) => !open && setProcessReturnOrder(null)}
+        order={processReturnOrder}
         onSuccess={() => refetch()}
       />
 
@@ -209,10 +237,14 @@ export default function OrdersPage() {
               if (newStatus === 'On-Hold') {
                 const order = orders?.find(o => o.id === id);
                 if (order) setOnHoldOrder(order);
+              } else if (newStatus === 'Returned') {
+                const order = orders?.find(o => o.id === id);
+                if (order) setProcessReturnOrder(order);
               } else {
                 handleStatusChange(id, newStatus);
               }
             }}
+            onProcessReturn={setProcessReturnOrder}
             isInventoryOnly={isInventoryOnly}
             canCreateOrder={canCreateOrder}
             isAdminOrOwner={isAdminOrOwner}

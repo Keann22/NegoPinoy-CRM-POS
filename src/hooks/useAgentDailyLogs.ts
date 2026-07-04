@@ -150,6 +150,13 @@ export function useAgentDailyLogs(userId?: string) {
       // 6. Refresh local logs
       await fetchLogs();
 
+      if (!auditRes.ok) {
+        return {
+          success: false,
+          error: auditData.error || 'AI audit failed. The log was saved but is still pending review.',
+        };
+      }
+
       return {
         success: true,
         verdict: auditData.verdict,

@@ -46,6 +46,7 @@ interface OrdersTableProps {
   onCodPayment: (order: FormattedOrder) => void;
   onDueDate: (order: FormattedOrder) => void;
   onStatusChange: (orderId: string, newStatus: OrderStatus) => void;
+  onProcessReturn: (order: FormattedOrder) => void;
   isAdminOrOwner: boolean;
   isInventoryOnly: boolean;
   canCreateOrder: boolean;
@@ -56,7 +57,7 @@ export function OrdersTable({
   orders, isLoading, selectedOrderIds,
   onSelectAll, onSelectOne, onViewDetails,
   onLogPayment, onEditPaymentTerms, onMarkShipped,
-  onViewWaybill, onCodPayment, onDueDate, onStatusChange,
+  onViewWaybill, onCodPayment, onDueDate, onStatusChange, onProcessReturn,
   isAdminOrOwner, isInventoryOnly, canCreateOrder, userRoles,
 }: OrdersTableProps) {
   const allSelected = orders.length > 0 && orders.every(o => selectedOrderIds.includes(o.id));
@@ -191,6 +192,12 @@ export function OrdersTable({
                       {!isInventoryOnly && canEditOrder && (
                         <>
                           <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => onProcessReturn(order)}
+                            disabled={order.orderStatus === 'Returned'}
+                          >
+                            Process Return
+                          </DropdownMenuItem>
                           <DropdownMenuItem
                             className="text-destructive focus:text-destructive focus:bg-destructive/10"
                             onClick={() => onStatusChange(order.id, 'Cancelled')}

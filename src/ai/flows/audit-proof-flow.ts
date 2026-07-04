@@ -6,9 +6,13 @@
  *   Facebook/Meta Business Suite screenshot relevant to the claimed task.
  * - AuditProofInput - Input type
  * - AuditProofOutput - Return type
+ *
+ * Calls the Gemini REST API directly (instead of going through Genkit's
+ * in-process `ai` client) because bundling Genkit's Google AI plugin into
+ * the Next.js server crashes under Turbopack (see src/ai/genkit.ts). A
+ * plain fetch() has no such bundling concerns.
  */
 
-import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
 const AuditProofInputSchema = z.object({
@@ -50,20 +54,25 @@ const AuditProofOutputSchema = z.object({
 });
 export type AuditProofOutput = z.infer<typeof AuditProofOutputSchema>;
 
-export async function auditProof(input: AuditProofInput): Promise<AuditProofOutput> {
-  return auditProofFlow(input);
-}
+const RESPONSE_JSON_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    verdict: { type: 'STRING', enum: ['approved', 'rejected', 'flagged'] },
+    confidence: { type: 'NUMBER' },
+    feedback: { type: 'STRING' },
+    isFacebookScreenshot: { type: 'BOOLEAN' },
+    matchesTaskType: { type: 'BOOLEAN' },
+  },
+  required: ['verdict', 'confidence', 'feedback', 'isFacebookScreenshot', 'matchesTaskType'],
+};
 
-const prompt = ai.definePrompt({
-  name: 'auditProofPrompt',
-  input: { schema: AuditProofInputSchema },
-  output: { schema: AuditProofOutputSchema },
-  prompt: `You are an AI compliance auditor for NegosyantengPinoy.Ph, a Filipino e-commerce business.
+function buildPrompt(taskType: string): string {
+  return `You are an AI compliance auditor for NegosyantengPinoy.Ph, a Filipino e-commerce business.
 Your job is to verify that sales agents are completing their daily Facebook catalog maintenance tasks.
 
 The agent has uploaded a screenshot as proof. Analyze the image carefully.
 
-Agent's claimed task: {{taskType}}
+Agent's claimed task: ${taskType}
 
 Task type definitions:
 - delete_inactive: The agent deleted one or more inactive or out-of-stock items from the Facebook/Meta product catalog.
@@ -83,17 +92,79 @@ Verdict rules:
 
 Write your feedback in Taglish (Filipino-English mix) so it's easy for the agents to understand.
 
-Screenshot image: {{media url=photoDataUri}}`,
-});
+Respond with JSON only, matching this shape: { verdict, confidence, feedback, isFacebookScreenshot, matchesTaskType }.`;
+}
 
-const auditProofFlow = ai.defineFlow(
-  {
-    name: 'auditProofFlow',
-    inputSchema: AuditProofInputSchema,
-    outputSchema: AuditProofOutputSchema,
-  },
-  async (input: AuditProofInput) => {
-    const { output } = await prompt(input);
-    return output!;
+function parseDataUri(photoDataUri: string): { mimeType: string; data: string } {
+  const match = /^data:([^;]+);base64,([\s\S]*)$/.exec(photoDataUri);
+  if (!match) {
+    throw new Error('photoDataUri is not a valid base64 data URI.');
   }
-);
+  return { mimeType: match[1], data: match[2] };
+}
+
+async function callGeminiVision(input: AuditProofInput): Promise<AuditProofOutput> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY is not configured.');
+  }
+
+  const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+  const { mimeType, data } = parseDataUri(input.photoDataUri);
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { text: buildPrompt(input.taskType) },
+              { inline_data: { mime_type: mimeType, data } },
+            ],
+          },
+        ],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema: RESPONSE_JSON_SCHEMA,
+        },
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    const bodyText = await res.text().catch(() => '');
+    throw new Error(`Gemini API request failed (${res.status}): ${bodyText.slice(0, 300)}`);
+  }
+
+  const json = await res.json();
+  const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) {
+    throw new Error('Gemini API returned no content.');
+  }
+
+  const parsed = JSON.parse(text);
+  return AuditProofOutputSchema.parse(parsed);
+}
+
+export async function auditProof(input: AuditProofInput): Promise<AuditProofOutput> {
+  const parsedInput = AuditProofInputSchema.parse(input);
+  try {
+    return await callGeminiVision(parsedInput);
+  } catch (err) {
+    console.error('auditProof: AI call failed, falling back to flagged verdict.', err);
+    // Fail safe: flag for human review instead of leaving the log stuck as
+    // 'pending' forever or throwing (which would abort the status update).
+    return {
+      verdict: 'flagged',
+      confidence: 0,
+      feedback:
+        'Hindi ma-verify ng AI ang proof mo dahil sa technical error. Mano-mano munang i-rereview ng admin. (AI audit failed due to a technical error.)',
+      isFacebookScreenshot: false,
+      matchesTaskType: false,
+    };
+  }
+}

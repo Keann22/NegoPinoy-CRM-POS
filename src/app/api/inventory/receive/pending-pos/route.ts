@@ -27,7 +27,7 @@ export async function GET(req: Request) {
 
     const mapped = filteredItems.map((i: any) => ({
       id: i.id,
-      productName: `${i.products.name} ${i.products.variant_name ? `[${i.products.variant_name}]` : ''}`,
+      productName: (i.products.variant_name && !i.products.name.includes(i.products.variant_name)) ? `${i.products.name} [${i.products.variant_name}]` : i.products.name,
       expectedQty: i.expected_qty,
       alreadyReceivedQty: i.received_qty || 0,
       remainingQty: Math.max(0, i.expected_qty - (i.received_qty || 0)),

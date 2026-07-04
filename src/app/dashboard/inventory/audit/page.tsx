@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -27,16 +29,41 @@ type EntryRow = {
   discrepancyToApply?: number;
 };
 
+type OnHoldCustomer = {
+  orderId: string;
+  customerName: string;
+  quantity: number;
+  holdSince: string | null;
+  holdReason: string | null;
+};
+
 export default function OutOfStockAudit() {
   const [products, setProducts] = useState<Product[]>([]);
   const [snapshotTime, setSnapshotTime] = useState<string>(
     new Date().toISOString().slice(0, 16) // "YYYY-MM-DDThh:mm"
   );
-  
+
   const [rows, setRows] = useState<EntryRow[]>([
     { id: Math.random().toString(), productId: "", qty: "", reasonCode: "", notes: "", status: 'pending' }
   ]);
   const [isSubmitting, setIsSubmitting] = useState<{ [key: string]: boolean }>({});
+  const [holdInfo, setHoldInfo] = useState<Record<string, OnHoldCustomer[] | 'loading'>>({});
+
+  const fetchOnHoldCustomers = async (productId: string) => {
+    if (!productId || holdInfo[productId]) return;
+    setHoldInfo(prev => ({ ...prev, [productId]: 'loading' }));
+    try {
+      const res = await fetch("/api/inventory/audit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: 'getOnHoldCustomers', productId })
+      });
+      const data = await res.json();
+      setHoldInfo(prev => ({ ...prev, [productId]: data.customers || [] }));
+    } catch {
+      setHoldInfo(prev => ({ ...prev, [productId]: [] }));
+    }
+  };
 
   useEffect(() => {
     supabase.from("products").select("id, name, variant_name, stock_level").then(({ data }) => {
@@ -50,6 +77,7 @@ export default function OutOfStockAudit() {
 
   const updateRow = (id: string, field: keyof EntryRow, value: string) => {
     setRows(rows.map(r => r.id === id ? { ...r, [field]: value, status: 'pending' } : r));
+    if (field === 'productId' && value) fetchOnHoldCustomers(value);
   };
 
   const removeRow = (id: string) => {
@@ -198,6 +226,29 @@ export default function OutOfStockAudit() {
                     <div className="mt-2 text-xs text-emerald-700 font-medium bg-emerald-50 p-2 rounded border border-emerald-200">
                       {row.discrepancyMessage}
                     </div>
+                  )}
+                  {row.productId && holdInfo[row.productId] && holdInfo[row.productId] !== 'loading' && (holdInfo[row.productId] as OnHoldCustomer[]).length > 0 && (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button type="button" className="mt-2 block">
+                          <Badge variant="outline" className="cursor-pointer border-amber-400 bg-amber-50 text-amber-800 hover:bg-amber-100">
+                            Held by {(holdInfo[row.productId] as OnHoldCustomer[]).length} customer(s)
+                          </Badge>
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-72 text-sm space-y-2">
+                        {(holdInfo[row.productId] as OnHoldCustomer[]).map(c => (
+                          <div key={c.orderId} className="border-b last:border-0 pb-2 last:pb-0">
+                            <div className="font-medium">{c.customerName}</div>
+                            <div className="text-xs text-slate-500">
+                              Order #{c.orderId.slice(0, 7).toUpperCase()} · qty {c.quantity}
+                              {c.holdSince ? ` · since ${new Date(c.holdSince).toLocaleDateString()}` : ''}
+                            </div>
+                            {c.holdReason && <div className="text-xs text-slate-600 italic mt-1">&ldquo;{c.holdReason}&rdquo;</div>}
+                          </div>
+                        ))}
+                      </PopoverContent>
+                    </Popover>
                   )}
                 </td>
                 <td className="p-2 align-top">

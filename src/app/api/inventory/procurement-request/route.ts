@@ -19,7 +19,7 @@ export async function GET(req: Request) {
 
     const mapped = liveOS.map(p => ({
       productId: p.id,
-      productName: `${p.name} ${p.variant_name ? `[${p.variant_name}]` : ''}`,
+      productName: (p.variant_name && !p.name.includes(p.variant_name)) ? `${p.name} [${p.variant_name}]` : p.name,
       systemQty: Math.abs(p.stock_level)
     }));
 
@@ -62,7 +62,7 @@ export async function POST(req: Request) {
       poId = po.id;
     }
 
-    // 2. Fetch existing items for this PO
+    // Fetch existing items for this PO
     const { data: existingItems, error: itemsErrFetch } = await supabase
       .from('purchase_order_items')
       .select('id, product_id, expected_qty')
@@ -72,9 +72,37 @@ export async function POST(req: Request) {
 
     const existingMap = new Map(existingItems?.map(i => [i.product_id, i]) || []);
 
+    // 2. Expand requests to components if they have an assembly_recipe
+    const expandedRequests = [];
+    for (const r of requests) {
+      const { data: prodData } = await supabase
+        .from('products')
+        .select('assembly_recipe')
+        .eq('id', r.productId)
+        .single();
+      
+      if (prodData && prodData.assembly_recipe && Array.isArray(prodData.assembly_recipe) && prodData.assembly_recipe.length > 0) {
+        for (const comp of prodData.assembly_recipe) {
+          expandedRequests.push({
+            productId: comp.component_id || comp.productId,
+            requestedQty: r.requestedQty * (comp.quantity || 1)
+          });
+        }
+      } else {
+        expandedRequests.push(r);
+      }
+    }
+
+    // Combine duplicate productIds in expandedRequests
+    const finalRequestsMap = new Map();
+    for (const er of expandedRequests) {
+      finalRequestsMap.set(er.productId, (finalRequestsMap.get(er.productId) || 0) + er.requestedQty);
+    }
+    const finalRequests = Array.from(finalRequestsMap.entries()).map(([productId, requestedQty]) => ({ productId, requestedQty }));
+
     const itemsToInsert = [];
     
-    for (const p of requests) {
+    for (const p of finalRequests) {
       if (existingMap.has(p.productId)) {
         // Update existing item
         const existingItem = existingMap.get(p.productId)!;
@@ -106,7 +134,7 @@ export async function POST(req: Request) {
 
     // --- Option C: Auto-adjust Negative Inventory ---
     // Fetch current stock levels for the requested products
-    const productIds = requests.map((r: any) => r.productId);
+    const productIds = finalRequests.map((r: any) => r.productId);
     const { data: productsToAdjust, error: prodErr } = await supabase
       .from('products')
       .select('id, stock_level')
@@ -116,7 +144,7 @@ export async function POST(req: Request) {
     if (!prodErr && productsToAdjust && productsToAdjust.length > 0) {
       for (const p of productsToAdjust) {
         // Find the total expected qty for this product across existing + new requests
-        const reqItem = requests.find((r: any) => r.productId === p.id);
+        const reqItem = finalRequests.find((r: any) => r.productId === p.id);
         if (!reqItem) continue;
         
         let newTotalExpected = reqItem.requestedQty;

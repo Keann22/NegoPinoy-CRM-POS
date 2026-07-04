@@ -1,246 +1,36 @@
 "use client";
 
-import { useState, useEffect, Fragment } from "react";
+import { Fragment } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Plus, Trash2 } from "lucide-react";
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { useSupabase } from "@/lib/supabase/hooks";
-import { useToast } from "@/hooks/use-toast";
-
-function ProductSearch({ onProductSelect }: { onProductSelect: (product: any) => void }) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState('');
-  const supabase = useSupabase();
-  const [productResults, setProductResults] = useState<any[]>([]);
-  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
-
-  useEffect(() => {
-    if (!supabase || search.length < 2) {
-      setProductResults([]);
-      return;
-    }
-    const handler = setTimeout(async () => {
-      setIsLoadingProducts(true);
-      try {
-        let query = supabase.from('products').select('id, name, stock_level, variant_name');
-        const searchWords = search.split(' ').filter(w => w.trim() !== '');
-        searchWords.forEach(w => {
-            query = query.or(`name.ilike.%${w}%,variant_name.ilike.%${w}%`);
-        });
-        const { data, error } = await query.order('name').limit(10);
-        if (error) throw error;
-        setProductResults(data || []);
-      } catch (err) {
-        console.error('Search error:', err);
-      } finally {
-        setIsLoadingProducts(false);
-      }
-    }, 250);
-    return () => clearTimeout(handler);
-  }, [supabase, search]);
-  
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="w-full justify-start font-normal text-left">
-          <Plus className="mr-2 h-4 w-4" /> Add Unexpected Item
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[300px] p-0" align="start">
-        <Command shouldFilter={false}>
-          <CommandInput
-            placeholder="Search products..."
-            value={search}
-            onValueChange={setSearch}
-          />
-          <CommandList>
-            {isLoadingProducts && <CommandItem disabled>Searching...</CommandItem>}
-            {productResults && productResults.length > 0 ? (
-              <CommandGroup>
-                {productResults.map((p) => (
-                  <CommandItem
-                    key={p.id}
-                    value={p.name.toLowerCase()}
-                    onSelect={() => {
-                      onProductSelect(p);
-                      setOpen(false);
-                      setSearch('');
-                    }}
-                  >
-                    {p.name}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            ) : (
-              !isLoadingProducts && <CommandEmpty>No products found.</CommandEmpty>
-            )}
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
+import { Loader2, Trash2 } from "lucide-react";
+import { usePendingPurchases } from "@/hooks/usePendingPurchases";
+import { PendingProductSearch } from "@/components/dashboard/inventory/pending-product-search";
 
 export function PendingPurchases({ onReceiveComplete }: { onReceiveComplete: () => void }) {
-  const [items, setItems] = useState<any[]>([]);
-  const [unexpectedItems, setUnexpectedItems] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submittingId, setSubmittingId] = useState<string | null>(null);
-  const { toast } = useToast();
-
-  const fetchPending = async () => {
-    try {
-      const res = await fetch("/api/inventory/receive/pending-pos");
-      const data = await res.json();
-      setItems(data.pendingItems || []);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchPending();
-  }, []);
-
-  const handleQtyChange = (id: string, qty: string) => {
-    setItems(items.map(i => i.id === id ? { ...i, receivedQty: qty } : i));
-  };
-
-  const handleReasonChange = (id: string, reason: string) => {
-    setItems(items.map(i => i.id === id ? { ...i, discrepancyReason: reason } : i));
-  };
-
-  const handleReceiveSingle = async (item: any, isUnexpected: boolean = false) => {
-    let toReceive = [];
-    let toReceiveUnexpected = [];
-
-    if (isUnexpected) {
-        if (!item.receivedQty || Number(item.receivedQty) <= 0) {
-            return toast({ variant: 'destructive', title: 'Invalid Quantity', description: 'Please enter a valid received quantity.' });
-        }
-        toReceiveUnexpected.push({
-            productId: item.id,
-            receivedQty: Number(item.receivedQty),
-            unitCost: item.sellingPrice ? item.sellingPrice * 0.8 : 0
-        });
-    } else {
-        if (!item.receivedQty || Number(item.receivedQty) <= 0) {
-            return toast({ variant: 'destructive', title: 'Invalid Quantity', description: 'Please enter a valid received quantity.' });
-        }
-        if (Number(item.receivedQty) < Number(item.remainingQty) && (!item.discrepancyReason || item.discrepancyReason.trim() === '')) {
-            return toast({ variant: 'destructive', title: 'Reason Required', description: `Please provide a discrepancy reason for: ${item.productName}` });
-        }
-        toReceive.push({
-            itemId: item.id,
-            receivedQty: Number(item.receivedQty),
-            discrepancyReason: Number(item.receivedQty) < Number(item.remainingQty) ? item.discrepancyReason : undefined
-        });
-    }
-
-    setSubmittingId(item.id);
-    try {
-      const res = await fetch("/api/inventory/receive/pending-pos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ receives: toReceive, unexpectedItems: toReceiveUnexpected })
-      });
-
-      if (!res.ok) throw new Error(await res.text());
-
-      toast({ title: 'Item Saved!', description: `Successfully received ${item.productName || item.name}.` });
-      
-      if (isUnexpected) {
-          setUnexpectedItems(unexpectedItems.filter(i => i.id !== item.id));
-      } else {
-          fetchPending();
-      }
-      onReceiveComplete();
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Error', description: e.message });
-    } finally {
-      setSubmittingId(null);
-    }
-  };
-
-  const handleCancel = async (item: any) => {
-      if (!confirm(`Are you sure you want to cancel the request for ${item.productName}?`)) return;
-      
-      setSubmittingId(item.id);
-      try {
-        const res = await fetch("/api/inventory/receive/pending-pos/cancel", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ itemId: item.id })
-        });
-        
-        if (!res.ok) throw new Error(await res.text());
-        
-        toast({ title: 'Request Cancelled', description: `Successfully removed ${item.productName} from the pending list.` });
-        fetchPending();
-      } catch (e: any) {
-        toast({ variant: 'destructive', title: 'Error', description: e.message });
-      } finally {
-        setSubmittingId(null);
-      }
-  };
-
-  const handleReceive = async () => {
-    // filter out items that have receivedQty entered
-    const toReceive = items.filter(i => i.receivedQty && Number(i.receivedQty) > 0).map(i => ({
-      itemId: i.id,
-      receivedQty: Number(i.receivedQty),
-      discrepancyReason: Number(i.receivedQty) < Number(i.remainingQty) ? i.discrepancyReason : undefined
-    }));
-
-    const toReceiveUnexpected = unexpectedItems.filter(i => i.receivedQty && Number(i.receivedQty) > 0).map(i => ({
-      productId: i.id,
-      receivedQty: Number(i.receivedQty),
-      unitCost: i.sellingPrice ? i.sellingPrice * 0.8 : 0 // Default approximation if needed, normally we ask for cost
-    }));
-
-    // Validation
-    const invalidDiscrepancies = items.filter(i => i.receivedQty && Number(i.receivedQty) > 0 && Number(i.receivedQty) < Number(i.remainingQty) && (!i.discrepancyReason || i.discrepancyReason.trim() === ''));
-    if (invalidDiscrepancies.length > 0) {
-        return toast({ variant: 'destructive', title: 'Reason Required', description: `Please provide a discrepancy reason for: ${invalidDiscrepancies.map(i => i.productName).join(', ')}` });
-    }
-
-    if (toReceive.length === 0 && toReceiveUnexpected.length === 0) {
-      return toast({ variant: 'destructive', title: 'No Items', description: "Please enter the received quantity for at least one item." });
-    }
-
-    setIsSubmitting(true);
-    try {
-      const res = await fetch("/api/inventory/receive/pending-pos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ receives: toReceive, unexpectedItems: toReceiveUnexpected })
-      });
-
-      if (!res.ok) throw new Error(await res.text());
-
-      toast({ title: 'Success', description: "Successfully received purchases!" });
-      setUnexpectedItems([]);
-      fetchPending();
-      onReceiveComplete();
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Error', description: e.message });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  const {
+    items,
+    setItems,
+    unexpectedItems,
+    setUnexpectedItems,
+    loading,
+    isSubmitting,
+    submittingId,
+    handleQtyChange,
+    handleReasonChange,
+    handleReceiveSingle,
+    handleCancel,
+    handleReceive,
+    closeBatch
+  } = usePendingPurchases(onReceiveComplete);
 
   if (loading) return <div>Loading pending purchases...</div>;
+  
   if (items.length === 0 && unexpectedItems.length === 0) {
-      // If nothing pending, just show the Add Unexpected Item wrapper
       return (
           <div className="mb-6 flex justify-end">
-              <ProductSearch onProductSelect={(p) => {
+              <PendingProductSearch onProductSelect={(p) => {
                   if (!unexpectedItems.find(x => x.id === p.id)) {
                       setUnexpectedItems([...unexpectedItems, { ...p, receivedQty: '' }]);
                   }
@@ -285,21 +75,7 @@ export function PendingPurchases({ onReceiveComplete }: { onReceiveComplete: () 
                                         variant="outline"
                                         size="sm"
                                         className="h-7 text-xs bg-white text-slate-600 hover:bg-red-50 hover:text-red-700"
-                                        onClick={async () => {
-                                            if (!confirm(`Are you sure you want to close ${batchName.replace(/_/g, ' ')}? Any unbought items will roll over to pending requests.`)) return;
-                                            try {
-                                                const res = await fetch('/api/inventory/procurement-batch/close', {
-                                                    method: 'POST',
-                                                    headers: { 'Content-Type': 'application/json' },
-                                                    body: JSON.stringify({ batchName })
-                                                });
-                                                if (!res.ok) throw new Error(await res.text());
-                                                toast({ title: 'Batch Closed', description: `Unbought items rolled over.` });
-                                                fetchPending();
-                                            } catch (e: any) {
-                                                toast({ variant: 'destructive', title: 'Error', description: e.message });
-                                            }
-                                        }}
+                                        onClick={() => closeBatch(batchName)}
                                     >
                                         Close Batch & Rollover
                                     </Button>
@@ -410,7 +186,7 @@ export function PendingPurchases({ onReceiveComplete }: { onReceiveComplete: () 
         
         <div className="p-4 border-t flex justify-between bg-slate-50 items-center">
           <div className="w-[250px]">
-              <ProductSearch onProductSelect={(p) => {
+              <PendingProductSearch onProductSelect={(p) => {
                   if (!unexpectedItems.find(x => x.id === p.id)) {
                       setUnexpectedItems([...unexpectedItems, { ...p, receivedQty: '' }]);
                   }

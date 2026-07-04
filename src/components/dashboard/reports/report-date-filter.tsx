@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { DateRange } from 'react-day-picker';
 import { format, startOfToday, subMonths } from 'date-fns';
 import { Calendar as CalendarIcon } from 'lucide-react';
@@ -26,6 +27,9 @@ interface ReportDateFilterProps {
 }
 
 export function ReportDateFilter({ date, setDate, className }: ReportDateFilterProps) {
+    const [mounted, setMounted] = React.useState(false);
+    React.useEffect(() => setMounted(true), []);
+
     const handlePresetChange = (value: string) => {
         const now = new Date();
         if (value === 'this-month') {
@@ -39,6 +43,13 @@ export function ReportDateFilter({ date, setDate, className }: ReportDateFilterP
             setDate({ from: new Date(now.getFullYear(), 0, 1), to: new Date(now.getFullYear(), 11, 31) });
         }
     }
+
+    if (!mounted) {
+        return <div className={cn("flex flex-wrap items-center gap-2 mb-4 animate-pulse", className)}>
+            <div className="h-9 w-[250px] bg-muted rounded-md"></div>
+        </div>;
+    }
+
   return (
     <div className={cn("flex flex-wrap items-center gap-2 mb-4", className)}>
       <span className="text-sm font-medium">Filter by:</span>

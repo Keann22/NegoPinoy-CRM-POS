@@ -1,12 +1,5 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useForm, useFieldArray, useWatch } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { useSupabase } from '@/lib/supabase/hooks';
-import { createClient } from '@/lib/supabase/client';
-
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -17,315 +10,37 @@ import { useToast } from '@/hooks/use-toast';
 import { CalendarIcon, Loader2, Trash2, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import Image from 'next/image';
 import { ZoomableImage } from "@/components/ui/zoomable-image";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { parseReceipt } from '@/ai/flows/parse-receipt-flow';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@/components/ui/command';
 import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AddProductDialog } from '@/components/dashboard/product-dialog';
 import { useRoleCheck } from '@/hooks/useRoleCheck';
-
-// Zod schemas
-const parsedItemSchema = z.object({
-  productId: z.string().min(1, "Product must be matched."),
-  productName: z.string(),
-  quantity: z.coerce.number().positive(),
-  unitCost: z.coerce.number().min(0),
-});
-
-const scanSchema = z.object({
-  supplierName: z.string().min(1, 'Supplier name is required.'),
-  purchaseDate: z.date({ required_error: 'A purchase date is required.' }),
-  items: z.array(parsedItemSchema).min(1, "The receipt must contain at least one valid item."),
-});
-
-type ScanFormValues = z.infer<typeof scanSchema>;
-type Product = { id: string; name: string; sku: string; [key: string]: any; };
-
-// Helper to convert File to Data URI
-const fileToDataUri = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-    });
-};
-
-function ProductSearch({ rowIndex, form, onAddNewProduct }: { rowIndex: number; form: any; onAddNewProduct: (searchTerm: string, rowIndex: number) => void; }) {
-    const [open, setOpen] = useState(false);
-    const [search, setSearch] = useState(form.getValues(`items.${rowIndex}.productName`) || '');
-
-    const [productResults, setProductResults] = useState<Product[]>([]);
-    const [isLoadingProducts, setIsLoadingProducts] = useState(false);
-  
-    const debouncedSearch = useCallback(() => {
-        const handler = setTimeout(async () => {
-            if (search.length < 2) {
-              setProductResults([]);
-              return;
-            }
-            
-            setIsLoadingProducts(true);
-            try {
-              const supabase = createClient();
-              let query = supabase.from('products').select('id, name, sku');
-              const searchWords = search.split(' ').filter((w: string) => w.trim() !== '');
-              searchWords.forEach((w: string) => {
-                  query = query.or(`name.ilike.%${w}%,variant_name.ilike.%${w}%`);
-              });
-              const { data, error } = await query.limit(10);
-              
-              if (!error && data) {
-                setProductResults(data as Product[]);
-              } else {
-                setProductResults([]);
-              }
-            } catch (error) {
-              console.error("Error searching products:", error);
-            } finally {
-              setIsLoadingProducts(false);
-            }
-          }, 300);
-      
-          return () => clearTimeout(handler);
-    }, [search]);
-
-
-    useEffect(() => {
-        if (!open) return;
-        const cleanup = debouncedSearch();
-        return cleanup;
-      }, [search, open, debouncedSearch]);
-
-
-    return (
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-            <Button variant="outline" className="w-full justify-start font-normal text-left">
-                {form.watch(`items.${rowIndex}.productName`) || 'Search product...'}
-            </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[300px] p-0" align="start">
-          <Command shouldFilter={false}>
-            <CommandInput
-              placeholder="Search products..."
-              value={search}
-              onValueChange={setSearch}
-            />
-            <CommandList>
-                {isLoadingProducts && <CommandItem disabled>Searching...</CommandItem>}
-                
-                {!isLoadingProducts && productResults.length > 0 && (
-                    <CommandGroup>
-                    {productResults.map((p) => (
-                        <CommandItem
-                        key={p.id}
-                        value={p.name.toLowerCase()}
-                        onSelect={() => {
-                            form.setValue(`items.${rowIndex}.productId`, p.id);
-                            form.setValue(`items.${rowIndex}.productName`, p.name);
-                            setOpen(false);
-                        }}
-                        >
-                        {p.name}
-                        </CommandItem>
-                    ))}
-                    </CommandGroup>
-                )}
-                
-                {!isLoadingProducts && search.length > 1 && (
-                    <>
-                        {productResults.length > 0 && <CommandSeparator />}
-                        <CommandItem
-                            value={(search + ' add_new').toLowerCase()}
-                            onSelect={() => {
-                                onAddNewProduct(search, rowIndex);
-                                setOpen(false);
-                            }}
-                            className="text-primary cursor-pointer"
-                        >
-                            + Add "{search}" as new product
-                        </CommandItem>
-                    </>
-                )}
-
-                <CommandEmpty>
-                    {!isLoadingProducts && productResults.length === 0 && search.length < 2 
-                        ? "Type to search products." 
-                        : "No products found."
-                    }
-                </CommandEmpty>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
-    );
-  }
+import { useScanReceipt } from '@/hooks/useScanReceipt';
+import { ScanProductSearch } from '@/components/dashboard/inventory/scan-product-search';
 
 export default function ScanReceiptPage() {
-    const [isParsing, setIsParsing] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
-    const [receiptImage, setReceiptImage] = useState<File | null>(null);
-    const [receiptImageUrl, setReceiptImageUrl] = useState<string | null>(null);
-
-    const supabase = useSupabase();
     const { toast } = useToast();
-
-    // State for the AddProductDialog
-    const [isAddProductDialogOpen, setIsAddProductDialogOpen] = useState(false);
-    const [addProductInitialValues, setAddProductInitialValues] = useState<any>();
-    const [productCreationRowIndex, setProductCreationRowIndex] = useState<number | null>(null);
     const { isManagement } = useRoleCheck();
-
-    const form = useForm<ScanFormValues>({
-        resolver: zodResolver(scanSchema),
-        defaultValues: {
-            supplierName: '',
-            purchaseDate: new Date(),
-            items: [],
-        },
-    });
-
-    const { fields, append, remove, replace } = useFieldArray({
-        control: form.control,
-        name: 'items',
-    });
-
-    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        setReceiptImage(file);
-        setReceiptImageUrl(URL.createObjectURL(file));
-        setIsParsing(true);
-        replace([]); // Clear previous items
-        toast({ title: 'Parsing Receipt...', description: 'Gemini is processing the receipt. This may take a moment.' });
-
-        try {
-            const dataUri = await fileToDataUri(file);
-            const result = await parseReceipt({ photoDataUri: dataUri });
-            
-            if (result.items && result.items.length > 0) {
-                const newItems = result.items.map(item => ({
-                    productName: item.productName || '',
-                    quantity: isNaN(Number(item.quantity)) || Number(item.quantity) <= 0 ? 1 : Number(item.quantity),
-                    unitCost: isNaN(Number(item.unitCost)) || Number(item.unitCost) < 0 ? 0 : Number(item.unitCost),
-                    productId: '',
-                }));
-                replace(newItems);
-                toast({ title: 'Receipt Parsed!', description: 'Please review the items below and match them to your products.' });
-            } else {
-                toast({ variant: 'destructive', title: 'Parsing Failed', description: 'No items were found on the receipt. Please try another image.' });
-            }
-        } catch (error) {
-            console.error("Error parsing receipt:", error);
-            toast({ variant: 'destructive', title: 'Parsing Error', description: 'An error occurred while parsing the receipt.' });
-        } finally {
-            setIsParsing(false);
-        }
-    };
-
-    const handleAddNewProduct = useCallback((productName: string, rowIndex: number) => {
-        const item = form.getValues(`items.${rowIndex}`);
-        setAddProductInitialValues({
-            name: productName,
-            sku: '',
-            description: '',
-            categoryId: 'Uncategorized',
-            supplierId: '',
-            images: [],
-            initialUnitCost: item.unitCost || 0,
-            sellingPrice: item.unitCost ? item.unitCost * 1.5 : 0, // Suggest markup
-            quantityOnHand: 0, // Stock is added when receipt is saved, not here.
-        });
-        setProductCreationRowIndex(rowIndex);
-        setIsAddProductDialogOpen(true);
-    }, [form]);
-
-    const items = useWatch({ control: form.control, name: 'items' });
-    const totalCost = items.reduce((total, item) => total + ((item.quantity || 0) * (item.unitCost || 0)), 0);
-
-    const onSubmit = async (values: ScanFormValues) => {
-        setIsSaving(true);
-        toast({ title: 'Saving to Inventory...', description: 'Please wait.' });
-
-        try {
-            // 1. Fetch current product data
-            const productIds = values.items.map(item => item.productId);
-            const { data: products, error: productsError } = await supabase
-                .from('products')
-                .select('id, stock_level, name')
-                .in('id', productIds);
-            
-            if (productsError) throw productsError;
-            
-            const productDataMap = new Map(products.map(p => [p.id, p]));
-
-            // Check if all products exist
-            for (const item of values.items) {
-                if (!productDataMap.has(item.productId)) {
-                    throw new Error(`Product "${item.productName}" not found in database.`);
-                }
-            }
-
-            // 2. Record Expense (exclude if supplier is Internal Inventory)
-            const totalExpense = values.items.reduce((sum, item) => sum + (item.quantity * item.unitCost), 0);
-            if (totalExpense > 0 && values.supplierName !== 'Internal Inventory') {
-                const { error: expenseError } = await supabase
-                    .from('expenses')
-                    .insert({
-                        expense_date: values.purchaseDate.toISOString(),
-                        amount: totalExpense,
-                        category: 'Cost of Goods Sold',
-                        description: `Scanned receipt from ${values.supplierName}`,
-                    });
-                if (expenseError) throw expenseError;
-            }
-            
-            // 3. Update products and create inventory movements
-            for (const item of values.items) {
-                // Update product stock level using atomic RPC
-                const { error: updateError } = await supabase.rpc('increment_stock', {
-                    p_product_id: item.productId,
-                    qty: item.quantity,
-                    new_unit_cost: item.unitCost
-                });
-                
-                if (updateError) throw updateError;
-
-                // Create inventory movement
-                const { error: movementError } = await supabase
-                    .from('inventory_movements')
-                    .insert({
-                        product_id: item.productId,
-                        quantity_change: item.quantity,
-                        movement_type: 'RESTOCK',
-                        timestamp: new Date().toISOString(),
-                        reason: `Scanned receipt from ${values.supplierName}`,
-                        supplier_name: values.supplierName,
-                        unit_cost: item.unitCost
-                    });
-                    
-                if (movementError) throw movementError;
-            }
-
-            toast({ title: 'Inventory Updated!', description: 'The items have been added to your inventory.' });
-            form.reset();
-            replace([]);
-            setReceiptImage(null);
-            setReceiptImageUrl(null);
-        } catch (e: any) {
-            console.error("Scanned receipt transaction failed: ", e);
-            toast({ variant: 'destructive', title: 'Save Failed', description: e.message || 'Could not save the items.' });
-        } finally {
-            setIsSaving(false);
-        }
-    };
+    const {
+        form,
+        fields,
+        remove,
+        handleFileChange,
+        handleAddNewProduct,
+        onSubmit,
+        isParsing,
+        isSaving,
+        receiptImage,
+        receiptImageUrl,
+        totalCost,
+        isAddProductDialogOpen,
+        setIsAddProductDialogOpen,
+        addProductInitialValues,
+        productCreationRowIndex,
+        setProductCreationRowIndex
+    } = useScanReceipt();
 
     return (
         <Card>
@@ -380,7 +95,7 @@ export default function ScanReceiptPage() {
                                         {!isParsing && fields.map((field, index) => (
                                             <TableRow key={field.id}>
                                                 <TableCell className="font-medium">
-                                                    <ProductSearch rowIndex={index} form={form} onAddNewProduct={handleAddNewProduct} />
+                                                    <ScanProductSearch rowIndex={index} form={form} onAddNewProduct={handleAddNewProduct} />
                                                     <FormMessage>{form.formState.errors?.items?.[index]?.productId?.message}</FormMessage>
                                                 </TableCell>
                                                 <TableCell>

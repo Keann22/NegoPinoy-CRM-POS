@@ -13,7 +13,7 @@ export function OrderIssues({ isAdmin }: { isAdmin?: boolean }) {
   const [selectedGroup, setSelectedGroup] = useState<any | null>(null);
   const [replyText, setReplyText] = useState("");
   const [isSending, setIsSending] = useState(false);
-  
+
   const { user } = useUser();
   const { userProfile } = useUserProfile();
   const canResolve = userProfile?.roles?.some(r => ['Admin', 'Owner', 'Sales'].includes(r));
@@ -76,8 +76,11 @@ export function OrderIssues({ isAdmin }: { isAdmin?: boolean }) {
       });
       allMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
+      const fullOrder = fullGroupIssues.find(fi => fi.orders)?.orders;
+
       setSelectedGroup({
          ...group,
+         orders: fullOrder || group.orders,
          issues: fullGroupIssues,
          messages: allMessages
       });
@@ -88,8 +91,8 @@ export function OrderIssues({ isAdmin }: { isAdmin?: boolean }) {
 
   const handleResolve = async () => {
     if (!selectedGroup) return;
-    if (!confirm("Are you sure you want to resolve ALL issues for this order? This will remove them from the dashboard.")) return;
-    
+    if (!confirm("This only dismisses the issue from this dashboard for record-keeping — it will NOT unblock Second Check or Packing. The order stays blocked until the item is actually re-picked in stock. Continue?")) return;
+
     try {
       for (const issue of selectedGroup.issues) {
           const res = await fetch('/api/inventory/issues', {
@@ -99,6 +102,7 @@ export function OrderIssues({ isAdmin }: { isAdmin?: boolean }) {
           });
           if (!res.ok) throw new Error("Failed to resolve an issue");
       }
+
       setSelectedGroup(null);
       fetchIssues();
     } catch (e: any) {

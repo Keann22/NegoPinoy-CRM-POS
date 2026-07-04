@@ -10,7 +10,63 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { action, productId, physicalCount } = body;
 
-    if (!action || !productId || typeof physicalCount !== 'number') {
+    if (!action || !productId) {
+      return NextResponse.json({ error: 'Missing core parameters' }, { status: 400 });
+    }
+
+    if (action === 'getOnHoldCustomers') {
+      // 1. Find on-hold orders holding this product
+      const { data: rows, error: rowsErr } = await supabase
+        .from('order_items')
+        .select('order_id, quantity, orders!inner(id, status, customer_id, order_date, customers(full_name))')
+        .eq('product_id', productId)
+        .eq('orders.status', 'On-Hold');
+      if (rowsErr) throw rowsErr;
+
+      const onHoldRows = (rows || []) as any[];
+      if (onHoldRows.length === 0) {
+        return NextResponse.json({ success: true, customers: [] });
+      }
+
+      // 2. Look up the hold reason from the most recent open issue's messages, if any
+      const orderIds = onHoldRows.map(r => r.order_id);
+      const { data: issues } = await supabase
+        .from('order_issues')
+        .select('id, order_id')
+        .in('order_id', orderIds)
+        .eq('status', 'open');
+
+      const issueIdToOrderId = new Map<string, string>();
+      (issues || []).forEach(i => issueIdToOrderId.set(i.id, i.order_id));
+
+      let orderIdToReason = new Map<string, string>();
+      if (issues && issues.length > 0) {
+        const { data: messages } = await supabase
+          .from('order_issue_messages')
+          .select('issue_id, message, created_at')
+          .in('issue_id', issues.map(i => i.id))
+          .order('created_at', { ascending: false });
+
+        (messages || []).forEach(m => {
+          const orderId = issueIdToOrderId.get(m.issue_id);
+          if (orderId && !orderIdToReason.has(orderId)) {
+            orderIdToReason.set(orderId, m.message);
+          }
+        });
+      }
+
+      const customers = onHoldRows.map(r => ({
+        orderId: r.order_id,
+        customerName: r.orders?.customers?.full_name || 'Unknown Customer',
+        quantity: r.quantity,
+        holdSince: r.orders?.order_date || null,
+        holdReason: orderIdToReason.get(r.order_id) || null,
+      }));
+
+      return NextResponse.json({ success: true, customers });
+    }
+
+    if (typeof physicalCount !== 'number') {
       return NextResponse.json({ error: 'Missing core parameters' }, { status: 400 });
     }
 

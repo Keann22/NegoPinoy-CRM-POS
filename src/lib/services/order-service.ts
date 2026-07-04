@@ -144,6 +144,70 @@ export async function createOrder(
 }
 
 // ---------------------------------------------------------------------------
+// Cancellation stock effects
+// ---------------------------------------------------------------------------
+
+/**
+ * Restores stock for every item on an order that is being cancelled.
+ * Stock is deducted immediately at order creation (see createOrder above), so
+ * cancelling must reverse that deduction or the item is permanently lost from stock.
+ */
+export async function restoreStockForCancelledOrder(
+  supabase: SupabaseClient,
+  orderId: string
+): Promise<void> {
+  const { data: items, error } = await supabase
+    .from('order_items')
+    .select('product_id, quantity')
+    .eq('order_id', orderId);
+  if (error) throw error;
+
+  for (const item of items || []) {
+    const { error: rpcError } = await supabase.rpc('increment_stock', {
+      p_product_id: item.product_id,
+      qty: item.quantity,
+      new_unit_cost: 0,
+    });
+    if (rpcError) throw rpcError;
+
+    await supabase.from('inventory_movements').insert({
+      product_id: item.product_id,
+      quantity_change: item.quantity,
+      movement_type: 'adjustment',
+      reason: `Order Cancelled: #${orderId}`,
+    });
+  }
+}
+
+/** Symmetric reversal for when a Cancelled order is moved back to an active status. */
+export async function deductStockForUncancelledOrder(
+  supabase: SupabaseClient,
+  orderId: string
+): Promise<void> {
+  const { data: items, error } = await supabase
+    .from('order_items')
+    .select('product_id, quantity')
+    .eq('order_id', orderId);
+  if (error) throw error;
+
+  for (const item of items || []) {
+    const { error: rpcError } = await supabase.rpc('increment_stock', {
+      p_product_id: item.product_id,
+      qty: -item.quantity,
+      new_unit_cost: 0,
+    });
+    if (rpcError) throw rpcError;
+
+    await supabase.from('inventory_movements').insert({
+      product_id: item.product_id,
+      quantity_change: -item.quantity,
+      movement_type: 'adjustment',
+      reason: `Order Un-cancelled: #${orderId}`,
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
 // editOrder
 // ---------------------------------------------------------------------------
 

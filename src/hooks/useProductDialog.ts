@@ -1,0 +1,324 @@
+import { useState, useEffect, useMemo } from 'react';
+import { useForm, useFieldArray } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { useSupabase, useUser } from '@/lib/supabase/hooks';
+import { useToast } from '@/hooks/use-toast';
+import { useUserProfile } from '@/hooks/useUserProfile';
+import type { FormattedProduct } from '@/types';
+
+export const productSchema = z.object({
+  name: z.string().min(1, "Product name is required"),
+  sku: z.string().optional(),
+  shelfLocation: z.string().optional(),
+  description: z.string().optional(),
+  categoryId: z.string().optional(),
+  images: z.custom<File[]>().optional(),
+  sellingPrice: z.coerce.number().min(0, "Selling price must be positive").optional().default(0),
+  installmentPrice: z.coerce.number().min(0).optional(),
+  quantityOnHand: z.coerce.number().int().min(0).optional().default(0),
+  supplierPricing: z.array(z.object({
+    supplierId: z.string().optional(),
+    supplierName: z.string(),
+    supplierCode: z.string().optional(),
+    unitCost: z.coerce.number().min(0),
+  })).optional().default([]),
+  hasVariations: z.boolean().default(false),
+  variations: z.array(z.object({
+    nameSuffix: z.string().min(1, "Variation name is required"),
+    sku: z.string().optional(),
+    sellingPrice: z.coerce.number().min(0, "Price must be positive"),
+    unitCost: z.coerce.number().min(0, "Cost must be positive").optional(),
+    quantityOnHand: z.coerce.number().int().min(0),
+    images: z.custom<File[]>().optional(),
+  })).optional().default([]),
+  assemblyRecipe: z.array(z.object({
+    productId: z.string().min(1),
+    productName: z.string(),
+    quantity: z.coerce.number().min(1),
+  })).optional().default([]),
+});
+
+export type ProductFormValues = z.infer<typeof productSchema>;
+export type Supplier = { id: string; name: string; [key: string]: any };
+
+export type CreateProps = {
+  mode: 'create';
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  initialValues?: Partial<ProductFormValues>;
+  onProductAdded?: (product: { id: string; name: string }) => void;
+  triggerButton?: React.ReactNode;
+};
+
+export type EditProps = {
+  mode: 'edit';
+  product: FormattedProduct | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void;
+};
+
+export type ProductDialogProps = CreateProps | EditProps;
+
+export async function uploadImages(supabase: any, files: File[]): Promise<string[]> {
+  return Promise.all(files.map(async (file) => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+    const { error } = await supabase.storage.from('products').upload(fileName, file);
+    if (error) throw error;
+    const { data: { publicUrl } } = supabase.storage.from('products').getPublicUrl(fileName);
+    return publicUrl;
+  }));
+}
+
+export function useProductDialog(props: ProductDialogProps) {
+  const isEdit = props.mode === 'edit';
+
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = props.open !== undefined && props.onOpenChange !== undefined;
+  const open = isControlled ? props.open! : internalOpen;
+  const setOpen = isControlled ? props.onOpenChange! : setInternalOpen;
+
+  const supabase = useSupabase();
+  const { user } = useUser();
+  const { toast } = useToast();
+  const { userProfile } = useUserProfile();
+  const isManagement = useMemo(() => userProfile?.roles?.some((r: string) => ['Admin', 'Owner'].includes(r)), [userProfile]);
+
+  const [supplierSearch, setSupplierSearch] = useState('');
+  const [componentSearch, setComponentSearch] = useState('');
+  const [localProduct, setLocalProduct] = useState<FormattedProduct | null>(null);
+
+  useEffect(() => {
+    if (isEdit && props.mode === 'edit' && props.product) setLocalProduct(props.product);
+  }, [isEdit, props]);
+  const displayProduct = isEdit ? ((props as EditProps).product || localProduct) : null;
+
+  const [supplierResults, setSupplierResults] = useState<Supplier[]>([]);
+  const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(false);
+  useEffect(() => {
+    if (!supabase || !user || !isManagement || supplierSearch.length < 1) { setSupplierResults([]); return; }
+    const handler = setTimeout(async () => {
+      setIsLoadingSuppliers(true);
+      let query = supabase.from('suppliers').select('id, name');
+      const searchWords = supplierSearch.split(' ').filter(w => w.trim() !== '');
+      searchWords.forEach(w => {
+          query = query.ilike('name', `%${w}%`);
+      });
+      const { data } = await query.order('name').limit(10);
+      setSupplierResults(data || []);
+      setIsLoadingSuppliers(false);
+    }, 250);
+    return () => clearTimeout(handler);
+  }, [supabase, user, isManagement, supplierSearch]);
+
+  const [categoryResults, setCategoryResults] = useState<{ id: string; name: string }[]>([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false);
+  useEffect(() => {
+    if (!supabase || !user) return;
+    setIsLoadingCategories(true);
+    supabase.from('categories').select('id, name').order('name').then(({ data }) => {
+      setCategoryResults(data || []);
+      setIsLoadingCategories(false);
+    });
+  }, [supabase, user]);
+
+  const [componentResults, setComponentResults] = useState<{ id: string; name: string }[]>([]);
+  const [isLoadingComponents, setIsLoadingComponents] = useState(false);
+  useEffect(() => {
+    if (!supabase || !user || componentSearch.length < 1) { setComponentResults([]); return; }
+    const handler = setTimeout(async () => {
+      setIsLoadingComponents(true);
+      let query = supabase.from('products').select('id, name, variant_name');
+      const searchWords = componentSearch.split(' ').filter(w => w.trim() !== '');
+      searchWords.forEach(w => {
+          query = query.or(`name.ilike.%${w}%,variant_name.ilike.%${w}%`);
+      });
+      const { data } = await query.order('name').limit(10);
+      setComponentResults(data || []);
+      setIsLoadingComponents(false);
+    }, 250);
+    return () => clearTimeout(handler);
+  }, [supabase, user, componentSearch]);
+
+  const form = useForm<ProductFormValues>({
+    resolver: zodResolver(productSchema),
+    defaultValues: { name: '', sku: '', shelfLocation: '', description: '', categoryId: '', images: [], sellingPrice: 0, quantityOnHand: 0, supplierPricing: [], hasVariations: false, variations: [], assemblyRecipe: [] },
+  });
+
+  const { fields: supplierFields, append: appendSupplier, remove: removeSupplier } = useFieldArray({ control: form.control, name: 'supplierPricing' });
+  const { fields: variationFields, append: appendVariation, remove: removeVariation } = useFieldArray({ control: form.control, name: 'variations' });
+  const { fields: recipeFields, append: appendRecipe, remove: removeRecipe } = useFieldArray({ control: form.control, name: 'assemblyRecipe' });
+  const hasVariations = form.watch('hasVariations');
+
+  useEffect(() => {
+    if (open) {
+      if (isEdit && displayProduct) {
+        form.reset({
+          name: displayProduct.name ?? '',
+          sku: displayProduct.sku ?? '',
+          shelfLocation: displayProduct.shelfLocation || '',
+          description: displayProduct.description ?? '',
+          categoryId: displayProduct.categoryId ?? undefined,
+          sellingPrice: displayProduct.sellingPrice ?? 0,
+          installmentPrice: displayProduct.installment_price ?? undefined,
+          supplierPricing: displayProduct.supplierPricing || [],
+          variations: [],
+          assemblyRecipe: displayProduct.assembly_recipe || [],
+        });
+      } else if (!isEdit) {
+        const iv = (props as CreateProps).initialValues;
+        form.reset(iv || { name: '', sku: '', description: '', categoryId: '', images: [], sellingPrice: 0, quantityOnHand: 0, supplierPricing: [], hasVariations: false, variations: [] });
+      }
+      setSupplierSearch('');
+      setComponentSearch('');
+    } else {
+      form.reset();
+      setSupplierSearch('');
+      setComponentSearch('');
+    }
+  }, [open]);
+
+  async function onSubmit(values: ProductFormValues) {
+    if (!supabase) return;
+
+    const finalSku = values.sku?.trim() || `PRD-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
+    const shouldCheckSku = !isEdit || finalSku !== displayProduct?.sku;
+    if (shouldCheckSku) {
+      const { data: existingSku } = await supabase.from('products').select('id').eq('sku', finalSku).limit(1);
+      if (existingSku && existingSku.length > 0) {
+        toast({ variant: 'destructive', title: 'Duplicate SKU', description: `A product with SKU "${finalSku}" already exists.` });
+        return;
+      }
+    }
+
+    setOpen(false);
+    toast({ title: isEdit ? 'Updating Product...' : 'Adding Product...', description: `"${values.name}" is being ${isEdit ? 'updated' : 'added'}.` });
+
+    const { images: imageFiles, quantityOnHand, supplierPricing, hasVariations: _hv, variations, installmentPrice, assemblyRecipe, ...core } = values;
+
+    try {
+      if (isEdit && displayProduct) {
+        let uploadedImageUrls: string[] = displayProduct.images || [];
+        if (imageFiles && imageFiles.length > 0) {
+          const newUrls = await uploadImages(supabase, imageFiles);
+          uploadedImageUrls = [...uploadedImageUrls, ...newUrls];
+        }
+
+        const { error } = await supabase.from('products').update({
+          name: core.name, sku: finalSku, shelf_location: core.shelfLocation || null,
+          description: core.description, category: core.categoryId,
+          selling_price: core.sellingPrice, installment_price: installmentPrice ?? null,
+          images: uploadedImageUrls, supplier_pricing: supplierPricing || [],
+          assembly_recipe: assemblyRecipe || [],
+        }).eq('id', displayProduct.id);
+        if (error) throw error;
+
+        if (variations && variations.length > 0) {
+          for (let i = 0; i < variations.length; i++) {
+            const v = variations[i];
+            let varImages = [...uploadedImageUrls];
+            if (v.images && v.images.length > 0) varImages = [...varImages, ...await uploadImages(supabase, v.images)];
+            const vSku = v.sku?.trim() || `PRD-${Date.now().toString().slice(-6)}-${i}-${Math.floor(100 + Math.random() * 900)}`;
+            const { data: newVar, error: varErr } = await supabase.from('products').insert({
+              name: `${core.name} - ${v.nameSuffix}`, variant_name: v.nameSuffix, parent_id: displayProduct.id,
+              sku: vSku, shelf_location: core.shelfLocation || null, description: core.description,
+              category: core.categoryId, selling_price: v.sellingPrice,
+              initial_unit_cost: v.unitCost ?? supplierPricing?.[0]?.unitCost ?? 0,
+              supplier_pricing: supplierPricing || [], stock_level: v.quantityOnHand, images: varImages,
+            }).select().single();
+            if (varErr) throw varErr;
+            if (v.quantityOnHand > 0) {
+              const cost = v.unitCost ?? supplierPricing?.[0]?.unitCost ?? 0;
+              await supabase.from('inventory_movements').insert({ product_id: newVar.id, quantity_change: v.quantityOnHand, movement_type: 'initial_stock', timestamp: new Date().toISOString(), reason: 'Initial stock for new variation', supplier_name: supplierPricing?.[0]?.supplierName || 'Initial Stock', unit_cost: cost });
+            }
+          }
+        }
+
+        toast({ title: 'Product Updated', description: `${values.name} has been successfully updated.` });
+        (props as EditProps).onSuccess?.();
+
+      } else {
+        let uploadedImageUrls: string[] = [];
+        if (imageFiles && imageFiles.length > 0) uploadedImageUrls = await uploadImages(supabase, imageFiles);
+
+        let parentProductId: string | null = null;
+        if (hasVariations && variations && variations.length > 0) {
+          const { data: parent, error: pErr } = await supabase.from('products').insert({
+            name: core.name, sku: finalSku, shelf_location: core.shelfLocation || null,
+            description: core.description, category: core.categoryId, images: uploadedImageUrls,
+            selling_price: 0, installment_price: null, stock_level: 0, supplier_pricing: [],
+          }).select().single();
+          if (pErr) throw pErr;
+          parentProductId = parent.id;
+          (props as CreateProps).onProductAdded?.({ id: parent.id, name: core.name });
+        }
+
+        const productsToCreate = hasVariations && variations && variations.length > 0
+          ? variations.map((v, i) => ({ name: `${core.name} - ${v.nameSuffix}`, variant_name: v.nameSuffix, sku: v.sku?.trim() || `PRD-${Date.now().toString().slice(-6)}-${i}-${Math.floor(100 + Math.random() * 900)}`, sellingPrice: v.sellingPrice, unitCost: v.unitCost, quantityOnHand: v.quantityOnHand, imagesToUpload: v.images }))
+          : [{ name: core.name, variant_name: null, sku: finalSku, sellingPrice: core.sellingPrice || 0, unitCost: undefined, quantityOnHand: quantityOnHand || 0, imagesToUpload: [] as File[] }];
+
+        for (let i = 0; i < productsToCreate.length; i++) {
+          const p = productsToCreate[i];
+          let varImages = uploadedImageUrls;
+          if (p.imagesToUpload && p.imagesToUpload.length > 0) varImages = await uploadImages(supabase, p.imagesToUpload as File[]);
+
+          const { data: newProduct, error: insErr } = await supabase.from('products').insert({
+            name: p.name, variant_name: p.variant_name, parent_id: parentProductId, sku: p.sku,
+            shelf_location: core.shelfLocation || null, description: core.description, category: core.categoryId,
+            selling_price: p.sellingPrice, installment_price: installmentPrice ?? null,
+            initial_unit_cost: p.unitCost ?? supplierPricing?.[0]?.unitCost ?? 0,
+            supplier_pricing: supplierPricing || [], stock_level: p.quantityOnHand, images: varImages,
+          }).select().single();
+          if (insErr) throw insErr;
+
+          if (i === 0 && !parentProductId) (props as CreateProps).onProductAdded?.({ id: newProduct.id, name: p.name });
+
+          if (p.quantityOnHand > 0) {
+            const cost = p.unitCost ?? supplierPricing?.[0]?.unitCost ?? 0;
+            await supabase.from('inventory_movements').insert({ product_id: newProduct.id, quantity_change: p.quantityOnHand, movement_type: 'initial_stock', timestamp: new Date().toISOString(), reason: 'Initial stock for new product', supplier_name: supplierPricing?.[0]?.supplierName || 'Initial Stock', unit_cost: cost });
+          }
+        }
+
+        toast({ title: 'Product Added', description: `${productsToCreate.length > 1 ? `${productsToCreate.length} variations` : core.name} successfully added.` });
+        form.reset();
+        setSupplierSearch('');
+      }
+    } catch (error: any) {
+      console.error('Product save error:', error);
+      toast({ variant: 'destructive', title: isEdit ? 'Update Failed' : 'Save Failed', description: error.message || `Could not ${isEdit ? 'update' : 'create'} "${values.name}".` });
+    }
+  }
+
+  return {
+    isEdit,
+    isControlled,
+    open,
+    setOpen,
+    displayProduct,
+    isManagement,
+    form,
+    supplierSearch,
+    setSupplierSearch,
+    supplierResults,
+    isLoadingSuppliers,
+    categoryResults,
+    isLoadingCategories,
+    componentSearch,
+    setComponentSearch,
+    componentResults,
+    isLoadingComponents,
+    supplierFields,
+    appendSupplier,
+    removeSupplier,
+    variationFields,
+    appendVariation,
+    removeVariation,
+    recipeFields,
+    appendRecipe,
+    removeRecipe,
+    hasVariations,
+    onSubmit
+  };
+}
