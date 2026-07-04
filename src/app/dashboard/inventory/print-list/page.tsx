@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAllProductsForPrint, type PrintableProduct, type PrintStockFilter } from '@/hooks/useAllProductsForPrint';
+import { ProductAllocationDialog } from '@/components/dashboard/inventory/product-allocation-dialog';
 
 type SortBy = 'name' | 'shelf';
 
@@ -71,6 +72,7 @@ export default function PrintInventoryListPage() {
   const { products, isLoading } = useAllProductsForPrint(stockFilter);
   const [sortBy, setSortBy] = useState<SortBy>('name');
   const sortedProducts = useMemo(() => sortProducts(products, sortBy), [products, sortBy]);
+  const [selectedProduct, setSelectedProduct] = useState<PrintableProduct | null>(null);
 
   const handleExportExcel = () => {
     const exportData = sortedProducts.map(p => ({
@@ -89,6 +91,7 @@ export default function PrintInventoryListPage() {
   };
 
   return (
+    <>
     <Card className="print:shadow-none print:border-none">
       <CardHeader className="print:hidden">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -97,6 +100,7 @@ export default function PrintInventoryListPage() {
             <CardDescription>
               A printable sheet of products and their current system stock, with blank columns for writing down your physical count.
               Defaults to low/negative stock only — printing the full catalog produces a very long, slow print job.
+              Click a product below to see its photo and which orders currently have it allocated.
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
@@ -151,7 +155,7 @@ export default function PrintInventoryListPage() {
                 ))
               ) : sortedProducts.length > 0 ? (
                 sortedProducts.map(p => (
-                  <TableRow key={p.id}>
+                  <TableRow key={p.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedProduct(p)}>
                     <TableCell className="font-medium">{displayName(p)}</TableCell>
                     <TableCell>{p.sku || '-'}</TableCell>
                     <TableCell>{p.shelf_location || '-'}</TableCell>
@@ -210,5 +214,11 @@ export default function PrintInventoryListPage() {
         }
       `}</style>
     </Card>
+    <ProductAllocationDialog
+      product={selectedProduct}
+      open={!!selectedProduct}
+      onOpenChange={(open) => !open && setSelectedProduct(null)}
+    />
+    </>
   );
 }

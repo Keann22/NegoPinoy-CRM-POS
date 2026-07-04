@@ -10,6 +10,7 @@ export interface PrintableProduct {
   sku: string | null;
   shelf_location: string | null;
   stock_level: number | null;
+  images: string[] | null;
 }
 
 const PAGE_SIZE = 1000;
@@ -46,7 +47,7 @@ export function useAllProductsForPrint(stockFilter: PrintStockFilter = 'all') {
       while (true) {
         let query = supabase
           .from('products')
-          .select('id, name, variant_name, sku, shelf_location, stock_level')
+          .select('id, name, variant_name, sku, shelf_location, stock_level, images')
           .not('name', 'ilike', '[DELETED]%');
 
         if (stockFilter === 'low-or-negative') {
