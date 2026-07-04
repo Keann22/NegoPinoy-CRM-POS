@@ -52,7 +52,7 @@ export function DueDateAlert() {
     if (dueCount === 0 || !isVisible) return null;
 
     return (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-md animate-in slide-in-from-top-4 fade-in">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-md animate-in slide-in-from-top-4 fade-in print:hidden">
             <Alert variant="destructive" className="bg-destructive/10 border-destructive/50 text-destructive shadow-lg relative">
                 <AlertCircle className="h-5 w-5" />
                 <AlertTitle className="text-base font-bold">Action Required!</AlertTitle>
