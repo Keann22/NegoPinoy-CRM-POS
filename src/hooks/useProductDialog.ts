@@ -2,10 +2,13 @@ import { useState, useEffect, useMemo } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import stringSimilarity from 'string-similarity';
 import { useSupabase, useUser } from '@/lib/supabase/hooks';
 import { useToast } from '@/hooks/use-toast';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import type { FormattedProduct } from '@/types';
+
+export type SimilarProductWarning = { id: string; name: string; matchType: 'exact' | 'similar' };
 
 export const productSchema = z.object({
   name: z.string().trim().min(1, "Product name is required"),
@@ -151,6 +154,53 @@ export function useProductDialog(props: ProductDialogProps) {
   const { fields: variationFields, append: appendVariation, remove: removeVariation } = useFieldArray({ control: form.control, name: 'variations' });
   const { fields: recipeFields, append: appendRecipe, remove: removeRecipe } = useFieldArray({ control: form.control, name: 'assemblyRecipe' });
   const hasVariations = form.watch('hasVariations');
+
+  // Warns (without blocking) when the typed name exactly matches an existing product after
+  // trim/case-normalizing (catches the whitespace/casing duplicates found in the catalog), or
+  // is a close fuzzy match to one (catches likely typos of an existing product name).
+  const nameValue = form.watch('name');
+  const [similarProductWarning, setSimilarProductWarning] = useState<SimilarProductWarning | null>(null);
+  useEffect(() => {
+    if (!supabase || !open) { setSimilarProductWarning(null); return; }
+    const trimmed = (nameValue || '').trim();
+    if (trimmed.length < 3) { setSimilarProductWarning(null); return; }
+
+    const handler = setTimeout(async () => {
+      const excludeId = isEdit ? displayProduct?.id : undefined;
+
+      const { data: exactMatches } = await supabase
+        .from('products')
+        .select('id, name')
+        .ilike('name', trimmed)
+        .not('name', 'ilike', '[DELETED]%')
+        .limit(5);
+      const exactMatch = exactMatches?.find(p => p.id !== excludeId);
+      if (exactMatch) {
+        setSimilarProductWarning({ id: exactMatch.id, name: exactMatch.name, matchType: 'exact' });
+        return;
+      }
+
+      const keyword = trimmed.split(/\s+/).filter(w => w.length >= 3).sort((a, b) => b.length - a.length)[0];
+      if (!keyword) { setSimilarProductWarning(null); return; }
+
+      const { data: candidates } = await supabase
+        .from('products')
+        .select('id, name')
+        .ilike('name', `%${keyword}%`)
+        .not('name', 'ilike', '[DELETED]%')
+        .limit(25);
+
+      let best: { id: string; name: string; score: number } | null = null;
+      for (const c of candidates || []) {
+        if (c.id === excludeId) continue;
+        const score = stringSimilarity.compareTwoStrings(trimmed.toLowerCase(), c.name.trim().toLowerCase());
+        if (score >= 0.85 && (!best || score > best.score)) best = { id: c.id, name: c.name, score };
+      }
+      setSimilarProductWarning(best ? { id: best.id, name: best.name, matchType: 'similar' } : null);
+    }, 400);
+
+    return () => clearTimeout(handler);
+  }, [supabase, open, nameValue, isEdit, displayProduct?.id]);
 
   useEffect(() => {
     if (open) {
@@ -299,6 +349,7 @@ export function useProductDialog(props: ProductDialogProps) {
     displayProduct,
     isManagement,
     form,
+    similarProductWarning,
     supplierSearch,
     setSupplierSearch,
     supplierResults,
