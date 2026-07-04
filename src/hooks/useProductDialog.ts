@@ -8,8 +8,8 @@ import { useUserProfile } from '@/hooks/useUserProfile';
 import type { FormattedProduct } from '@/types';
 
 export const productSchema = z.object({
-  name: z.string().min(1, "Product name is required"),
-  sku: z.string().optional(),
+  name: z.string().trim().min(1, "Product name is required"),
+  sku: z.string().trim().optional(),
   shelfLocation: z.string().optional(),
   description: z.string().optional(),
   categoryId: z.string().optional(),
@@ -25,8 +25,8 @@ export const productSchema = z.object({
   })).optional().default([]),
   hasVariations: z.boolean().default(false),
   variations: z.array(z.object({
-    nameSuffix: z.string().min(1, "Variation name is required"),
-    sku: z.string().optional(),
+    nameSuffix: z.string().trim().min(1, "Variation name is required"),
+    sku: z.string().trim().optional(),
     sellingPrice: z.coerce.number().min(0, "Price must be positive"),
     unitCost: z.coerce.number().min(0, "Cost must be positive").optional(),
     quantityOnHand: z.coerce.number().int().min(0),
