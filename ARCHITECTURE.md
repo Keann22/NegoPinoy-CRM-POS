@@ -273,6 +273,42 @@ Both sum `order_items.cost_price_at_sale × quantity` for non-void (`Cancelled`/
 
 ---
 
+## Order Fulfillment Pipeline
+
+Scope: Picker app → Second Check → Packer app → Packed Orders review → For Shipping / For Pick-up.
+
+Each scan app is a thin page backed by its own hook. Same shape every time: scan a QR → fetch the order by id → update `orders.status` → append a row to `order_logs`.
+
+| Stage | Page | Hook | Status transition |
+|---|---|---|---|
+| Picker app | `src/app/dashboard/pick/page.tsx` | `src/hooks/usePicker.ts` | `Processing` → `Picked` (or `Picked (with issue)` if items are flagged out of stock) |
+| Second check | `src/app/dashboard/verify/page.tsx` | inline in the page | `Picked` / `Picked (with issue)` → `Photo` |
+| Packer app | `src/app/dashboard/pack/page.tsx` | `src/hooks/usePacker.ts` | `Photo` → `Packed` |
+| Packed orders | `src/app/dashboard/packed-orders/page.tsx` | inline in the page | `Packed` → `For Shipping` (Verify), stays `Packed` with `not_for_shipping_reason` set (Delay), or → `Processing` (Revert) |
+| For shipping / for pick-up | `src/app/dashboard/for-shipping/page.tsx`, `src/app/dashboard/for-pick-up/page.tsx` | `src/hooks/useForShipping.ts` | `For Shipping` → shipped/completed |
+
+Detail per stage:
+
+- **Picker app** — flags out-of-stock items with a missing quantity. On submit with issues: inserts rows into `order_issues`, posts an initial message to `order_issue_messages`, calls `POST /api/inventory/procurement-request` to auto-create restock requests, and inserts a `notifications` row for the sales rep.
+- **Second check** — re-diffs the order's current items against the picker's `order_logs` snapshot (`snapshot_data.items`) to catch edits made to the order after picking, and surfaces them as warnings before allowing submission.
+- **Packer app** — assigns items into one or more boxes with dimensions/weight (`boxes_config`), and on submit auto-resolves any open `order_issues` for that order.
+- **Packed orders** — a review page, not a scanner. `verify-shipping-dialog.tsx` collects shipping address/COD/payment details and moves the order to `For Shipping`; `not-for-shipping-dialog.tsx` delays it; `revert-pending-dialog.tsx` sends it back to `Processing`.
+- **For shipping / for pick-up** — syncs SPX courier files, exports courier-format sheets, and marks orders shipped via `mark-shipped-dialog.tsx`.
+
+### Shared data layer
+
+The apps never call each other directly — they coordinate entirely through shared Supabase tables.
+
+| Table | Written by | Read by |
+|---|---|---|
+| `order_issues` (+ `order_issue_messages`) | Picker app (on out-of-stock report), resolved by Packer app | Dashboard `order-issues.tsx` widget via `GET /api/inventory/issues`; `POST /api/inventory/procurement-request` auto-creates restock requests consumed by the Procurement Request page and Procurement Sheet report |
+| `order_logs` | Every stage (Picker, Second check, Packer, Packed orders actions) | `order-trail-dialog.tsx` (order history timeline on the Orders page); Second check and Packer both read the latest `Picked`/`Picked (with issue)` log to detect edits made after picking |
+| `notifications` | Picker app (issue reported), Packer app (order packed) | Bell-icon notifications for the sales rep who owns the order |
+
+`orders.status` is the state machine; `order_logs` / `order_issues` / `notifications` are side channels that keep reporting and alerts in sync without the apps knowing about each other.
+
+---
+
 ## Key Files to Know
 
 | File | Purpose |
@@ -293,6 +329,7 @@ Both sum `order_items.cost_price_at_sale × quantity` for non-void (`Cancelled`/
 | `src/app/dashboard/reports/pnl-report.tsx` | P&L Statement report — see "Cost of Goods Sold" |
 | `update_order_func.sql` | `process_order_transaction` Postgres RPC — where `cost_price_at_sale` gets snapshotted |
 | `src/hooks/useProducts.ts` | Products list — paginated fetch, see "1000-row query cap" |
+| `src/hooks/usePicker.ts`, `usePacker.ts`, `useForShipping.ts` | Scan-app hooks — see "Order Fulfillment Pipeline" |
 
 ---
 
