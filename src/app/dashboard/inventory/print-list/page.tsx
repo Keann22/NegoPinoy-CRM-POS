@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { Printer } from 'lucide-react';
+import { Printer, Download } from 'lucide-react';
+import * as xlsx from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -71,6 +72,22 @@ export default function PrintInventoryListPage() {
   const [sortBy, setSortBy] = useState<SortBy>('name');
   const sortedProducts = useMemo(() => sortProducts(products, sortBy), [products, sortBy]);
 
+  const handleExportExcel = () => {
+    const exportData = sortedProducts.map(p => ({
+      'Product': displayName(p),
+      'SKU': p.sku || '',
+      'Shelf Location': p.shelf_location || '',
+      'System Stock': p.stock_level ?? 0,
+      'Physical Count': '',
+      'Notes': '',
+    }));
+
+    const worksheet = xlsx.utils.json_to_sheet(exportData);
+    const workbook = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(workbook, worksheet, 'Inventory Count');
+    xlsx.writeFile(workbook, `Inventory_Count_${STOCK_FILTER_LABELS[stockFilter].replace(/[^a-zA-Z0-9]+/g, '_')}_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`);
+  };
+
   return (
     <Card className="print:shadow-none print:border-none">
       <CardHeader className="print:hidden">
@@ -102,6 +119,9 @@ export default function PrintInventoryListPage() {
                 <SelectItem value="shelf">Sort by Shelf Location</SelectItem>
               </SelectContent>
             </Select>
+            <Button variant="outline" size="sm" onClick={handleExportExcel} disabled={isLoading || products.length === 0}>
+              <Download className="mr-2 h-4 w-4" /> Export to Excel
+            </Button>
             <Button variant="outline" size="sm" onClick={() => window.print()} disabled={isLoading || products.length === 0}>
               <Printer className="mr-2 h-4 w-4" /> Print
             </Button>
