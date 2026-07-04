@@ -16,7 +16,33 @@ function displayName(p: PrintableProduct) {
   return p.variant_name ? `${p.name} [${p.variant_name}]` : p.name;
 }
 
-/** Products with no shelf location sort to the end — they can't be found by walking shelves. */
+/**
+ * Plain case-insensitive compare, trimmed first. Deliberately not using localeCompare's
+ * numeric/locale collation here — with 1000+ product names full of mixed punctuation
+ * (-, /, &, brackets), that collation mode is not a consistent total order, which made
+ * Array.prototype.sort produce a genuinely wrong-looking result (confirmed empirically).
+ * Lowercase codepoint comparison is strictly transitive, at the cost of "2" not sorting
+ * before "10". Trimming matters because some product names have stray leading whitespace
+ * (invisible in the UI since HTML collapses it) that would otherwise sort them all first.
+ */
+function compareNatural(a: string, b: string): number {
+  const la = a.trim().toLowerCase();
+  const lb = b.trim().toLowerCase();
+  return la < lb ? -1 : la > lb ? 1 : 0;
+}
+
+function compareByName(a: PrintableProduct, b: PrintableProduct): number {
+  const nameCompare = compareNatural(a.name, b.name);
+  return nameCompare !== 0 ? nameCompare : compareNatural(a.variant_name || '', b.variant_name || '');
+}
+
+/**
+ * Always sorts alphabetically client-side rather than trusting the database's default
+ * collation, which can put digit-led names (e.g. "1 Reclining Chair") in a surprising
+ * spot relative to letter-led names.
+ * For shelf sort, products with no shelf location sort to the end — they can't be found
+ * by walking shelves — with name as the tiebreaker within each shelf.
+ */
 function sortProducts(products: PrintableProduct[], sortBy: SortBy): PrintableProduct[] {
   const sorted = [...products];
   if (sortBy === 'shelf') {
@@ -24,9 +50,11 @@ function sortProducts(products: PrintableProduct[], sortBy: SortBy): PrintablePr
       const aEmpty = !a.shelf_location;
       const bEmpty = !b.shelf_location;
       if (aEmpty !== bEmpty) return aEmpty ? 1 : -1;
-      const shelfCompare = (a.shelf_location || '').localeCompare(b.shelf_location || '');
-      return shelfCompare !== 0 ? shelfCompare : a.name.localeCompare(b.name);
+      const shelfCompare = compareNatural(a.shelf_location || '', b.shelf_location || '');
+      return shelfCompare !== 0 ? shelfCompare : compareByName(a, b);
     });
+  } else {
+    sorted.sort(compareByName);
   }
   return sorted;
 }
