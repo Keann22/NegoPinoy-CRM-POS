@@ -8,9 +8,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useAllProductsForPrint, type PrintableProduct } from '@/hooks/useAllProductsForPrint';
+import { useAllProductsForPrint, type PrintableProduct, type PrintStockFilter } from '@/hooks/useAllProductsForPrint';
 
 type SortBy = 'name' | 'shelf';
+
+const STOCK_FILTER_LABELS: Record<PrintStockFilter, string> = {
+  'low-or-negative': 'Low (1-10) or Negative Stock',
+  negative: 'Negative Stock Only',
+  all: 'All Products',
+};
 
 function displayName(p: PrintableProduct) {
   return p.variant_name ? `${p.name} [${p.variant_name}]` : p.name;
@@ -60,7 +66,8 @@ function sortProducts(products: PrintableProduct[], sortBy: SortBy): PrintablePr
 }
 
 export default function PrintInventoryListPage() {
-  const { products, isLoading } = useAllProductsForPrint();
+  const [stockFilter, setStockFilter] = useState<PrintStockFilter>('low-or-negative');
+  const { products, isLoading } = useAllProductsForPrint(stockFilter);
   const [sortBy, setSortBy] = useState<SortBy>('name');
   const sortedProducts = useMemo(() => sortProducts(products, sortBy), [products, sortBy]);
 
@@ -71,10 +78,21 @@ export default function PrintInventoryListPage() {
           <div>
             <CardTitle className="font-headline">Print Inventory List</CardTitle>
             <CardDescription>
-              A printable sheet of every product and its current system stock, with blank columns for writing down your physical count.
+              A printable sheet of products and their current system stock, with blank columns for writing down your physical count.
+              Defaults to low/negative stock only — printing the full catalog produces a very long, slow print job.
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
+            <Select value={stockFilter} onValueChange={(v) => setStockFilter(v as PrintStockFilter)}>
+              <SelectTrigger className="w-[210px]">
+                <SelectValue placeholder="Filter by stock" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="low-or-negative">{STOCK_FILTER_LABELS['low-or-negative']}</SelectItem>
+                <SelectItem value="negative">{STOCK_FILTER_LABELS.negative}</SelectItem>
+                <SelectItem value="all">{STOCK_FILTER_LABELS.all}</SelectItem>
+              </SelectContent>
+            </Select>
             <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}>
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Sort by" />
@@ -134,6 +152,7 @@ export default function PrintInventoryListPage() {
             <h1 className="text-2xl font-bold uppercase">Inventory Count Sheet</h1>
             <div className="text-right text-sm">
               <p>Date Printed: {format(new Date(), 'PPPP p')}</p>
+              <p>Filter: {STOCK_FILTER_LABELS[stockFilter]}</p>
               <p>Total Items: {products.length}</p>
             </div>
           </div>
