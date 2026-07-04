@@ -8,12 +8,14 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, ShieldCheck, ScanLine, X, Check, AlertTriangle, Info, AlertCircle } from 'lucide-react';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { ProductPhotoDialog } from '@/components/dashboard/product-photo-dialog';
 
 type OrderItem = {
   id: string;
   product_id: string;
   product_name: string;
   quantity: number;
+  images?: string[] | null;
 };
 
 export default function VerifyApp() {
@@ -27,6 +29,7 @@ export default function VerifyApp() {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [viewingPhotoItem, setViewingPhotoItem] = useState<OrderItem | null>(null);
 
   const startScanner = async () => {
     setScanning(true);
@@ -34,6 +37,7 @@ export default function VerifyApp() {
     setOrderDetails(null);
     setOrderItems([]);
     setWarnings([]);
+    setViewingPhotoItem(null);
 
     const { Html5QrcodeScanner } = await import('html5-qrcode');
 
@@ -84,12 +88,12 @@ export default function VerifyApp() {
       // Fetch order details
       const { data, error } = await supabase
         .from('orders')
-        .select('id, status, customer_id, sales_person_name, customers(full_name), order_items(id, product_id, product_name, quantity)')
+        .select('id, status, customer_id, sales_person_name, customers(full_name), order_items(id, product_id, product_name, quantity, products(images))')
         .eq('id', orderId)
         .single();
-        
+
       if (error) throw error;
-      
+
       if (!data) {
         toast({ title: 'Order not found', description: 'Invalid QR code.', variant: 'destructive' });
         setScannedOrderId(null);
@@ -97,7 +101,14 @@ export default function VerifyApp() {
       }
 
       setOrderDetails(data);
-      setOrderItems(data.order_items || []);
+      const items = (data.order_items || []).map((item: any) => ({
+        id: item.id,
+        product_id: item.product_id,
+        product_name: item.product_name,
+        quantity: item.quantity,
+        images: item.products?.images ?? null
+      }));
+      setOrderItems(items);
 
       const newWarnings: string[] = [];
 
@@ -322,7 +333,13 @@ export default function VerifyApp() {
                       {orderItems.map(item => (
                         <tr key={item.id} className="border-b last:border-0">
                           <td className="p-3">
-                            <span className="font-medium text-slate-800">{item.product_name}</span>
+                            <button
+                              type="button"
+                              onClick={() => setViewingPhotoItem(item)}
+                              className="font-medium text-slate-800 underline decoration-dotted underline-offset-2 hover:text-primary text-left"
+                            >
+                              {item.product_name}
+                            </button>
                           </td>
                           <td className="p-3 text-center">
                             <span className="font-bold text-lg">{item.quantity}</span>
@@ -354,6 +371,12 @@ export default function VerifyApp() {
           </CardContent>
         </Card>
       )}
+
+      <ProductPhotoDialog
+        product={viewingPhotoItem}
+        open={!!viewingPhotoItem}
+        onOpenChange={(open) => !open && setViewingPhotoItem(null)}
+      />
     </div>
   );
 }

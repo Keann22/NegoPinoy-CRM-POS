@@ -1,286 +1,33 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useSupabase } from '@/lib/supabase/hooks';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, ClipboardList, ScanLine, X, Check, AlertCircle } from 'lucide-react';
-import { useUserProfile } from '@/hooks/useUserProfile';
 import { Checkbox } from '@/components/ui/checkbox';
-
-type OrderItem = {
-  id: string;
-  product_id: string;
-  product_name: string;
-  quantity: number;
-};
+import { usePicker } from '@/hooks/usePicker';
+import { ProductPhotoDialog } from '@/components/dashboard/product-photo-dialog';
 
 export default function PickerApp() {
-  const supabase = useSupabase();
-  const { toast } = useToast();
-  const { userProfile } = useUserProfile();
-  const [scanner, setScanner] = useState<any>(null);
-  const [scanning, setScanning] = useState(false);
-  const [scannedOrderId, setScannedOrderId] = useState<string | null>(null);
-  const [orderDetails, setOrderDetails] = useState<any>(null);
-  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
-  const [outOfStockQty, setOutOfStockQty] = useState<Map<string, number>>(new Map());
-  const [qtyDrafts, setQtyDrafts] = useState<Map<string, string>>(new Map());
-  const [loading, setLoading] = useState(false);
-
-  const startScanner = async () => {
-    setScanning(true);
-    setScannedOrderId(null);
-    setOrderDetails(null);
-    setOrderItems([]);
-    setOutOfStockQty(new Map());
-    setQtyDrafts(new Map());
-
-    const { Html5QrcodeScanner } = await import('html5-qrcode');
-
-    setTimeout(() => {
-      const newScanner = new Html5QrcodeScanner(
-        "reader",
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        /* verbose= */ false
-      );
-      
-      newScanner.render(
-        (decodedText) => {
-          newScanner.clear();
-          setScanning(false);
-          handleScanSuccess(decodedText);
-        },
-        (error) => {
-          // ignore background errors
-        }
-      );
-      setScanner(newScanner);
-    }, 100);
-  };
-
-  const stopScanner = () => {
-    if (scanner) {
-      scanner.clear().catch(console.error);
-      setScanner(null);
-    }
-    setScanning(false);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (scanner) {
-        scanner.clear().catch(console.error);
-      }
-    };
-  }, [scanner]);
-
-  const handleScanSuccess = async (orderId: string) => {
-    if (!supabase) return;
-    setLoading(true);
-    setScannedOrderId(orderId);
-    
-    try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select('id, status, customer_id, sales_person_name, customers(full_name), order_items(id, product_id, product_name, quantity)')
-        .eq('id', orderId)
-        .single();
-        
-      if (error) throw error;
-      
-      if (!data) {
-        toast({ title: 'Order not found', description: 'Invalid QR code.', variant: 'destructive' });
-        setScannedOrderId(null);
-        return;
-      }
-
-      setOrderDetails(data);
-      setOrderItems(data.order_items || []);
-
-      if (['Picked', 'Picked (with issue)', 'Photo', 'Packed', 'For Shipping', 'For Pick-up'].includes(data.status)) {
-        toast({ 
-          title: 'Already Picked', 
-          description: `This order is marked as ${data.status}.`, 
-          variant: 'default' 
-        });
-      }
-
-    } catch (err) {
-      console.error(err);
-      toast({ title: 'Error', description: 'Failed to fetch order details.', variant: 'destructive' });
-      setScannedOrderId(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const toggleOutOfStock = (itemId: string, fullQty: number) => {
-    const nextQty = new Map(outOfStockQty);
-    const nextDrafts = new Map(qtyDrafts);
-    if (nextQty.has(itemId)) {
-      nextQty.delete(itemId);
-      nextDrafts.delete(itemId);
-    } else {
-      nextQty.set(itemId, fullQty);
-      nextDrafts.set(itemId, String(fullQty));
-    }
-    setOutOfStockQty(nextQty);
-    setQtyDrafts(nextDrafts);
-  };
-
-  // Keep the draft text free-form while typing (so the field can be cleared
-  // and re-typed) and only sync a valid parsed value into outOfStockQty.
-  // Clamping to [1, fullQty] happens on blur, in commitOutOfStockQty.
-  const handleQtyDraftChange = (itemId: string, rawValue: string) => {
-    const nextDrafts = new Map(qtyDrafts);
-    nextDrafts.set(itemId, rawValue);
-    setQtyDrafts(nextDrafts);
-
-    const parsed = parseInt(rawValue, 10);
-    if (!isNaN(parsed) && parsed > 0) {
-      const nextQty = new Map(outOfStockQty);
-      nextQty.set(itemId, parsed);
-      setOutOfStockQty(nextQty);
-    }
-  };
-
-  const commitOutOfStockQty = (itemId: string, fullQty: number) => {
-    const clamped = Math.min(Math.max(1, outOfStockQty.get(itemId) || 1), fullQty);
-    const nextQty = new Map(outOfStockQty);
-    nextQty.set(itemId, clamped);
-    setOutOfStockQty(nextQty);
-    const nextDrafts = new Map(qtyDrafts);
-    nextDrafts.set(itemId, String(clamped));
-    setQtyDrafts(nextDrafts);
-  };
-
-  const handleSubmitPicking = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!supabase || !scannedOrderId) return;
-    
-    setLoading(true);
-
-    try {
-      const hasIssues = outOfStockQty.size > 0;
-      const newStatus = hasIssues ? 'Picked (with issue)' : 'Picked';
-
-      // 1. Update order status
-      const { error: orderError } = await supabase
-        .from('orders')
-        .update({ status: newStatus })
-        .eq('id', scannedOrderId);
-
-      if (orderError) throw orderError;
-
-      const userName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : 'Unknown Staff';
-
-      // 2. Insert into order_logs with item snapshot
-      const itemSnapshot = orderItems.map(item => ({
-        id: item.id,
-        product_id: item.product_id,
-        product_name: item.product_name,
-        quantity: item.quantity
-      }));
-      await supabase.from('order_logs').insert({
-        order_id: scannedOrderId,
-        status: newStatus,
-        user_name: userName,
-        snapshot_data: { items: itemSnapshot }
-      });
-
-      // 3. Handle Issues if any
-      if (hasIssues) {
-        const issuesToInsert = [];
-        const procurementRequests = [];
-
-        for (const [itemId, missingQty] of Array.from(outOfStockQty.entries())) {
-          const item = orderItems.find(i => i.id === itemId);
-          if (item) {
-            issuesToInsert.push({
-              order_id: scannedOrderId,
-              product_id: item.product_id,
-              status: 'open',
-              reported_by_name: userName,
-              out_of_stock_qty: missingQty
-            });
-            procurementRequests.push({
-              productId: item.product_id,
-              requestedQty: missingQty
-            });
-          }
-        }
-
-        if (issuesToInsert.length > 0) {
-          const { data: insertedIssues, error: issuesErr } = await supabase
-            .from('order_issues')
-            .insert(issuesToInsert)
-            .select('id, product_id');
-          
-          if (issuesErr) console.error("Error inserting order issues:", issuesErr);
-          
-          if (insertedIssues && insertedIssues.length > 0) {
-            const initialMessages = insertedIssues.map(issue => {
-              const item = orderItems.find(i => i.product_id === issue.product_id);
-              const productName = item ? item.product_name : 'this item';
-              const missingQty = item ? outOfStockQty.get(item.id) : undefined;
-              const qtyNote = item && missingQty && missingQty < item.quantity
-                ? ` (${missingQty} of ${item.quantity} units)`
-                : '';
-              return {
-                issue_id: issue.id,
-                sender_role: 'picker',
-                sender_name: userName,
-                message: `Picker reported ${productName} as out of stock${qtyNote}.`
-              };
-            });
-            
-            const { error: msgErr } = await supabase
-              .from('order_issue_messages')
-              .insert(initialMessages);
-              
-            if (msgErr) console.error("Error inserting issue messages:", msgErr);
-          }
-
-          // Auto-submit to procurement
-          await fetch('/api/inventory/procurement-request', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ requests: procurementRequests })
-          });
-
-          // Notify Sales Agent
-          if (orderDetails?.sales_person_name) {
-            await supabase.from('notifications').insert({
-              sales_person_name: orderDetails.sales_person_name,
-              title: 'Order Issue Reported',
-              message: `Order #${scannedOrderId.substring(0, 7).toUpperCase()} has out-of-stock items reported by ${userName}.`,
-              link: '/dashboard'
-            });
-          }
-        }
-      }
-
-      toast({
-        title: 'Success!',
-        description: `Order marked as ${newStatus}.`,
-        variant: 'default'
-      });
-
-      setScannedOrderId(null);
-      setOrderDetails(null);
-      setOutOfStockQty(new Map());
-      setQtyDrafts(new Map());
-
-    } catch (err) {
-      console.error(err);
-      toast({ title: 'Error', description: 'Failed to submit picking result.', variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const {
+    scanner,
+    scanning,
+    scannedOrderId,
+    setScannedOrderId,
+    orderDetails,
+    orderItems,
+    outOfStockQty,
+    qtyDrafts,
+    loading,
+    viewingPhotoItem,
+    setViewingPhotoItem,
+    startScanner,
+    stopScanner,
+    toggleOutOfStock,
+    handleQtyDraftChange,
+    commitOutOfStockQty,
+    handleSubmitPicking
+  } = usePicker();
 
   return (
     <div className="flex flex-col h-full max-w-2xl mx-auto p-4 space-y-4">
@@ -361,7 +108,13 @@ export default function PickerApp() {
                         return (
                         <tr key={item.id} className={`border-b last:border-0 ${isFlagged ? 'bg-red-50' : ''}`}>
                           <td className="p-3">
-                            <span className="font-medium text-slate-800">{item.product_name}</span>
+                            <button
+                              type="button"
+                              onClick={() => setViewingPhotoItem(item)}
+                              className="font-medium text-slate-800 underline decoration-dotted underline-offset-2 hover:text-primary text-left"
+                            >
+                              {item.product_name}
+                            </button>
                           </td>
                           <td className="p-3 text-center">
                             <span className="font-bold">{item.quantity}</span>
@@ -415,6 +168,12 @@ export default function PickerApp() {
           </CardContent>
         </Card>
       )}
+
+      <ProductPhotoDialog
+        product={viewingPhotoItem}
+        open={!!viewingPhotoItem}
+        onOpenChange={(open) => !open && setViewingPhotoItem(null)}
+      />
     </div>
   );
 }
