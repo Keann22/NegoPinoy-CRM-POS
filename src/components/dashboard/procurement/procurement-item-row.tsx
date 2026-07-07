@@ -112,6 +112,9 @@ export function ProcurementItemRow({
         onClick={() => onViewAllocated({ id: item.productId, name: item.productName })}
       >
           {item.staffRequestedQty !== null ? item.staffRequestedQty : <span className="text-xs text-slate-400 font-normal">Pending</span>}
+          {item.requestedByName && (
+            <div className="text-[10px] font-normal text-slate-400 mt-0.5">by {item.requestedByName}</div>
+          )}
       </td>
       <td className="p-3 text-center">
         <div className="relative flex items-center justify-center">

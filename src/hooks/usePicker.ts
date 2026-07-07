@@ -244,7 +244,7 @@ export function usePicker() {
           await fetch('/api/inventory/procurement-request', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ requests: procurementRequests })
+            body: JSON.stringify({ requests: procurementRequests, requestedByName: userName })
           });
 
           if (orderDetails?.sales_person_name) {

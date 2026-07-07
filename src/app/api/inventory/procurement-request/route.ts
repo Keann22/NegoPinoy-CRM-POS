@@ -32,7 +32,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { requests } = await req.json(); // Array of { productId, requestedQty }
+    const { requests, requestedByName } = await req.json(); // Array of { productId, requestedQty }
 
     if (!requests || requests.length === 0) {
       return NextResponse.json({ error: 'No items provided' }, { status: 400 });
@@ -108,9 +108,10 @@ export async function POST(req: Request) {
         const existingItem = existingMap.get(p.productId)!;
         await supabase
           .from('purchase_order_items')
-          .update({ 
+          .update({
             expected_qty: existingItem.expected_qty + p.requestedQty,
-            status: 'pending_receipt' 
+            status: 'pending_receipt',
+            ...(requestedByName ? { requested_by_name: requestedByName } : {})
           })
           .eq('id', existingItem.id);
       } else {
@@ -120,7 +121,8 @@ export async function POST(req: Request) {
           product_id: p.productId,
           expected_qty: p.requestedQty,
           unit_cost: 0,
-          status: 'pending_receipt'
+          status: 'pending_receipt',
+          requested_by_name: requestedByName || null
         });
       }
     }

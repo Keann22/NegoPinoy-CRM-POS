@@ -5,6 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Search, PlusCircle } from "lucide-react";
+import { useUserProfile } from "@/hooks/useUserProfile";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -24,6 +25,7 @@ export function AddMissingItemDialog({
   const [productSearch, setProductSearch] = useState('');
   const [productResults, setProductResults] = useState<any[]>([]);
   const [isSearchingProducts, setIsSearchingProducts] = useState(false);
+  const { userProfile } = useUserProfile();
 
   useEffect(() => {
     if (productSearch.length < 2) {
@@ -61,11 +63,13 @@ export function AddMissingItemDialog({
 
     try {
       setIsSearchingProducts(true);
+      const requestedByName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : 'Unknown Staff';
       const res = await fetch('/api/inventory/procurement-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          requests: [{ productId: product.id, requestedQty: 1 }]
+          requests: [{ productId: product.id, requestedQty: 1 }],
+          requestedByName
         })
       });
       if (!res.ok) throw new Error(await res.text());
