@@ -28,6 +28,7 @@ export function useProductsPage() {
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
   const [viewingReservedProduct, setViewingReservedProduct] = useState<{ id: string; name: string } | null>(null);
   const [viewingPackedProduct, setViewingPackedProduct] = useState<{ id: string; name: string } | null>(null);
+  const [viewingAllocatedProduct, setViewingAllocatedProduct] = useState<{ id: string; name: string } | null>(null);
 
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
   useEffect(() => {
@@ -210,6 +211,8 @@ export function useProductsPage() {
     setViewingReservedProduct,
     viewingPackedProduct,
     setViewingPackedProduct,
+    viewingAllocatedProduct,
+    setViewingAllocatedProduct,
     paginatedProducts,
     totalCount,
     isLoading,

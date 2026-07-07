@@ -11,6 +11,7 @@ import { BulkBuyDialog } from "@/components/dashboard/procurement/bulk-buy-dialo
 import { AddMissingItemDialog } from "@/components/dashboard/procurement/add-missing-item-dialog";
 import { ReportIssueDialog } from "@/components/dashboard/procurement/report-issue-dialog";
 import { ProcurementItemRow } from "@/components/dashboard/procurement/procurement-item-row";
+import { ReservedStockDialog } from "@/components/dashboard/reserved-stock-dialog";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -52,6 +53,8 @@ export default function ProcurementSheet() {
 
   const [issueDialogOpen, setIssueDialogOpen] = useState(false);
   const [issueProduct, setIssueProduct] = useState<any>(null);
+
+  const [viewingAllocatedItem, setViewingAllocatedItem] = useState<{ id: string; name: string } | null>(null);
 
   const fetchData = async () => {
     try {
@@ -314,6 +317,7 @@ export default function ProcurementSheet() {
                         setIssueDialogOpen(true);
                       }}
                       handleDeleteDraftItem={handleDeleteDraftItem}
+                      onViewAllocated={setViewingAllocatedItem}
                     />
                   ))}
                 </tbody>
@@ -373,6 +377,18 @@ export default function ProcurementSheet() {
           setIssueDialogOpen(false);
           setIssueProduct(null);
         }}
+      />
+
+      <ReservedStockDialog
+        productId={viewingAllocatedItem?.id || ''}
+        productName={viewingAllocatedItem?.name || ''}
+        isOpen={!!viewingAllocatedItem}
+        onClose={() => setViewingAllocatedItem(null)}
+        statusFilter={[
+          'Pending Payment', 'Processing', 'Picked', 'Picked (with issue)', 'Photo',
+          'Packed', 'For Shipping', 'For Pick-up', 'On-Hold', 'Waiting for Stock',
+        ]}
+        title="Stock Allocation Details"
       />
     </div>
   );

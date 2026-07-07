@@ -48,6 +48,8 @@ export default function ProductsPage() {
     setViewingReservedProduct,
     viewingPackedProduct,
     setViewingPackedProduct,
+    viewingAllocatedProduct,
+    setViewingAllocatedProduct,
     paginatedProducts,
     totalCount,
     isLoading,
@@ -137,6 +139,7 @@ export default function ProductsPage() {
             onDelete={setDeletingProduct}
             onViewReserved={setViewingReservedProduct}
             onViewPacked={setViewingPackedProduct}
+            onViewAllocated={setViewingAllocatedProduct}
           />
           {!isLoading && totalCount === 0 && (
               <div className="flex flex-col items-center justify-center text-center border-2 border-dashed rounded-lg p-12 mt-4">
@@ -244,6 +247,17 @@ export default function ProductsPage() {
           onClose={() => setViewingPackedProduct(null)}
           statusFilter={['Packed']}
           title="Packed Stock Details"
+      />
+      <ReservedStockDialog
+          productId={viewingAllocatedProduct?.id || ''}
+          productName={viewingAllocatedProduct?.name || ''}
+          isOpen={!!viewingAllocatedProduct}
+          onClose={() => setViewingAllocatedProduct(null)}
+          statusFilter={[
+            'Pending Payment', 'Processing', 'Picked', 'Picked (with issue)', 'Photo',
+            'Packed', 'For Shipping', 'For Pick-up', 'On-Hold', 'Waiting for Stock',
+          ]}
+          title="Stock Allocation Details"
       />
     </>
   );

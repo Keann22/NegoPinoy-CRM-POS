@@ -20,6 +20,7 @@ export function ProcurementItemRow({
   openBuyDialog,
   onReportIssue,
   handleDeleteDraftItem,
+  onViewAllocated,
 }: {
   item: any;
   groupId: string | null;
@@ -37,6 +38,7 @@ export function ProcurementItemRow({
   openBuyDialog: (item: any, groupId: string | null) => void;
   onReportIssue: () => void;
   handleDeleteDraftItem: (id: string) => void;
+  onViewAllocated: (item: { id: string; name: string }) => void;
 }) {
   const hasDiscrepancy = item.staffRequestedQty !== null && item.systemQty !== item.staffRequestedQty;
 
@@ -97,8 +99,18 @@ export function ProcurementItemRow({
           </div>
         )}
       </td>
-      <td className="p-3 font-bold text-slate-500 text-center text-lg">{item.currentStock}</td>
-      <td className={`p-3 font-bold text-center text-lg ${hasDiscrepancy ? "text-orange-600" : "text-green-600"}`}>
+      <td
+        className="p-3 font-bold text-slate-500 text-center text-lg cursor-pointer hover:underline hover:text-indigo-600"
+        title="See which orders/customers this stock is allocated to"
+        onClick={() => onViewAllocated({ id: item.productId, name: item.productName })}
+      >
+        {item.currentStock}
+      </td>
+      <td
+        className={`p-3 font-bold text-center text-lg cursor-pointer hover:underline ${hasDiscrepancy ? "text-orange-600" : "text-green-600 hover:text-indigo-600"}`}
+        title="See which orders/customers this stock is allocated to"
+        onClick={() => onViewAllocated({ id: item.productId, name: item.productName })}
+      >
           {item.staffRequestedQty !== null ? item.staffRequestedQty : <span className="text-xs text-slate-400 font-normal">Pending</span>}
       </td>
       <td className="p-3 text-center">

@@ -45,11 +45,15 @@ export function OrderIssues({ isAdmin }: { isAdmin?: boolean }) {
         orderTitle: issue.orders ? `Order #${issue.orders.id.substring(0,7).toUpperCase()}` : 'Unknown Order',
         customerName: issue.orders?.customers?.full_name || '',
         reporter: issue.reported_by_name || issue.order_issue_messages?.[0]?.sender_name || 'Unknown',
+        createdAt: issue.created_at,
         items: [],
         messagesCount: 0,
         issues: [],
         orders: issue.orders
       };
+    }
+    if (issue.created_at && new Date(issue.created_at) < new Date(acc[orderId].createdAt)) {
+      acc[orderId].createdAt = issue.created_at;
     }
     const itemLabel = issue.products?.name || 'Unknown Item';
     acc[orderId].items.push(issue.out_of_stock_qty ? `${itemLabel} (x${issue.out_of_stock_qty})` : itemLabel);
@@ -185,6 +189,13 @@ export function OrderIssues({ isAdmin }: { isAdmin?: boolean }) {
                       <p className="flex items-center gap-1 text-slate-600">
                         Reported by: <span className="font-medium text-slate-800">{group.reporter}</span>
                       </p>
+                      {group.createdAt && (
+                        <p className="flex items-center gap-1 text-slate-600">
+                          Reported on: <span className="font-medium text-slate-800">
+                            {new Date(group.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </span>
+                        </p>
+                      )}
                     </div>
                   </div>
                   <Button variant="ghost" size="sm" className="w-full mt-4 text-amber-700 bg-amber-50 hover:bg-amber-100">

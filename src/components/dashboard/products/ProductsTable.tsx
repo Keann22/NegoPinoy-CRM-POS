@@ -33,19 +33,30 @@ interface ProductsTableProps {
   onDelete: (product: FormattedProduct) => void;
   onViewReserved: (product: { id: string; name: string }) => void;
   onViewPacked: (product: { id: string; name: string }) => void;
+  onViewAllocated: (product: { id: string; name: string }) => void;
 }
 
-function StockCell({ product, onViewReserved, onViewPacked }: {
+function StockCell({ product, onViewReserved, onViewPacked, onViewAllocated }: {
   product: FormattedProduct;
   onViewReserved: (p: { id: string; name: string }) => void;
   onViewPacked: (p: { id: string; name: string }) => void;
+  onViewAllocated: (p: { id: string; name: string }) => void;
 }) {
+  const allocatedTarget = { id: product.id, name: product.variantName || product.name };
   return (
     <div className="space-y-1 text-sm">
-      <p className="font-medium text-foreground">
+      <p
+        className="font-medium text-foreground cursor-pointer hover:underline"
+        onClick={() => onViewAllocated(allocatedTarget)}
+      >
         Physical: {(product.quantityOnHand ?? 0) + (product.reservedStock || 0)}
       </p>
-      <p className="text-muted-foreground">Available: {product.quantityOnHand ?? 0}</p>
+      <p
+        className="text-muted-foreground cursor-pointer hover:underline"
+        onClick={() => onViewAllocated(allocatedTarget)}
+      >
+        Available: {product.quantityOnHand ?? 0}
+      </p>
       {(product.reservedStock || 0) > 0 && (
         <p
           className="text-amber-600 dark:text-amber-400 cursor-pointer hover:underline"
@@ -66,18 +77,30 @@ function StockCell({ product, onViewReserved, onViewPacked }: {
   );
 }
 
-function GroupStockCell({ product, onViewReserved, onViewPacked }: {
+function GroupStockCell({ product, onViewReserved, onViewPacked, onViewAllocated }: {
   product: FormattedProduct;
   onViewReserved: (p: { id: string; name: string }) => void;
   onViewPacked: (p: { id: string; name: string }) => void;
+  onViewAllocated: (p: { id: string; name: string }) => void;
 }) {
   const totalAvailable = product.children!.reduce((acc, c) => acc + (c.quantityOnHand || 0), 0);
   const totalReserved = product.children!.reduce((acc, c) => acc + (c.reservedStock || 0), 0);
   const totalPacked = product.children!.reduce((acc, c) => acc + (c.packedStock || 0), 0);
+  const allocatedTarget = { id: product.id, name: product.name };
   return (
     <div className="space-y-1 text-sm">
-      <p className="font-medium text-foreground">Physical: {totalAvailable + totalReserved}</p>
-      <p className="text-muted-foreground">Available: {totalAvailable}</p>
+      <p
+        className="font-medium text-foreground cursor-pointer hover:underline"
+        onClick={() => onViewAllocated(allocatedTarget)}
+      >
+        Physical: {totalAvailable + totalReserved}
+      </p>
+      <p
+        className="text-muted-foreground cursor-pointer hover:underline"
+        onClick={() => onViewAllocated(allocatedTarget)}
+      >
+        Available: {totalAvailable}
+      </p>
       {totalReserved > 0 && (
         <p className="text-amber-600 dark:text-amber-400 cursor-pointer hover:underline"
           onClick={() => onViewReserved({ id: product.id, name: product.name })}>
@@ -132,7 +155,7 @@ export function ProductsTable({
   products, isLoading, selectedProductIds, expandedParents, isManagement,
   onSelectAll, onSelectOne, onToggleExpand,
   onViewDetails, onEdit, onViewHistory, onDelete,
-  onViewReserved, onViewPacked,
+  onViewReserved, onViewPacked, onViewAllocated,
 }: ProductsTableProps) {
   const allSelected = products.length > 0 && products.every(p => selectedProductIds.includes(p.id));
 
@@ -216,8 +239,8 @@ export function ProductsTable({
               <TableCell className="hidden md:table-cell">{product.shelfLocation || '-'}</TableCell>
               <TableCell className="hidden md:table-cell">
                 {product.children && product.children.length > 0
-                  ? <GroupStockCell product={product} onViewReserved={onViewReserved} onViewPacked={onViewPacked} />
-                  : <StockCell product={product} onViewReserved={onViewReserved} onViewPacked={onViewPacked} />
+                  ? <GroupStockCell product={product} onViewReserved={onViewReserved} onViewPacked={onViewPacked} onViewAllocated={onViewAllocated} />
+                  : <StockCell product={product} onViewReserved={onViewReserved} onViewPacked={onViewPacked} onViewAllocated={onViewAllocated} />
                 }
               </TableCell>
               <TableCell>
@@ -243,7 +266,7 @@ export function ProductsTable({
                 <TableCell>{child.price}</TableCell>
                 <TableCell className="hidden md:table-cell">{child.shelfLocation || '-'}</TableCell>
                 <TableCell className="hidden md:table-cell">
-                  <StockCell product={child} onViewReserved={onViewReserved} onViewPacked={onViewPacked} />
+                  <StockCell product={child} onViewReserved={onViewReserved} onViewPacked={onViewPacked} onViewAllocated={onViewAllocated} />
                 </TableCell>
                 <TableCell>
                   <ProductActionsMenu product={child} isManagement={isManagement} onViewDetails={onViewDetails} onEdit={onEdit} onViewHistory={onViewHistory} onDelete={onDelete} />
