@@ -13,9 +13,13 @@ interface FileUploadProps {
   onChange: (files: File[]) => void;
   className?: string;
   multiple?: boolean;
+  /** Already-uploaded image URLs (persisted). Shown alongside pending files with their own remove button. */
+  existingImages?: string[];
+  /** Called when the user removes an already-uploaded image. */
+  onRemoveExisting?: (url: string) => void;
 }
 
-export function FileUpload({ value, onChange, className, multiple = false }: FileUploadProps) {
+export function FileUpload({ value, onChange, className, multiple = false, existingImages, onRemoveExisting }: FileUploadProps) {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const newFiles = Array.from(e.target.files);
@@ -42,10 +46,30 @@ export function FileUpload({ value, onChange, className, multiple = false }: Fil
             </span>
             <Input id="file-upload" type="file" multiple={multiple} className="hidden" onChange={handleFileChange} accept="image/*" />
         </Label>
-        
-        {value?.length > 0 && (
+
+        {(existingImages && existingImages.length > 0) || (value?.length > 0) ? (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          {value.map((file, i) => {
+          {existingImages?.map((url) => (
+            <div key={url} className="relative aspect-square rounded-md overflow-hidden">
+              <ZoomableImage
+                  src={url}
+                  alt="Product image"
+                  fill
+                  className="object-cover rounded-md"
+              />
+              <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon"
+                  className="absolute top-1 right-1 h-6 w-6"
+                  onClick={() => onRemoveExisting?.(url)}
+              >
+                  <X className="h-4 w-4" />
+                  <span className="sr-only">Remove image</span>
+              </Button>
+            </div>
+          ))}
+          {value?.map((file, i) => {
             const objectUrl = URL.createObjectURL(file);
             return (
                 <div key={i} className="relative aspect-square rounded-md overflow-hidden">
@@ -70,7 +94,7 @@ export function FileUpload({ value, onChange, className, multiple = false }: Fil
             )
           })}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

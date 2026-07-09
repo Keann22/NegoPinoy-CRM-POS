@@ -18,6 +18,10 @@ interface VariationsSectionProps {
   removeVariation: UseFieldArrayRemove;
   isEdit: boolean;
   displayProduct: FormattedProduct | null;
+  variantExistingImages: Record<string, string[]>;
+  variantNewImages: Record<string, File[]>;
+  onRemoveVariantExistingImage: (variantId: string, url: string) => void;
+  onVariantNewImagesChange: (variantId: string, files: File[]) => void;
 }
 
 /**
@@ -28,6 +32,7 @@ interface VariationsSectionProps {
  */
 export function ProductVariationsSection({
   form, variationFields, appendVariation, removeVariation, isEdit, displayProduct,
+  variantExistingImages, variantNewImages, onRemoveVariantExistingImage, onVariantNewImagesChange,
 }: VariationsSectionProps) {
   const hasVariations = form.watch('hasVariations');
 
@@ -38,13 +43,22 @@ export function ProductVariationsSection({
         <div className="space-y-3">
           <FormLabel className="text-base font-semibold">Existing Variations</FormLabel>
           <DialogDescription>
-            To edit a variation, expand the parent row on the Products table and click Edit on the specific variation.
+            Add or remove photos per variation here. To change its name, price, or stock, expand the parent row on the Products table and click Edit on that specific variation.
           </DialogDescription>
-          <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
+          <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
             {displayProduct.children.map(child => (
-              <div key={child.id} className="flex justify-between items-center bg-muted/30 p-2 rounded-md border text-sm">
-                <span className="font-medium text-foreground">{child.variantName || child.name}</span>
-                <span className="text-muted-foreground">{child.price} &bull; Stock: {child.quantityOnHand ?? 0}</span>
+              <div key={child.id} className="bg-muted/30 p-3 rounded-md border space-y-2">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="font-medium text-foreground">{child.variantName || child.name}</span>
+                  <span className="text-muted-foreground">{child.price} &bull; Stock: {child.quantityOnHand ?? 0}</span>
+                </div>
+                <FileUpload
+                  value={variantNewImages[child.id] || []}
+                  onChange={(files) => onVariantNewImagesChange(child.id, files)}
+                  multiple
+                  existingImages={variantExistingImages[child.id] || []}
+                  onRemoveExisting={(url) => onRemoveVariantExistingImage(child.id, url)}
+                />
               </div>
             ))}
           </div>

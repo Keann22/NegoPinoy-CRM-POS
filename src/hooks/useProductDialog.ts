@@ -75,6 +75,14 @@ export async function uploadImages(supabase: any, files: File[]): Promise<string
   }));
 }
 
+export async function deleteImages(supabase: any, urls: string[]): Promise<void> {
+  const imagePaths = urls
+    .filter(url => !url.includes('placehold.co'))
+    .map(url => url.split('/').pop()!);
+  if (imagePaths.length === 0) return;
+  await supabase.storage.from('products').remove(imagePaths);
+}
+
 export function useProductDialog(props: ProductDialogProps) {
   const isEdit = props.mode === 'edit';
 
@@ -92,6 +100,17 @@ export function useProductDialog(props: ProductDialogProps) {
   const [supplierSearch, setSupplierSearch] = useState('');
   const [componentSearch, setComponentSearch] = useState('');
   const [localProduct, setLocalProduct] = useState<FormattedProduct | null>(null);
+  const [existingImages, setExistingImages] = useState<string[]>([]);
+  const removeExistingImage = (url: string) => setExistingImages(prev => prev.filter(u => u !== url));
+
+  // Per-existing-variant photo edits (keyed by variant product id), separate from the
+  // `variations` field array which only holds brand-new variations being created.
+  const [variantExistingImages, setVariantExistingImages] = useState<Record<string, string[]>>({});
+  const [variantNewImages, setVariantNewImages] = useState<Record<string, File[]>>({});
+  const removeVariantExistingImage = (variantId: string, url: string) =>
+    setVariantExistingImages(prev => ({ ...prev, [variantId]: (prev[variantId] || []).filter(u => u !== url) }));
+  const updateVariantNewImages = (variantId: string, files: File[]) =>
+    setVariantNewImages(prev => ({ ...prev, [variantId]: files }));
 
   useEffect(() => {
     if (isEdit && props.mode === 'edit' && props.product) setLocalProduct(props.product);
@@ -217,14 +236,25 @@ export function useProductDialog(props: ProductDialogProps) {
           variations: [],
           assemblyRecipe: displayProduct.assembly_recipe || [],
         });
+        setExistingImages(displayProduct.images || []);
+        const initialVariantImages: Record<string, string[]> = {};
+        (displayProduct.children || []).forEach(child => { initialVariantImages[child.id] = child.images || []; });
+        setVariantExistingImages(initialVariantImages);
+        setVariantNewImages({});
       } else if (!isEdit) {
         const iv = (props as CreateProps).initialValues;
         form.reset(iv || { name: '', sku: '', description: '', categoryId: '', images: [], sellingPrice: 0, quantityOnHand: 0, supplierPricing: [], hasVariations: false, variations: [] });
+        setExistingImages([]);
+        setVariantExistingImages({});
+        setVariantNewImages({});
       }
       setSupplierSearch('');
       setComponentSearch('');
     } else {
       form.reset();
+      setExistingImages([]);
+      setVariantExistingImages({});
+      setVariantNewImages({});
       setSupplierSearch('');
       setComponentSearch('');
     }
@@ -250,11 +280,12 @@ export function useProductDialog(props: ProductDialogProps) {
 
     try {
       if (isEdit && displayProduct) {
-        let uploadedImageUrls: string[] = displayProduct.images || [];
+        let uploadedImageUrls: string[] = existingImages;
         if (imageFiles && imageFiles.length > 0) {
           const newUrls = await uploadImages(supabase, imageFiles);
           uploadedImageUrls = [...uploadedImageUrls, ...newUrls];
         }
+        const removedImageUrls = (displayProduct.images || []).filter(url => !existingImages.includes(url));
 
         const { error } = await supabase.from('products').update({
           name: core.name, sku: finalSku, shelf_location: core.shelfLocation || null,
@@ -264,6 +295,25 @@ export function useProductDialog(props: ProductDialogProps) {
           assembly_recipe: assemblyRecipe || [],
         }).eq('id', displayProduct.id);
         if (error) throw error;
+
+        if (removedImageUrls.length > 0) await deleteImages(supabase, removedImageUrls);
+
+        for (const child of displayProduct.children || []) {
+          const remainingExisting = variantExistingImages[child.id] ?? (child.images || []);
+          const pendingFiles = variantNewImages[child.id] || [];
+          const removedVariantUrls = (child.images || []).filter(url => !remainingExisting.includes(url));
+          if (pendingFiles.length === 0 && removedVariantUrls.length === 0) continue;
+
+          let finalVariantImages = remainingExisting;
+          if (pendingFiles.length > 0) {
+            finalVariantImages = [...finalVariantImages, ...await uploadImages(supabase, pendingFiles)];
+          }
+
+          const { error: vImgErr } = await supabase.from('products').update({ images: finalVariantImages }).eq('id', child.id);
+          if (vImgErr) throw vImgErr;
+
+          if (removedVariantUrls.length > 0) await deleteImages(supabase, removedVariantUrls);
+        }
 
         if (variations && variations.length > 0) {
           for (let i = 0; i < variations.length; i++) {
@@ -349,6 +399,12 @@ export function useProductDialog(props: ProductDialogProps) {
     displayProduct,
     isManagement,
     form,
+    existingImages,
+    removeExistingImage,
+    variantExistingImages,
+    variantNewImages,
+    removeVariantExistingImage,
+    updateVariantNewImages,
     similarProductWarning,
     supplierSearch,
     setSupplierSearch,

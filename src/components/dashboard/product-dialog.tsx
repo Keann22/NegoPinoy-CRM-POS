@@ -25,6 +25,12 @@ export function ProductDialog(props: ProductDialogProps) {
     displayProduct,
     isManagement,
     form,
+    existingImages,
+    removeExistingImage,
+    variantExistingImages,
+    variantNewImages,
+    removeVariantExistingImage,
+    updateVariantNewImages,
     similarProductWarning,
     supplierSearch,
     setSupplierSearch,
@@ -69,8 +75,16 @@ export function ProductDialog(props: ProductDialogProps) {
 
               <FormField control={form.control} name="images" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{isEdit ? 'Add Product Images' : 'Product Images (Optional)'}</FormLabel>
-                  <FormControl><FileUpload value={field.value || []} onChange={field.onChange} /></FormControl>
+                  <FormLabel>{isEdit ? 'Product Images' : 'Product Images (Optional)'}</FormLabel>
+                  <FormControl>
+                    <FileUpload
+                      value={field.value || []}
+                      onChange={field.onChange}
+                      multiple
+                      existingImages={isEdit ? existingImages : undefined}
+                      onRemoveExisting={isEdit ? removeExistingImage : undefined}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
@@ -233,6 +247,10 @@ export function ProductDialog(props: ProductDialogProps) {
                 removeVariation={removeVariation}
                 isEdit={isEdit}
                 displayProduct={displayProduct}
+                variantExistingImages={variantExistingImages}
+                variantNewImages={variantNewImages}
+                onRemoveVariantExistingImage={removeVariantExistingImage}
+                onVariantNewImagesChange={updateVariantNewImages}
               />
             </div>
 
