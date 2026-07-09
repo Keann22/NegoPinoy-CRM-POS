@@ -7,10 +7,16 @@
  * - AuditProofInput - Input type
  * - AuditProofOutput - Return type
  *
- * Calls the Gemini REST API directly (instead of going through Genkit's
+ * Calls the OpenRouter REST API directly (instead of going through Genkit's
  * in-process `ai` client) because bundling Genkit's Google AI plugin into
  * the Next.js server crashes under Turbopack (see src/ai/genkit.ts). A
  * plain fetch() has no such bundling concerns.
+ *
+ * Uses OpenRouter instead of calling Gemini directly because the Gemini
+ * free tier is unavailable for this account/region (all keys return
+ * `generate_content_free_tier_requests limit: 0` regardless of project).
+ * OpenRouter's free-tier vision models (`:free` suffix) aren't subject to
+ * that restriction.
  */
 
 import { z } from 'genkit';
@@ -54,18 +60,6 @@ const AuditProofOutputSchema = z.object({
 });
 export type AuditProofOutput = z.infer<typeof AuditProofOutputSchema>;
 
-const RESPONSE_JSON_SCHEMA = {
-  type: 'OBJECT',
-  properties: {
-    verdict: { type: 'STRING', enum: ['approved', 'rejected', 'flagged'] },
-    confidence: { type: 'NUMBER' },
-    feedback: { type: 'STRING' },
-    isFacebookScreenshot: { type: 'BOOLEAN' },
-    matchesTaskType: { type: 'BOOLEAN' },
-  },
-  required: ['verdict', 'confidence', 'feedback', 'isFacebookScreenshot', 'matchesTaskType'],
-};
-
 function buildPrompt(taskType: string): string {
   return `You are an AI compliance auditor for NegosyantengPinoy.Ph, a Filipino e-commerce business.
 Your job is to verify that sales agents are completing their daily Facebook catalog maintenance tasks.
@@ -95,55 +89,44 @@ Write your feedback in Taglish (Filipino-English mix) so it's easy for the agent
 Respond with JSON only, matching this shape: { verdict, confidence, feedback, isFacebookScreenshot, matchesTaskType }.`;
 }
 
-function parseDataUri(photoDataUri: string): { mimeType: string; data: string } {
-  const match = /^data:([^;]+);base64,([\s\S]*)$/.exec(photoDataUri);
-  if (!match) {
-    throw new Error('photoDataUri is not a valid base64 data URI.');
-  }
-  return { mimeType: match[1], data: match[2] };
-}
-
-async function callGeminiVision(input: AuditProofInput): Promise<AuditProofOutput> {
-  const apiKey = process.env.GEMINI_API_KEY;
+async function callOpenRouterVision(input: AuditProofInput): Promise<AuditProofOutput> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
-    throw new Error('GEMINI_API_KEY is not configured.');
+    throw new Error('OPENROUTER_API_KEY is not configured.');
   }
 
-  const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
-  const { mimeType, data } = parseDataUri(input.photoDataUri);
+  const model = process.env.OPENROUTER_MODEL || 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free';
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              { text: buildPrompt(input.taskType) },
-              { inline_data: { mime_type: mimeType, data } },
-            ],
-          },
-        ],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          responseSchema: RESPONSE_JSON_SCHEMA,
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: buildPrompt(input.taskType) },
+            { type: 'image_url', image_url: { url: input.photoDataUri } },
+          ],
         },
-      }),
-    }
-  );
+      ],
+      response_format: { type: 'json_object' },
+    }),
+  });
 
   if (!res.ok) {
     const bodyText = await res.text().catch(() => '');
-    throw new Error(`Gemini API request failed (${res.status}): ${bodyText.slice(0, 300)}`);
+    throw new Error(`OpenRouter API request failed (${res.status}): ${bodyText.slice(0, 300)}`);
   }
 
   const json = await res.json();
-  const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+  const text = json?.choices?.[0]?.message?.content;
   if (!text) {
-    throw new Error('Gemini API returned no content.');
+    throw new Error('OpenRouter API returned no content.');
   }
 
   const parsed = JSON.parse(text);
@@ -153,7 +136,7 @@ async function callGeminiVision(input: AuditProofInput): Promise<AuditProofOutpu
 export async function auditProof(input: AuditProofInput): Promise<AuditProofOutput> {
   const parsedInput = AuditProofInputSchema.parse(input);
   try {
-    return await callGeminiVision(parsedInput);
+    return await callOpenRouterVision(parsedInput);
   } catch (err) {
     console.error('auditProof: AI call failed, falling back to flagged verdict.', err);
     // Fail safe: flag for human review instead of leaving the log stuck as
