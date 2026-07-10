@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Flag, ShoppingCart, Trash2 } from "lucide-react";
 
@@ -40,7 +41,12 @@ export function ProcurementItemRow({
   handleDeleteDraftItem: (id: string) => void;
   onViewAllocated: (item: { id: string; name: string }) => void;
 }) {
-  const hasDiscrepancy = item.staffRequestedQty !== null && item.systemQty !== item.staffRequestedQty;
+  // Current Stock's deficit should always equal the total of every open order
+  // (including already-picked/packed ones, since stock is deducted at order
+  // creation, not at pick/pack) — that's the actual ledger math. Compare
+  // against the full total here, not needToBuyQty, or this would falsely
+  // flag every product that simply has a packed order in its queue.
+  const hasDiscrepancy = item.systemQty !== (item.totalOpenDemandQty || 0);
 
   return (
     <tr className={hasDiscrepancy ? "bg-orange-50 hover:bg-orange-100" : "hover:bg-slate-50 transition-colors"}>
@@ -63,14 +69,14 @@ export function ProcurementItemRow({
         </button>
         {hasDiscrepancy && (
             <div className="text-xs font-bold text-orange-600 mt-1 flex items-center gap-2">
-                <span>⚠️ Discrepancy detected.</span>
-                <Button 
-                  size="sm" 
-                  variant="outline" 
+                <span>⚠️ Current Stock doesn't match total open orders.</span>
+                <Button
+                  size="sm"
+                  variant="outline"
                   className="h-6 px-2 text-[10px] border-orange-200 hover:bg-orange-100 hover:text-orange-700"
-                  onClick={() => handleSyncInventory(item.productId, item.staffRequestedQty)}
+                  onClick={() => handleSyncInventory(item.productId, item.totalOpenDemandQty || 0)}
                 >
-                  Sync
+                  Sync Stock
                 </Button>
             </div>
         )}
@@ -107,14 +113,38 @@ export function ProcurementItemRow({
         {item.currentStock}
       </td>
       <td
-        className={`p-3 font-bold text-center text-lg cursor-pointer hover:underline ${hasDiscrepancy ? "text-orange-600" : "text-green-600 hover:text-indigo-600"}`}
-        title="See which orders/customers this stock is allocated to"
+        className="p-3 font-bold text-center text-lg cursor-pointer text-slate-500 hover:underline hover:text-indigo-600"
+        title="Manual note from staff — not used to calculate the Buy quantity"
         onClick={() => onViewAllocated({ id: item.productId, name: item.productName })}
       >
           {item.staffRequestedQty !== null ? item.staffRequestedQty : <span className="text-xs text-slate-400 font-normal">Pending</span>}
           {item.requestedByName && (
             <div className="text-[10px] font-normal text-slate-400 mt-0.5">by {item.requestedByName}</div>
           )}
+          {item.sourceOrders && item.sourceOrders.length > 0 && (
+            <div className="mt-1 space-y-0.5">
+              {item.sourceOrders.map((so: any, idx: number) => (
+                <div key={idx} className="text-[10px] font-normal text-slate-500">
+                  for{' '}
+                  <Link
+                    href={`/dashboard/orders/${so.orderId}`}
+                    className="text-primary hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    #{so.shortOrderId}
+                  </Link>
+                  {' '}({so.customerName})
+                </div>
+              ))}
+            </div>
+          )}
+      </td>
+      <td
+        className="p-3 font-bold text-center text-lg cursor-pointer text-blue-600 hover:underline hover:text-indigo-600"
+        title="Orders still waiting on this item to be picked — this is the Buy quantity. Click to see everyone affected, including already-packed orders."
+        onClick={() => onViewAllocated({ id: item.productId, name: item.productName })}
+      >
+          {item.needToBuyQty > 0 ? item.needToBuyQty : <span className="text-xs text-slate-400 font-normal">None</span>}
       </td>
       <td className="p-3 text-center">
         <div className="relative flex items-center justify-center">

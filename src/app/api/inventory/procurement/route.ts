@@ -207,6 +207,34 @@ export async function GET(req: Request) {
       components?.forEach(c => addDemand(c.componentId, row.quantity * c.qtyPerBundle, isUnfulfilled));
     });
 
+    // 3c. Fetch which order(s) prompted each staff draft request, if any were
+    // recorded (see procurement_request_sources) — lets "Staff Req." trace
+    // back to the order that needed it, e.g. a picker reporting a shortage
+    // while picking. Tolerate the table not existing yet (pre-migration)
+    // rather than breaking the whole sheet.
+    const draftItemIds = (drafts || []).map(d => d.id);
+    const sourceOrdersByDraftId = new Map<string, { orderId: string; shortOrderId: string; customerName: string; quantity: number }[]>();
+    if (draftItemIds.length > 0) {
+      const { data: sourceRows, error: sourceErr } = await supabase
+        .from('procurement_request_sources')
+        .select('purchase_order_item_id, quantity, orders(id, customers(full_name))')
+        .in('purchase_order_item_id', draftItemIds);
+      if (sourceErr) {
+        console.error('procurement_request_sources unavailable (has the migration been run?):', sourceErr.message);
+      } else {
+        sourceRows?.forEach((row: any) => {
+          const list = sourceOrdersByDraftId.get(row.purchase_order_item_id) || [];
+          list.push({
+            orderId: row.orders.id,
+            shortOrderId: row.orders.id.split('-')[0].toUpperCase(),
+            customerName: row.orders.customers?.full_name || 'Unknown',
+            quantity: row.quantity
+          });
+          sourceOrdersByDraftId.set(row.purchase_order_item_id, list);
+        });
+      }
+    }
+
     // Combine
     const osMap = new Map();
 
@@ -239,6 +267,7 @@ export async function GET(req: Request) {
         staffRequestedQty: draft ? draft.expected_qty : null,
         requestedByName: draft ? draft.requested_by_name : null,
         draftItemId: draft ? draft.id : null,
+        sourceOrders: draft ? (sourceOrdersByDraftId.get(draft.id) || []) : [],
         totalOpenDemandQty: totalOpenDemandMap.get(p.id) || 0,
         needToBuyQty: needToBuyMap.get(p.id) || 0,
         supplierId: p.supplier_id,

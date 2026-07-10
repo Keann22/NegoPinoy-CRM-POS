@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSupabase } from '@/lib/supabase/hooks';
 import { useToast } from '@/hooks/use-toast';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { resolveOpenOrderIssues } from '@/lib/services/order-service';
 
 export type OrderItem = {
   id: string;
@@ -174,6 +175,13 @@ export function usePicker() {
 
       if (orderError) throw orderError;
 
+      // A clean re-pick (no missing items this time) means whatever was
+      // previously reported for this order is fixed — clear it before any
+      // new issues (below) get inserted, so freshly-reported ones stay open.
+      if (!hasIssues) {
+        await resolveOpenOrderIssues(supabase, scannedOrderId);
+      }
+
       const userName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : 'Unknown Staff';
 
       const itemSnapshot = orderItems.map(item => ({
@@ -205,7 +213,8 @@ export function usePicker() {
             });
             procurementRequests.push({
               productId: item.product_id,
-              requestedQty: missingQty
+              requestedQty: missingQty,
+              orderId: scannedOrderId
             });
           }
         }

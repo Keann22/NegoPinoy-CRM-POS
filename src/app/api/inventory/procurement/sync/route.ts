@@ -7,13 +7,13 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function POST(req: Request) {
   try {
-    const { productId, staffRequestedQty } = await req.json();
+    const { productId, targetQty } = await req.json();
 
-    if (!productId || typeof staffRequestedQty !== 'number') {
+    if (!productId || typeof targetQty !== 'number') {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const targetStockLevel = -staffRequestedQty;
+    const targetStockLevel = -targetQty;
     
     // Fetch current stock
     const { data: p, error: fetchErr } = await supabase

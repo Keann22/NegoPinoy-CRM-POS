@@ -32,7 +32,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { requests, requestedByName } = await req.json(); // Array of { productId, requestedQty }
+    const { requests, requestedByName } = await req.json(); // Array of { productId, requestedQty, orderId? }
 
     if (!requests || requests.length === 0) {
       return NextResponse.json({ error: 'No items provided' }, { status: 400 });
@@ -72,20 +72,23 @@ export async function POST(req: Request) {
 
     const existingMap = new Map(existingItems?.map(i => [i.product_id, i]) || []);
 
-    // 2. Expand requests to components if they have an assembly_recipe
-    const expandedRequests = [];
+    // 2. Expand requests to components if they have an assembly_recipe,
+    // carrying the originating orderId (if any) onto each expanded component
+    // so a bundle shortage still traces back to the order that needed it.
+    const expandedRequests: { productId: string; requestedQty: number; orderId?: string }[] = [];
     for (const r of requests) {
       const { data: prodData } = await supabase
         .from('products')
         .select('assembly_recipe')
         .eq('id', r.productId)
         .single();
-      
+
       if (prodData && prodData.assembly_recipe && Array.isArray(prodData.assembly_recipe) && prodData.assembly_recipe.length > 0) {
         for (const comp of prodData.assembly_recipe) {
           expandedRequests.push({
             productId: comp.component_id || comp.productId,
-            requestedQty: r.requestedQty * (comp.quantity || 1)
+            requestedQty: r.requestedQty * (comp.quantity || 1),
+            orderId: r.orderId
           });
         }
       } else {
@@ -100,8 +103,19 @@ export async function POST(req: Request) {
     }
     const finalRequests = Array.from(finalRequestsMap.entries()).map(([productId, requestedQty]) => ({ productId, requestedQty }));
 
+    // Per-product, per-order quantity contributed by this submission, so each
+    // draft line can be attributed back to the order(s) that triggered it.
+    const productOrderContributions = new Map<string, Map<string, number>>();
+    for (const er of expandedRequests) {
+      if (!er.orderId) continue;
+      if (!productOrderContributions.has(er.productId)) productOrderContributions.set(er.productId, new Map());
+      const m = productOrderContributions.get(er.productId)!;
+      m.set(er.orderId, (m.get(er.orderId) || 0) + er.requestedQty);
+    }
+
     const itemsToInsert = [];
-    
+    const purchaseOrderItemIdByProduct = new Map<string, string>();
+
     for (const p of finalRequests) {
       if (existingMap.has(p.productId)) {
         // Update existing item
@@ -114,6 +128,7 @@ export async function POST(req: Request) {
             ...(requestedByName ? { requested_by_name: requestedByName } : {})
           })
           .eq('id', existingItem.id);
+        purchaseOrderItemIdByProduct.set(p.productId, existingItem.id);
       } else {
         // Insert new item
         itemsToInsert.push({
@@ -128,10 +143,28 @@ export async function POST(req: Request) {
     }
 
     if (itemsToInsert.length > 0) {
-      const { error: itemsErr } = await supabase
+      const { data: insertedItems, error: itemsErr } = await supabase
         .from('purchase_order_items')
-        .insert(itemsToInsert);
+        .insert(itemsToInsert)
+        .select('id, product_id');
       if (itemsErr) throw itemsErr;
+      insertedItems?.forEach(i => purchaseOrderItemIdByProduct.set(i.product_id, i.id));
+    }
+
+    // Record which order(s) prompted this request, if any were provided.
+    const sourceRowsToInsert = [];
+    for (const [productId, contributions] of Array.from(productOrderContributions.entries())) {
+      const purchaseOrderItemId = purchaseOrderItemIdByProduct.get(productId);
+      if (!purchaseOrderItemId) continue;
+      for (const [orderId, qty] of Array.from(contributions.entries())) {
+        sourceRowsToInsert.push({ purchase_order_item_id: purchaseOrderItemId, order_id: orderId, quantity: qty });
+      }
+    }
+    if (sourceRowsToInsert.length > 0) {
+      const { error: sourceErr } = await supabase
+        .from('procurement_request_sources')
+        .insert(sourceRowsToInsert);
+      if (sourceErr) console.error('Error recording procurement request sources:', sourceErr);
     }
 
     // --- Option C: Auto-adjust Negative Inventory ---

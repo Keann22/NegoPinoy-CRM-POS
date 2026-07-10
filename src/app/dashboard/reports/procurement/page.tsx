@@ -87,10 +87,18 @@ export default function ProcurementSheet() {
     setSelectedItems(newState);
   };
 
+  // needToBuyQty only counts orders where the item hasn't been picked yet —
+  // once an order is Picked/Packed/etc., a staff member already pulled a real
+  // unit for it, so it no longer needs buying even though it's still "open."
+  // That's the number to buy against, not Staff Req. (a stale manual note)
+  // and not Current Stock's raw deficit (which also includes already-packed
+  // orders, since stock is deducted at order creation, not at pick/pack).
+  const suggestedBuyQty = (item: any) => item.needToBuyQty || 0;
+
   const openBuyDialog = (item: any, groupId: string | null) => {
     setBuyDialogData({
       item,
-      qty: item.staffRequestedQty !== null ? item.staffRequestedQty.toString() : item.systemQty.toString(),
+      qty: suggestedBuyQty(item).toString(),
       cost: editedCosts[item.productId] !== undefined ? editedCosts[item.productId] : (item.unitCost ? item.unitCost.toString() : ''),
       supplierId: groupId || item.supplierId || ''
     });
@@ -102,11 +110,11 @@ export default function ProcurementSheet() {
     if (selectedInGroup.length === 0) {
       return alert("Please select at least one item to purchase.");
     }
-    
+
     const purchases = selectedInGroup.map((item: any) => ({
       productId: item.productId,
       productName: item.productName,
-      qty: item.staffRequestedQty !== null ? item.staffRequestedQty : item.systemQty,
+      qty: suggestedBuyQty(item),
       cost: editedCosts[item.productId] !== undefined ? Number(editedCosts[item.productId]) : Number(item.unitCost || 0),
       supplierId: item.supplierId || groupId || null,
       draftItemId: item.draftItemId
@@ -155,12 +163,12 @@ export default function ProcurementSheet() {
     }
   };
 
-  const handleSyncInventory = async (productId: string, staffRequestedQty: number) => {
+  const handleSyncInventory = async (productId: string, totalOpenDemandQty: number) => {
     try {
       const res = await fetch('/api/inventory/procurement/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId, staffRequestedQty })
+        body: JSON.stringify({ productId, targetQty: totalOpenDemandQty })
       });
 
       const data = await res.json();
@@ -288,7 +296,8 @@ export default function ProcurementSheet() {
                     </th>
                     <th className="p-3 text-left w-1/3">Product</th>
                     <th className="p-3 text-center">Current Stock</th>
-                    <th className="p-3 text-center">Staff Req.</th>
+                    <th className="p-3 text-center">Staff Req. <span className="font-normal normal-case text-[10px] text-slate-400">(note)</span></th>
+                    <th className="p-3 text-center">Need to Buy <span className="font-normal normal-case text-[10px] text-slate-400">(not yet picked)</span></th>
                     <th className="p-3 text-center w-32">Unit Cost</th>
                     <th className="p-3 text-center w-28">Buy Action</th>
                     <th className="p-3 text-center w-12"></th>
