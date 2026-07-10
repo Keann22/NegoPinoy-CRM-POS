@@ -273,6 +273,18 @@ Both sum `order_items.cost_price_at_sale × quantity` for non-void (`Cancelled`/
 
 ---
 
+## Bundle Products & Assembly Recipes
+
+Some products are **bundles** assembled from other real, purchasable products — e.g. "Cy19 Stainless Pan 32cm with Takip" = 1x pan + 1x glass cover. This is modeled via `products.assembly_recipe` (a JSON array of `{ productId, quantity }`), configured per bundle product. A bundle's own `stock_level` is not meaningful for purchasing — suppliers only sell the components, never the bundle itself.
+
+**Expansion happens in two places:**
+- `POST /api/inventory/procurement-request` — when a picker/staff reports a bundle out of stock, the request is expanded onto its components (`requestedQty × component.quantity`) before being written to `purchase_order_items`, so the resulting draft targets something a supplier can actually sell.
+- `GET /api/inventory/procurement` ([route.ts](src/app/api/inventory/procurement/route.ts)) — separately expands *order demand* for a bundle onto its components (section "3a/3b" in the route) so the Buy quantity reflects real customer orders for the bundle, not just direct component orders.
+
+**Self-healing leaked bundle drafts**: if a bundle's `assembly_recipe` wasn't configured yet at the moment someone reported it out of stock, the expansion above has nothing to expand, and a `purchase_order_items` draft lands directly on the bundle's own `product_id` — where it's stuck forever, since a bundle is never a real thing to "Buy". `migrateLeakedBundleDrafts()` (top of `GET /api/inventory/procurement`) runs on every Procurement page load: it finds any `STAFF_DRAFT` item whose product now has a non-empty `assembly_recipe`, and migrates it onto its components, merging into whatever component draft already exists. Because this route can be hit by two near-simultaneous requests, each leak is claimed via an atomic `DELETE ... RETURNING` (not a status flip — `purchase_order_items.status` only allows `pending_receipt`/`received` by a DB check constraint) so only one concurrent request processes a given leak; the other sees nothing deleted and skips it.
+
+---
+
 ## Order Fulfillment Pipeline
 
 Scope: Picker app → Second Check → Packer app → Packed Orders review → For Shipping / For Pick-up.
@@ -325,7 +337,7 @@ The apps never call each other directly — they coordinate entirely through sha
 | `src/app/dashboard/accounting/payments/page.tsx` | Payments Log — see "Payments Dashboard" |
 | `src/app/api/payments/extract-ocr/route.ts` | Tesseract + Google Vision fallback OCR on payment proof images |
 | `src/app/api/payments/verify-pdf/route.ts` | Bank/GCash statement PDF matching — see "Payments Dashboard" |
-| `src/app/api/inventory/procurement/route.ts` | Procurement "Buy" action — updates product cost + backfills COGS, see "Cost of Goods Sold" |
+| `src/app/api/inventory/procurement/route.ts` | Procurement "Buy" action — updates product cost + backfills COGS (see "Cost of Goods Sold"); also self-heals leaked bundle drafts (see "Bundle Products & Assembly Recipes") |
 | `src/app/dashboard/reports/pnl-report.tsx` | P&L Statement report — see "Cost of Goods Sold" |
 | `update_order_func.sql` | `process_order_transaction` Postgres RPC — where `cost_price_at_sale` gets snapshotted |
 | `src/hooks/useProducts.ts` | Products list — paginated fetch, see "1000-row query cap" |
