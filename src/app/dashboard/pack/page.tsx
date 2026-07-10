@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -74,13 +75,19 @@ export default function PackerApp() {
         <Card className="border-primary/50 shadow-lg w-full">
           <CardHeader className="bg-primary/5 pb-4">
             <CardTitle className="flex justify-between items-center">
-              <span>Order #{scannedOrderId.substring(0, 7).toUpperCase()}</span>
+              <Link href={`/dashboard/orders/${scannedOrderId}`} target="_blank" className="hover:underline">
+                Order #{scannedOrderId.substring(0, 7).toUpperCase()}
+              </Link>
               <Badge variant={orderDetails.status === 'Packed' ? 'secondary' : 'default'}>
                 {orderDetails.status}
               </Badge>
             </CardTitle>
             <CardDescription className="text-base text-foreground font-medium">
-              {orderDetails.customers?.full_name || 'Unknown Customer'}
+              {orderDetails.customer_id ? (
+                <Link href={`/dashboard/customers/${orderDetails.customer_id}`} target="_blank" className="hover:underline">
+                  {orderDetails.customers?.full_name || 'Unknown Customer'}
+                </Link>
+              ) : (orderDetails.customers?.full_name || 'Unknown Customer')}
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-6">

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useMemo, useEffect, useState } from 'react';
 import { Skeleton } from '../ui/skeleton';
@@ -10,6 +11,8 @@ import { useUser } from '@/lib/supabase/hooks';
 import { DateRange } from 'react-day-picker';
 
 type RecentSaleItem = {
+    orderId: string;
+    customerId: string | null;
     name: string;
     email: string;
     amount: string;
@@ -111,6 +114,8 @@ export function RecentSales({ dateRange, salespersonId = 'all' }: RecentSalesPro
 
                     const fallback = name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
                     return {
+                        orderId: order.id,
+                        customerId: canSeeCustomers ? order.customer_id : null,
                         name,
                         email,
                         amount: `+₱${Number(order.total_amount || 0).toFixed(2)}`,
@@ -158,10 +163,20 @@ export function RecentSales({ dateRange, salespersonId = 'all' }: RecentSalesPro
                     <AvatarFallback>{sale.avatarFallback}</AvatarFallback>
                 </Avatar>
                 <div className="ml-4 space-y-1">
-                    <p className="text-sm font-medium leading-none">{sale.name}</p>
+                    {sale.customerId ? (
+                        <Link href={`/dashboard/customers/${sale.customerId}`} className="text-sm font-medium leading-none text-primary hover:underline">
+                            {sale.name}
+                        </Link>
+                    ) : (
+                        <p className="text-sm font-medium leading-none">{sale.name}</p>
+                    )}
                     <p className="text-sm text-muted-foreground">{sale.email}</p>
                 </div>
-                <div className="ml-auto font-medium">{sale.amount}</div>
+                <div className="ml-auto font-medium">
+                    <Link href={`/dashboard/orders/${sale.orderId}`} className="hover:underline">
+                        {sale.amount}
+                    </Link>
+                </div>
                 </div>
             ))}
             {!isLoading && recentSales.length === 0 && (

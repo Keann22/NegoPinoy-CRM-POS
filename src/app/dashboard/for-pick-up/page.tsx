@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -136,7 +137,11 @@ export default function ForPickUpPage() {
               )}
               {!loading && paginatedOrders.map(order => (
                 <TableRow key={order.id}>
-                  <TableCell className="font-mono text-sm">{order.orderId}</TableCell>
+                  <TableCell className="font-mono text-sm">
+                    <Link href={`/dashboard/orders/${order.id}`} className="font-semibold text-primary hover:underline">
+                      {order.orderId}
+                    </Link>
+                  </TableCell>
                   <TableCell className="font-mono text-sm font-semibold">{order.tracking_number}</TableCell>
                   <TableCell>
                     <div className="font-medium">{order.shippingName}</div>

@@ -65,7 +65,7 @@ export default function PaymentsPage() {
   const [isVerifying, setIsVerifying] = useState(false);
   
   // Map of order_id to order & customer info
-  const [orderMap, setOrderMap] = useState<Map<string, { customerName: string; salesPersonName: string }>>(new Map());
+  const [orderMap, setOrderMap] = useState<Map<string, { customerName: string; customerId: string | null; salesPersonName: string }>>(new Map());
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
 
   const filteredPayments = useMemo(() => {
@@ -125,22 +125,24 @@ export default function PaymentsPage() {
         const orderIds = Array.from(new Set(payments.map(p => p.order_id)));
         if (orderIds.length === 0) return;
 
-        const map = new Map<string, { customerName: string; salesPersonName: string }>();
-        
+        const map = new Map<string, { customerName: string; customerId: string | null; salesPersonName: string }>();
+
         // Supabase nested join syntax: fetching order and its related customer
         const { data, error } = await supabase
           .from('orders')
-          .select('id, sales_person_name, customers(full_name)')
+          .select('id, sales_person_name, customers(id, full_name)')
           .in('id', orderIds);
-          
+
         if (error) throw error;
-        
+
         if (data) {
           data.forEach(o => {
             // @ts-ignore - Supabase nested type casting
             const customerName = o.customers?.full_name || 'Unknown Customer';
+            // @ts-ignore - Supabase nested type casting
+            const customerId = o.customers?.id || null;
             const salesPersonName = o.sales_person_name || 'Unknown';
-            map.set(o.id, { customerName, salesPersonName });
+            map.set(o.id, { customerName, customerId, salesPersonName });
           });
         }
         setOrderMap(map);

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +10,7 @@ import type { PrintableProduct } from '@/hooks/useAllProductsForPrint';
 
 interface AllocationRow {
   orderId: string;
+  customerId: string | null;
   customerName: string;
   quantity: number;
   status: string;
@@ -49,12 +51,13 @@ export function ProductAllocationDialog({ product, open, onOpenChange }: Product
       try {
         const { data, error } = await supabase
           .from('order_items')
-          .select('order_id, quantity, orders!inner(status, customers(full_name))')
+          .select('order_id, quantity, orders!inner(status, customer_id, customers(full_name))')
           .eq('product_id', product.id)
           .in('orders.status', IN_FLIGHT_STATUSES);
         if (error) { console.error('Error fetching product allocation:', error); return; }
         const rows: AllocationRow[] = (data || []).map((r: any) => ({
           orderId: r.order_id,
+          customerId: r.orders?.customer_id || null,
           customerName: r.orders?.customers?.full_name || 'Unknown Customer',
           quantity: r.quantity,
           status: r.orders?.status || '-',
@@ -116,8 +119,18 @@ export function ProductAllocationDialog({ product, open, onOpenChange }: Product
                 <TableBody>
                   {allocations.map((a, i) => (
                     <TableRow key={i}>
-                      <TableCell className="font-medium">{a.customerName}</TableCell>
-                      <TableCell className="font-mono text-xs">#{a.orderId.slice(0, 7).toUpperCase()}</TableCell>
+                      <TableCell className="font-medium">
+                        {a.customerId ? (
+                          <Link href={`/dashboard/customers/${a.customerId}`} className="text-primary hover:underline">
+                            {a.customerName}
+                          </Link>
+                        ) : a.customerName}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        <Link href={`/dashboard/orders/${a.orderId}`} className="font-semibold text-primary hover:underline">
+                          #{a.orderId.slice(0, 7).toUpperCase()}
+                        </Link>
+                      </TableCell>
                       <TableCell><Badge variant="secondary">{a.status}</Badge></TableCell>
                       <TableCell className="text-right">{a.quantity}</TableCell>
                     </TableRow>

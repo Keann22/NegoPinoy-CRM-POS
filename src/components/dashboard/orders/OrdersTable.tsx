@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -73,6 +74,7 @@ export function OrdersTable({
               aria-label="Select all"
             />
           </TableHead>
+          <TableHead>Order #</TableHead>
           <TableHead>Customer</TableHead>
           <TableHead className="hidden sm:table-cell">Type</TableHead>
           <TableHead className="hidden sm:table-cell">Status</TableHead>
@@ -85,6 +87,7 @@ export function OrdersTable({
         {isLoading && Array.from({ length: 5 }).map((_, i) => (
           <TableRow key={i}>
             <TableCell><Skeleton className="h-4 w-4" /></TableCell>
+            <TableCell><Skeleton className="h-4 w-20" /></TableCell>
             <TableCell><Skeleton className="h-4 w-32" /></TableCell>
             <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
             <TableCell className="hidden sm:table-cell"><Skeleton className="h-6 w-28 rounded-full" /></TableCell>
@@ -108,7 +111,24 @@ export function OrdersTable({
                 />
               </TableCell>
               <TableCell>
-                <div className="font-medium">{order.customerName}</div>
+                <Link
+                  href={`/dashboard/orders/${order.id}`}
+                  className="font-mono text-xs font-semibold text-primary hover:underline"
+                >
+                  {order.id.split('-')[0].toUpperCase()}
+                </Link>
+              </TableCell>
+              <TableCell>
+                {order.customerId ? (
+                  <Link
+                    href={`/dashboard/customers/${order.customerId}`}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    {order.customerName}
+                  </Link>
+                ) : (
+                  <div className="font-medium">{order.customerName}</div>
+                )}
               </TableCell>
               <TableCell className="hidden sm:table-cell">
                 {order.paymentType}

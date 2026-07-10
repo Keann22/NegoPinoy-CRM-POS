@@ -17,7 +17,7 @@ export function PaymentHistoryTable({
 }: {
   isLoading: boolean;
   paginatedData: any[];
-  orderMap: Map<string, { customerName: string; salesPersonName: string }>;
+  orderMap: Map<string, { customerName: string; customerId: string | null; salesPersonName: string }>;
   handleStatusChange: (paymentId: string, newStatus: string) => void;
 }) {
   return (

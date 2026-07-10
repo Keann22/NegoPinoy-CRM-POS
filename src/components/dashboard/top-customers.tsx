@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useMemo, useEffect, useState } from 'react';
 import { Skeleton } from '../ui/skeleton';
@@ -9,6 +10,7 @@ import { useUser } from '@/lib/supabase/hooks';
 import { DateRange } from 'react-day-picker';
 
 type TopCustomerItem = {
+    id: string | null;
     name: string;
     email: string;
     amount: string;
@@ -122,6 +124,7 @@ export function TopCustomers({ dateRange, salespersonId = 'all' }: TopCustomersP
 
                     const fallback = name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
                     return {
+                        id: canSeeCustomers ? customerId : null,
                         name,
                         email,
                         amount: `₱${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
@@ -169,7 +172,13 @@ export function TopCustomers({ dateRange, salespersonId = 'all' }: TopCustomersP
                     <AvatarFallback>{customer.avatarFallback}</AvatarFallback>
                 </Avatar>
                 <div className="ml-4 space-y-1">
-                    <p className="text-sm font-medium leading-none">{customer.name}</p>
+                    {customer.id ? (
+                        <Link href={`/dashboard/customers/${customer.id}`} className="text-sm font-medium leading-none text-primary hover:underline">
+                            {customer.name}
+                        </Link>
+                    ) : (
+                        <p className="text-sm font-medium leading-none">{customer.name}</p>
+                    )}
                     <p className="text-sm text-muted-foreground">{customer.email}</p>
                 </div>
                 <div className="ml-auto font-medium">{customer.amount}</div>

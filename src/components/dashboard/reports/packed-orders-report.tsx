@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useSupabase } from '@/lib/supabase/hooks';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +15,7 @@ import * as xlsx from 'xlsx';
 type PackedOrder = {
   id: string;
   orderId: string;
+  customerId: string | null;
   customerName: string;
   orderDate: string;
   daysOld: number;
@@ -61,6 +63,7 @@ export function PackedOrdersReport() {
             total_amount,
             balance_due,
             customers (
+              id,
               full_name,
               mobile_number,
               region,
@@ -88,6 +91,7 @@ export function PackedOrdersReport() {
           return {
             id: item.id,
             orderId: item.id.split('-')[0].toUpperCase(),
+            customerId: item.customers?.id || null,
             customerName: item.customers?.full_name || 'Unknown',
             orderDate: item.order_date,
             daysOld: differenceInDays(new Date(), date),
@@ -227,8 +231,18 @@ export function PackedOrdersReport() {
               )}
               {!loading && orders.map((order) => (
                 <TableRow key={order.id}>
-                  <TableCell className="font-mono">{order.orderId}</TableCell>
-                  <TableCell className="font-medium">{order.customerName}</TableCell>
+                  <TableCell className="font-mono">
+                    <Link href={`/dashboard/orders/${order.id}`} className="font-semibold text-primary hover:underline">
+                      {order.orderId}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="font-medium">
+                    {order.customerId ? (
+                      <Link href={`/dashboard/customers/${order.customerId}`} className="text-primary hover:underline">
+                        {order.customerName}
+                      </Link>
+                    ) : order.customerName}
+                  </TableCell>
                   <TableCell>
                     <div className="flex flex-col">
                       <span className={

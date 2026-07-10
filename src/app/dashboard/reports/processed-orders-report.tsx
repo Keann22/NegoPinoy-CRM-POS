@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { format, isValid } from 'date-fns';
 import { Calendar as CalendarIcon, Printer, CheckCircle, Check, Undo2, Search } from 'lucide-react';
@@ -155,8 +156,20 @@ export function ProcessedOrdersReport() {
                             onChange={() => toggleSelect(order.id)}
                         />
                     </TableCell>
-                    <TableCell className="font-mono text-xs">{order.id ? order.id.substring(0, 7).toUpperCase() : 'N/A'}</TableCell>
-                    <TableCell className="font-medium">{order.customerName}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                        {order.id ? (
+                            <Link href={`/dashboard/orders/${order.id}`} className="font-semibold text-primary hover:underline">
+                                {order.id.substring(0, 7).toUpperCase()}
+                            </Link>
+                        ) : 'N/A'}
+                    </TableCell>
+                    <TableCell className="font-medium">
+                        {order.customerId ? (
+                            <Link href={`/dashboard/customers/${order.customerId}`} className="text-primary hover:underline">
+                                {order.customerName}
+                            </Link>
+                        ) : order.customerName}
+                    </TableCell>
                     <TableCell>{order.orderDate && isValid(new Date(order.orderDate)) ? format(new Date(order.orderDate), 'PPP p') : '—'}</TableCell>
                     <TableCell>
                         <span className={cn(

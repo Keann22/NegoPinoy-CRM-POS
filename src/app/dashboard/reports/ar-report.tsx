@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useMemo, useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -117,7 +118,18 @@ export function AccountsReceivableReport() {
                     ))}
                     {orders.map((order) => (
                         <TableRow key={order.id}>
-                            <TableCell className="font-medium">{order.customerName}</TableCell>
+                            <TableCell className="font-medium">
+                                {order.customerId ? (
+                                    <Link href={`/dashboard/customers/${order.customerId}`} className="text-primary hover:underline">
+                                        {order.customerName}
+                                    </Link>
+                                ) : order.customerName}
+                                <div className="text-xs text-muted-foreground font-mono mt-0.5">
+                                    <Link href={`/dashboard/orders/${order.id}`} className="hover:underline">
+                                        #{order.id.split('-')[0].toUpperCase()}
+                                    </Link>
+                                </div>
+                            </TableCell>
                             <TableCell>{format(new Date(order.orderDate), 'PPP')}</TableCell>
                             <TableCell>
                                 <span className="text-muted-foreground">

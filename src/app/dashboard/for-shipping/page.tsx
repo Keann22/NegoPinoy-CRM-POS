@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -90,7 +91,11 @@ export default function ForShippingPage() {
               )}
               {!loading && paginatedData.map(order => (
                 <TableRow key={order.id}>
-                  <TableCell className="font-mono text-sm">{order.orderId}</TableCell>
+                  <TableCell className="font-mono text-sm">
+                    <Link href={`/dashboard/orders/${order.id}`} className="font-semibold text-primary hover:underline">
+                      {order.orderId}
+                    </Link>
+                  </TableCell>
                   <TableCell>
                     <div className="font-medium">{order.shippingName}</div>
                     <div className="text-xs text-muted-foreground">{order.shippingAddress?.city || ''}, {order.shippingAddress?.province || ''}</div>

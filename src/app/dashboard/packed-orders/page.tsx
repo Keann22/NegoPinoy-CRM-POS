@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -188,8 +189,18 @@ export default function PackedOrdersPage() {
         )}
         {!isLoading && ordersToRender.map(order => (
           <TableRow key={order.id}>
-            <TableCell className="font-mono text-sm">{order.id.split('-')[0].toUpperCase()}</TableCell>
-            <TableCell className="font-medium">{order.customerName}</TableCell>
+            <TableCell className="font-mono text-sm">
+              <Link href={`/dashboard/orders/${order.id}`} className="font-semibold text-primary hover:underline">
+                {order.id.split('-')[0].toUpperCase()}
+              </Link>
+            </TableCell>
+            <TableCell className="font-medium">
+              {order.customerId ? (
+                <Link href={`/dashboard/customers/${order.customerId}`} className="text-primary hover:underline">
+                  {order.customerName}
+                </Link>
+              ) : order.customerName}
+            </TableCell>
             <TableCell className="text-muted-foreground text-sm">{(order as any).salesPersonName || '-'}</TableCell>
             <TableCell>
               <div className="flex flex-col">

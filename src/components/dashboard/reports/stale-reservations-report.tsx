@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useSupabase } from '@/lib/supabase/hooks';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +14,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 type StaleReservation = {
   id: string;
   orderId: string;
+  fullOrderId: string;
+  customerId: string | null;
   customerName: string;
   productName: string;
   quantity: number;
@@ -41,7 +44,7 @@ export function StaleReservationsReport() {
               id,
               order_date,
               status,
-              customers!inner(full_name)
+              customers!inner(id, full_name)
             )
           `)
           .in('orders.status', ['Pending Payment', 'Processing']);
@@ -58,6 +61,8 @@ export function StaleReservationsReport() {
           return {
             id: `${item.orders.id}-${item.products.name}`, // Uniqueish key
             orderId: item.orders.id.split('-')[0].toUpperCase(),
+            fullOrderId: item.orders.id,
+            customerId: item.orders.customers?.id || null,
             customerName: item.orders.customers?.full_name || 'Unknown',
             productName: productName,
             quantity: item.quantity,
@@ -138,9 +143,19 @@ export function StaleReservationsReport() {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="font-medium">{res.customerName}</TableCell>
+                    <TableCell className="font-medium">
+                      {res.customerId ? (
+                        <Link href={`/dashboard/customers/${res.customerId}`} className="text-primary hover:underline">
+                          {res.customerName}
+                        </Link>
+                      ) : res.customerName}
+                    </TableCell>
                     <TableCell>{res.productName}</TableCell>
-                    <TableCell className="font-mono text-sm">{res.orderId}</TableCell>
+                    <TableCell className="font-mono text-sm">
+                      <Link href={`/dashboard/orders/${res.fullOrderId}`} className="font-semibold text-primary hover:underline">
+                        {res.orderId}
+                      </Link>
+                    </TableCell>
                     <TableCell>
                       <Badge variant={res.status === 'Pending Payment' ? 'destructive' : 'secondary'}>
                         {res.status}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +32,7 @@ type EntryRow = {
 
 type OnHoldCustomer = {
   orderId: string;
+  customerId: string | null;
   customerName: string;
   quantity: number;
   holdSince: string | null;
@@ -239,9 +241,18 @@ export default function OutOfStockAudit() {
                       <PopoverContent className="w-72 text-sm space-y-2">
                         {(holdInfo[row.productId] as OnHoldCustomer[]).map(c => (
                           <div key={c.orderId} className="border-b last:border-0 pb-2 last:pb-0">
-                            <div className="font-medium">{c.customerName}</div>
+                            <div className="font-medium">
+                              {c.customerId ? (
+                                <Link href={`/dashboard/customers/${c.customerId}`} className="text-primary hover:underline">
+                                  {c.customerName}
+                                </Link>
+                              ) : c.customerName}
+                            </div>
                             <div className="text-xs text-slate-500">
-                              Order #{c.orderId.slice(0, 7).toUpperCase()} · qty {c.quantity}
+                              <Link href={`/dashboard/orders/${c.orderId}`} className="hover:underline">
+                                Order #{c.orderId.slice(0, 7).toUpperCase()}
+                              </Link>
+                              {' '}· qty {c.quantity}
                               {c.holdSince ? ` · since ${new Date(c.holdSince).toLocaleDateString()}` : ''}
                             </div>
                             {c.holdReason && <div className="text-xs text-slate-600 italic mt-1">&ldquo;{c.holdReason}&rdquo;</div>}

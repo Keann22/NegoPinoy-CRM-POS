@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useSupabase } from '@/lib/supabase/hooks';
 import { Button } from '@/components/ui/button';
@@ -30,6 +31,8 @@ export default function VerifyApp() {
   const [loading, setLoading] = useState(false);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [viewingPhotoItem, setViewingPhotoItem] = useState<OrderItem | null>(null);
+  const [samePersonBlock, setSamePersonBlock] = useState(false);
+  const [samePersonName, setSamePersonName] = useState<string | null>(null);
 
   const startScanner = async () => {
     setScanning(true);
@@ -38,6 +41,8 @@ export default function VerifyApp() {
     setOrderItems([]);
     setWarnings([]);
     setViewingPhotoItem(null);
+    setSamePersonBlock(false);
+    setSamePersonName(null);
 
     const { Html5QrcodeScanner } = await import('html5-qrcode');
 
@@ -83,7 +88,9 @@ export default function VerifyApp() {
     setLoading(true);
     setScannedOrderId(orderId);
     setWarnings([]);
-    
+    setSamePersonBlock(false);
+    setSamePersonName(null);
+
     try {
       // Fetch order details
       const { data, error } = await supabase
@@ -120,12 +127,18 @@ export default function VerifyApp() {
       // Check if order was edited since picked by comparing item snapshot
       const { data: pickLog } = await supabase
         .from('order_logs')
-        .select('snapshot_data')
+        .select('user_name, snapshot_data')
         .eq('order_id', orderId)
         .in('status', ['Picked', 'Picked (with issue)'])
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
+
+      const currentUserName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : '';
+      if (pickLog?.user_name && currentUserName && pickLog.user_name.trim().toLowerCase() === currentUserName.toLowerCase()) {
+        setSamePersonBlock(true);
+        setSamePersonName(pickLog.user_name);
+      }
 
       if (pickLog?.snapshot_data?.items) {
         const pickedItems: { product_name: string; quantity: number; product_id: string }[] = pickLog.snapshot_data.items;
@@ -193,6 +206,11 @@ export default function VerifyApp() {
     
     if (orderDetails?.status === 'On-Hold' || orderDetails?.status?.includes('issue')) {
       toast({ title: 'Cannot Proceed', description: 'Please resolve the issue before submitting.', variant: 'destructive' });
+      return;
+    }
+
+    if (samePersonBlock) {
+      toast({ title: 'Cannot Proceed', description: 'The picker and checker must not be the same person.', variant: 'destructive' });
       return;
     }
 
@@ -282,17 +300,36 @@ export default function VerifyApp() {
         <Card className="border-primary/50 shadow-lg w-full">
           <CardHeader className="bg-primary/5 pb-4">
             <CardTitle className="flex justify-between items-center">
-              <span>Order #{scannedOrderId.substring(0, 7).toUpperCase()}</span>
+              <Link href={`/dashboard/orders/${scannedOrderId}`} target="_blank" className="hover:underline">
+                Order #{scannedOrderId.substring(0, 7).toUpperCase()}
+              </Link>
               <Badge variant={orderDetails.status === 'On-Hold' ? 'destructive' : 'default'}>
                 {orderDetails.status}
               </Badge>
             </CardTitle>
             <CardDescription className="text-base text-foreground font-medium">
-              {orderDetails.customers?.full_name || 'Unknown Customer'}
+              {orderDetails.customer_id ? (
+                <Link href={`/dashboard/customers/${orderDetails.customer_id}`} target="_blank" className="hover:underline">
+                  {orderDetails.customers?.full_name || 'Unknown Customer'}
+                </Link>
+              ) : (orderDetails.customers?.full_name || 'Unknown Customer')}
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-6">
-            
+
+            {samePersonBlock && (
+              <div className="mb-6 bg-destructive/10 border border-destructive/30 text-destructive p-4 rounded-md flex items-start gap-3">
+                <AlertCircle className="h-6 w-6 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold">Picker and Checker Cannot Be the Same Person</p>
+                  <p className="text-sm mt-1">
+                    This order was picked by <strong>{samePersonName}</strong>, which matches the account currently signed in.
+                    A different staff member must perform the second check before this can be confirmed.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {warnings.length > 0 && (
               <div className="mb-6 space-y-3">
                 {warnings.map((warn, idx) => (
@@ -307,7 +344,7 @@ export default function VerifyApp() {
               </div>
             )}
 
-            {!warnings.length && (
+            {!warnings.length && !samePersonBlock && (
               <div className="mb-6 bg-emerald-50 border border-emerald-100 text-emerald-800 p-4 rounded-md flex items-center gap-3">
                 <Check className="h-6 w-6 text-emerald-500" />
                 <p className="text-sm font-medium">No recent changes detected since picking.</p>
@@ -362,7 +399,7 @@ export default function VerifyApp() {
                 <Button type="button" variant="outline" className="flex-1" onClick={() => setScannedOrderId(null)}>
                   Cancel
                 </Button>
-                <Button type="submit" className="flex-1" disabled={loading || orderDetails?.status === 'On-Hold' || orderDetails?.status?.includes('issue')}>
+                <Button type="submit" className="flex-1" disabled={loading || orderDetails?.status === 'On-Hold' || orderDetails?.status?.includes('issue') || samePersonBlock}>
                   {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
                   Confirm Checked (Photo)
                 </Button>

@@ -13,7 +13,7 @@ export function PaymentTableRow({
   handleStatusChange,
 }: {
   payment: any;
-  orderInfo: { customerName: string; salesPersonName: string } | undefined;
+  orderInfo: { customerName: string; customerId: string | null; salesPersonName: string } | undefined;
   handleStatusChange: (paymentId: string, newStatus: string) => void;
 }) {
   const d = new Date(payment.payment_date);
@@ -42,7 +42,11 @@ export function PaymentTableRow({
         </Link>
       </TableCell>
       <TableCell className="font-medium">
-        {orderInfo?.customerName || 'Loading...'}
+        {orderInfo?.customerId ? (
+          <Link href={`/dashboard/customers/${orderInfo.customerId}`} className="text-primary hover:underline">
+            {orderInfo.customerName}
+          </Link>
+        ) : (orderInfo?.customerName || 'Loading...')}
       </TableCell>
       <TableCell className="text-muted-foreground whitespace-nowrap">
         {orderInfo?.salesPersonName || 'Unknown'}

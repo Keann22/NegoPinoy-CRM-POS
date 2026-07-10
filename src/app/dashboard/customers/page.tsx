@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { MoreHorizontal, Star, Flame, Users, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -163,7 +164,9 @@ export default function CustomersPage() {
               return (
               <TableRow key={cust.id}>
                 <TableCell>
-                  <div className="font-medium">{cust.full_name || 'Unknown'}</div>
+                  <Link href={`/dashboard/customers/${cust.id}`} className="font-medium text-primary hover:underline">
+                    {cust.full_name || 'Unknown'}
+                  </Link>
                   <div className="text-xs text-muted-foreground font-mono mt-1">{cust.psid}</div>
                 </TableCell>
                 <TableCell>

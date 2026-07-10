@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -84,7 +85,11 @@ export default function ReturnsPage() {
                 returns.map(r => (
                   <TableRow key={r.id}>
                     <TableCell className="whitespace-nowrap">{format(new Date(r.created_at), 'MMM d, yyyy h:mm a')}</TableCell>
-                    <TableCell className="font-mono text-xs">#{r.order_id.slice(0, 7).toUpperCase()}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      <Link href={`/dashboard/orders/${r.order_id}`} className="font-semibold text-primary hover:underline">
+                        #{r.order_id.slice(0, 7).toUpperCase()}
+                      </Link>
+                    </TableCell>
                     <TableCell className="font-medium">{r.product_name || 'Unknown Product'}</TableCell>
                     <TableCell>{r.quantity}</TableCell>
                     <TableCell><Badge variant={TYPE_VARIANT[r.return_type]}>{TYPE_LABEL[r.return_type]}</Badge></TableCell>
