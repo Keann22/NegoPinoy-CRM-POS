@@ -294,9 +294,11 @@ export function useProductDialog(props: ProductDialogProps) {
           images: uploadedImageUrls, supplier_pricing: supplierPricing || [],
           assembly_recipe: assemblyRecipe || [],
           // Variant rows are listed by variant_name, not name (see ProductsTable's
-          // `child.variantName || child.name`) — keep it in sync or renames silently
-          // stop showing up in the products list.
-          ...(displayProduct.parent_id ? { variant_name: core.name } : {}),
+          // `child.variantName || child.name`). Only touch it on an actual rename —
+          // Product Name shows the full compound name, so unconditionally syncing it
+          // would clobber a short, already-correct variant_name (e.g. "CASH BASIS")
+          // every time someone edits price/stock without renaming.
+          ...(displayProduct.parent_id && core.name !== displayProduct.name ? { variant_name: core.name } : {}),
         }).eq('id', displayProduct.id);
         if (error) throw error;
 
