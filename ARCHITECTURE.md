@@ -162,6 +162,19 @@ Key tables (not exhaustive):
 
 **Auth**: Uses `supabase.auth` — user metadata stores `first_name`, `last_name`, and `roles[]`.
 
+### Product Variants: `name` vs `variant_name` (recurring bug source)
+
+A variant is just a row in `products` with `parent_id` set. It has **two separate name columns** that must be kept in sync manually — nothing in the DB enforces it:
+
+- `name` — the full display name (by convention `"${parentName} - ${variantSuffix}"`, e.g. `"18L Kaisa Villa Air fryer Oven - CASH BASIS"`).
+- `variant_name` — just the short suffix (e.g. `"CASH BASIS"`), used by `ProductsTable.tsx` to label the row nested under its parent (`child.variantName || child.name`).
+
+The product edit dialog (`product-dialog.tsx` / `useProductDialog.ts`) only exposes a single "Product Name" field, pre-filled with the full `name`. Editing and saving it used to write `name` only — `variant_name` silently went stale, so a renamed variant would keep showing its **old** name in the products list even though the rename "worked" (confirmed bug, fixed in `useProductDialog.ts`'s edit-submit path).
+
+**The fix**: on save, if the product being edited is a variant (`parent_id` set) **and** the name actually changed (`core.name !== displayProduct.name`), `variant_name` is updated to match. The "did it actually change" guard matters — since Product Name always shows the *full* compound name, unconditionally syncing on every save (e.g. just editing price/stock) would overwrite an already-correct short `variant_name` like `"CASH BASIS"` with the full string every time.
+
+**Known limitation**: this only keeps things in sync going forward. Variants renamed *before* the fix landed still show stale `variant_name` in the list until someone re-opens and re-saves that specific variant (which now correctly syncs it).
+
 ---
 
 ## Supabase Client Usage
@@ -329,7 +342,7 @@ The apps never call each other directly — they coordinate entirely through sha
 | `src/app/dashboard/page.tsx` | Dashboard home — metrics, charts |
 | `src/app/dashboard/orders/page.tsx` | Order list page (~714 lines — refactor in Phase 2) |
 | `src/components/dashboard/order-dialog.tsx` | Order create/edit dialog (~1400 lines — refactor in Phase 2) |
-| `src/components/dashboard/product-dialog.tsx` | Product create/edit dialog (~1200 lines — refactor in Phase 2) |
+| `src/components/dashboard/product-dialog.tsx`, `src/hooks/useProductDialog.ts` | Product create/edit dialog (~1200 lines — refactor in Phase 2) — see "Product Variants: name vs variant_name" |
 | `src/lib/supabase/hooks.ts` | `useUser()`, `useAuth()`, `useSupabase()` |
 | `src/hooks/useUserProfile.ts` | `useUserProfile()` — builds user profile from auth metadata |
 | `src/types/index.ts` | Central type exports |
