@@ -23,7 +23,7 @@ export function ScanProductSearch({ rowIndex, form, onAddNewProduct }: { rowInde
             setIsLoadingProducts(true);
             try {
               const supabase = createClient();
-              let query = supabase.from('products').select('id, name, sku');
+              let query = supabase.from('products').select('id, name, sku').not('name', 'ilike', '[DELETED]%');
               const searchWords = search.split(' ').filter((w: string) => w.trim() !== '');
               searchWords.forEach((w: string) => {
                   query = query.or(`name.ilike.%${w}%,variant_name.ilike.%${w}%`);

@@ -36,7 +36,7 @@ export function AddMissingItemDialog({
       setIsSearchingProducts(true);
       try {
         const searchWords = productSearch.split(' ').filter(w => w.trim() !== '');
-        let query = supabase.from('products').select('*');
+        let query = supabase.from('products').select('*').not('name', 'ilike', '[DELETED]%');
         searchWords.forEach(word => {
           query = query.ilike('name', `%${word}%`);
         });

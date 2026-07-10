@@ -29,7 +29,8 @@ export function useProductSearch(query: string) {
       try {
         let q = supabase
           .from('products')
-          .select('id, name, stock_level, selling_price, installment_price, parent_id, supplier_pricing');
+          .select('id, name, stock_level, selling_price, installment_price, parent_id, supplier_pricing')
+          .not('name', 'ilike', '[DELETED]%');
         const words = query.split(' ').filter(w => w.trim() !== '');
         words.forEach(w => { q = q.or(`name.ilike.%${w}%,variant_name.ilike.%${w}%`); });
         const { data, error } = await q.gt('selling_price', 0).limit(15);

@@ -20,7 +20,7 @@ export function PendingProductSearch({ onProductSelect }: { onProductSelect: (pr
     const handler = setTimeout(async () => {
       setIsLoadingProducts(true);
       try {
-        let query = supabase.from('products').select('id, name, stock_level, variant_name, selling_price');
+        let query = supabase.from('products').select('id, name, stock_level, variant_name, selling_price').not('name', 'ilike', '[DELETED]%');
         const searchWords = search.split(' ').filter(w => w.trim() !== '');
         searchWords.forEach(w => {
             query = query.or(`name.ilike.%${w}%,variant_name.ilike.%${w}%`);

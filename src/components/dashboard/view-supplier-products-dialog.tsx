@@ -115,6 +115,7 @@ export function ViewSupplierProductsDialog({ supplier, open, onOpenChange }: Vie
         const { data, error } = await supabase
           .from('products')
           .select('*')
+          .not('name', 'ilike', '[DELETED]%')
           .filter('supplier_pricing', 'cs', JSON.stringify([{ supplierId: supplier.id }]));
 
         if (error) throw error;

@@ -23,7 +23,7 @@ export function ProductSearch({ onProductSelect }: { onProductSelect: (product: 
     const handler = setTimeout(async () => {
       setIsLoadingProducts(true);
       try {
-        let query = supabase.from('products').select('*');
+        let query = supabase.from('products').select('*').not('name', 'ilike', '[DELETED]%');
         const searchWords = search.split(' ').filter(w => w.trim() !== '');
         searchWords.forEach(w => {
             query = query.or(`name.ilike.%${w}%,variant_name.ilike.%${w}%`);
