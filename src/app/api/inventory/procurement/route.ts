@@ -7,8 +7,109 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Every order status that still owes a customer this product (mirrors the
+// "Stock Allocation Details" dialog). Stock is deducted from the ledger the
+// moment an order is placed — not at pick/pack — so this full set is what
+// Current Stock's deficit actually represents, and is only used to detect
+// when Current Stock has drifted from that ledger truth (see hasDiscrepancy
+// in procurement-item-row.tsx), not to decide how much to buy.
+const ALL_OPEN_STATUSES = [
+  'Pending Payment', 'Processing', 'Picked', 'Picked (with issue)', 'Photo',
+  'Packed', 'For Shipping', 'For Pick-up', 'On-Hold', 'Waiting for Stock',
+];
+
+// Statuses where the item has NOT yet been physically found and secured by a
+// picker. Once an order reaches Picked/Photo/Packed/For Shipping/For Pick-up,
+// a staff member already pulled a real unit for it — buying more wouldn't
+// help that order. This narrower set is what actually needs purchasing.
+const UNFULFILLED_STATUSES = [
+  'Pending Payment', 'Processing', 'Picked (with issue)', 'On-Hold', 'Waiting for Stock',
+];
+
+// A picker/staff request for a bundle product (e.g. "Wok Pan with Takip")
+// normally gets expanded onto its components at request time (see
+// procurement-request/route.ts) — but if the bundle's assembly_recipe wasn't
+// configured yet at that moment, the draft lands on the bundle's own
+// product_id instead, and nothing re-checks it afterwards. Suppliers only
+// sell the raw components, so a bundle can never actually be "bought" here.
+// Self-heal any such leaked draft on every load by migrating it onto its
+// components, merging into whatever component draft already exists.
+async function migrateLeakedBundleDrafts() {
+  const { data: staffDraftItems } = await supabase
+    .from('purchase_order_items')
+    .select('id, po_id, product_id, expected_qty, requested_by_name, purchase_orders!inner(notes)')
+    .eq('purchase_orders.notes', 'STAFF_DRAFT')
+    .eq('status', 'pending_receipt');
+
+  if (!staffDraftItems || staffDraftItems.length === 0) return;
+
+  const { data: products } = await supabase
+    .from('products')
+    .select('id, assembly_recipe')
+    .in('id', staffDraftItems.map(i => i.product_id));
+
+  const recipeMap = new Map((products || []).map(p => [p.id, Array.isArray(p.assembly_recipe) ? p.assembly_recipe : []]));
+  const leaked = staffDraftItems.filter(i => (recipeMap.get(i.product_id) || []).length > 0);
+
+  for (const leak of leaked) {
+    // This route can be hit by two overlapping requests (e.g. the page fires
+    // an initial + a refetch nearly back-to-back). Without a lock, both would
+    // read the same leak, both find no existing component draft yet, and
+    // both insert their own copy — duplicating every component row. Claim the
+    // leak first by deleting it: a DELETE is atomic per row in Postgres, so
+    // only one of the concurrent requests actually removes it and gets a row
+    // back; the loser's delete matches nothing and it skips reprocessing.
+    // (purchase_order_items.status only allows 'pending_receipt'/'received',
+    // so a transient status value isn't an option here.)
+    const { data: claimed } = await supabase
+      .from('purchase_order_items')
+      .delete()
+      .eq('id', leak.id)
+      .select('id');
+
+    if (!claimed || claimed.length === 0) continue;
+
+    for (const comp of recipeMap.get(leak.product_id)!) {
+      const componentId = comp.productId || comp.component_id;
+      if (!componentId) continue;
+      const addQty = leak.expected_qty * (comp.quantity || 1);
+
+      const { data: existingComponentDraft } = await supabase
+        .from('purchase_order_items')
+        .select('id, expected_qty')
+        .eq('po_id', leak.po_id)
+        .eq('product_id', componentId)
+        .maybeSingle();
+
+      if (existingComponentDraft) {
+        await supabase
+          .from('purchase_order_items')
+          .update({
+            expected_qty: existingComponentDraft.expected_qty + addQty,
+            status: 'pending_receipt',
+            ...(leak.requested_by_name ? { requested_by_name: leak.requested_by_name } : {})
+          })
+          .eq('id', existingComponentDraft.id);
+      } else {
+        await supabase
+          .from('purchase_order_items')
+          .insert({
+            po_id: leak.po_id,
+            product_id: componentId,
+            expected_qty: addQty,
+            unit_cost: 0,
+            status: 'pending_receipt',
+            requested_by_name: leak.requested_by_name || null
+          });
+      }
+    }
+  }
+}
+
 export async function GET(req: Request) {
   try {
+    await migrateLeakedBundleDrafts();
+
     // 1. Get all suppliers
     const { data: suppliers, error: sErr } = await supabase
       .from('suppliers')
@@ -43,9 +144,72 @@ export async function GET(req: Request) {
       .in('id', Array.from(productIdsToFetch));
     if (lErr) throw lErr;
 
+    // 3a. Bundle products consume a target component's physical stock too
+    // (e.g. "Wok Pan with Takip" = 1x Wok Pan + 1x Cover) — an order for the
+    // bundle never references the component's product_id directly in
+    // order_items, so it has to be found via assembly_recipe and expanded.
+    // assembly_recipe defaults to `[]` (not null) on most products, so a
+    // `.not(is, null)` filter matches nearly the whole table and silently
+    // truncates at Supabase's 1000-row cap. Page through everything instead
+    // and filter for a genuinely non-empty recipe client-side.
+    const bundleProducts: { id: string; assembly_recipe: any }[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data: page, error: bundleErr } = await supabase
+        .from('products')
+        .select('id, assembly_recipe')
+        .range(from, from + 999);
+      if (bundleErr) throw bundleErr;
+      if (!page || page.length === 0) break;
+      bundleProducts.push(...page);
+      if (page.length < 1000) break;
+    }
+
+    // bundleProductId -> [{ componentId, qtyPerBundle }], limited to recipes
+    // that include at least one of our target components.
+    const bundleToComponents = new Map<string, { componentId: string; qtyPerBundle: number }[]>();
+    bundleProducts.forEach((bp: any) => {
+      const recipe = Array.isArray(bp.assembly_recipe) ? bp.assembly_recipe : [];
+      if (recipe.length === 0) return;
+      const relevant = recipe
+        .map((comp: any) => ({ componentId: comp.productId || comp.component_id, qtyPerBundle: comp.quantity || 1 }))
+        .filter((c: any) => c.componentId && productIdsToFetch.has(c.componentId));
+      if (relevant.length > 0) bundleToComponents.set(bp.id, relevant);
+    });
+    const bundleProductIds = new Set(bundleToComponents.keys());
+
+    // 3b. Get live order demand (how many units customers actually still
+    // need), independent of whatever quantity staff manually requested. One
+    // query covering both direct orders and orders for bundles that consume
+    // a target component, across every open status.
+    const allProductIdsForDemand = new Set([...Array.from(productIdsToFetch), ...Array.from(bundleProductIds)]);
+    const { data: demandRows, error: demandErr } = await supabase
+      .from('order_items')
+      .select('product_id, quantity, orders!inner(status)')
+      .in('product_id', Array.from(allProductIdsForDemand))
+      .in('orders.status', ALL_OPEN_STATUSES);
+    if (demandErr) throw demandErr;
+
+    const totalOpenDemandMap = new Map<string, number>();
+    const needToBuyMap = new Map<string, number>();
+    const addDemand = (productId: string, quantity: number, isUnfulfilled: boolean) => {
+      totalOpenDemandMap.set(productId, (totalOpenDemandMap.get(productId) || 0) + quantity);
+      if (isUnfulfilled) {
+        needToBuyMap.set(productId, (needToBuyMap.get(productId) || 0) + quantity);
+      }
+    };
+    demandRows?.forEach((row: any) => {
+      const isUnfulfilled = UNFULFILLED_STATUSES.includes(row.orders.status);
+      if (productIdsToFetch.has(row.product_id)) {
+        addDemand(row.product_id, row.quantity, isUnfulfilled);
+      }
+      // Expand bundle orders onto whichever target component(s) they consume.
+      const components = bundleToComponents.get(row.product_id);
+      components?.forEach(c => addDemand(c.componentId, row.quantity * c.qtyPerBundle, isUnfulfilled));
+    });
+
     // Combine
     const osMap = new Map();
-    
+
     for (const p of liveOS) {
       const draft = draftMap.get(p.id);
       const systemQty = Math.max(0, -p.stock_level);
@@ -75,6 +239,8 @@ export async function GET(req: Request) {
         staffRequestedQty: draft ? draft.expected_qty : null,
         requestedByName: draft ? draft.requested_by_name : null,
         draftItemId: draft ? draft.id : null,
+        totalOpenDemandQty: totalOpenDemandMap.get(p.id) || 0,
+        needToBuyQty: needToBuyMap.get(p.id) || 0,
         supplierId: p.supplier_id,
         unitCost: matchedCost
       });
