@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,7 @@ export function OrderIssues({ isAdmin }: { isAdmin?: boolean }) {
       acc[orderId] = {
         orderId,
         orderTitle: issue.orders ? `Order #${issue.orders.id.substring(0,7).toUpperCase()}` : 'Unknown Order',
+        customerId: issue.orders?.customer_id || null,
         customerName: issue.orders?.customers?.full_name || '',
         reporter: issue.reported_by_name || issue.order_issue_messages?.[0]?.sender_name || 'Unknown',
         createdAt: issue.created_at,
@@ -169,9 +171,29 @@ export function OrderIssues({ isAdmin }: { isAdmin?: boolean }) {
                 >
                   <div>
                     <h4 className="font-semibold text-slate-900 text-sm line-clamp-2">
-                      {group.orderTitle}
+                      {group.orderId && group.orderId !== 'unknown' ? (
+                        <Link
+                          href={`/dashboard/orders/${group.orderId}`}
+                          className="hover:underline hover:text-amber-700"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {group.orderTitle}
+                        </Link>
+                      ) : group.orderTitle}
                     </h4>
-                    {group.customerName && <p className="text-xs text-slate-600 font-medium">{group.customerName}</p>}
+                    {group.customerName && (
+                      <p className="text-xs text-slate-600 font-medium">
+                        {group.customerId ? (
+                          <Link
+                            href={`/dashboard/customers/${group.customerId}`}
+                            className="hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {group.customerName}
+                          </Link>
+                        ) : group.customerName}
+                      </p>
+                    )}
                     <div className="mt-2 space-y-1">
                         <p className="text-xs font-semibold text-red-600">Missing Items ({group.items.length}):</p>
                         <ul className="text-xs text-red-500 list-disc pl-4 space-y-0.5">
@@ -214,8 +236,22 @@ export function OrderIssues({ isAdmin }: { isAdmin?: boolean }) {
             <div>
               <DialogTitle className="flex items-center gap-2 text-xl">
                 <AlertCircle className="text-amber-600 w-6 h-6" />
-                Order Issue: {selectedGroup?.orderTitle}
+                Order Issue:{' '}
+                {selectedGroup?.orderId && selectedGroup.orderId !== 'unknown' ? (
+                  <Link href={`/dashboard/orders/${selectedGroup.orderId}`} className="text-primary hover:underline">
+                    {selectedGroup.orderTitle}
+                  </Link>
+                ) : selectedGroup?.orderTitle}
               </DialogTitle>
+              {selectedGroup?.customerName && (
+                <p className="text-sm text-slate-600 pl-8">
+                  {selectedGroup.customerId ? (
+                    <Link href={`/dashboard/customers/${selectedGroup.customerId}`} className="text-primary hover:underline">
+                      {selectedGroup.customerName}
+                    </Link>
+                  ) : selectedGroup.customerName}
+                </p>
+              )}
               <div className="text-sm text-slate-600 mt-2 pl-8">
                 <span className="font-semibold text-slate-800">Missing Items:</span>
                 <ul className="list-disc pl-4 mt-1 space-y-0.5 text-red-600">

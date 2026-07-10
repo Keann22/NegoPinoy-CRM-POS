@@ -31,6 +31,7 @@ export async function GET(req: Request) {
       .filter((i: any) => i.orders && activeStatuses.includes(i.orders.status))
       .map((i: any) => ({
         orderId: i.orders.id,
+        customerId: i.orders.customer_id || null,
         quantityNeeded: i.quantity,
         status: i.orders.status,
         customerName: i.orders.customers?.name || 'Unknown Customer',

@@ -208,6 +208,38 @@ export async function deductStockForUncancelledOrder(
 }
 
 // ---------------------------------------------------------------------------
+// Order issue resolution
+// ---------------------------------------------------------------------------
+
+/**
+ * Statuses that only happen after picking has succeeded (cleanly or via a fix).
+ * An order can't reach any of these while still short a product, so any
+ * still-open order_issues tied to it are stale and should auto-clear.
+ */
+export const STATUSES_THAT_CLEAR_ORDER_ISSUES: string[] = [
+  'Picked', 'Photo', 'Packed', 'For Shipping', 'For Pick-up',
+  'Shipped', 'Completed', 'Payment Received (COD)',
+];
+
+/**
+ * Resolves any still-open order_issues for an order. Call this whenever an
+ * order's status moves to one of STATUSES_THAT_CLEAR_ORDER_ISSUES through any
+ * path (Packer app, Mark Shipped, manual status dropdown, bulk status change),
+ * not just the one flow that originally reported the issue — otherwise the
+ * Order Issues dashboard keeps showing tickets for orders that already shipped.
+ */
+export async function resolveOpenOrderIssues(
+  supabase: SupabaseClient,
+  orderId: string
+): Promise<void> {
+  await supabase
+    .from('order_issues')
+    .update({ status: 'resolved' })
+    .eq('order_id', orderId)
+    .eq('status', 'open');
+}
+
+// ---------------------------------------------------------------------------
 // editOrder
 // ---------------------------------------------------------------------------
 

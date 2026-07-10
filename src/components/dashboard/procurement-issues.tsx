@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -230,11 +231,22 @@ export function ProcurementIssues({ isAdmin }: { isAdmin?: boolean }) {
                     {affectedOrders.map((order, idx) => (
                       <li key={idx} className="p-4 hover:bg-slate-50">
                         <div className="flex justify-between items-start mb-1">
-                          <span className="font-semibold text-sm text-slate-900">{order.customerName}</span>
+                          <span className="font-semibold text-sm text-slate-900">
+                            {order.customerId ? (
+                              <Link href={`/dashboard/customers/${order.customerId}`} className="text-primary hover:underline">
+                                {order.customerName}
+                              </Link>
+                            ) : order.customerName}
+                          </span>
                           <span className="bg-orange-100 text-orange-800 text-xs font-bold px-2 py-0.5 rounded">Waiting for {order.quantityNeeded}</span>
                         </div>
                         <div className="text-xs text-slate-500 flex justify-between">
-                          <span>Processed by: <span className="font-medium text-slate-700">{order.salesPerson}</span></span>
+                          <span>
+                            <Link href={`/dashboard/orders/${order.orderId}`} className="font-mono hover:underline hover:text-primary">
+                              #{order.orderId.slice(0, 7).toUpperCase()}
+                            </Link>
+                            {' '}· Processed by: <span className="font-medium text-slate-700">{order.salesPerson}</span>
+                          </span>
                           <span className="capitalize">{order.status.replace('_', ' ')}</span>
                         </div>
                       </li>

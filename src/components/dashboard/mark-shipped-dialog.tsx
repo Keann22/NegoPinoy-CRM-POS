@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useSupabase } from '@/lib/supabase/hooks';
+import { resolveOpenOrderIssues } from '@/lib/services/order-service';
 import {
     Dialog,
     DialogContent,
@@ -51,6 +52,8 @@ export function MarkShippedDialog({
                 .eq('id', orderId);
 
             if (error) throw error;
+
+            await resolveOpenOrderIssues(supabase, orderId);
 
             toast({
                 title: "Order Updated",

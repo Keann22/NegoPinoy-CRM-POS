@@ -57,6 +57,7 @@ export async function POST(req: Request) {
 
       const customers = onHoldRows.map(r => ({
         orderId: r.order_id,
+        customerId: r.orders?.customer_id || null,
         customerName: r.orders?.customers?.full_name || 'Unknown Customer',
         quantity: r.quantity,
         holdSince: r.orders?.order_date || null,

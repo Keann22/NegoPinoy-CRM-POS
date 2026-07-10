@@ -9,6 +9,7 @@ import * as z from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useSupabase } from "@/lib/supabase/hooks";
 import { useToast } from "@/hooks/use-toast";
+import { resolveOpenOrderIssues, STATUSES_THAT_CLEAR_ORDER_ISSUES } from "@/lib/services/order-service";
 import { Loader2 } from "lucide-react";
 import type { Order } from "@/app/dashboard/orders/page";
 import { useEffect, useState } from "react";
@@ -101,7 +102,11 @@ export function CompleteCodPaymentDialog({ order, open, onOpenChange, onSuccess 
             .eq('id', order.id);
 
         if (updateError) throw updateError;
-        
+
+        if (STATUSES_THAT_CLEAR_ORDER_ISSUES.includes(newStatus)) {
+            await resolveOpenOrderIssues(supabase, order.id);
+        }
+
         // 4. Log Processing Fee Expense if any
         if (processingFee > 0) {
             const { error: expenseError } = await supabase

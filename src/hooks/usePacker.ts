@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSupabase } from '@/lib/supabase/hooks';
 import { useToast } from '@/hooks/use-toast';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { resolveOpenOrderIssues } from '@/lib/services/order-service';
 
 export type OrderItem = {
   id: string;
@@ -321,11 +322,7 @@ export function usePacker() {
 
       if (error) throw error;
 
-      await supabase
-        .from('order_issues')
-        .update({ status: 'resolved' })
-        .eq('order_id', scannedOrderId)
-        .eq('status', 'open');
+      await resolveOpenOrderIssues(supabase, scannedOrderId);
 
       const userName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : 'Unknown Staff';
       await supabase.from('order_logs').insert({

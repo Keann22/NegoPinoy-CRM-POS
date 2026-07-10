@@ -19,7 +19,7 @@ export async function GET(req: Request) {
         .select(`
           *,
           products(name, variant_name, images),
-          orders(id, status, sales_person_name, customers(full_name), order_items(*)),
+          orders(id, status, sales_person_name, customer_id, customers(full_name), order_items(*)),
           order_issue_messages(*)
         `)
         .eq('id', id)
@@ -42,7 +42,7 @@ export async function GET(req: Request) {
         .select(`
           *,
           products(name, variant_name, images),
-          orders(id, customers(full_name)),
+          orders(id, customer_id, customers(full_name)),
           order_issue_messages(id, sender_name, created_at)
         `)
         .eq('status', 'open')

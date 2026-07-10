@@ -26,7 +26,7 @@ import { ProcessReturnDialog } from '@/components/dashboard/process-return-dialo
 import { OrdersFilterBar } from '@/components/dashboard/orders/OrdersFilterBar';
 import { OrdersTable } from '@/components/dashboard/orders/OrdersTable';
 import { useOrders } from '@/hooks/useOrders';
-import { restoreStockForCancelledOrder, deductStockForUncancelledOrder } from '@/lib/services/order-service';
+import { restoreStockForCancelledOrder, deductStockForUncancelledOrder, resolveOpenOrderIssues, STATUSES_THAT_CLEAR_ORDER_ISSUES } from '@/lib/services/order-service';
 
 import type { FormattedOrder, Order, OrderStatus } from '@/types';
 import { ORDER_STATUSES } from '@/types';
@@ -138,6 +138,10 @@ export default function OrdersPage() {
     }
     const { error } = await supabase.from('orders').update(updatePayload).eq('id', orderId);
     if (error) throw error;
+
+    if (STATUSES_THAT_CLEAR_ORDER_ISSUES.includes(newStatus)) {
+      await resolveOpenOrderIssues(supabase, orderId);
+    }
   };
 
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
