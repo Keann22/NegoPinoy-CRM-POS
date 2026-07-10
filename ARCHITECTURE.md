@@ -286,15 +286,46 @@ Both sum `order_items.cost_price_at_sale × quantity` for non-void (`Cancelled`/
 
 ---
 
+## Procurement Sheet: three numbers that must not be confused
+
+**Location**: `src/app/dashboard/reports/procurement/page.tsx`, backed by `GET /api/inventory/procurement`.
+
+The sheet only lists products that have an active **Staff Draft** — a `purchase_order_items` row on the special `purchase_orders.notes = 'STAFF_DRAFT'` PO, created via `POST /api/inventory/procurement-request` (called from the Picker app on out-of-stock report, the "Add Missing Item" dialog, or the standalone Procurement Request page). Each row then shows three numbers that look similar but answer different questions:
+
+| Column | Meaning | Source |
+|---|---|---|
+| **Current Stock** | Running ledger: total ever purchased minus total committed to every open order — including already-picked/packed ones, since stock is deducted the moment an order is *placed*, not when it's picked. Can drift stale if manually mis-synced. | `products.stock_level` |
+| **Staff Req. (note)** | A manually-typed number from whoever submitted the request. Informational only — never auto-grows when new orders arrive, only auto-shrinks when an order is edited down. **Never used to decide how much to buy.** | `purchase_order_items.expected_qty` on the STAFF_DRAFT row |
+| **Need to Buy (buy qty)** | Live count of orders still needing this item that have **not yet been picked** (`Pending Payment`, `Processing`, `Picked (with issue)`, `On-Hold`, `Waiting for Stock`). Drives the "Buy" quantity default. Orders already `Picked`/`Photo`/`Packed`/`For Shipping`/`For Pick-up` are excluded — a real unit was already pulled for those. | Live `order_items` query in the GET route |
+
+A fourth, internal-only **Total Open Demand** (every open order regardless of pick status — the true counterpart to `stock_level`'s ledger math) exists only to detect when Current Stock has drifted from reality (the orange "Current Stock doesn't match total open orders" warning + "Sync Stock" button — which syncs Current Stock to Total Open Demand, not to Staff Req.).
+
+**Order attribution** (`procurement_request_sources`, migration in `scripts/migrations/add_procurement_request_sources.sql`): when a request is tied to a specific order (currently only the Picker app's out-of-stock report), this table records which order(s) contributed to a draft line's quantity, so "Staff Req." can show "for #A232A043 (Customer Name)" instead of an anonymous number. Ad-hoc requests (Add Missing Item, the standalone Procurement Request page) have no order to attach and stay unattributed — that's expected, not a bug.
+
+---
+
 ## Bundle Products & Assembly Recipes
 
 Some products are **bundles** assembled from other real, purchasable products — e.g. "Cy19 Stainless Pan 32cm with Takip" = 1x pan + 1x glass cover. This is modeled via `products.assembly_recipe` (a JSON array of `{ productId, quantity }`), configured per bundle product. A bundle's own `stock_level` is not meaningful for purchasing — suppliers only sell the components, never the bundle itself.
 
-**Expansion happens in two places:**
+**Expansion happens in three places:**
 - `POST /api/inventory/procurement-request` — when a picker/staff reports a bundle out of stock, the request is expanded onto its components (`requestedQty × component.quantity`) before being written to `purchase_order_items`, so the resulting draft targets something a supplier can actually sell.
-- `GET /api/inventory/procurement` ([route.ts](src/app/api/inventory/procurement/route.ts)) — separately expands *order demand* for a bundle onto its components (section "3a/3b" in the route) so the Buy quantity reflects real customer orders for the bundle, not just direct component orders.
+- `GET /api/inventory/procurement` ([route.ts](src/app/api/inventory/procurement/route.ts)) — separately expands *order demand* for a bundle onto its components (section "3a/3b" in the route) so both Total Open Demand and Need to Buy reflect real customer orders for the bundle, not just direct component orders.
+- `reserved-stock-dialog.tsx` (Stock Allocation Details popup) — does the same expansion client-side, tagging each bundle-driven row with "via <bundle name>", so its customer list matches the number shown on the procurement sheet.
 
-**Self-healing leaked bundle drafts**: if a bundle's `assembly_recipe` wasn't configured yet at the moment someone reported it out of stock, the expansion above has nothing to expand, and a `purchase_order_items` draft lands directly on the bundle's own `product_id` — where it's stuck forever, since a bundle is never a real thing to "Buy". `migrateLeakedBundleDrafts()` (top of `GET /api/inventory/procurement`) runs on every Procurement page load: it finds any `STAFF_DRAFT` item whose product now has a non-empty `assembly_recipe`, and migrates it onto its components, merging into whatever component draft already exists. Because this route can be hit by two near-simultaneous requests, each leak is claimed via an atomic `DELETE ... RETURNING` (not a status flip — `purchase_order_items.status` only allows `pending_receipt`/`received` by a DB check constraint) so only one concurrent request processes a given leak; the other sees nothing deleted and skips it.
+**Gotcha**: `assembly_recipe` defaults to `[]` (empty array), **not `null`**, on almost every product. A `.not('assembly_recipe', 'is', null)` filter matches nearly the whole catalog and silently truncates at the 1000-row cap (see "1000-row query cap" above) before it reaches the bundle you actually need. Page through with `.range()` and check `recipe.length > 0` client-side instead.
+
+**Self-healing leaked bundle drafts**: if a bundle's `assembly_recipe` wasn't configured yet at the moment someone reported it out of stock — or a product merge accidentally reassigns a `purchase_order_items` row onto a bundle's `product_id` — the expansion above has nothing to expand, and the draft lands directly on the bundle's own `product_id`, where it's stuck forever, since a bundle is never a real thing to "Buy". `migrateLeakedBundleDrafts()` (top of `GET /api/inventory/procurement`) runs on every Procurement page load: it finds any `STAFF_DRAFT` item whose product now has a non-empty `assembly_recipe`, and migrates it onto its components, merging into whatever component draft already exists. Because this route can be hit by two near-simultaneous requests, each leak is claimed via an atomic `DELETE ... RETURNING` (not a status flip — `purchase_order_items.status` only allows `pending_receipt`/`received` by a DB check constraint) so only one concurrent request processes a given leak; the other sees nothing deleted and skips it.
+
+---
+
+## Soft-Deleted Products (`[DELETED]` prefix)
+
+Products are never hard-deleted — they're renamed with a `[DELETED] ` prefix. `useProducts.ts` (the main Products page) filters these out with `.not('name', 'ilike', '[DELETED]%')`.
+
+**Rule going forward**: every product search box in the app must apply this same filter, or literal `[DELETED]`-named products become fully searchable and orderable again. This filter was missing from 6 different search components in one audit — order "Add Product" (`useProductSearch.ts`), Bulk Receive (`product-search.tsx`), Receive's "Add Unexpected Item" (`pending-product-search.tsx`), `scan-product-search.tsx`, Procurement's "Add Missing Item" dialog, and `view-supplier-products-dialog.tsx` — check any new product-search UI against this pattern before shipping it.
+
+**Orphaned children (recurring data bug)**: `useProducts.ts` only fetches variant children for parent IDs that survived the `[DELETED]` filter — so if a parent was renamed to `[DELETED]` without first reassigning its children to a new parent, those children become invisible on the Products page (not a top-level row, and not fetched as anyone's child either) even though they still carry real stock and order history. One cleanup pass found and merged 23 such orphans, several with real inventory (one had 4,200 units sitting invisible). If a product seems to have vanished from the Products page, or shows stock/orders with no visible source product, check `products.parent_id` against a `[DELETED]`-named parent first.
 
 ---
 
@@ -320,13 +351,15 @@ Detail per stage:
 - **Packed orders** — a review page, not a scanner. `verify-shipping-dialog.tsx` collects shipping address/COD/payment details and moves the order to `For Shipping`; `not-for-shipping-dialog.tsx` delays it; `revert-pending-dialog.tsx` sends it back to `Processing`.
 - **For shipping / for pick-up** — syncs SPX courier files, exports courier-format sheets, and marks orders shipped via `mark-shipped-dialog.tsx`.
 
+**`order_issues` auto-resolution isn't just the Packer app.** `resolveOpenOrderIssues()` + `STATUSES_THAT_CLEAR_ORDER_ISSUES` in `src/lib/services/order-service.ts` is the single source of truth for "which statuses mean the issue is behind us" (`Picked`, `Photo`, `Packed`, `For Shipping`, `For Pick-up`, `Shipped`, `Completed`, `Payment Received (COD)`). It's called from every path that can move an order into one of those statuses — the Packer app, a clean re-pick in the Picker app, the manual "Update Status" dropdown / bulk status change on the Orders page, `mark-shipped-dialog.tsx`, and COD payment completion. Any *new* path that transitions an order's status must call this too, or its issue tickets go stale and sit open on the dashboard forever even after the order shipped (confirmed bug: found 30 stale-but-resolved tickets in one audit before every path was wired up).
+
 ### Shared data layer
 
 The apps never call each other directly — they coordinate entirely through shared Supabase tables.
 
 | Table | Written by | Read by |
 |---|---|---|
-| `order_issues` (+ `order_issue_messages`) | Picker app (on out-of-stock report), resolved by Packer app | Dashboard `order-issues.tsx` widget via `GET /api/inventory/issues`; `POST /api/inventory/procurement-request` auto-creates restock requests consumed by the Procurement Request page and Procurement Sheet report |
+| `order_issues` (+ `order_issue_messages`) | Picker app (on out-of-stock report) | Dashboard `order-issues.tsx` widget via `GET /api/inventory/issues`; `POST /api/inventory/procurement-request` auto-creates restock requests consumed by the Procurement Request page and Procurement Sheet report |
 | `order_logs` | Every stage (Picker, Second check, Packer, Packed orders actions) | `order-trail-dialog.tsx` (order history timeline on the Orders page); Second check and Packer both read the latest `Picked`/`Picked (with issue)` log to detect edits made after picking |
 | `notifications` | Picker app (issue reported), Packer app (order packed) | Bell-icon notifications for the sales rep who owns the order |
 
@@ -353,8 +386,11 @@ The apps never call each other directly — they coordinate entirely through sha
 | `src/app/api/inventory/procurement/route.ts` | Procurement "Buy" action — updates product cost + backfills COGS (see "Cost of Goods Sold"); also self-heals leaked bundle drafts (see "Bundle Products & Assembly Recipes") |
 | `src/app/dashboard/reports/pnl-report.tsx` | P&L Statement report — see "Cost of Goods Sold" |
 | `update_order_func.sql` | `process_order_transaction` Postgres RPC — where `cost_price_at_sale` gets snapshotted |
-| `src/hooks/useProducts.ts` | Products list — paginated fetch, see "1000-row query cap" |
+| `src/hooks/useProducts.ts` | Products list — paginated fetch, see "1000-row query cap" and "Soft-Deleted Products" |
 | `src/hooks/usePicker.ts`, `usePacker.ts`, `useForShipping.ts` | Scan-app hooks — see "Order Fulfillment Pipeline" |
+| `src/hooks/useProductSearch.ts` | Order "Add Product" search — see "Soft-Deleted Products" for why every product search needs the `[DELETED]` filter |
+| `src/lib/services/order-service.ts` | `resolveOpenOrderIssues()` / `STATUSES_THAT_CLEAR_ORDER_ISSUES` — see "order_issues auto-resolution" under "Order Fulfillment Pipeline" |
+| `src/components/dashboard/reserved-stock-dialog.tsx` | "Stock Allocation Details" popup — bundle-aware, see "Bundle Products & Assembly Recipes" |
 
 ---
 
