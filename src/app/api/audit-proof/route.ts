@@ -2,19 +2,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { auditProof } from '@/ai/flows/audit-proof-flow';
 
+// The free-tier vision models this flow calls can be slow under load;
+// give them more room than the platform's 10s default so a slow-but-alive
+// call doesn't get killed by the platform before our own fallback can run.
+export const maxDuration = 30;
+
 /**
  * POST /api/audit-proof
  *
  * Triggers the AI audit flow on an uploaded agent proof image.
  * Updates the agent_daily_logs record with the AI verdict.
  *
- * Body: { logId: string, photoDataUri: string, taskType: string }
+ * Body: { logId: string, photoUrl: string, taskType: string }
  */
 export async function POST(req: NextRequest) {
   try {
-    const { logId, photoDataUri, taskType } = await req.json();
+    const { logId, photoUrl, taskType } = await req.json();
 
-    if (!logId || !photoDataUri || !taskType) {
+    if (!logId || !photoUrl || !taskType) {
       return NextResponse.json({ error: 'Missing required fields.' }, { status: 400 });
     }
 
@@ -32,7 +37,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Run the AI audit
-    const result = await auditProof({ photoDataUri, taskType });
+    const result = await auditProof({ photoUrl, taskType });
 
     // Update the log with the AI verdict
     const { error: updateError } = await supabase

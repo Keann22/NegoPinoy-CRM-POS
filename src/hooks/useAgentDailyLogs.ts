@@ -56,18 +56,6 @@ export function useAgentDailyLogs(userId?: string) {
   }
 
   /**
-   * Converts a File to a base64 data URI for sending to the AI.
-   */
-  function fileToDataUri(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  }
-
-  /**
    * Submits a new daily log entry.
    * Uploads the image to Supabase Storage, checks for duplicates,
    * inserts the log, then triggers the AI audit.
@@ -133,14 +121,20 @@ export function useAgentDailyLogs(userId?: string) {
 
       if (insertError) throw insertError;
 
+      if (!publicUrl) {
+        return {
+          success: false,
+          error: 'Failed to get a public URL for the uploaded image. The log was saved but is still pending review.',
+        };
+      }
+
       // 5. Trigger AI audit asynchronously
-      const dataUri = await fileToDataUri(params.imageFile);
       const auditRes = await fetch('/api/audit-proof', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           logId: newLog.id,
-          photoDataUri: dataUri,
+          photoUrl: publicUrl,
           taskType: params.taskType,
         }),
       });

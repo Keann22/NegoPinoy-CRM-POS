@@ -22,10 +22,10 @@
 import { z } from 'genkit';
 
 const AuditProofInputSchema = z.object({
-  photoDataUri: z
+  photoUrl: z
     .string()
     .describe(
-      "A screenshot uploaded by a sales agent as proof of their daily task, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'"
+      'A public URL pointing to a screenshot uploaded by a sales agent as proof of their daily task.'
     ),
   taskType: z
     .string()
@@ -89,48 +89,97 @@ Write your feedback in Taglish (Filipino-English mix) so it's easy for the agent
 Respond with JSON only, matching this shape: { verdict, confidence, feedback, isFacebookScreenshot, matchesTaskType }.`;
 }
 
+/**
+ * Fetches the proof image server-side and converts it to a base64 data URI.
+ * The vision model needs inline image data (remote image_url fetches are
+ * unreliable on the free tier, returning empty 502s), while fetching it
+ * server-to-server here avoids Vercel's ~4.5MB request body limit that a
+ * client-side base64 upload would hit.
+ */
+async function fetchAsDataUri(imageUrl: string): Promise<string> {
+  const res = await fetch(imageUrl);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch proof image (${res.status}).`);
+  }
+  const mimeType = res.headers.get('content-type') || 'image/png';
+  const buffer = Buffer.from(await res.arrayBuffer());
+  return `data:${mimeType};base64,${buffer.toString('base64')}`;
+}
+
+// Free-tier OpenRouter vision models are shared across all their users and
+// can be slow or briefly rate-limited. Try a couple of candidates, each
+// under its own hard timeout, before giving up (the caller falls back to a
+// 'flagged' verdict for manual review rather than ever leaving this hanging
+// past the platform's function-duration limit).
+const CANDIDATE_MODELS = [
+  process.env.OPENROUTER_MODEL || 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
+  'google/gemma-4-26b-a4b-it:free',
+];
+const MODEL_TIMEOUT_MS = 12_000;
+
+async function callOneModel(model: string, apiKey: string, dataUri: string, taskType: string): Promise<AuditProofOutput> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS);
+
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: buildPrompt(taskType) },
+              { type: 'image_url', image_url: { url: dataUri } },
+            ],
+          },
+        ],
+        response_format: { type: 'json_object' },
+      }),
+    });
+
+    if (!res.ok) {
+      const bodyText = await res.text().catch(() => '');
+      throw new Error(`OpenRouter API request failed (${res.status}): ${bodyText.slice(0, 300)}`);
+    }
+
+    const json = await res.json();
+    const text = json?.choices?.[0]?.message?.content;
+    if (!text) {
+      throw new Error('OpenRouter API returned no content.');
+    }
+
+    const parsed = JSON.parse(text);
+    return AuditProofOutputSchema.parse(parsed);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function callOpenRouterVision(input: AuditProofInput): Promise<AuditProofOutput> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     throw new Error('OPENROUTER_API_KEY is not configured.');
   }
 
-  const model = process.env.OPENROUTER_MODEL || 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free';
+  const dataUri = await fetchAsDataUri(input.photoUrl);
 
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: buildPrompt(input.taskType) },
-            { type: 'image_url', image_url: { url: input.photoDataUri } },
-          ],
-        },
-      ],
-      response_format: { type: 'json_object' },
-    }),
-  });
-
-  if (!res.ok) {
-    const bodyText = await res.text().catch(() => '');
-    throw new Error(`OpenRouter API request failed (${res.status}): ${bodyText.slice(0, 300)}`);
+  let lastError: unknown;
+  for (const model of CANDIDATE_MODELS) {
+    try {
+      return await callOneModel(model, apiKey, dataUri, input.taskType);
+    } catch (err) {
+      lastError = err;
+      console.error(`auditProof: model ${model} failed, trying next candidate.`, err);
+    }
   }
-
-  const json = await res.json();
-  const text = json?.choices?.[0]?.message?.content;
-  if (!text) {
-    throw new Error('OpenRouter API returned no content.');
-  }
-
-  const parsed = JSON.parse(text);
-  return AuditProofOutputSchema.parse(parsed);
+  throw lastError;
 }
 
 export async function auditProof(input: AuditProofInput): Promise<AuditProofOutput> {
