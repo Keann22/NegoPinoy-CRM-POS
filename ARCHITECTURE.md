@@ -368,11 +368,17 @@ The apps never call each other directly — they coordinate entirely through sha
 
 | Table | Written by | Read by |
 |---|---|---|
-| `order_issues` (+ `order_issue_messages`) | Picker app (on out-of-stock report) | Dashboard `order-issues.tsx` widget via `GET /api/inventory/issues`; `POST /api/inventory/procurement-request` auto-creates restock requests consumed by the Procurement Request page and Procurement Sheet report |
+| `order_issues` (+ `order_issue_messages`) | Picker app (on out-of-stock report); Bulk Receive (on qty shortfall — see below) | Dashboard `order-issues.tsx` widget via `GET /api/inventory/issues`; `POST /api/inventory/procurement-request` auto-creates restock requests consumed by the Procurement Request page and Procurement Sheet report; Inbox Drawer (all issue types) |
 | `order_logs` | Every stage (Picker, Second check, Packer, Packed orders actions) | `order-trail-dialog.tsx` (order history timeline on the Orders page); Second check and Packer both read the latest `Picked`/`Picked (with issue)` log to detect edits made after picking |
 | `notifications` | Picker app (issue reported), Packer app (order packed) | Bell-icon notifications for the sales rep who owns the order |
 
 `orders.status` is the state machine; `order_logs` / `order_issues` / `notifications` are side channels that keep reporting and alerts in sync without the apps knowing about each other.
+
+### Purchase-Receiving Discrepancies → Inbox Drawer
+
+`order_issues` isn't picker-only. Bulk Receive (`src/app/dashboard/inventory/receive`, `POST /api/inventory/receive/pending-pos`) inserts an `order_issues` row with `issue_type: 'purchase_discrepancy'` (`order_id` left null, `po_id` set instead) whenever received qty is less than expected and staff enters a shortage note — same table as picker-reported issues, discriminated by `issue_type` (`'order'` is the default). This reuses the existing realtime plumbing rather than building a parallel system: the Inbox Drawer (`src/components/dashboard/inbox-drawer.tsx`, global in the dashboard header, not scoped to any one role) subscribes to `INSERT` on `order_issue_messages` and fires an urgent toast + browser notification whenever a message has `requires_attention: true`, regardless of issue type. Clicking a purchase-discrepancy card opens `purchase-issue-dialog.tsx` (reply thread + Resolve) instead of `overdue-order-dialog.tsx`, which handles picker-reported issues.
+
+`GET /api/inventory/issues` (used by the `order-issues.tsx` dashboard widget and `overdue-order-dialog.tsx`) filters to `issue_type = 'order'` only — purchase-discrepancy issues are inbox-only and intentionally don't appear on that widget.
 
 ---
 
