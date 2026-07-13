@@ -25,6 +25,7 @@ import { ProcessReturnDialog } from '@/components/dashboard/process-return-dialo
 
 import { OrdersFilterBar } from '@/components/dashboard/orders/OrdersFilterBar';
 import { OrdersTable } from '@/components/dashboard/orders/OrdersTable';
+import { OverdueOrders } from '@/components/dashboard/orders/OverdueOrders';
 import { useOrders } from '@/hooks/useOrders';
 import { restoreStockForCancelledOrder, deductStockForUncancelledOrder, resolveOpenOrderIssues, STATUSES_THAT_CLEAR_ORDER_ISSUES } from '@/lib/services/order-service';
 
@@ -68,6 +69,7 @@ export default function OrdersPage() {
   const [searchQuery, setSearchQuery] = useState(searchParams?.get('search') || '');
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [showOnlyOverdue, setShowOnlyOverdue] = useState(false);
 
   // ── Derived: filtered + formatted orders ───────────────────────────────────
   const formattedOrders: FormattedOrder[] = useMemo(() => {
@@ -81,6 +83,11 @@ export default function OrdersPage() {
         (o.id || '').toLowerCase().includes(query) ||
         (customerMap.get(o.customerId) || '').toLowerCase().replace(/\s+/g, ' ').includes(query)
       );
+    }
+    if (showOnlyOverdue) {
+      const tenDaysAgo = new Date();
+      tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
+      filtered = filtered.filter(o => o.orderStatus === 'Processing' && o.paymentType !== 'Lay-away' && o.orderDate && new Date(o.orderDate) < tenDaysAgo);
     }
     if (date?.from) {
       const fromTime = date.from.getTime();
@@ -107,7 +114,7 @@ export default function OrdersPage() {
         formattedTotal: `₱${(Number(order.totalAmount) || 0).toFixed(2)}`,
       };
     });
-  }, [orders, customerMap, date, statusFilter, typeFilter, searchQuery]);
+  }, [orders, customerMap, date, statusFilter, typeFilter, searchQuery, showOnlyOverdue]);
 
   const totalPages = Math.ceil((formattedOrders?.length || 0) / rowsPerPage) || 1;
   const paginatedOrders = useMemo(() => {
@@ -207,6 +214,34 @@ export default function OrdersPage() {
           </div>
         </CardHeader>
         <CardContent>
+          {!showOnlyOverdue && orders && (
+             <OverdueOrders 
+                orders={orders} 
+                customerMap={customerMap}
+                onViewAll={() => {
+                  setShowOnlyOverdue(true);
+                  setCurrentPage(1);
+                }} 
+                onOrderUpdated={refetch}
+             />
+          )}
+
+          {showOnlyOverdue && (
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md flex items-center justify-between">
+              <div>
+                <h3 className="text-red-800 font-semibold flex items-center gap-2">
+                  Showing Overdue Orders
+                </h3>
+                <p className="text-sm text-red-600 mt-1">
+                  Filtering for orders processing for more than 10 days. Use the checkboxes to perform bulk actions.
+                </p>
+              </div>
+              <Button variant="outline" onClick={() => setShowOnlyOverdue(false)}>
+                Clear Filter
+              </Button>
+            </div>
+          )}
+
           <OrdersFilterBar
             searchQuery={searchQuery} onSearchChange={(q) => { setSearchQuery(q); setCurrentPage(1); }}
             statusFilter={statusFilter} onStatusChange={(s) => { setStatusFilter(s); setCurrentPage(1); }}
