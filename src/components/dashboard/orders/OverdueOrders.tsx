@@ -11,11 +11,12 @@ import { OverdueOrderDialog } from "./overdue-order-dialog";
 interface OverdueOrdersProps {
   orders: Order[];
   customerMap: Map<string, string>;
-  onViewAll: () => void;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
   onOrderUpdated?: () => void;
 }
 
-export function OverdueOrders({ orders, customerMap, onViewAll, onOrderUpdated }: OverdueOrdersProps) {
+export function OverdueOrders({ orders, customerMap, isExpanded, onToggleExpand, onOrderUpdated }: OverdueOrdersProps) {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   // Only orders in "Processing" that are older than 10 days
   const overdueOrders = orders.filter((o) => {
@@ -34,7 +35,7 @@ export function OverdueOrders({ orders, customerMap, onViewAll, onOrderUpdated }
     return null;
   }
 
-  const displayedOrders = overdueOrders.slice(0, 6);
+  const displayedOrders = isExpanded ? overdueOrders : overdueOrders.slice(0, 6);
   const hasMore = overdueOrders.length > 6;
 
   return (
@@ -45,9 +46,14 @@ export function OverdueOrders({ orders, customerMap, onViewAll, onOrderUpdated }
             <AlertCircle className="w-5 h-5" />
             Overdue Orders ({overdueOrders.length})
           </div>
-          {hasMore && (
-            <Button variant="ghost" size="sm" onClick={onViewAll} className="text-red-700 hover:bg-red-100/50 hover:text-red-800">
+          {hasMore && !isExpanded && (
+            <Button variant="ghost" size="sm" onClick={onToggleExpand} className="text-red-700 hover:bg-red-100/50 hover:text-red-800">
               View All {overdueOrders.length}
+            </Button>
+          )}
+          {isExpanded && (
+            <Button variant="ghost" size="sm" onClick={onToggleExpand} className="text-red-700 hover:bg-red-100/50 hover:text-red-800">
+              Close Expanded View
             </Button>
           )}
         </CardTitle>
@@ -94,10 +100,10 @@ export function OverdueOrders({ orders, customerMap, onViewAll, onOrderUpdated }
           })}
         </div>
         
-        {hasMore && (
+        {(hasMore || isExpanded) && (
           <div className="mt-4 flex justify-center border-t border-red-100 pt-4">
-            <Button variant="outline" onClick={onViewAll} className="w-full sm:w-auto border-red-200 text-red-700 hover:bg-red-50">
-              View All Overdue Orders
+            <Button variant="outline" onClick={onToggleExpand} className="w-full sm:w-auto border-red-200 text-red-700 hover:bg-red-50">
+              {isExpanded ? "Back to All Orders" : "View All Overdue Orders"}
             </Button>
           </div>
         )}

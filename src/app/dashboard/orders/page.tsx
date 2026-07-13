@@ -214,91 +214,80 @@ export default function OrdersPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {!showOnlyOverdue && orders && (
+          {orders && (
              <OverdueOrders 
                 orders={orders} 
                 customerMap={customerMap}
-                onViewAll={() => {
-                  setShowOnlyOverdue(true);
+                isExpanded={showOnlyOverdue}
+                onToggleExpand={() => {
+                  setShowOnlyOverdue(!showOnlyOverdue);
                   setCurrentPage(1);
                 }} 
                 onOrderUpdated={refetch}
              />
           )}
 
-          {showOnlyOverdue && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md flex items-center justify-between">
-              <div>
-                <h3 className="text-red-800 font-semibold flex items-center gap-2">
-                  Showing Overdue Orders
-                </h3>
-                <p className="text-sm text-red-600 mt-1">
-                  Filtering for orders processing for more than 10 days. Use the checkboxes to perform bulk actions.
-                </p>
-              </div>
-              <Button variant="outline" onClick={() => setShowOnlyOverdue(false)}>
-                Clear Filter
-              </Button>
-            </div>
-          )}
-
-          <OrdersFilterBar
-            searchQuery={searchQuery} onSearchChange={(q) => { setSearchQuery(q); setCurrentPage(1); }}
-            statusFilter={statusFilter} onStatusChange={(s) => { setStatusFilter(s); setCurrentPage(1); }}
-            typeFilter={typeFilter} onTypeChange={(t) => { setTypeFilter(t); setCurrentPage(1); }}
-            date={date} onDateChange={(d) => { setDate(d); setCurrentPage(1); }}
-            selectedOrderIds={selectedOrderIds} onBulkStatusChange={handleBulkStatusChange}
-          />
-          <OrdersTable
-            orders={paginatedOrders}
-            isLoading={isLoading}
-            selectedOrderIds={selectedOrderIds}
-            onSelectAll={(checked) => {
-              if (checked) {
-                const newSel = new Set([...selectedOrderIds, ...paginatedOrders.map(o => o.id)]);
-                setSelectedOrderIds(Array.from(newSel));
-              } else {
-                const visible = new Set(paginatedOrders.map(o => o.id));
-                setSelectedOrderIds(selectedOrderIds.filter(id => !visible.has(id)));
-              }
-            }}
-            onSelectOne={(id, checked) =>
-              setSelectedOrderIds(prev => checked ? [...prev, id] : prev.filter(x => x !== id))
-            }
-            onViewDetails={(order) => router.push(`/dashboard/orders/${order.id}`)}
-            onLogPayment={setLogPaymentOrder}
-            onEditPaymentTerms={setEditPaymentOrder}
-            onMarkShipped={setMarkShippedOrder}
-            onViewWaybill={setViewWaybillOrder}
-            onCodPayment={setCodPaymentOrder}
-            onDueDate={setDueDateOrder}
-            onStatusChange={(id, newStatus) => {
-              if (newStatus === 'On-Hold') {
-                const order = orders?.find(o => o.id === id);
-                if (order) setOnHoldOrder(order);
-              } else if (newStatus === 'Returned') {
-                const order = orders?.find(o => o.id === id);
-                if (order) setProcessReturnOrder(order);
-              } else {
-                handleStatusChange(id, newStatus);
-              }
-            }}
-            onProcessReturn={setProcessReturnOrder}
-            isInventoryOnly={isInventoryOnly}
-            canCreateOrder={canCreateOrder}
-            isAdminOrOwner={isAdminOrOwner}
-            userRoles={userProfile?.roles ?? []}
-          />
-          {!isLoading && (!formattedOrders || formattedOrders.length === 0) && (
-            <div className="flex flex-col items-center justify-center text-center border-2 border-dashed rounded-lg p-12 mt-4">
-              <p className="text-lg font-semibold">No orders found</p>
-              <p className="text-muted-foreground mt-2">
-                {canCreateOrder ? 'Click "New Order" to get started.' : 'No orders matched your criteria.'}
-              </p>
-            </div>
+          {!showOnlyOverdue && (
+            <>
+              <OrdersFilterBar
+                searchQuery={searchQuery} onSearchChange={(q) => { setSearchQuery(q); setCurrentPage(1); }}
+                statusFilter={statusFilter} onStatusChange={(s) => { setStatusFilter(s); setCurrentPage(1); }}
+                typeFilter={typeFilter} onTypeChange={(t) => { setTypeFilter(t); setCurrentPage(1); }}
+                date={date} onDateChange={(d) => { setDate(d); setCurrentPage(1); }}
+                selectedOrderIds={selectedOrderIds} onBulkStatusChange={handleBulkStatusChange}
+              />
+              <OrdersTable
+                orders={paginatedOrders}
+                isLoading={isLoading}
+                selectedOrderIds={selectedOrderIds}
+                onSelectAll={(checked) => {
+                  if (checked) {
+                    const newSel = new Set([...selectedOrderIds, ...paginatedOrders.map(o => o.id)]);
+                    setSelectedOrderIds(Array.from(newSel));
+                  } else {
+                    const visible = new Set(paginatedOrders.map(o => o.id));
+                    setSelectedOrderIds(selectedOrderIds.filter(id => !visible.has(id)));
+                  }
+                }}
+                onSelectOne={(id, checked) =>
+                  setSelectedOrderIds(prev => checked ? [...prev, id] : prev.filter(x => x !== id))
+                }
+                onViewDetails={(order) => router.push(`/dashboard/orders/${order.id}`)}
+                onLogPayment={setLogPaymentOrder}
+                onEditPaymentTerms={setEditPaymentOrder}
+                onMarkShipped={setMarkShippedOrder}
+                onViewWaybill={setViewWaybillOrder}
+                onCodPayment={setCodPaymentOrder}
+                onDueDate={setDueDateOrder}
+                onStatusChange={(id, newStatus) => {
+                  if (newStatus === 'On-Hold') {
+                    const order = orders?.find(o => o.id === id);
+                    if (order) setOnHoldOrder(order);
+                  } else if (newStatus === 'Returned') {
+                    const order = orders?.find(o => o.id === id);
+                    if (order) setProcessReturnOrder(order);
+                  } else {
+                    handleStatusChange(id, newStatus);
+                  }
+                }}
+                onProcessReturn={setProcessReturnOrder}
+                isInventoryOnly={isInventoryOnly}
+                canCreateOrder={canCreateOrder}
+                isAdminOrOwner={isAdminOrOwner}
+                userRoles={userProfile?.roles ?? []}
+              />
+              {!isLoading && (!formattedOrders || formattedOrders.length === 0) && (
+                <div className="flex flex-col items-center justify-center text-center border-2 border-dashed rounded-lg p-12 mt-4">
+                  <p className="text-lg font-semibold">No orders found</p>
+                  <p className="text-muted-foreground mt-2">
+                    {canCreateOrder ? 'Click "New Order" to get started.' : 'No orders matched your criteria.'}
+                  </p>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
-        {formattedOrders && formattedOrders.length > 0 && (
+        {formattedOrders && formattedOrders.length > 0 && !showOnlyOverdue && (
           <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-2">
             <div className="text-sm text-muted-foreground">
               Showing <strong>{(currentPage - 1) * rowsPerPage + 1}-{Math.min(currentPage * rowsPerPage, formattedOrders.length)}</strong> of <strong>{formattedOrders.length}</strong> orders
