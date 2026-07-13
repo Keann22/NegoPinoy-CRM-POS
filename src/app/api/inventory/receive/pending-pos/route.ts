@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createStaffMessage, getAdminAndInventoryLeadNames, fanOutStaffNotifications, resolveRecipientNames } from '@/lib/services/staff-message-service';
+import { getAffectedSalesReps } from '@/lib/services/procurement-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,7 +9,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-export async function GET(req: Request) {
+export async function GET() {
   try {
     const { data: items, error } = await supabase
       .from('purchase_order_items')
@@ -52,6 +54,20 @@ export async function POST(req: Request) {
     if ((!receives || receives.length === 0) && (!unexpectedItems || unexpectedItems.length === 0)) {
       return NextResponse.json({ error: 'No items provided' }, { status: 400 });
     }
+
+    // Fetched lazily (only if at least one item actually has a discrepancy) and
+    // cached across the loop so multiple discrepant items in one submission
+    // don't each re-fetch the same admin/lead list.
+    let escalationRecipients: string[] | null = null;
+    const getEscalationRecipients = async (): Promise<string[]> => {
+      if (!escalationRecipients) {
+        escalationRecipients = resolveRecipientNames(
+          await getAdminAndInventoryLeadNames(supabase),
+          reportedByName || 'Inventory Staff'
+        );
+      }
+      return escalationRecipients;
+    };
 
     if (receives && receives.length > 0) {
       for (const r of receives) {
@@ -102,6 +118,8 @@ export async function POST(req: Request) {
 
         // 5. Raise an urgent purchase issue for the Inbox when fewer items arrived than expected
         if (r.discrepancyReason) {
+          const recipientNames = await getEscalationRecipients();
+
           const { data: purchaseIssue, error: issueErr } = await supabase
             .from('order_issues')
             .insert({
@@ -125,8 +143,36 @@ export async function POST(req: Request) {
                 sender_name: reportedByName || 'Inventory Staff',
                 message: reason,
                 requires_attention: true,
-                mentions: []
+                mentions: recipientNames
               });
+
+            // Actually ping Admin/Inventory leads via the Bell — previously this
+            // only created the Inbox Drawer thread with empty mentions, so
+            // nobody was notified unless they happened to be online at that moment.
+            await fanOutStaffNotifications(supabase, recipientNames, {
+              senderName: reportedByName || 'Inventory Staff',
+              message: reason,
+            });
+          }
+
+          // 6. Separately, create a product-issue thread pinged to whoever's order
+          // actually depends on this shortage — a distinct, customer-order-facing
+          // message (not the PO/batch-oriented purchase_discrepancy thread above,
+          // which is purchasing-ops internal) so the sales rep sees something
+          // relevant to them rather than PO batch details they don't need.
+          const affectedSalesReps = resolveRecipientNames(
+            await getAffectedSalesReps(supabase, poItem.product_id),
+            reportedByName || 'Inventory Staff'
+          );
+          if (affectedSalesReps.length > 0) {
+            await createStaffMessage(supabase, {
+              issueType: 'product',
+              productId: poItem.product_id,
+              message: reason,
+              senderName: reportedByName || 'Inventory Staff',
+              senderRole: 'inventory',
+              recipientNames: affectedSalesReps,
+            });
           }
         }
 

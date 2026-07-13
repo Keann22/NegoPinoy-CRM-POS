@@ -3,7 +3,10 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { Flag } from "lucide-react";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import { StaffSearch } from "@/components/dashboard/staff-search";
 
 export function ReportIssueDialog({
   open,
@@ -16,12 +19,15 @@ export function ReportIssueDialog({
   issueProduct: any;
   onSuccess: () => void;
 }) {
+  const { userProfile } = useUserProfile();
   const [issueNote, setIssueNote] = useState("");
+  const [extraRecipients, setExtraRecipients] = useState<string[]>([]);
   const [isSubmittingIssue, setIsSubmittingIssue] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setIssueNote("");
+      setExtraRecipients([]);
     }
   }, [open]);
 
@@ -33,18 +39,25 @@ export function ReportIssueDialog({
 
     setIsSubmittingIssue(true);
     try {
-      const res = await fetch('/api/inventory/issues', {
+      const senderName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : 'Inventory';
+      const roles = userProfile?.roles || [];
+      const senderRole = roles.some((r: string) => String(r).toLowerCase() === 'sales') ? 'sales' : 'inventory';
+
+      const res = await fetch('/api/inventory/procurement-issues/report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           productId: issueProduct.productId,
-          note: issueNote.trim()
+          note: issueNote.trim(),
+          senderName,
+          senderRole,
+          extraRecipientNames: extraRecipients,
         })
       });
 
-      if (!res.ok) throw new Error(await res.text());
-      
-      alert("Issue reported successfully! It will now appear on the main dashboard for Sales.");
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Failed to report issue');
+
+      alert("Issue reported — the Admin team, Inventory, and any sales reps waiting on this item have been notified.");
       onSuccess();
     } catch (e: any) {
       alert("Failed to report issue: " + e.message);
@@ -75,12 +88,19 @@ export function ReportIssueDialog({
               className="w-full border rounded-md p-2 text-sm min-h-[100px]"
             />
           </div>
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-slate-700">Tag additional staff (optional)</Label>
+            <StaffSearch selected={extraRecipients} onChange={setExtraRecipients} />
+            <p className="text-xs text-slate-500">
+              The Admin team, Jas Urs/Jasmin Urs, and any sales reps with an order still waiting on this item are notified automatically.
+            </p>
+          </div>
         </div>
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button 
-            type="button" 
-            className="bg-amber-600 hover:bg-amber-700 text-white" 
+          <Button
+            type="button"
+            className="bg-amber-600 hover:bg-amber-700 text-white"
             onClick={handleReportIssue}
             disabled={isSubmittingIssue}
           >
