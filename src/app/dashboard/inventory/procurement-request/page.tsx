@@ -58,7 +58,7 @@ export default function ProcurementRequestPage() {
     }
 
     const displayName = `${product.name} ${product.variant_name ? `[${product.variant_name}]` : ''}`;
-    setItems([...items, { productId: product.id, productName: displayName, requestedQty: "1" }]);
+    setItems([...items, { productId: product.id, productName: displayName, requestedQty: "1", orderId: "" }]);
     setOpenSearch(false);
     setProductSearch('');
   };
@@ -67,16 +67,26 @@ export default function ProcurementRequestPage() {
     setItems(items.map(i => i.productId === productId ? { ...i, requestedQty: newQty } : i));
   };
 
+  const handleOrderIdChange = (productId: string, orderId: string) => {
+    setItems(items.map(i => i.productId === productId ? { ...i, orderId } : i));
+  };
+
   const handleRemove = (productId: string) => {
     setItems(items.filter(i => i.productId !== productId));
   };
 
   const handleSubmit = async () => {
+    const missingOrderId = items.some(i => !i.orderId || i.orderId.trim() === '');
+    if (missingOrderId) {
+      return alert("Please enter an Order Number for all items.");
+    }
+
     const validRequests = items
       .filter(i => i.requestedQty && Number(i.requestedQty) > 0)
       .map(i => ({
         productId: i.productId,
-        requestedQty: Number(i.requestedQty)
+        requestedQty: Number(i.requestedQty),
+        orderId: i.orderId.trim()
       }));
 
     if (validRequests.length === 0) {
@@ -162,6 +172,7 @@ export default function ProcurementRequestPage() {
             <thead className="bg-slate-100 text-slate-700 border-b">
               <tr>
                 <th className="p-4">Product Name</th>
+                <th className="p-4 w-1/4 text-center">Order #</th>
                 <th className="p-4 w-1/4 text-center">Qty to Request</th>
                 <th className="p-4 w-16 text-center"></th>
               </tr>
@@ -170,6 +181,17 @@ export default function ProcurementRequestPage() {
               {items.map(item => (
                 <tr key={item.productId} className="hover:bg-slate-50 transition-colors">
                   <td className="p-4 font-medium text-slate-900">{item.productName}</td>
+                  <td className="p-4">
+                    <div className="flex items-center justify-center">
+                      <Input 
+                        type="text" 
+                        placeholder="Required"
+                        className="w-32 text-center border-blue-200 focus-visible:ring-blue-500" 
+                        value={item.orderId || ''}
+                        onChange={(e) => handleOrderIdChange(item.productId, e.target.value)}
+                      />
+                    </div>
+                  </td>
                   <td className="p-4">
                     <div className="flex items-center justify-center">
                       <Input 

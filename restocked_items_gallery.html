@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restocked Items - June 30, 2026</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
+        
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #3b82f6;
+            --accent-hover: #60a5fa;
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 2rem;
+            background-image: 
+                radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
+                radial-gradient(at 50% 0%, hsla(225,39%,30%,0.2) 0, transparent 50%), 
+                radial-gradient(at 100% 0%, hsla(339,49%,30%,0.2) 0, transparent 50%);
+            background-attachment: fixed;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 4rem;
+            padding: 3rem 2rem;
+            background: var(--card-bg);
+            border-radius: 24px;
+            border: 1px solid var(--border);
+            backdrop-filter: blur(16px);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            position: relative;
+            overflow: hidden;
+        }
+
+        header::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 4px;
+            background: linear-gradient(to right, #60a5fa, #a78bfa, #f472b6);
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #e0f2fe, #bae6fd);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem;
+            letter-spacing: -1px;
+        }
+
+        .subtitle {
+            color: #cbd5e1;
+            font-size: 1.3rem;
+            font-weight: 300;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 2.5rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            backdrop-filter: blur(12px);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+        }
+
+        .card:hover {
+            transform: translateY(-12px);
+            box-shadow: 0 25px 30px -10px rgba(0, 0, 0, 0.5);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .image-container {
+            width: 100%;
+            height: 280px;
+            overflow: hidden;
+            position: relative;
+            background: #1e293b;
+        }
+
+        .image-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.6s ease;
+        }
+
+        .card:hover .image-container img {
+            transform: scale(1.08);
+        }
+
+        .content {
+            padding: 1.8rem;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .product-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            line-height: 1.4;
+            color: #f1f5f9;
+        }
+
+        .qty-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.6rem 1.2rem;
+            background: rgba(59, 130, 246, 0.15);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 1rem;
+            color: #93c5fd;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .no-image {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #334155;
+            color: #94a3b8;
+            font-size: 0.9rem;
+            font-weight: 300;
+        }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 2.5rem; }
+            .grid { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+            .image-container { height: 220px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Restocked Inventory</h1>
+            <p class="subtitle">A visual summary of items received on <strong>June 30, 2026</strong></p>
+        </header>
+
+        <div class="grid">
+            <div class="card">
+                <div class="image-container">
+                    <img src="https://sgkjdtwqqbrpmrfukhja.supabase.co/storage/v1/object/public/products/1780735377849-nkk5en.png" alt="Stainless LPG And Pot Holder with WHEELS" onerror="this.outerHTML='<div class=\'no-image\'>No Image Available</div>'">
+                </div>
+                <div class="content">
+                    <h3 class="product-title">Stainless LPG And Pot Holder with WHEELS</h3>
+                    <div><span class="qty-badge">+10 Received</span></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="image-container">
+                    <img src="https://sgkjdtwqqbrpmrfukhja.supabase.co/storage/v1/object/public/products/1781593259820-c7nrm.jpg" alt="1L No Mess Bottle Shaker Pancake Dispenser" onerror="this.outerHTML='<div class=\'no-image\'>No Image Available</div>'">
+                </div>
+                <div class="content">
+                    <h3 class="product-title">1L No Mess Bottle Shaker Pancake Dispenser</h3>
+                    <div><span class="qty-badge">+5 Received</span></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="image-container">
+                    <img src="https://sgkjdtwqqbrpmrfukhja.supabase.co/storage/v1/object/public/products/1782284901457-xz6gu5.jpg" alt="Cy20 flat honey comb - 26cm" onerror="this.outerHTML='<div class=\'no-image\'>No Image Available</div>'">
+                </div>
+                <div class="content">
+                    <h3 class="product-title">Cy20 flat honey comb - 26cm</h3>
+                    <div><span class="qty-badge">+4 Received</span></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="image-container">
+                    <img src="https://sgkjdtwqqbrpmrfukhja.supabase.co/storage/v1/object/public/products/1782350867516-bhl5b.png" alt="Pots, Collander and Lid Organizer" onerror="this.outerHTML='<div class=\'no-image\'>No Image Available</div>'">
+                </div>
+                <div class="content">
+                    <h3 class="product-title">Pots, Collander and Lid Organizer</h3>
+                    <div><span class="qty-badge">+4 Received</span></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="image-container">
+                    <img src="https://sgkjdtwqqbrpmrfukhja.supabase.co/storage/v1/object/public/products/1780730557156-6l7gx8.jfif" alt="T&T Solar Lamp (30000 watts)" onerror="this.outerHTML='<div class=\'no-image\'>No Image Available</div>'">
+                </div>
+                <div class="content">
+                    <h3 class="product-title">T&T Solar Lamp (30000 watts)</h3>
+                    <div><span class="qty-badge">+3 Received</span></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="image-container">
+                    <img src="https://sgkjdtwqqbrpmrfukhja.supabase.co/storage/v1/object/public/products/1782721942054-tcjpz.PNG" alt="Melamine Serving Plate" onerror="this.outerHTML='<div class=\'no-image\'>No Image Available</div>'">
+                </div>
+                <div class="content">
+                    <h3 class="product-title">Melamine Serving Plate</h3>
+                    <div><span class="qty-badge">+3 Received</span></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="image-container">
+                    <img src="https://sgkjdtwqqbrpmrfukhja.supabase.co/storage/v1/object/public/products/1782721827133-u279fdq.PNG" alt="Melamine Soup Casserole" onerror="this.outerHTML='<div class=\'no-image\'>No Image Available</div>'">
+                </div>
+                <div class="content">
+                    <h3 class="product-title">Melamine Soup Casserole</h3>
+                    <div><span class="qty-badge">+3 Received</span></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="image-container">
+                    <img src="https://sgkjdtwqqbrpmrfukhja.supabase.co/storage/v1/object/public/products/1781869041787-jr4pe.jpg" alt="Seasoning Bottle 3pcs set" onerror="this.outerHTML='<div class=\'no-image\'>No Image Available</div>'">
+                </div>
+                <div class="content">
+                    <h3 class="product-title">Seasoning Bottle 3pcs set</h3>
+                    <div><span class="qty-badge">+2 Received</span></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="image-container">
+                    <img src="https://sgkjdtwqqbrpmrfukhja.supabase.co/storage/v1/object/public/products/1782783382398-ogg1e.jfif" alt="16 holes Mini Donut" onerror="this.outerHTML='<div class=\'no-image\'>No Image Available</div>'">
+                </div>
+                <div class="content">
+                    <h3 class="product-title">16 holes Mini Donut</h3>
+                    <div><span class="qty-badge">+2 Received</span></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="image-container">
+                    <img src="https://sgkjdtwqqbrpmrfukhja.supabase.co/storage/v1/object/public/products/1781349160765-7pzxa.jpg" alt="BIG SIZE Stainless steel tray With Cover 3pcs" onerror="this.outerHTML='<div class=\'no-image\'>No Image Available</div>'">
+                </div>
+                <div class="content">
+                    <h3 class="product-title">BIG SIZE Stainless steel tray With Cover 3pcs</h3>
+                    <div><span class="qty-badge">+2 Received</span></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="image-container">
+                    <img src="https://sgkjdtwqqbrpmrfukhja.supabase.co/storage/v1/object/public/products/1782527129999-qlr0hk.jfif" alt="Detachable mixer Stainless with bowl" onerror="this.outerHTML='<div class=\'no-image\'>No Image Available</div>'">
+                </div>
+                <div class="content">
+                    <h3 class="product-title">Detachable mixer Stainless with bowl</h3>
+                    <div><span class="qty-badge">+2 Received</span></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="image-container">
+                    <img src="https://sgkjdtwqqbrpmrfukhja.supabase.co/storage/v1/object/public/products/1781944241314-y9zq6n.PNG" alt="VICHELENA COOKWARE SETS  - (V8)" onerror="this.outerHTML='<div class=\'no-image\'>No Image Available</div>'">
+                </div>
+                <div class="content">
+                    <h3 class="product-title">VICHELENA COOKWARE SETS - (V8)</h3>
+                    <div><span class="qty-badge">+2 Received</span></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="image-container">
+                    <img src="https://sgkjdtwqqbrpmrfukhja.supabase.co/storage/v1/object/public/products/1782285363013-45boad.jpg" alt="Cy19 Stainless pan - 28cm with takip" onerror="this.outerHTML='<div class=\'no-image\'>No Image Available</div>'">
+                </div>
+                <div class="content">
+                    <h3 class="product-title">Cy19 Stainless pan - 28cm with takip</h3>
+                    <div><span class="qty-badge">+2 Received</span></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="image-container">
+                    <img src="https://sgkjdtwqqbrpmrfukhja.supabase.co/storage/v1/object/public/products/1780379032213-2ilv85.png" alt="Kaisa Villa Food Processor" onerror="this.outerHTML='<div class=\'no-image\'>No Image Available</div>'">
+                </div>
+                <div class="content">
+                    <h3 class="product-title">Kaisa Villa 5L Food Processors</h3>
+                    <div><span class="qty-badge">+4 Received</span></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="image-container">
+                    <img src="https://sgkjdtwqqbrpmrfukhja.supabase.co/storage/v1/object/public/products/1781320633320-wkttr7.jpg" alt="KAISA VILLA STAINLESS CASSEROLE - 6.5L KV-2246" onerror="this.outerHTML='<div class=\'no-image\'>No Image Available</div>'">
+                </div>
+                <div class="content">
+                    <h3 class="product-title">KAISA VILLA STAINLESS CASSEROLE</h3>
+                    <div><span class="qty-badge">+2 Received</span></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="image-container">
+                    <img src="https://sgkjdtwqqbrpmrfukhja.supabase.co/storage/v1/object/public/products/1780369017950-j9otze.png" alt="Vichelena 8pcs (VL8) Casserole Cookware Set" onerror="this.outerHTML='<div class=\'no-image\'>No Image Available</div>'">
+                </div>
+                <div class="content">
+                    <h3 class="product-title">Vichelena 8pcs Casserole Cookware Set</h3>
+                    <div><span class="qty-badge">+1 Received</span></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</body>
+</html>

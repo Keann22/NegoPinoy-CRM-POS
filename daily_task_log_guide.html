@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="tl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paano gamitin ang Daily Task Log</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-slate-50 text-slate-800 p-4 md:p-8 min-h-screen">
+    <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        
+        <!-- Header -->
+        <div class="bg-blue-900 text-white p-8">
+            <h1 class="text-3xl font-bold mb-2">Paano gamitin ang Daily Task Log</h1>
+            <p class="text-blue-100 text-lg">Para ma-submit ang proof ng inyong daily maintenance task, sundin lang ang mga steps na ito:</p>
+        </div>
+
+        <div class="p-8">
+            
+            <!-- Step 1 -->
+            <div class="mb-10">
+                <div class="flex items-center gap-4 mb-4">
+                    <div class="flex-shrink-0 w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xl">1</div>
+                    <h2 class="text-2xl font-semibold text-slate-800">Pag-access sa Daily Task Log</h2>
+                </div>
+                <ul class="list-disc list-inside space-y-2 text-slate-600 ml-2 md:ml-14 text-lg">
+                    <li>Tingnan ang navigation sidebar sa kaliwang bahagi ng inyong screen.</li>
+                    <li>I-scroll hanggang sa pinakababa ng menu.</li>
+                    <li>I-click ang <strong>"Daily Task Log"</strong>.</li>
+                </ul>
+            </div>
+
+            <!-- Optional Image Placeholder (You can change src to your screenshot image) -->
+            <div class="mb-10 md:ml-14 bg-slate-100 border border-slate-300 rounded-xl p-2 text-center shadow-sm">
+                <!-- Para ilagay ang screenshot niyo, palitan lang ang "src" value sa baba -->
+                <!-- Halimbawa: src="screenshot.png" -->
+                <div class="aspect-video bg-white flex items-center justify-center rounded-lg border-2 border-dashed border-slate-300">
+                    <div class="text-slate-400 p-4">
+                        <svg class="mx-auto h-12 w-12 mb-2 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <p class="font-medium text-lg text-slate-500">I-save ang screenshot na ipinadala mo bilang "screenshot.png" <br>sa parehong folder ng HTML file na ito para lumabas ang picture dito.</p>
+                    </div>
+                </div>
+                <img src="screenshot.png" id="actual-screenshot" class="max-w-full rounded-lg shadow-md mx-auto hidden mt-4" alt="Daily Task Log Interface" onerror="this.style.display='none'">
+                <script>
+                    // Simple script to show the image if it exists and hide the placeholder
+                    const img = document.getElementById('actual-screenshot');
+                    img.onload = function() {
+                        this.classList.remove('hidden');
+                        this.previousElementSibling.classList.add('hidden');
+                    }
+                </script>
+            </div>
+
+            <!-- Step 2 -->
+            <div class="mb-10">
+                <div class="flex items-center gap-4 mb-4">
+                    <div class="flex-shrink-0 w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xl">2</div>
+                    <h2 class="text-2xl font-semibold text-slate-800">Pag-submit ng Proof</h2>
+                </div>
+                <p class="text-slate-600 ml-2 md:ml-14 text-lg mb-6">Pagkapasok sa Daily Task Log page, makikita niyo ang "Submit Today's Proof" section sa kaliwa. Dito niyo i-a-upload ang proof niyo:</p>
+                
+                <div class="ml-2 md:ml-14 grid gap-4">
+                    <div class="bg-slate-50 p-5 rounded-lg border border-slate-200 shadow-sm transition-all hover:shadow-md">
+                        <strong class="text-slate-800 text-lg block mb-1">Date:</strong> 
+                        <span class="text-slate-600">Auto-filled na ito, kaya hindi niyo na kailangang galawin.</span>
+                    </div>
+                    
+                    <div class="bg-slate-50 p-5 rounded-lg border border-slate-200 shadow-sm transition-all hover:shadow-md">
+                        <strong class="text-slate-800 text-lg block mb-1">Task Type:</strong> 
+                        <span class="text-slate-600">I-click ang dropdown menu at piliin kung alin sa tatlong tasks ang natapos niyo ngayong araw:
+                            <ul class="list-disc list-inside mt-2 ml-2 space-y-1">
+                                <li>Delete Inactive Items</li>
+                                <li>Add New Product</li>
+                                <li>Chatbot Training</li>
+                            </ul>
+                        </span>
+                    </div>
+                    
+                    <div class="bg-slate-50 p-5 rounded-lg border border-blue-100 bg-blue-50/30 shadow-sm transition-all hover:shadow-md">
+                        <strong class="text-blue-900 text-lg block mb-1">Screenshot Proof:</strong>
+                        <ul class="list-disc list-inside mt-2 space-y-2 text-slate-700">
+                            <li>Mag-take ng screenshot ng natapos niyong task mula sa <strong>Facebook/Meta Business Suite</strong>.</li>
+                            <li>I-click ang dashed box na may nakasulat na <span class="bg-white px-2 py-1 rounded border text-sm font-mono text-slate-500">"Click to upload a screenshot"</span>.</li>
+                            <li>Piliin ang file mula sa computer niyo. (PNG, JPG, at WEBP formats ang tinatanggap).</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="bg-slate-50 p-5 rounded-lg border border-slate-200 shadow-sm transition-all hover:shadow-md">
+                        <strong class="text-slate-800 text-lg block mb-1">Notes (Optional):</strong> 
+                        <span class="text-slate-600">Kung may gusto kayong idagdag na info tungkol sa ginawa niyo, i-type niyo lang sa box na ito.</span>
+                    </div>
+                    
+                    <div class="bg-slate-800 p-5 rounded-lg border border-slate-700 shadow-sm text-white">
+                        <strong class="text-white text-lg block mb-1">Submit:</strong> 
+                        <span class="text-slate-300">I-click ang <span class="bg-blue-600 px-3 py-1 rounded-md font-semibold mx-1">Submit</span> button sa pinakababa para ma-save ang inyong progress.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reminder -->
+            <div class="mt-12 bg-yellow-50 border-l-4 border-yellow-400 p-6 rounded-r-lg shadow-sm">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-yellow-500" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-lg font-bold text-yellow-800">Reminder!</h3>
+                        <div class="mt-2 text-yellow-800 font-medium leading-relaxed">
+                            <p>Gawin ito bago mag-log out araw-araw. Importante ito para ma-track natin ang inyong compliance at hindi magka-issue sa commission niyo. Kung may technical problems kayo sa pag-upload, sabihan niyo agad ako.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</body>
+</html>

@@ -38,6 +38,81 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'No items provided' }, { status: 400 });
     }
 
+    // --- Order Validation ---
+    const uniqueOrderIds = new Set<string>();
+    for (const r of requests) {
+      if (r.orderId) uniqueOrderIds.add(r.orderId.trim());
+    }
+
+    for (const rawOrderId of uniqueOrderIds) {
+      // 1. Check if the order exists (staff might type just the first 8 characters)
+      const { data: orderData, error: orderErr } = await supabase
+        .from('orders')
+        .select('id')
+        .ilike('id', `${rawOrderId}%`)
+        .limit(1)
+        .maybeSingle();
+
+      if (orderErr) {
+        return NextResponse.json({ error: `Database error checking order number ${rawOrderId}: ${orderErr.message}` }, { status: 500 });
+      }
+      if (!orderData) {
+        return NextResponse.json({ error: `Order Number not found: ${rawOrderId}` }, { status: 400 });
+      }
+
+      const realOrderId = orderData.id;
+
+      // 2. Check if the requested products for this order are actually in the order
+      const productsForThisOrder = requests.filter((r: any) => r.orderId?.trim() === rawOrderId).map((r: any) => r.productId);
+      
+      const { data: itemsData, error: itemsErr } = await supabase
+        .from('order_items')
+        .select('product_id')
+        .eq('order_id', realOrderId);
+
+      if (itemsErr) {
+        return NextResponse.json({ error: `Database error checking items for order ${rawOrderId}: ${itemsErr.message}` }, { status: 500 });
+      }
+      
+      const orderProductIds = itemsData?.map((i: any) => i.product_id) || [];
+      
+      // Fetch assembly recipes for all products in the order to see if the requested product is a component
+      const { data: bundleData } = await supabase
+        .from('products')
+        .select('id, assembly_recipe')
+        .in('id', orderProductIds)
+        .not('assembly_recipe', 'is', null);
+
+      const validProductIds = new Set<string>(orderProductIds);
+      if (bundleData) {
+        for (const bundle of bundleData) {
+          if (Array.isArray(bundle.assembly_recipe)) {
+            for (const comp of bundle.assembly_recipe) {
+              if (comp.component_id) validProductIds.add(comp.component_id);
+              if (comp.productId) validProductIds.add(comp.productId); // Just in case schema uses productId
+            }
+          }
+        }
+      }
+
+      for (const pid of productsForThisOrder) {
+        if (!validProductIds.has(pid)) {
+          // fetch product name for better error message
+          const { data: pData } = await supabase.from('products').select('name').eq('id', pid).single();
+          const pName = pData?.name || 'Unknown Product';
+          return NextResponse.json({ error: `Product "${pName}" is not part of Order ${rawOrderId} (nor is it a component of any bundle in the order).` }, { status: 400 });
+        }
+      }
+
+      // Update the request to use the full UUID so it saves correctly in procurement_request_sources
+      for (const r of requests) {
+        if (r.orderId?.trim() === rawOrderId) {
+          r.orderId = realOrderId;
+        }
+      }
+    }
+    // --- End Order Validation ---
+
     // 1. Find existing STAFF_DRAFT
     let poId = null;
     const { data: existingPo, error: existErr } = await supabase

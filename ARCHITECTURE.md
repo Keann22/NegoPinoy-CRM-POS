@@ -300,7 +300,11 @@ The sheet only lists products that have an active **Staff Draft** — a `purchas
 
 A fourth, internal-only **Total Open Demand** (every open order regardless of pick status — the true counterpart to `stock_level`'s ledger math) exists only to detect when Current Stock has drifted from reality (the orange "Current Stock doesn't match total open orders" warning + "Sync Stock" button — which syncs Current Stock to Total Open Demand, not to Staff Req.).
 
-**Order attribution** (`procurement_request_sources`, migration in `scripts/migrations/add_procurement_request_sources.sql`): when a request is tied to a specific order (currently only the Picker app's out-of-stock report), this table records which order(s) contributed to a draft line's quantity, so "Staff Req." can show "for #A232A043 (Customer Name)" instead of an anonymous number. Ad-hoc requests (Add Missing Item, the standalone Procurement Request page) have no order to attach and stay unattributed — that's expected, not a bug.
+**Order attribution** (`procurement_request_sources`, migration in `scripts/migrations/add_procurement_request_sources.sql`): when a request is tied to a specific order (currently only the Picker app's out-of-stock report), this table records which order(s) contributed to a draft line's quantity, so "Staff Req." can show "for #A232A043 (Customer Name)" instead of an anonymous number. 
+
+**Order Validation Rule:** Ad-hoc requests created via the standalone Procurement Request page now strictly require a valid Order Number for each item. The system enforces that:
+1. The typed Order Number (even a short prefix) resolves to a valid order in the database.
+2. The requested product is either directly part of the order (`order_items`) or is an underlying component/part of a bundle product in that order (`assembly_recipe`).
 
 ---
 

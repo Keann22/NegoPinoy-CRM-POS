@@ -121,7 +121,7 @@ export async function GET(req: Request) {
     // 2. Get all draft requests from Staff
     const { data: drafts, error: dErr } = await supabase
       .from('purchase_order_items')
-      .select('id, product_id, expected_qty, po_id, requested_by_name, purchase_orders!inner(notes)')
+      .select('id, product_id, expected_qty, po_id, requested_by_name, created_at, purchase_orders!inner(notes)')
       .eq('purchase_orders.notes', 'STAFF_DRAFT')
       .eq('status', 'pending_receipt');
     if (dErr) throw dErr;
@@ -266,6 +266,7 @@ export async function GET(req: Request) {
         currentStock: p.stock_level,
         staffRequestedQty: draft ? draft.expected_qty : null,
         requestedByName: draft ? draft.requested_by_name : null,
+        requestedAt: draft ? draft.created_at : null,
         draftItemId: draft ? draft.id : null,
         sourceOrders: draft ? (sourceOrdersByDraftId.get(draft.id) || []) : [],
         totalOpenDemandQty: totalOpenDemandMap.get(p.id) || 0,
