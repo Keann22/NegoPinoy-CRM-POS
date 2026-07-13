@@ -10,6 +10,7 @@ import { useUserProfile } from '@/hooks/useUserProfile';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { OverdueOrderDialog } from './orders/overdue-order-dialog';
 import { PurchaseIssueDialog } from './purchase-issue-dialog';
+import { StaffMessageThreadDialog } from './staff-message-thread-dialog';
 import type { Order } from '@/types';
 
 export function InboxDrawer() {
@@ -24,6 +25,8 @@ export function InboxDrawer() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedPurchaseIssue, setSelectedPurchaseIssue] = useState<any | null>(null);
   const [isPurchaseDialogOpen, setIsPurchaseDialogOpen] = useState(false);
+  const [selectedStaffMessage, setSelectedStaffMessage] = useState<any | null>(null);
+  const [isStaffMessageDialogOpen, setIsStaffMessageDialogOpen] = useState(false);
 
   const fetchIssues = useCallback(async () => {
     if (!supabase) return;
@@ -122,6 +125,12 @@ export function InboxDrawer() {
   const openIssueDialog = async (issue: any) => {
     if (!supabase) return;
 
+    if (issue.issue_type === 'staff_message') {
+      setSelectedStaffMessage(issue);
+      setIsStaffMessageDialogOpen(true);
+      return;
+    }
+
     if (issue.issue_type === 'purchase_discrepancy') {
       setSelectedPurchaseIssue(issue);
       setIsPurchaseDialogOpen(true);
@@ -168,9 +177,21 @@ export function InboxDrawer() {
                  const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
                  const isUrgent = lastMessage?.requires_attention;
                  const isPurchaseIssue = issue.issue_type === 'purchase_discrepancy';
+                 const isStaffMessage = issue.issue_type === 'staff_message';
                  const batchName = issue.purchase_orders?.notes === 'STAFF_DRAFT'
                    ? 'Pending Staff Requests'
                    : (issue.purchase_orders?.notes || 'Unknown Batch');
+
+                 let cardTitle: string;
+                 if (isStaffMessage) {
+                   cardTitle = issue.order_id
+                     ? `Message re: Order #${issue.orders?.id?.substring(0, 7).toUpperCase()}`
+                     : `Message re: ${issue.products?.name || 'Product'}`;
+                 } else if (isPurchaseIssue) {
+                   cardTitle = `PO Shortage - ${batchName}`;
+                 } else {
+                   cardTitle = `Order #${issue.orders?.id?.substring(0, 7).toUpperCase()}`;
+                 }
 
                  return (
                    <div
@@ -181,15 +202,17 @@ export function InboxDrawer() {
                      <div className="flex justify-between items-start mb-2">
                        <span className="font-semibold text-sm flex items-center gap-1">
                          {isUrgent && <AlertCircle className="w-4 h-4 text-red-500" />}
-                         {isPurchaseIssue ? `PO Shortage - ${batchName}` : `Order #${issue.orders?.id?.substring(0, 7).toUpperCase()}`}
+                         {cardTitle}
                        </span>
                        <span className="text-[10px] text-slate-500">
                          {lastMessage ? new Date(lastMessage.created_at).toLocaleString() : new Date(issue.created_at).toLocaleString()}
                        </span>
                      </div>
-                     <div className="text-xs font-medium text-slate-700 mb-1">
-                       {issue.products?.name} - {issue.status}
-                     </div>
+                     {!isStaffMessage && (
+                       <div className="text-xs font-medium text-slate-700 mb-1">
+                         {issue.products?.name} - {issue.status}
+                       </div>
+                     )}
                      {lastMessage ? (
                        <div className="text-xs text-slate-600 truncate">
                          <span className="font-semibold">{lastMessage.sender_name}:</span> {lastMessage.message}
@@ -219,6 +242,13 @@ export function InboxDrawer() {
         open={isPurchaseDialogOpen}
         onOpenChange={setIsPurchaseDialogOpen}
         onResolved={fetchIssues}
+      />
+
+      <StaffMessageThreadDialog
+        issue={selectedStaffMessage}
+        open={isStaffMessageDialogOpen}
+        onOpenChange={setIsStaffMessageDialogOpen}
+        onUpdated={fetchIssues}
       />
     </>
   );

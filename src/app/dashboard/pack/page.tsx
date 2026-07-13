@@ -212,11 +212,21 @@ export default function PackerApp() {
                 </div>
               )}
 
+              {orderDetails?.status !== 'Photo' && orderDetails?.status !== 'On-Hold' && !orderDetails?.status?.includes('issue') && (
+                <div className="bg-destructive/10 text-destructive border border-destructive/20 rounded-md p-4 space-y-2 mb-4">
+                  <div className="font-semibold flex items-center gap-2"><AlertCircle className="w-5 h-5"/> Second Check Required</div>
+                  <p className="text-sm">
+                    This order hasn&apos;t been verified by a checker yet (current status: &quot;{orderDetails?.status}&quot;).
+                    It must go through Second Check / Photo before it can be packed.
+                  </p>
+                </div>
+              )}
+
               <div className="pt-6 flex gap-3 border-t mt-6">
                 <Button type="button" variant="outline" className="flex-1" onClick={() => setScannedOrderId(null)}>
                   Cancel
                 </Button>
-                <Button type="submit" className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white" disabled={loading || orderDetails?.status === 'On-Hold' || orderDetails?.status?.includes('issue')}>
+                <Button type="submit" className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white" disabled={loading || orderDetails?.status === 'On-Hold' || orderDetails?.status?.includes('issue') || orderDetails?.status !== 'Photo'}>
                   {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Package className="mr-2 h-4 w-4" />}
                   Confirm Packed
                 </Button>

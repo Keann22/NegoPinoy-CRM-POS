@@ -267,7 +267,16 @@ export function usePacker() {
       toast({ title: 'Cannot Proceed', description: 'Please resolve the issue before packing.', variant: 'destructive' });
       return;
     }
-    
+
+    if (orderDetails?.status !== 'Photo') {
+      toast({
+        title: 'Second Check Required',
+        description: `This order hasn't gone through Second Check (Photo) yet — current status: "${orderDetails?.status}". A checker must scan and verify it before it can be packed.`,
+        variant: 'destructive'
+      });
+      return;
+    }
+
     for (const item of orderItems) {
       let assignedQty = 0;
       boxes.forEach(b => {
