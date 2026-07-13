@@ -47,7 +47,8 @@ export function MarkShippedDialog({
                 .from('orders')
                 .update({
                     status: 'Shipped',
-                    tracking_number: trackingNumber || null
+                    tracking_number: trackingNumber || null,
+                    shipped_at: new Date().toISOString()
                 })
                 .eq('id', orderId);
 

@@ -54,7 +54,7 @@ export default function ProcurementSheet() {
   const [issueDialogOpen, setIssueDialogOpen] = useState(false);
   const [issueProduct, setIssueProduct] = useState<any>(null);
 
-  const [viewingAllocatedItem, setViewingAllocatedItem] = useState<{ id: string; name: string } | null>(null);
+  const [viewingAllocatedItem, setViewingAllocatedItem] = useState<{ id: string; name: string; context?: 'total' | 'needToBuy' } | null>(null);
 
   const fetchData = async () => {
     try {
@@ -393,11 +393,12 @@ export default function ProcurementSheet() {
         productName={viewingAllocatedItem?.name || ''}
         isOpen={!!viewingAllocatedItem}
         onClose={() => setViewingAllocatedItem(null)}
-        statusFilter={[
-          'Pending Payment', 'Processing', 'Picked', 'Picked (with issue)',
-          'Packed', 'For Shipping', 'For Pick-up', 'On-Hold', 'Waiting for Stock',
-        ]}
-        title="Stock Allocation Details"
+        statusFilter={
+          viewingAllocatedItem?.context === 'needToBuy'
+            ? ['Pending Payment', 'Processing', 'Picked (with issue)', 'On-Hold', 'Waiting for Stock']
+            : ['Pending Payment', 'Processing', 'Picked', 'Picked (with issue)', 'Photo', 'Packed', 'For Shipping', 'For Pick-up', 'On-Hold', 'Waiting for Stock']
+        }
+        title={viewingAllocatedItem?.context === 'needToBuy' ? "Orders Needing This Item" : "Total Open Demand"}
       />
     </div>
   );

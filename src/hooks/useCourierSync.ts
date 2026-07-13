@@ -96,7 +96,7 @@ export function useCourierSync() {
       while (true) {
         const { data, error } = await supabase
           .from('orders')
-          .select('id, status, tracking_number, payment_method, balance_due, next_due_date')
+          .select('id, status, tracking_number, payment_method, balance_due, next_due_date, shipped_at')
           .order('id')
           .range(from, from + step - 1);
           
@@ -226,6 +226,11 @@ export function useCourierSync() {
 
         if (['Shipped', 'Completed', 'Payment Received (COD)'].includes(systemStatus)) {
             updatePayload.completed_at = new Date().toISOString();
+        }
+
+        // Stamp the first time an order reaches a shipped-or-later state; never overwrite once set.
+        if (['Shipped', 'Completed', 'Payment Received (COD)'].includes(systemStatus) && !matchedOrder.shipped_at) {
+            updatePayload.shipped_at = new Date().toISOString();
         }
 
         if (systemStatus === 'Completed' && (matchedOrder.payment_method === 'Installment' || matchedOrder.payment_method === 'Lay-away') && matchedOrder.balance_due > 0) {

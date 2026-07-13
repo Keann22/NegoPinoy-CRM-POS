@@ -31,6 +31,7 @@ type UnpaidShippedOrder = {
   totalAmount: number;
   balanceDue: number;
   orderDate: string;
+  shippedAt: string;
   customerId: string;
   customerName: string;
   paymentType: string;
@@ -62,10 +63,10 @@ export default function UnpaidShippedOrdersPage() {
       try {
         const { data: ordersData, error } = await supabase
           .from('orders')
-          .select('id, total_amount, balance_due, order_date, created_at, customer_id, payment_method, status, tracking_number')
+          .select('id, total_amount, balance_due, order_date, created_at, shipped_at, customer_id, payment_method, status, tracking_number')
           .gt('balance_due', 0)
           .in('status', UNPAID_STATUSES)
-          .order('order_date', { ascending: true });
+          .order('shipped_at', { ascending: true, nullsFirst: true });
 
         if (error) throw error;
 
@@ -81,17 +82,20 @@ export default function UnpaidShippedOrdersPage() {
         const customerMap = new Map<string, string>();
         (customersData || []).forEach((c: any) => customerMap.set(c.id, c.full_name || 'Unknown Customer'));
 
-        setOrders(mapped.map((o: any) => ({
-          id: o.id,
-          totalAmount: Number(o.total_amount) || 0,
-          balanceDue: Number(o.balance_due) || 0,
-          orderDate: o.order_date || o.created_at,
-          customerId: o.customer_id,
-          customerName: customerMap.get(o.customer_id) || 'Unknown Customer',
-          paymentType: o.payment_method,
-          orderStatus: o.status,
-          trackingNumber: o.tracking_number,
-        })));
+        setOrders(mapped
+          .filter((o: any) => o.shipped_at)
+          .map((o: any) => ({
+            id: o.id,
+            totalAmount: Number(o.total_amount) || 0,
+            balanceDue: Number(o.balance_due) || 0,
+            orderDate: o.order_date || o.created_at,
+            shippedAt: o.shipped_at,
+            customerId: o.customer_id,
+            customerName: customerMap.get(o.customer_id) || 'Unknown Customer',
+            paymentType: o.payment_method,
+            orderStatus: o.status,
+            trackingNumber: o.tracking_number,
+          })));
       } catch (err) {
         console.error('Unpaid shipped orders fetch error:', err);
       } finally {
@@ -102,7 +106,7 @@ export default function UnpaidShippedOrdersPage() {
   }, [supabase, user, isManagement]);
 
   const overdueUnpaidOrders = useMemo(() => {
-    return orders.filter(o => differenceInDays(new Date(), new Date(o.orderDate)) >= OVERDUE_DAYS_THRESHOLD);
+    return orders.filter(o => differenceInDays(new Date(), new Date(o.shippedAt)) >= OVERDUE_DAYS_THRESHOLD);
   }, [orders]);
 
   const totalOutstanding = useMemo(
@@ -129,7 +133,7 @@ export default function UnpaidShippedOrdersPage() {
             <div>
               <CardTitle className="font-headline">Unpaid Shipped Orders</CardTitle>
               <CardDescription>
-                Orders that have already shipped but still have a balance due after {OVERDUE_DAYS_THRESHOLD}+ days.
+                Orders that have already shipped but still have a balance due {OVERDUE_DAYS_THRESHOLD}+ days after shipping.
               </CardDescription>
             </div>
             <div className="text-right">
@@ -147,8 +151,8 @@ export default function UnpaidShippedOrdersPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Customer</TableHead>
-                <TableHead>Order Date</TableHead>
-                <TableHead>Days Since Order</TableHead>
+                <TableHead>Shipped Date</TableHead>
+                <TableHead>Days Since Shipped</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Tracking #</TableHead>
                 <TableHead className="text-right">Total Amount</TableHead>
@@ -168,7 +172,7 @@ export default function UnpaidShippedOrdersPage() {
                 </TableRow>
               ))}
               {overdueUnpaidOrders.map((order) => {
-                const daysSinceOrder = differenceInDays(new Date(), new Date(order.orderDate));
+                const daysSinceShipped = differenceInDays(new Date(), new Date(order.shippedAt));
                 return (
                   <TableRow key={order.id}>
                     <TableCell className="font-medium">
@@ -183,9 +187,9 @@ export default function UnpaidShippedOrdersPage() {
                         </Link>
                       </div>
                     </TableCell>
-                    <TableCell>{format(new Date(order.orderDate), 'PPP')}</TableCell>
+                    <TableCell>{format(new Date(order.shippedAt), 'PPP')}</TableCell>
                     <TableCell>
-                      <Badge variant="destructive">{daysSinceOrder} days</Badge>
+                      <Badge variant="destructive">{daysSinceShipped} days</Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">{order.orderStatus}</TableCell>
                     <TableCell className="text-muted-foreground font-mono text-xs">{order.trackingNumber || '—'}</TableCell>

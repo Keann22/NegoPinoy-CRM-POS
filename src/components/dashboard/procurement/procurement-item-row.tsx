@@ -39,7 +39,7 @@ export function ProcurementItemRow({
   openBuyDialog: (item: any, groupId: string | null) => void;
   onReportIssue: () => void;
   handleDeleteDraftItem: (id: string) => void;
-  onViewAllocated: (item: { id: string; name: string }) => void;
+  onViewAllocated: (item: { id: string; name: string; context: 'total' | 'needToBuy' }) => void;
 }) {
   // Current Stock's deficit should always equal the total of every open order
   // (including already-picked/packed ones, since stock is deducted at order
@@ -108,14 +108,14 @@ export function ProcurementItemRow({
       <td
         className="p-3 font-bold text-slate-500 text-center text-lg cursor-pointer hover:underline hover:text-indigo-600"
         title="See which orders/customers this stock is allocated to"
-        onClick={() => onViewAllocated({ id: item.productId, name: item.productName })}
+        onClick={() => onViewAllocated({ id: item.productId, name: item.productName, context: 'total' })}
       >
         {item.currentStock}
       </td>
       <td
         className="p-3 font-bold text-center text-lg cursor-pointer text-slate-500 hover:underline hover:text-indigo-600"
         title="Manual note from staff — not used to calculate the Buy quantity"
-        onClick={() => onViewAllocated({ id: item.productId, name: item.productName })}
+        onClick={() => onViewAllocated({ id: item.productId, name: item.productName, context: 'total' })}
       >
           {item.staffRequestedQty !== null ? item.staffRequestedQty : <span className="text-xs text-slate-400 font-normal">Pending</span>}
           {item.requestedByName && (
@@ -141,8 +141,8 @@ export function ProcurementItemRow({
       </td>
       <td
         className="p-3 font-bold text-center text-lg cursor-pointer text-blue-600 hover:underline hover:text-indigo-600"
-        title="Orders still waiting on this item to be picked — this is the Buy quantity. Click to see everyone affected, including already-packed orders."
-        onClick={() => onViewAllocated({ id: item.productId, name: item.productName })}
+        title="Orders still waiting on this item to be picked — this is the Buy quantity. Excludes already-packed orders."
+        onClick={() => onViewAllocated({ id: item.productId, name: item.productName, context: 'needToBuy' })}
       >
           {item.needToBuyQty > 0 ? item.needToBuyQty : <span className="text-xs text-slate-400 font-normal">None</span>}
       </td>
