@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { createStaffMessage, getAdminAndInventoryLeadNames, resolveRecipientNames } from '@/lib/services/staff-message-service';
+import { getAdminAndInventoryLeadNames, resolveRecipientNames, fanOutStaffNotifications } from '@/lib/services/staff-message-service';
 import { getAffectedSalesReps } from '@/lib/services/procurement-service';
 
 export const dynamic = 'force-dynamic';
@@ -19,6 +19,31 @@ export async function POST(req: Request) {
 
     const resolvedSenderName = senderName || 'Inventory';
 
+    // 1. Create the issue in the same procurement_issues table the dashboard's
+    // "Procurement Issues" widget already reads from (GET /api/inventory/procurement-issues),
+    // so this shows up there with its existing Affected Orders / reply / resolve UI,
+    // instead of a separate order_issues thread nothing else displays.
+    const { data: issue, error: issueErr } = await supabase
+      .from('procurement_issues')
+      .insert({ product_id: productId, status: 'open' })
+      .select('id')
+      .single();
+
+    if (issueErr) throw issueErr;
+
+    const { error: msgErr } = await supabase
+      .from('procurement_issue_messages')
+      .insert({
+        issue_id: issue.id,
+        sender_role: senderRole || 'procurement',
+        sender_name: resolvedSenderName,
+        message: note,
+      });
+
+    if (msgErr) throw msgErr;
+
+    // 2. Separately, still ping the people who need to know via the Bell —
+    // Admin/Jas/Jasmin plus any sales rep with an order waiting on this product.
     const [adminAndLeadNames, salesRepNames] = await Promise.all([
       getAdminAndInventoryLeadNames(supabase),
       getAffectedSalesReps(supabase, productId),
@@ -29,20 +54,12 @@ export async function POST(req: Request) {
       resolvedSenderName
     );
 
-    if (recipientNames.length === 0) {
-      return NextResponse.json({ error: 'No recipients resolved for this issue' }, { status: 400 });
-    }
-
-    const issueId = await createStaffMessage(supabase, {
-      issueType: 'product',
-      productId,
-      message: note,
+    await fanOutStaffNotifications(supabase, recipientNames, {
       senderName: resolvedSenderName,
-      senderRole: senderRole || 'inventory',
-      recipientNames,
+      message: note,
     });
 
-    return NextResponse.json({ success: true, issueId });
+    return NextResponse.json({ success: true, issueId: issue.id });
   } catch (error: any) {
     console.error('Error reporting procurement issue:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
