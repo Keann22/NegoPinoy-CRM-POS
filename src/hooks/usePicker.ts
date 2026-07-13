@@ -175,12 +175,11 @@ export function usePicker() {
 
       if (orderError) throw orderError;
 
-      // A clean re-pick (no missing items this time) means whatever was
-      // previously reported for this order is fixed — clear it before any
-      // new issues (below) get inserted, so freshly-reported ones stay open.
-      if (!hasIssues) {
-        await resolveOpenOrderIssues(supabase, scannedOrderId);
-      }
+      // Whatever was flagged on an earlier pick attempt for this order is
+      // stale now — clear it before any new issues (below) get inserted, so
+      // the Missing Items list reflects only this attempt's results instead
+      // of accumulating every past attempt (clean or partial re-pick alike).
+      await resolveOpenOrderIssues(supabase, scannedOrderId);
 
       const userName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : 'Unknown Staff';
 
