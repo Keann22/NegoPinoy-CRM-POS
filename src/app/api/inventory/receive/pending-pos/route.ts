@@ -47,7 +47,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { receives, unexpectedItems } = await req.json(); 
+    const { receives, unexpectedItems, reportedByName } = await req.json();
 
     if ((!receives || receives.length === 0) && (!unexpectedItems || unexpectedItems.length === 0)) {
       return NextResponse.json({ error: 'No items provided' }, { status: 400 });
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
         // 1. Get PO item
         const { data: poItem, error: poErr } = await supabase
           .from('purchase_order_items')
-          .select('product_id, unit_cost, expected_qty, received_qty')
+          .select('po_id, product_id, unit_cost, expected_qty, received_qty')
           .eq('id', r.itemId)
           .single();
           
@@ -99,6 +99,36 @@ export async function POST(req: Request) {
             unit_cost: poItem.unit_cost,
             reason: reason
           });
+
+        // 5. Raise an urgent purchase issue for the Inbox when fewer items arrived than expected
+        if (r.discrepancyReason) {
+          const { data: purchaseIssue, error: issueErr } = await supabase
+            .from('order_issues')
+            .insert({
+              issue_type: 'purchase_discrepancy',
+              po_id: poItem.po_id,
+              product_id: poItem.product_id,
+              status: 'open',
+              reported_by_name: reportedByName || 'Inventory Staff'
+            })
+            .select('id')
+            .single();
+
+          if (issueErr) {
+            console.error('Error creating purchase issue:', issueErr);
+          } else {
+            await supabase
+              .from('order_issue_messages')
+              .insert({
+                issue_id: purchaseIssue.id,
+                sender_role: 'inventory',
+                sender_name: reportedByName || 'Inventory Staff',
+                message: reason,
+                requires_attention: true,
+                mentions: []
+              });
+          }
+        }
 
         // Auto-resolve any open procurement issues for this product
         const { data: issues } = await supabase

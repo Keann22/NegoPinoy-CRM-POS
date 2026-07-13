@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSupabase } from '@/lib/supabase/hooks';
 import { useToast } from '@/hooks/use-toast';
+import { useUserProfile } from '@/hooks/useUserProfile';
 
 export function usePendingPurchases(onReceiveComplete: () => void) {
   const [items, setItems] = useState<any[]>([]);
@@ -9,6 +10,8 @@ export function usePendingPurchases(onReceiveComplete: () => void) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const { toast } = useToast();
+  const { userProfile } = useUserProfile();
+  const reportedByName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : undefined;
 
   const fetchPending = async () => {
     try {
@@ -66,7 +69,7 @@ export function usePendingPurchases(onReceiveComplete: () => void) {
       const res = await fetch("/api/inventory/receive/pending-pos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ receives: toReceive, unexpectedItems: toReceiveUnexpected })
+        body: JSON.stringify({ receives: toReceive, unexpectedItems: toReceiveUnexpected, reportedByName })
       });
 
       if (!res.ok) throw new Error(await res.text());
@@ -135,7 +138,7 @@ export function usePendingPurchases(onReceiveComplete: () => void) {
       const res = await fetch("/api/inventory/receive/pending-pos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ receives: toReceive, unexpectedItems: toReceiveUnexpected })
+        body: JSON.stringify({ receives: toReceive, unexpectedItems: toReceiveUnexpected, reportedByName })
       });
 
       if (!res.ok) throw new Error(await res.text());

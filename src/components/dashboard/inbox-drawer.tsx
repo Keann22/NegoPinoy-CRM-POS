@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { OverdueOrderDialog } from './orders/overdue-order-dialog';
+import { PurchaseIssueDialog } from './purchase-issue-dialog';
 import type { Order } from '@/types';
 
 export function InboxDrawer() {
@@ -21,17 +22,20 @@ export function InboxDrawer() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [selectedCustomerName, setSelectedCustomerName] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedPurchaseIssue, setSelectedPurchaseIssue] = useState<any | null>(null);
+  const [isPurchaseDialogOpen, setIsPurchaseDialogOpen] = useState(false);
 
   const fetchIssues = useCallback(async () => {
     if (!supabase) return;
 
-    // Fetch all open issues and their orders
+    // Fetch all open issues (order issues and purchase-receiving issues) and their context
     const { data, error } = await supabase
       .from('order_issues')
       .select(`
         *,
         products(name),
         orders(id, status, customer_id, customers(full_name)),
+        purchase_orders(id, notes),
         order_issue_messages(id, sender_name, message, created_at, requires_attention, mentions)
       `)
       .eq('status', 'open')
@@ -77,8 +81,8 @@ export function InboxDrawer() {
           const isUrgent = newMsg.requires_attention === true;
           const isMentioned = newMsg.mentions && Array.isArray(newMsg.mentions) && newMsg.mentions.some((m: string) => m.toLowerCase() === fullName.toLowerCase());
 
-          // Don't toast if I sent it
-          if (newMsg.sender_name !== fullName && (isUrgent || isMentioned)) {
+          // Show urgent toast if marked urgent or mentioned
+          if (isUrgent || isMentioned) {
              toast({
                title: "Urgent Order Issue Update",
                description: `${newMsg.sender_name}: ${newMsg.message}`,
@@ -91,7 +95,7 @@ export function InboxDrawer() {
                   body: `${newMsg.sender_name}: ${newMsg.message}`
                 });
              }
-          } else if (newMsg.sender_name !== fullName) {
+          } else {
              // Normal toast
              toast({
                title: "New Issue Message",
@@ -108,14 +112,18 @@ export function InboxDrawer() {
     };
   }, [supabase, userProfile, toast, fetchIssues]);
 
-  const openIssueDialog = async (issueId: string) => {
+  const openIssueDialog = async (issue: any) => {
     if (!supabase) return;
-    
-    // Find the order id for this issue
-    const { data } = await supabase.from('order_issues').select('order_id').eq('id', issueId).single();
-    if (data?.order_id) {
+
+    if (issue.issue_type === 'purchase_discrepancy') {
+      setSelectedPurchaseIssue(issue);
+      setIsPurchaseDialogOpen(true);
+      return;
+    }
+
+    if (issue.order_id) {
        // Fetch full order to open dialog
-       const { data: orderData } = await supabase.from('orders').select('*, customers(full_name)').eq('id', data.order_id).single();
+       const { data: orderData } = await supabase.from('orders').select('*, customers(full_name)').eq('id', issue.order_id).single();
        if (orderData) {
          setSelectedOrder(orderData as unknown as Order);
          setSelectedCustomerName(orderData.customers?.full_name || 'Unknown Customer');
@@ -152,17 +160,21 @@ export function InboxDrawer() {
                  const messages = issue.order_issue_messages || [];
                  const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
                  const isUrgent = lastMessage?.requires_attention;
+                 const isPurchaseIssue = issue.issue_type === 'purchase_discrepancy';
+                 const batchName = issue.purchase_orders?.notes === 'STAFF_DRAFT'
+                   ? 'Pending Staff Requests'
+                   : (issue.purchase_orders?.notes || 'Unknown Batch');
 
                  return (
-                   <div 
-                     key={issue.id} 
+                   <div
+                     key={issue.id}
                      className={`p-3 rounded-lg border cursor-pointer hover:bg-slate-50 transition-colors ${isUrgent ? 'border-red-300 bg-red-50 hover:bg-red-100' : 'border-slate-200'}`}
-                     onClick={() => openIssueDialog(issue.id)}
+                     onClick={() => openIssueDialog(issue)}
                    >
                      <div className="flex justify-between items-start mb-2">
                        <span className="font-semibold text-sm flex items-center gap-1">
                          {isUrgent && <AlertCircle className="w-4 h-4 text-red-500" />}
-                         Order #{issue.orders?.id?.substring(0, 7).toUpperCase()}
+                         {isPurchaseIssue ? `PO Shortage - ${batchName}` : `Order #${issue.orders?.id?.substring(0, 7).toUpperCase()}`}
                        </span>
                        <span className="text-[10px] text-slate-500">
                          {lastMessage ? new Date(lastMessage.created_at).toLocaleString() : new Date(issue.created_at).toLocaleString()}
@@ -187,12 +199,19 @@ export function InboxDrawer() {
       </Sheet>
 
       {/* Render the Issue Dialog when clicked */}
-      <OverdueOrderDialog 
-        order={selectedOrder} 
+      <OverdueOrderDialog
+        order={selectedOrder}
         customerName={selectedCustomerName}
-        open={isDialogOpen} 
+        open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         onOrderUpdated={fetchIssues}
+      />
+
+      <PurchaseIssueDialog
+        issue={selectedPurchaseIssue}
+        open={isPurchaseDialogOpen}
+        onOpenChange={setIsPurchaseDialogOpen}
+        onResolved={fetchIssues}
       />
     </>
   );

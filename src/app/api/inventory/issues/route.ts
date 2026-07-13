@@ -20,6 +20,7 @@ export async function GET(req: Request) {
           *,
           products(name, variant_name, images),
           orders(id, status, sales_person_name, customer_id, customers(full_name), order_items(*)),
+          purchase_orders(id, notes),
           order_issue_messages(*)
         `)
         .eq('id', id)
@@ -36,7 +37,7 @@ export async function GET(req: Request) {
       
       return NextResponse.json(data);
     } else {
-      // Get all open issues
+      // Get all open order issues (purchase-receiving issues live in the Inbox Drawer instead)
       const { data, error } = await supabase
         .from('order_issues')
         .select(`
@@ -46,6 +47,7 @@ export async function GET(req: Request) {
           order_issue_messages(id, sender_name, created_at)
         `)
         .eq('status', 'open')
+        .eq('issue_type', 'order')
         .order('created_at', { ascending: false });
       
       if (error) throw error;
