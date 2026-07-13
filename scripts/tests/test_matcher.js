@@ -7,13 +7,7 @@ async function test() {
     
       let trackingCol = -1;
       let refCol = -1;
-      let pickupTimeCol = 10;
-      let paymentRoleCol = 32;
-      let codAmountCol = 38;
-      let estShippingFeeCol = 42;
       let foundHeaders = false;
-
-      let orderUpdates = {};
 
       worksheet.eachRow((row, rowNumber) => {
           if (!foundHeaders) {
@@ -21,10 +15,6 @@ async function test() {
                   const val = cell.value?.toString().toLowerCase().trim() || '';
                   if (val === 'tracking number' || val === 'tracking no.') trackingCol = colNumber;
                   else if (val.includes('customer reference') || val === 'order number') refCol = colNumber;
-                  else if (val.includes('pickup time')) pickupTimeCol = colNumber;
-                  else if (val.includes('payment role')) paymentRoleCol = colNumber;
-                  else if (val.includes('cod amount')) codAmountCol = colNumber;
-                  else if (val.includes('shipping fee') || val.includes('est. shipping')) estShippingFeeCol = colNumber;
               });
               
               if (trackingCol !== -1 && refCol !== -1) {

@@ -26,7 +26,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useAuth } from '@/lib/supabase/hooks';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -55,7 +54,6 @@ export type UserProfile = {
 };
 
 export default function UsersPage() {
-  const auth = useAuth();
   const supabase = createClient();
   const { userProfile: currentUserProfile } = useUserProfile();
   const [deletingUser, setDeletingUser] = useState<UserProfile | null>(null);

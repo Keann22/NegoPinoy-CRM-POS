@@ -107,7 +107,7 @@ export function TopProducts({ dateRange, salespersonId = 'all' }: TopProductsPro
                 }
 
                 const topProductIds = top5ProductEntries.map(e => e[0]);
-                let productMap = new Map<string, { name: string; sku: string }>();
+                const productMap = new Map<string, { name: string; sku: string }>();
 
                 if (canSeeProducts) {
                     const { data: products, error: productsError } = await supabase

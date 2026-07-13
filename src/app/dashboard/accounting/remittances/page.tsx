@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Upload, FileText } from 'lucide-react';
@@ -69,7 +69,7 @@ export default function SPXRemittancesPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">
-                    Go to your Shopee Xpress or courier portal and download the "Account Transaction List" Excel file that contains your COD collections and shipping fees.
+                    Go to your Shopee Xpress or courier portal and download the &quot;Account Transaction List&quot; Excel file that contains your COD collections and shipping fees.
                   </p>
                 </CardContent>
               </Card>
@@ -79,7 +79,7 @@ export default function SPXRemittancesPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">
-                    Click the green "Upload Remittance File" button above and select your downloaded Excel file.
+                    Click the green &quot;Upload Remittance File&quot; button above and select your downloaded Excel file.
                   </p>
                 </CardContent>
               </Card>

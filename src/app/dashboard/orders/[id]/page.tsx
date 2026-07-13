@@ -18,8 +18,8 @@ import { WaybillSummaryDialog } from '@/components/dashboard/waybill-summary-dia
 import { OrderTrailDialog } from '@/components/dashboard/order-trail-dialog';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useOrderDetail } from '@/hooks/useOrderDetail';
-import { resolveOpenOrderIssues } from '@/lib/services/order-service';
-import type { Order, OrderStatus } from '@/types';
+import { resolveOpenOrderIssues } from '@/lib/services/order-issues-service';
+import type { OrderStatus } from '@/types';
 
 type StatusVariant = 'outline' | 'secondary' | 'destructive' | 'default';
 
@@ -45,7 +45,7 @@ export default function OrderDetailPage() {
   const orderId = params.id as string;
   const supabase = useSupabase();
 
-  const { order, customer, orderItems: rawItems, payments: rawPayments, isLoading, refetch } = useOrderDetail(orderId);
+  const { order, customer, orderItems: rawItems, payments: rawPayments, isLoading } = useOrderDetail(orderId);
   const { userProfile } = useUserProfile();
 
   // Dialog state

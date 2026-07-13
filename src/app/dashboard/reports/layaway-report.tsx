@@ -154,7 +154,7 @@ export function LayawayReport() {
                 {!isLoading && orders.length === 0 && (
                 <div className="flex flex-col items-center justify-center text-center border-2 border-dashed rounded-lg p-12 mt-4">
                     <p className="text-lg font-semibold">No Active Lay-away Plans</p>
-                    <p className="text-muted-foreground mt-2">There are no current orders marked as 'Lay-away' with a pending balance.</p>
+                    <p className="text-muted-foreground mt-2">There are no current orders marked as &apos;Lay-away&apos; with a pending balance.</p>
                 </div>
                 )}
             </CardContent>

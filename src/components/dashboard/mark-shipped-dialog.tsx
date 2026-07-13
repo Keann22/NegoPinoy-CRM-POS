@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useSupabase } from '@/lib/supabase/hooks';
-import { resolveOpenOrderIssues } from '@/lib/services/order-service';
+import { resolveOpenOrderIssues } from '@/lib/services/order-issues-service';
 import {
     Dialog,
     DialogContent,
@@ -82,7 +82,7 @@ export function MarkShippedDialog({
                     <DialogHeader>
                         <DialogTitle>Mark as Shipped</DialogTitle>
                         <DialogDescription>
-                            Enter the tracking number for this order. The status will be updated to "Shipped".
+                            Enter the tracking number for this order. The status will be updated to &quot;Shipped&quot;.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">

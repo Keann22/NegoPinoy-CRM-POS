@@ -7,168 +7,12 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Every order status that still owes a customer this product (mirrors the
-// "Stock Allocation Details" dialog). Stock is deducted from the ledger the
-// moment an order is placed — not at pick/pack — so this full set is what
-// Current Stock's deficit actually represents, and is only used to detect
-// when Current Stock has drifted from that ledger truth (see hasDiscrepancy
-// in procurement-item-row.tsx), not to decide how much to buy.
-const ALL_OPEN_STATUSES = [
-  'Pending Payment', 'Processing', 'Picked', 'Picked (with issue)', 'Photo',
-  'Packed', 'For Shipping', 'For Pick-up', 'On-Hold', 'Waiting for Stock',
-];
+import { ALL_OPEN_STATUSES, UNFULFILLED_STATUSES, migrateLeakedBundleDrafts, autoCleanupStaffDrafts } from '@/lib/services/procurement-service';
 
-// Statuses where the item has NOT yet been physically found and secured by a
-// picker. Once an order reaches Picked/Photo/Packed/For Shipping/For Pick-up,
-// a staff member already pulled a real unit for it — buying more wouldn't
-// help that order. This narrower set is what actually needs purchasing.
-const UNFULFILLED_STATUSES = [
-  'Pending Payment', 'Processing', 'Picked (with issue)', 'On-Hold', 'Waiting for Stock',
-];
-
-// A picker/staff request for a bundle product (e.g. "Wok Pan with Takip")
-// normally gets expanded onto its components at request time (see
-// procurement-request/route.ts) — but if the bundle's assembly_recipe wasn't
-// configured yet at that moment, the draft lands on the bundle's own
-// product_id instead, and nothing re-checks it afterwards. Suppliers only
-// sell the raw components, so a bundle can never actually be "bought" here.
-// Self-heal any such leaked draft on every load by migrating it onto its
-// components, merging into whatever component draft already exists.
-async function migrateLeakedBundleDrafts() {
-  const { data: staffDraftItems } = await supabase
-    .from('purchase_order_items')
-    .select('id, po_id, product_id, expected_qty, requested_by_name, purchase_orders!inner(notes)')
-    .eq('purchase_orders.notes', 'STAFF_DRAFT')
-    .eq('status', 'pending_receipt');
-
-  if (!staffDraftItems || staffDraftItems.length === 0) return;
-
-  const { data: products } = await supabase
-    .from('products')
-    .select('id, assembly_recipe')
-    .in('id', staffDraftItems.map(i => i.product_id));
-
-  const recipeMap = new Map((products || []).map(p => [p.id, Array.isArray(p.assembly_recipe) ? p.assembly_recipe : []]));
-  const leaked = staffDraftItems.filter(i => (recipeMap.get(i.product_id) || []).length > 0);
-
-  for (const leak of leaked) {
-    // This route can be hit by two overlapping requests (e.g. the page fires
-    // an initial + a refetch nearly back-to-back). Without a lock, both would
-    // read the same leak, both find no existing component draft yet, and
-    // both insert their own copy — duplicating every component row. Claim the
-    // leak first by deleting it: a DELETE is atomic per row in Postgres, so
-    // only one of the concurrent requests actually removes it and gets a row
-    // back; the loser's delete matches nothing and it skips reprocessing.
-    // (purchase_order_items.status only allows 'pending_receipt'/'received',
-    // so a transient status value isn't an option here.)
-    const { data: claimed } = await supabase
-      .from('purchase_order_items')
-      .delete()
-      .eq('id', leak.id)
-      .select('id');
-
-    if (!claimed || claimed.length === 0) continue;
-
-    for (const comp of recipeMap.get(leak.product_id)!) {
-      const componentId = comp.productId || comp.component_id;
-      if (!componentId) continue;
-      const addQty = leak.expected_qty * (comp.quantity || 1);
-
-      const { data: existingComponentDraft } = await supabase
-        .from('purchase_order_items')
-        .select('id, expected_qty')
-        .eq('po_id', leak.po_id)
-        .eq('product_id', componentId)
-        .maybeSingle();
-
-      if (existingComponentDraft) {
-        await supabase
-          .from('purchase_order_items')
-          .update({
-            expected_qty: existingComponentDraft.expected_qty + addQty,
-            status: 'pending_receipt',
-            ...(leak.requested_by_name ? { requested_by_name: leak.requested_by_name } : {})
-          })
-          .eq('id', existingComponentDraft.id);
-      } else {
-        await supabase
-          .from('purchase_order_items')
-          .insert({
-            po_id: leak.po_id,
-            product_id: componentId,
-            expected_qty: addQty,
-            unit_cost: 0,
-            status: 'pending_receipt',
-            requested_by_name: leak.requested_by_name || null
-          });
-      }
-    }
-  }
-}
-
-async function autoCleanupStaffDrafts() {
-  const { data: drafts } = await supabase
-    .from('purchase_order_items')
-    .select('id, expected_qty, purchase_orders!inner(notes)')
-    .eq('purchase_orders.notes', 'STAFF_DRAFT')
-    .eq('status', 'pending_receipt');
-
-  if (!drafts || drafts.length === 0) return;
-
-  const draftIds = drafts.map((d: any) => d.id);
-
-  const { data: sources, error: srcErr } = await supabase
-    .from('procurement_request_sources')
-    .select('id, quantity, purchase_order_item_id, orders!inner(status)')
-    .in('purchase_order_item_id', draftIds);
-
-  if (srcErr) {
-    console.error('Skipping auto cleanup (procurement_request_sources might not exist):', srcErr.message);
-    return;
-  }
-
-  if (!sources || sources.length === 0) return;
-
-  const sourcesToDelete: string[] = [];
-  const draftUpdates = new Map<string, number>();
-
-  for (const src of (sources as any[])) {
-    if (!UNFULFILLED_STATUSES.includes(src.orders.status)) {
-      sourcesToDelete.push(src.id);
-      draftUpdates.set(
-        src.purchase_order_item_id, 
-        (draftUpdates.get(src.purchase_order_item_id) || 0) + src.quantity
-      );
-    }
-  }
-
-  if (sourcesToDelete.length > 0) {
-    // Delete the fulfilled source links
-    // Split deletes into chunks of 100 just in case there are many
-    for (let i = 0; i < sourcesToDelete.length; i += 100) {
-      await supabase.from('procurement_request_sources').delete().in('id', sourcesToDelete.slice(i, i + 100));
-    }
-
-    // Update or delete the draft itself based on deducted qty
-    for (const [draftId, qtyToDeduct] of draftUpdates.entries()) {
-      const draft = drafts.find((d: any) => d.id === draftId);
-      if (!draft) continue;
-      
-      const newQty = draft.expected_qty - qtyToDeduct;
-      
-      if (newQty <= 0) {
-        await supabase.from('purchase_order_items').delete().eq('id', draftId);
-      } else {
-        await supabase.from('purchase_order_items').update({ expected_qty: newQty }).eq('id', draftId);
-      }
-    }
-  }
-}
-
-export async function GET(req: Request) {
+export async function GET() {
   try {
-    await migrateLeakedBundleDrafts();
-    await autoCleanupStaffDrafts();
+    await migrateLeakedBundleDrafts(supabase);
+    await autoCleanupStaffDrafts(supabase);
 
     // 1. Get all suppliers
     const { data: suppliers, error: sErr } = await supabase
@@ -564,7 +408,7 @@ export async function PATCH(req: Request) {
     }
 
     const { data: currentProduct } = await supabase.from('products').select('supplier_pricing, initial_unit_cost').eq('id', productId).single();
-    let newPricing = currentProduct?.supplier_pricing || [];
+    const newPricing = currentProduct?.supplier_pricing || [];
     
     const { data: sup } = await supabase.from('suppliers').select('name').eq('id', newSupplierId).single();
     const supplierName = sup?.name || 'Unknown Supplier';

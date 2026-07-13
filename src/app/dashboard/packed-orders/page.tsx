@@ -250,7 +250,7 @@ export default function PackedOrdersPage() {
             <div>
               <CardTitle className="font-headline">Packed Orders</CardTitle>
               <CardDescription>
-                Review freshly packed orders, verify their shipping details, and send them to the "For Shipping" queue.
+                Review freshly packed orders, verify their shipping details, and send them to the &quot;For Shipping&quot; queue.
               </CardDescription>
             </div>
           </div>

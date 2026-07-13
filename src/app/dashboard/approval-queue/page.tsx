@@ -69,7 +69,7 @@ export default function ApprovalQueuePage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h2 className="text-2xl font-bold mb-1">Knowledge Verification</h2>
-          <p className="text-muted-foreground text-sm">Review real customer conversations to expand the chatbot's brain.</p>
+          <p className="text-muted-foreground text-sm">Review real customer conversations to expand the chatbot&apos;s brain.</p>
         </div>
         <button 
           disabled={loading}

@@ -6,7 +6,7 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.
 
 async function test() {
     // 1. Fetch orders
-    const { data, error } = await supabase
+    const { data } = await supabase
         .from('orders')
         .select('id, spx_sync_data')
         .in('id', ['cb634396-04e2-4f6f-8db8-a6534d22fe9d', '3fe2dd2a-6674-4db1-a65d-f801719d2047'])
@@ -26,7 +26,7 @@ async function test() {
     let foundHeaders = false;
     const orderUpdates = {};
 
-    worksheet.eachRow((row, rowNumber) => {
+    worksheet.eachRow((row) => {
         if (!foundHeaders) {
             row.eachCell((cell, colNumber) => {
                 const val = cell.value?.toString().toLowerCase().trim() || '';
@@ -79,7 +79,7 @@ async function test() {
             }
         };
         console.log(`Updating ${fullId} with fee ${updateData.estimated_shipping_fee}...`);
-        const res = await supabase.from('orders').update(updateObj).eq('id', fullId);
+        await supabase.from('orders').update(updateObj).eq('id', fullId);
     }
 }
 

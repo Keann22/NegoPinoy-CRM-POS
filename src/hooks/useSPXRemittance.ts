@@ -40,7 +40,7 @@ export function useSPXRemittance() {
       let typeCol = -1;
       let amountCol = -1;
 
-      worksheet.eachRow((row, rowNumber) => {
+      worksheet.eachRow((row) => {
         if (!headersFound) {
           row.eachCell((cell, colNumber) => {
             const val = cell.value?.toString().toLowerCase().trim() || '';
@@ -119,7 +119,7 @@ export function useSPXRemittance() {
         let totalAvailableCod = 0; // Real COD SPX collected, before capping to what the order still needs
         let totalShippingFee = 0;
         let totalProcessingFee = 0;
-        let matchedTrackingNos: string[] = [];
+        const matchedTrackingNos: string[] = [];
         let matched = false;
 
         for (const t of trackingList) {
@@ -244,7 +244,7 @@ export function useSPXRemittance() {
                 if (paymentError) throw paymentError;
               }
 
-              let finalShippingFee = Math.abs(totalShippingFee);
+              const finalShippingFee = Math.abs(totalShippingFee);
               let finalProcessingFee = Math.abs(totalProcessingFee);
               
               const excelHadNoDeductions = totalShippingFee === 0 && totalProcessingFee === 0;

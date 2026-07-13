@@ -27,7 +27,7 @@ async function syncOldFile() {
 
     const orderUpdates = {};
 
-    worksheet.eachRow((row, rowNumber) => {
+    worksheet.eachRow((row) => {
         if (!foundHeaders) {
             row.eachCell((cell, colNumber) => {
                 const val = cell.value?.toString().toLowerCase().trim() || '';

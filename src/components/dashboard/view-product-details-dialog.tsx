@@ -1,8 +1,6 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import type { FormattedProduct } from '@/app/dashboard/products/page';
-import Image from "next/image";
-import { format } from "date-fns";
 import { ZoomableImage } from "@/components/ui/zoomable-image";
 
 interface ViewProductDetailsDialogProps {

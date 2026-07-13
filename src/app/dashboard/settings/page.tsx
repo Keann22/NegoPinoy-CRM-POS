@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useSupabase, useUser } from '@/lib/supabase/hooks';
+import { useSupabase } from '@/lib/supabase/hooks';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useToast } from '@/hooks/use-toast';
 import { User, Mail, ShieldCheck } from 'lucide-react';
@@ -13,7 +13,6 @@ import { Badge } from '@/components/ui/badge';
 
 export default function SettingsPage() {
     const supabase = useSupabase();
-    const { user } = useUser();
     const { userProfile } = useUserProfile();
     const { toast } = useToast();
     

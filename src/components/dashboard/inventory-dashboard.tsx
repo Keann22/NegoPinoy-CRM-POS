@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useSupabase, useUser } from "@/lib/supabase/hooks";
-import { AlertTriangle, Package, ArrowDownToLine, ArrowUpRight, ClipboardList, Settings2, PackageSearch } from "lucide-react";
+import { AlertTriangle, Package, ArrowDownToLine, ArrowUpRight, ClipboardList, PackageSearch } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OrderIssues } from "@/components/dashboard/order-issues";

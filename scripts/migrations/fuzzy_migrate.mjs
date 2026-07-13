@@ -5,10 +5,6 @@ const addressData = JSON.parse(fs.readFileSync('src/lib/philippine-address-data.
 const unmigrated = JSON.parse(fs.readFileSync('unmigrated_addresses.json', 'utf8'));
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
-function cleanStr(s) {
-  return s.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
-
 // Build a flat list of all locations for fast searching
 const locations = [];
 for (const [regionCode, r] of Object.entries(addressData)) {

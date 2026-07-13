@@ -53,7 +53,7 @@ export function useScanReceipt() {
         },
     });
 
-    const { fields, append, remove, replace } = useFieldArray({
+    const { fields, remove, replace } = useFieldArray({
         control: form.control,
         name: 'items',
     });

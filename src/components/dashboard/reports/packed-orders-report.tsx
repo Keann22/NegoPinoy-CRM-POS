@@ -5,7 +5,6 @@ import { useState, useEffect } from 'react';
 import { useSupabase } from '@/lib/supabase/hooks';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { Loader2, Printer, Download } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -136,7 +135,7 @@ export function PackedOrdersReport() {
         order.items = [{ product_name: 'Item', quantity: 1, selling_price_at_sale: order.totalAmount, discount: 0 }];
       }
 
-      let codAmount = order.balanceDue || 0;
+      const codAmount = order.balanceDue || 0;
       const isCOD = codAmount > 0;
       
       const detailedAddress = order.customer?.street_address 
@@ -187,7 +186,7 @@ export function PackedOrdersReport() {
           <div>
             <CardTitle>Packed Orders Report</CardTitle>
             <CardDescription>
-              All orders currently in "Packed" status waiting to be shipped. 
+              All orders currently in &quot;Packed&quot; status waiting to be shipped. 
               <br />Useful for courier bulk uploads.
             </CardDescription>
           </div>

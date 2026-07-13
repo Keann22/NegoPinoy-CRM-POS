@@ -1,15 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useSupabase } from '@/lib/supabase/hooks';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ShieldCheck, ScanLine, X, Check, AlertTriangle, Info, AlertCircle } from 'lucide-react';
+import { Loader2, ShieldCheck, Check, AlertTriangle, AlertCircle } from 'lucide-react';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { ProductPhotoDialog } from '@/components/dashboard/product-photo-dialog';
+import { VerifyScanner } from '@/components/dashboard/orders/verify-scanner';
 
 type OrderItem = {
   id: string;
@@ -23,7 +24,6 @@ export default function VerifyApp() {
   const supabase = useSupabase();
   const { toast } = useToast();
   const { userProfile } = useUserProfile();
-  const [scanner, setScanner] = useState<any>(null);
   const [scanning, setScanning] = useState(false);
   const [scannedOrderId, setScannedOrderId] = useState<string | null>(null);
   const [orderDetails, setOrderDetails] = useState<any>(null);
@@ -34,8 +34,7 @@ export default function VerifyApp() {
   const [samePersonBlock, setSamePersonBlock] = useState(false);
   const [samePersonName, setSamePersonName] = useState<string | null>(null);
 
-  const startScanner = async () => {
-    setScanning(true);
+  const handleScanStart = () => {
     setScannedOrderId(null);
     setOrderDetails(null);
     setOrderItems([]);
@@ -43,45 +42,7 @@ export default function VerifyApp() {
     setViewingPhotoItem(null);
     setSamePersonBlock(false);
     setSamePersonName(null);
-
-    const { Html5QrcodeScanner } = await import('html5-qrcode');
-
-    setTimeout(() => {
-      const newScanner = new Html5QrcodeScanner(
-        "reader",
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        /* verbose= */ false
-      );
-      
-      newScanner.render(
-        (decodedText) => {
-          newScanner.clear();
-          setScanning(false);
-          handleScanSuccess(decodedText);
-        },
-        (error) => {
-          // ignore background errors
-        }
-      );
-      setScanner(newScanner);
-    }, 100);
   };
-
-  const stopScanner = () => {
-    if (scanner) {
-      scanner.clear().catch(console.error);
-      setScanner(null);
-    }
-    setScanning(false);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (scanner) {
-        scanner.clear().catch(console.error);
-      }
-    };
-  }, [scanner]);
 
   const handleScanSuccess = async (orderId: string) => {
     if (!supabase) return;
@@ -264,30 +225,13 @@ export default function VerifyApp() {
         <p className="text-muted-foreground text-sm">Scan order QR to verify items before packing.</p>
       </div>
 
-      {!scanning && !scannedOrderId && (
-        <Card className="shadow-md border-primary/20 max-w-md mx-auto w-full">
-          <CardContent className="flex flex-col items-center justify-center p-8 space-y-4">
-            <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center">
-              <ScanLine className="h-12 w-12 text-primary" />
-            </div>
-            <Button size="lg" className="w-full text-lg h-14" onClick={startScanner}>
-              Tap to Scan Order
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {scanning && (
-        <Card className="max-w-md mx-auto w-full">
-          <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle>Scanning...</CardTitle>
-            <Button variant="ghost" size="icon" onClick={stopScanner}><X className="h-4 w-4" /></Button>
-          </CardHeader>
-          <CardContent>
-            <div id="reader" className="w-full rounded overflow-hidden"></div>
-            <p className="text-center text-sm text-muted-foreground mt-4">Point your camera at the unified QR code on the order slip.</p>
-          </CardContent>
-        </Card>
+      {!scannedOrderId && (
+        <VerifyScanner 
+          scanning={scanning} 
+          setScanning={setScanning} 
+          onScanSuccess={handleScanSuccess} 
+          onScanStart={handleScanStart} 
+        />
       )}
 
       {loading && !orderDetails && (

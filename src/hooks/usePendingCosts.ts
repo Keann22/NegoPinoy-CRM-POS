@@ -139,7 +139,7 @@ export function usePendingCosts() {
         if (updateErr) throw updateErr;
       }
 
-      let updatedSupplierPricing = movement.products.supplier_pricing || [];
+      const updatedSupplierPricing = movement.products.supplier_pricing || [];
       const supplierObj = allSuppliers.find(s => s.name === supplierValue);
       
       if (supplierObj) {

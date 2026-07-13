@@ -4,7 +4,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from "@/components/ui/badge";
 import { useSupabase, useUser } from "@/lib/supabase/hooks";
 import { useState, useEffect } from "react";
-import Image from "next/image";
 import { ZoomableImage } from "@/components/ui/zoomable-image";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";

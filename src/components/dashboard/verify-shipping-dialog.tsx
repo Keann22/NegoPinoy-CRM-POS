@@ -53,7 +53,7 @@ export function VerifyShippingDialog({ order, open, onOpenChange, onSuccess }: V
   useEffect(() => {
     if (open && order && supabase) {
       // Fetch customer details
-      supabase.from('customers').select('*').eq('id', order.customerId).single().then(({ data, error }) => {
+      supabase.from('customers').select('*').eq('id', order.customerId).single().then(({ data }) => {
         if (data) {
           setShippingName(data.full_name || '');
           setShippingPhone(data.mobile_number || '');
@@ -208,7 +208,7 @@ export function VerifyShippingDialog({ order, open, onOpenChange, onSuccess }: V
         <DialogHeader>
           <DialogTitle>Verify Shipping Details</DialogTitle>
           <DialogDescription>
-            Confirm or edit the shipping details for this order. It will be moved to the "For Shipping" tab.
+            Confirm or edit the shipping details for this order. It will be moved to the &quot;For Shipping&quot; tab.
           </DialogDescription>
         </DialogHeader>
         
@@ -337,7 +337,7 @@ export function VerifyShippingDialog({ order, open, onOpenChange, onSuccess }: V
 
             <div className="flex items-center space-x-2 col-span-2 mt-4 bg-muted/50 p-3 rounded-md">
               <Checkbox id="saveAsSecondary" checked={saveAsSecondary} onCheckedChange={(checked) => setSaveAsSecondary(checked === true)} />
-              <Label htmlFor="saveAsSecondary" className="cursor-pointer">Save this address as customer's Secondary Address</Label>
+              <Label htmlFor="saveAsSecondary" className="cursor-pointer">Save this address as customer&apos;s Secondary Address</Label>
             </div>
           </div>
         </div>

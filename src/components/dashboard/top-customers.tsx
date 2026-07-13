@@ -89,7 +89,7 @@ export function TopCustomers({ dateRange, salespersonId = 'all' }: TopCustomersP
                 }
 
                 const topCustomerIds = top5CustomerEntries.map(e => e[0]);
-                let customerMap = new Map<string, { name: string; email: string }>();
+                const customerMap = new Map<string, { name: string; email: string }>();
 
                 if (canSeeCustomers) {
                     const { data: customers, error: customersError } = await supabase

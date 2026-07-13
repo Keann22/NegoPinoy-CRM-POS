@@ -159,7 +159,7 @@ export default function BulkReceivePage() {
                          {fields.length === 0 && (
                             <TableRow>
                                 <TableCell colSpan={5} className="h-24 text-center">
-                                No items added. Click "Add Item" to start.
+                                No items added. Click &quot;Add Item&quot; to start.
                                 </TableCell>
                             </TableRow>
                         )}
@@ -190,7 +190,7 @@ export default function BulkReceivePage() {
                         console.error(e);
                         toast({ variant: 'destructive', title: "Error loading items" });
                     }
-                }}>Load 'To Procure' Items</Button>
+                }}>Load &apos;To Procure&apos; Items</Button>
             </div>
 
             {isManagement && (

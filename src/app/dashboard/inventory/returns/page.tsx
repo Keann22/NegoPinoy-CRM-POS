@@ -49,7 +49,7 @@ export default function ReturnsPage() {
       <CardHeader>
         <CardTitle className="font-headline">Returns</CardTitle>
         <CardDescription>
-          Every processed return, including exchanges and write-offs that don't appear in Inventory History since they don't change stock.
+          Every processed return, including exchanges and write-offs that don&apos;t appear in Inventory History since they don&apos;t change stock.
         </CardDescription>
       </CardHeader>
       <CardContent>

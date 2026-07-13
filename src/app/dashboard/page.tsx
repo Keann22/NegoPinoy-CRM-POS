@@ -3,7 +3,6 @@
 import { Activity, CreditCard, DollarSign, TrendingUp, CalendarIcon, Filter } from 'lucide-react';
 import { useMemo, useEffect, useState } from 'react';
 import { useUser, useSupabase } from '@/lib/supabase/hooks';
-import { useRouter } from 'next/navigation';
 import { DateRange } from 'react-day-picker';
 import { startOfMonth, endOfMonth, format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -29,30 +28,9 @@ import { ComplianceWidget } from '@/components/dashboard/compliance-widget';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUserProfile } from '@/hooks/useUserProfile';
 
-// Types based on backend.json
-type Order = {
-  id: string;
-  totalAmount: number;
-  balanceDue: number;
-  orderStatus: 'Pending Payment' | 'Processing' | 'Packed' | 'Shipped' | 'Completed' | 'Cancelled' | 'Returned';
-};
-
-type OrderItem = {
-  orderId: string;
-  quantity: number;
-  costPriceAtSale: number;
-};
-
-type Expense = {
-  amount: number;
-  category: string;
-};
-
-
 export default function DashboardPage() {
     const { user } = useUser();
     const { userProfile } = useUserProfile();
-    const router = useRouter();
 
     const isManagement = useMemo(() => userProfile?.roles.some(r => ['Admin', 'Owner'].includes(r)), [userProfile]);
     const isSales = useMemo(() => userProfile?.roles.includes('Sales'), [userProfile]);

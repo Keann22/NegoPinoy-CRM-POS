@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useSupabase } from '@/lib/supabase/hooks';
 import { useToast } from '@/hooks/use-toast';
 import { useUserProfile } from '@/hooks/useUserProfile';
 
@@ -38,8 +37,8 @@ export function usePendingPurchases(onReceiveComplete: () => void) {
   };
 
   const handleReceiveSingle = async (item: any, isUnexpected: boolean = false) => {
-    let toReceive = [];
-    let toReceiveUnexpected = [];
+    const toReceive = [];
+    const toReceiveUnexpected = [];
 
     if (isUnexpected) {
         if (!item.receivedQty || Number(item.receivedQty) <= 0) {

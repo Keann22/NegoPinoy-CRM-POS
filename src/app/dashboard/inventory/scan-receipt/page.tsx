@@ -138,7 +138,7 @@ export default function ScanReceiptPage() {
                     open={isAddProductDialogOpen}
                     onOpenChange={setIsAddProductDialogOpen}
                     initialValues={addProductInitialValues}
-                    onProductAdded={(newProduct) => {
+                    onProductAdded={(newProduct: { id: string; name: string }) => {
                         if (productCreationRowIndex !== null) {
                             form.setValue(`items.${productCreationRowIndex}.productId`, newProduct.id);
                             form.setValue(`items.${productCreationRowIndex}.productName`, newProduct.name);

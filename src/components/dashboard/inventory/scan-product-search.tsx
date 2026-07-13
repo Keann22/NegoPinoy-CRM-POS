@@ -99,7 +99,7 @@ export function ScanProductSearch({ rowIndex, form, onAddNewProduct }: { rowInde
                             }}
                             className="text-primary cursor-pointer"
                         >
-                            + Add "{search}" as new product
+                            + Add &quot;{search}&quot; as new product
                         </CommandItem>
                     </>
                 )}

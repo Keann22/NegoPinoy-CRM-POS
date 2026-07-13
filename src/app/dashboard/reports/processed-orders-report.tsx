@@ -67,7 +67,7 @@ export function ProcessedOrdersReport() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <CardTitle className="font-headline">Processed Orders (Batch Printing)</CardTitle>
-            <CardDescription>View and print orders currently in "Processing" state.</CardDescription>
+            <CardDescription>View and print orders currently in &quot;Processing&quot; state.</CardDescription>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={handlePrint} disabled={orders.length === 0}>

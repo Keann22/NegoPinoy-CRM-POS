@@ -11,7 +11,6 @@ import { usePacker } from '@/hooks/usePacker';
 
 export default function PackerApp() {
   const {
-    scanner,
     scanning,
     scannedOrderId,
     setScannedOrderId,

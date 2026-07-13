@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSupabase, useUser } from '@/lib/supabase/hooks';
 import { useUserProfile } from '@/hooks/useUserProfile';
-import { startOfDay, endOfDay } from 'date-fns';
+import { endOfDay } from 'date-fns';
 import { AlertCircle, X } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -20,7 +20,6 @@ export function DueDateAlert() {
 
         const checkDueToday = async () => {
             try {
-                const todayStart = startOfDay(new Date()).toISOString();
                 const todayEnd = endOfDay(new Date()).toISOString();
 
                 // Look for orders due today OR overdue (lte todayEnd) where balance > 0

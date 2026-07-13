@@ -5,7 +5,6 @@ import {
   Archive,
   ArrowDownUp,
   AlertTriangle,
-  Bell,
   BookCopy,
   Building,
   ChevronDown,
@@ -40,7 +39,6 @@ import { useEffect, useState, useMemo } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DueDateAlert } from '@/components/dashboard/due-date-alert';
 import {

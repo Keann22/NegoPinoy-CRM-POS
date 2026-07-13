@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { DateRange } from 'react-day-picker';
 import {
   startOfMonth,
   endOfMonth,
   format,
 } from 'date-fns';
-import { Calendar as CalendarIcon, CheckCircle2, TrendingUp, PackageCheck } from 'lucide-react';
+import { Calendar as CalendarIcon, CheckCircle2, PackageCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import {

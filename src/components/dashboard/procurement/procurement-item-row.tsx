@@ -68,7 +68,7 @@ export function ProcurementItemRow({
         </button>
         {hasDiscrepancy && (
             <div className="text-xs font-bold text-orange-600 mt-1 flex items-center gap-2">
-                <span>⚠️ Current Stock doesn't match total open orders.</span>
+                <span>⚠️ Current Stock doesn&apos;t match total open orders.</span>
                 <Button
                   size="sm"
                   variant="outline"

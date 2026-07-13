@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { User, Send, Brain, Bot, Save, RefreshCw, MessageSquare } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 
 export default function SimulatorPage() {
   const [testQuestion, setTestQuestion] = useState('');
@@ -63,7 +63,7 @@ export default function SimulatorPage() {
     <div className="max-w-4xl mx-auto py-8">
       <div className="mb-10 text-center">
         <h2 className="text-3xl font-bold mb-2">AI Simulation Lab</h2>
-        <p className="text-muted-foreground">Ask a question to see how the bot would respond. Edit the answer and click "Train" to improve its brain instantly.</p>
+        <p className="text-muted-foreground">Ask a question to see how the bot would respond. Edit the answer and click &quot;Train&quot; to improve its brain instantly.</p>
       </div>
 
       <Card className="overflow-hidden flex flex-col min-h-[600px] border-slate-200 dark:border-slate-800">

@@ -16,14 +16,12 @@ async function run() {
   let matchCount = 0;
   for (const row of data) {
     const trackingNo = row[0];
-    const refNo = row[2];
-    const name = row[15];
     const spxStatus = row[5];
-    
+
     if (!trackingNo) continue;
 
     // Try to find by tracking number
-    const { data: orders, error } = await supabase
+    const { data: orders } = await supabase
       .from('orders')
       .select('id, status, customer_id, customers (full_name)')
       .eq('tracking_number', trackingNo);

@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, Trash2, Plus } from "lucide-react";
 import { useSupabase, useUser } from "@/lib/supabase/hooks";
-import { useRoleCheck } from "@/hooks/useRoleCheck";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
@@ -16,7 +15,6 @@ export default function ProcurementRequestPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const supabase = useSupabase();
   const { user } = useUser();
-  const { isManagement } = useRoleCheck();
 
   const [openSearch, setOpenSearch] = useState(false);
   const [productSearch, setProductSearch] = useState('');
@@ -34,7 +32,6 @@ export default function ProcurementRequestPage() {
         let query = supabase.from('products').select('id, name, variant_name').not('name', 'ilike', '[DELETED]%');
         const searchWords = productSearch.split(' ').filter(w => w.trim() !== '');
         if (searchWords.length > 0) {
-            const orConditions = searchWords.map(w => `name.ilike.%${w}%,variant_name.ilike.%${w}%`).join(',');
             searchWords.forEach(w => {
                 query = query.or(`name.ilike.%${w}%,variant_name.ilike.%${w}%`);
             });
@@ -164,7 +161,7 @@ export default function ProcurementRequestPage() {
       {items.length === 0 ? (
         <div className="p-12 text-center border rounded-lg border-dashed text-slate-400">
           <p className="text-lg font-medium">Your request list is empty</p>
-          <p className="text-sm">Click the "Add Product" button above to start building your request.</p>
+          <p className="text-sm">Click the &quot;Add Product&quot; button above to start building your request.</p>
         </div>
       ) : (
         <div className="border rounded-lg overflow-hidden shadow-sm">

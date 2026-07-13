@@ -274,7 +274,7 @@ export default function AssembleKitPage() {
                                         <AlertCircle className="h-4 w-4" />
                                         <AlertTitle>No Recipe Found</AlertTitle>
                                         <AlertDescription>
-                                            This product does not have an assembly recipe. Please edit the product in the Products tab and set up its "Assembly Recipe" first.
+                                            This product does not have an assembly recipe. Please edit the product in the Products tab and set up its &quot;Assembly Recipe&quot; first.
                                         </AlertDescription>
                                     </Alert>
                                 )}

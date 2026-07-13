@@ -80,7 +80,7 @@ export function ReportIssueDialog({
             Reporting an issue for: <span className="font-semibold text-slate-900">{issueProduct?.productName}</span>
           </p>
           <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-700">Why can't this be purchased?</label>
+            <label className="text-sm font-medium text-slate-700">Why can&apos;t this be purchased?</label>
             <textarea
               value={issueNote}
               onChange={e => setIssueNote(e.target.value)}

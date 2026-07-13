@@ -179,7 +179,7 @@ export default function ProductsPage() {
       <EditProductDialog 
         product={editingProduct}
         open={!!editingProduct}
-        onOpenChange={(isOpen) => !isOpen && setEditingProduct(null)}
+        onOpenChange={(isOpen: boolean) => !isOpen && setEditingProduct(null)}
         onSuccess={() => refetch()}
       />
 
@@ -200,7 +200,7 @@ export default function ProductsPage() {
             <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
-                This action will permanently delete the product "{deletingProduct?.name}". This action cannot be undone.
+                This action will permanently delete the product &quot;{deletingProduct?.name}&quot;. This action cannot be undone.
             </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

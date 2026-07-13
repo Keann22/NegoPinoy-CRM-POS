@@ -75,7 +75,7 @@ export function RecentSales({ dateRange, salespersonId = 'all' }: RecentSalesPro
                 }
 
                 // Build customer map if user can see customers
-                let customerMap = new Map<string, { name: string; email: string }>();
+                const customerMap = new Map<string, { name: string; email: string }>();
 
                 if (canSeeCustomers) {
                     const customerIds = [...new Set(orders.map(o => o.customer_id).filter(Boolean))];

@@ -46,7 +46,7 @@ export function ProductSupplierSection({
             {isEdit && (
               <FormField control={form.control} name={`supplierPricing.${index}.supplierCode`} render={({ field: cf }) => (
                 <FormItem>
-                  <FormLabel className="text-xs text-muted-foreground">Supplier's Product Code</FormLabel>
+                  <FormLabel className="text-xs text-muted-foreground">Supplier&apos;s Product Code</FormLabel>
                   <FormControl><Input placeholder="e.g. WK-32-SS" className="h-8" {...cf} /></FormControl>
                 </FormItem>
               )} />

@@ -70,7 +70,7 @@ export function ProductVariationsSection({
         <>
           <FormLabel className="text-base font-semibold">Create New Variations</FormLabel>
           <DialogDescription>
-            Create new variations (e.g. "5L", "Red") based on this product's details.
+            Create new variations (e.g. &quot;5L&quot;, &quot;Red&quot;) based on this product&apos;s details.
           </DialogDescription>
         </>
       )}

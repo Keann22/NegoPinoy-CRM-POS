@@ -60,7 +60,7 @@ export function useShippingExport(orders: ShippingOrder[], setLoading: (val: boo
       orders.forEach(order => {
         const items = order.items.length > 0 ? order.items : [{ product_name: 'Item', quantity: 1, selling_price_at_sale: order.totalAmount, discount: 0 }];
         
-        let codAmount = order.balanceDue || 0;
+        const codAmount = order.balanceDue || 0;
         const isCOD = codAmount > 0;
         
         const addr = order.shippingAddress || {};

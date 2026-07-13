@@ -9,7 +9,7 @@ import * as z from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useSupabase } from "@/lib/supabase/hooks";
 import { useToast } from "@/hooks/use-toast";
-import { resolveOpenOrderIssues, STATUSES_THAT_CLEAR_ORDER_ISSUES } from "@/lib/services/order-service";
+import { resolveOpenOrderIssues, STATUSES_THAT_CLEAR_ORDER_ISSUES } from "@/lib/services/order-issues-service";
 import { Loader2 } from "lucide-react";
 import type { Order } from "@/app/dashboard/orders/page";
 import { useEffect, useState } from "react";

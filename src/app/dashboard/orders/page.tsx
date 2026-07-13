@@ -27,10 +27,10 @@ import { OrdersFilterBar } from '@/components/dashboard/orders/OrdersFilterBar';
 import { OrdersTable } from '@/components/dashboard/orders/OrdersTable';
 import { OverdueOrders } from '@/components/dashboard/orders/OverdueOrders';
 import { useOrders } from '@/hooks/useOrders';
-import { restoreStockForCancelledOrder, deductStockForUncancelledOrder, resolveOpenOrderIssues, STATUSES_THAT_CLEAR_ORDER_ISSUES } from '@/lib/services/order-service';
+import { restoreStockForCancelledOrder, deductStockForUncancelledOrder } from '@/lib/services/order-service';
+import { resolveOpenOrderIssues, STATUSES_THAT_CLEAR_ORDER_ISSUES } from '@/lib/services/order-issues-service';
 
 import type { FormattedOrder, Order, OrderStatus } from '@/types';
-import { ORDER_STATUSES } from '@/types';
 
 // Re-export for files that import Order from this page during transition
 export type { Order } from '@/types';

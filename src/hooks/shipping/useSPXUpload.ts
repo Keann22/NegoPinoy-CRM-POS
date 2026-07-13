@@ -43,7 +43,7 @@ export function useSPXUpload(orders: ShippingOrder[], setLoading: (val: boolean)
       let codServiceFeeCol = -1;
       let foundHeaders = false;
 
-      worksheet.eachRow((row, rowNumber) => {
+      worksheet.eachRow((row) => {
           if (!foundHeaders) {
               row.eachCell((cell, colNumber) => {
                   const val = cell.value?.toString().toLowerCase().trim() || '';

@@ -55,7 +55,7 @@ export function ToOrderReport() {
       fetch();
     }, [supabase, user]);
 
-    const [selectedSupplier, setSelectedSupplier] = useState<string>('all');
+    const [selectedSupplier] = useState<string>('all');
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
     const toOrder = useMemo(() => {
@@ -63,16 +63,6 @@ export function ToOrderReport() {
         // Only show products with strictly negative stock
         return products.filter(p => p.quantityOnHand < 0).sort((a, b) => a.quantityOnHand - b.quantityOnHand);
     }, [products]);
-
-    const uniqueSuppliers = useMemo(() => {
-        const suppliers = new Set<string>();
-        toOrder.forEach(p => {
-            if (p.supplierPricing && Array.isArray(p.supplierPricing)) {
-                p.supplierPricing.forEach(sp => suppliers.add(sp.supplierName));
-            }
-        });
-        return Array.from(suppliers).sort();
-    }, [toOrder]);
 
     const filteredToOrder = useMemo(() => {
         if (selectedSupplier === 'all') return toOrder;

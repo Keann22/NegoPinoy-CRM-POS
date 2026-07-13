@@ -147,7 +147,7 @@ export default function ExpensesPage() {
         <div>
           <CardTitle className="font-headline">Expenses</CardTitle>
           <CardDescription>
-            View and record your business's operational costs.
+            View and record your business&apos;s operational costs.
           </CardDescription>
         </div>
         <div className='flex gap-2'>
@@ -184,7 +184,7 @@ export default function ExpensesPage() {
             <div className="flex flex-col items-center justify-center text-center border-2 border-dashed rounded-lg p-12 mt-4">
                 <p className="text-lg font-semibold">No expenses found</p>
                 <p className="text-muted-foreground mt-2">
-                    Click "Add Expense" to get started.
+                    Click &quot;Add Expense&quot; to get started.
                 </p>
             </div>
         ) : (

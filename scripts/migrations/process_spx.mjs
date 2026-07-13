@@ -41,7 +41,7 @@ async function run() {
   const byTracking = {};
 
   for (const row of transactions) {
-    const [txnId, txnType, trackingNumber, statusTime, txnAmountStr] = row;
+    const [, txnType, trackingNumber, , txnAmountStr] = row;
     if (!trackingNumber || trackingNumber === 'Tracking Number') continue;
 
     const amount = parseFloat(String(txnAmountStr).replace('+', '').replace(',', ''));

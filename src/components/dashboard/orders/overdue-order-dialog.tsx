@@ -41,7 +41,7 @@ export function OverdueOrderDialog({ order, customerName, open, onOpenChange, on
       setIssues([]);
       setReplyText("");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [open, order]);
 
   const fetchIssues = async (orderId: string) => {
@@ -137,7 +137,7 @@ export function OverdueOrderDialog({ order, customerName, open, onOpenChange, on
   const daysOverdue = order.orderDate ? differenceInDays(new Date(), new Date(order.orderDate)) : 0;
   
   // Flatten all messages from all issues for this order
-  let allIssueMessages: any[] = [];
+  const allIssueMessages: any[] = [];
   issues.forEach(issue => {
     if (issue.order_issue_messages) {
       allIssueMessages.push(...issue.order_issue_messages);

@@ -15,7 +15,7 @@ async function checkExpenses() {
 
     const supabase = createClient(url, key);
 
-    const { data: expenses, error: expError } = await supabase
+    const { data: expenses } = await supabase
         .from('expenses')
         .select('description')
         .limit(10);

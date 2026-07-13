@@ -6,7 +6,7 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.
 
 async function test() {
     // 1. Fetch orders
-    const { data, error } = await supabase
+    const { data } = await supabase
         .from('orders')
         .select('id')
         .eq('status', 'For Shipping')
@@ -28,7 +28,7 @@ async function test() {
     let foundHeaders = false;
     const orderUpdates = {};
 
-    worksheet.eachRow((row, rowNumber) => {
+    worksheet.eachRow((row) => {
         if (!foundHeaders) {
             row.eachCell((cell, colNumber) => {
                 const val = cell.value?.toString().toLowerCase().trim() || '';

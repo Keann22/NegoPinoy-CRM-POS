@@ -20,8 +20,6 @@ async function run() {
   
   for (const row of data) {
     const trackingNo = row[0];
-    const refNo = row[2];
-    const name = row[15];
     const spxStatus = row[5];
     
     if (!trackingNo) continue;
@@ -35,7 +33,7 @@ async function run() {
 
     if (!newStatus) continue;
 
-    const { data: orders, error } = await supabase
+    const { data: orders } = await supabase
       .from('orders')
       .select('id, status, customer_id, customers (full_name)')
       .eq('tracking_number', trackingNo);

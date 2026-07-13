@@ -56,6 +56,7 @@ export async function POST(request: Request) {
     const arrayBuffer = await file.arrayBuffer();
     
     // Force Vercel's Node File Trace (NFT) to bundle the worker file
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- NFT traces require() calls; import may not be picked up the same way
     require('pdfjs-dist/legacy/build/pdf.worker.js');
     
     // Use the native pdfjs-dist library which properly supports password decryption

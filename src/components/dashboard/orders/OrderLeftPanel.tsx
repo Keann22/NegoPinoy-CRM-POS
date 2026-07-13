@@ -6,7 +6,6 @@ import { FormField, FormControl, FormItem, FormLabel, FormMessage } from '@/comp
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Textarea } from '@/components/ui/textarea';
 import { FileUpload } from '@/components/ui/file-upload';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -36,7 +35,6 @@ interface OrderLeftPanelProps {
 export function OrderLeftPanel({
   control,
   watch,
-  setValue,
   isEditing,
   selectedCustomer,
   onClearCustomer,
@@ -46,13 +44,10 @@ export function OrderLeftPanel({
   isSearchingCustomers,
   onCustomerSelect,
   onAddCustomerClick,
-  totalAmount,
-  overpaymentApplied,
 }: OrderLeftPanelProps) {
   const paymentType = watch('paymentType');
   const amountPaid = watch('amountPaid');
   const isDownpaymentCOD = watch('isDownpaymentCOD');
-  const includeInsurance = watch('includeInsurance');
 
   return (
     <div className="md:col-span-1 space-y-4">
@@ -60,7 +55,7 @@ export function OrderLeftPanel({
       <FormField
         control={control}
         name="customerId"
-        render={({ field }) => (
+        render={() => (
           <FormItem className="flex flex-col">
             <FormLabel>Customer</FormLabel>
             {selectedCustomer ? (

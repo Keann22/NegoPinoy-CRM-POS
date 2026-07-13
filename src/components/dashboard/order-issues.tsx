@@ -5,17 +5,15 @@ import { Button } from "@/components/ui/button";
 import { AlertCircle, CheckCircle2, MessageSquare, PackageOpen, Send } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { useUser } from "@/lib/supabase/hooks";
 import { useUserProfile } from "@/hooks/useUserProfile";
 
-export function OrderIssues({ isAdmin }: { isAdmin?: boolean }) {
+export function OrderIssues({ }: { isAdmin?: boolean }) {
   const [issues, setIssues] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedGroup, setSelectedGroup] = useState<any | null>(null);
   const [replyText, setReplyText] = useState("");
   const [isSending, setIsSending] = useState(false);
 
-  const { user } = useUser();
   const { userProfile } = useUserProfile();
   const canResolve = userProfile?.roles?.some(r => ['Admin', 'Owner', 'Sales'].includes(r));
 
@@ -35,7 +33,7 @@ export function OrderIssues({ isAdmin }: { isAdmin?: boolean }) {
 
   useEffect(() => {
     fetchIssues();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, []);
 
   const groupedIssues = Object.values(issues.reduce((acc, issue) => {
@@ -74,7 +72,7 @@ export function OrderIssues({ isAdmin }: { isAdmin?: boolean }) {
           group.issues.map((i: any) => fetch(`/api/inventory/issues?id=${i.id}`).then(res => res.json()))
       );
       
-      let allMessages: any[] = [];
+      const allMessages: any[] = [];
       fullGroupIssues.forEach(fullIssue => {
           if (fullIssue.order_issue_messages) {
               allMessages.push(...fullIssue.order_issue_messages);

@@ -16,7 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { MoreHorizontal } from 'lucide-react';
 import { ORDER_STATUSES } from '@/types';
-import type { FormattedOrder, Order, OrderStatus } from '@/types';
+import type { FormattedOrder, OrderStatus } from '@/types';
 
 type StatusVariant = 'outline' | 'secondary' | 'destructive' | 'default';
 
@@ -59,7 +59,7 @@ export function OrdersTable({
   onSelectAll, onSelectOne, onViewDetails,
   onLogPayment, onEditPaymentTerms, onMarkShipped,
   onViewWaybill, onCodPayment, onDueDate, onStatusChange, onProcessReturn,
-  isAdminOrOwner, isInventoryOnly, canCreateOrder, userRoles,
+  isAdminOrOwner, isInventoryOnly, userRoles,
 }: OrdersTableProps) {
   const allSelected = orders.length > 0 && orders.every(o => selectedOrderIds.includes(o.id));
 

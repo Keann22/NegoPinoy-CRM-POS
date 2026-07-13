@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     if (items && items.length > 0) {
         // 3. We have unbought items. Roll them over to a STAFF_DRAFT PO.
         // First, see if we already have an active STAFF_DRAFT PO
-        let { data: draftPo, error: draftErr } = await supabase
+        let { data: draftPo } = await supabase
             .from('purchase_orders')
             .select('id')
             .eq('notes', 'STAFF_DRAFT')

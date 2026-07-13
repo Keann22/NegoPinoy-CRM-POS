@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import Image from 'next/image';
 import { ZoomableImage } from '@/components/ui/zoomable-image';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,

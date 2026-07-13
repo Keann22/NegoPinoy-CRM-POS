@@ -7,7 +7,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-export async function GET(req: Request) {
+export async function GET() {
   try {
     const { data: liveOS, error: lErr } = await supabase
       .from('products')
@@ -135,7 +135,7 @@ export async function POST(req: Request) {
 
     // 1. Find existing STAFF_DRAFT
     let poId = null;
-    const { data: existingPo, error: existErr } = await supabase
+    const { data: existingPo } = await supabase
       .from('purchase_orders')
       .select('id')
       .eq('notes', 'STAFF_DRAFT')

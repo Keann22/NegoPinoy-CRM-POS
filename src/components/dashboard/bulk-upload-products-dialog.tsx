@@ -290,8 +290,8 @@ export function BulkUploadProductsDialog() {
             Upload a CSV file with your products. The only required column is <strong>name</strong>. Other supported columns are: sku, description, categoryId, sellingPrice (or price), costPrice, and stock. Suppliers must be assigned manually after upload.
           </DialogDescription>
           <div className="text-xs text-muted-foreground bg-muted p-2 rounded-md space-y-1">
-            <p>If 'sku' is not provided, a unique one will be generated from the product name.</p>
-            <p>Fields with commas or line breaks should be wrapped in double quotes (e.g., "This is a, description").</p>
+            <p>If &apos;sku&apos; is not provided, a unique one will be generated from the product name.</p>
+            <p>Fields with commas or line breaks should be wrapped in double quotes (e.g., &quot;This is a, description&quot;).</p>
           </div>
         </DialogHeader>
         <Form {...form}>

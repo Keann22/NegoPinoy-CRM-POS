@@ -8,7 +8,7 @@
     "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "check:lines": "node -e \"const fs=require('fs'),path=require('path');function walk(dir){const files=fs.readdirSync(dir,{withFileTypes:true});for(const f of files){if(f.name==='node_modules'||f.name==='.next')continue;const p=path.join(dir,f.name);if(f.isDirectory())walk(p);else if(p.match(/\\.(tsx?|jsx?)$/)){const lines=fs.readFileSync(p,'utf8').split('\\n').length;if(lines>400)console.log(lines+'\\t'+p);}}}walk('./src');\" | sort -rn"
   },
@@ -79,6 +79,8 @@
     "@types/react-dom": "^19.2.1",
     "@types/string-similarity": "^4.0.2",
     "dotenv": "^17.4.2",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.2.10",
     "genkit-cli": "^1.20.0",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",

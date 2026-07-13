@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSupabase } from '@/lib/supabase/hooks';
 import { useToast } from '@/hooks/use-toast';
 import { useUserProfile } from '@/hooks/useUserProfile';
-import { resolveOpenOrderIssues } from '@/lib/services/order-service';
+import { resolveOpenOrderIssues } from '@/lib/services/order-issues-service';
 
 export type OrderItem = {
   id: string;
@@ -50,7 +50,7 @@ export function usePicker() {
           setScanning(false);
           handleScanSuccess(decodedText);
         },
-        (error) => {
+        () => {
           // ignore background errors
         }
       );

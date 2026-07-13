@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { AlertCircle, CheckCircle2, MessageSquare, PackageOpen, Send } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { useUser } from "@/lib/supabase/hooks";
 import { useUserProfile } from "@/hooks/useUserProfile";
 
 export function ProcurementIssues({ isAdmin }: { isAdmin?: boolean }) {
@@ -17,7 +16,6 @@ export function ProcurementIssues({ isAdmin }: { isAdmin?: boolean }) {
   const [replyText, setReplyText] = useState("");
   const [isSending, setIsSending] = useState(false);
   
-  const { user } = useUser();
   const { userProfile } = useUserProfile();
 
   const fetchIssues = async () => {
@@ -36,7 +34,7 @@ export function ProcurementIssues({ isAdmin }: { isAdmin?: boolean }) {
 
   useEffect(() => {
     fetchIssues();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, []);
 
   const openIssue = async (issue: any) => {

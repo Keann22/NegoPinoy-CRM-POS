@@ -6,7 +6,7 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PU
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Create a new batch from staff requests
-export async function POST(req: Request) {
+export async function POST() {
   try {
     // 1. Find all POs that are STAFF_DRAFT
     const { data: draftPOs, error: draftErr } = await supabase
@@ -60,7 +60,7 @@ export async function POST(req: Request) {
     }
 
     // 4. Determine next batch number
-    const { data: allBatches, error: bErr } = await supabase
+    const { data: allBatches } = await supabase
         .from('purchase_orders')
         .select('notes')
         .like('notes', 'BATCH_%');

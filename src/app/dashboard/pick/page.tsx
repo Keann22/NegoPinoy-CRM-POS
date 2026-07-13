@@ -11,7 +11,6 @@ import { ProductPhotoDialog } from '@/components/dashboard/product-photo-dialog'
 
 export default function PickerApp() {
   const {
-    scanner,
     scanning,
     scannedOrderId,
     setScannedOrderId,

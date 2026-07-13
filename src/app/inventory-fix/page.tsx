@@ -86,7 +86,7 @@ export default function InventoryFixPage() {
       <div>
         <h1 className="text-3xl font-bold text-slate-800">Inventory Reconciliation Tool</h1>
         <p className="text-slate-600 mt-2">
-          Match your Excel "Out of Stock" items to the correct database products.
+          Match your Excel &quot;Out of Stock&quot; items to the correct database products.
         </p>
       </div>
 
@@ -95,7 +95,7 @@ export default function InventoryFixPage() {
           <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-sm">Action Needed</span> 
           Unmatched Excel Items ({unmatchedExcelItems.length})
         </h2>
-        <p className="text-sm text-slate-500 mb-4">These items had very low confidence matches. Please select their database equivalent, or ignore them if they shouldn't be matched.</p>
+        <p className="text-sm text-slate-500 mb-4">These items had very low confidence matches. Please select their database equivalent, or ignore them if they shouldn&apos;t be matched.</p>
         <div className="border rounded-md overflow-hidden bg-white shadow-sm">
           <table className="w-full text-left">
             <thead className="bg-slate-50 border-b">

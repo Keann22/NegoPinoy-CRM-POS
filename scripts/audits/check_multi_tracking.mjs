@@ -60,8 +60,6 @@ async function run() {
   // 3. Compare with DB
   const { data: orders } = await supabase.from('orders').select('id, amount_paid, balance_due, tracking_number');
   
-  let processCount = 0;
-
   for (const [shortId, data] of Object.entries(byOrder)) {
       if (data.trackings.size > 1) {
           console.log(`Order ${shortId} has multiple tracking numbers in financials:`, Array.from(data.trackings));

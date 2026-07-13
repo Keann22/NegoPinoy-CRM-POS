@@ -15,7 +15,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 async function checkOrder() {
     console.log('Fetching orders...');
     
-    const { data: orders, error: ordersError } = await supabase
+    const { data: orders } = await supabase
         .from('orders')
         .select('*');
         

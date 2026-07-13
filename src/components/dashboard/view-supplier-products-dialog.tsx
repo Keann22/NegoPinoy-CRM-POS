@@ -3,7 +3,6 @@ import { useEffect, useState, useMemo } from "react";
 import { useSupabase } from "@/lib/supabase/hooks";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import Image from "next/image";
 import { ZoomableImage } from "@/components/ui/zoomable-image";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -37,7 +36,7 @@ function EditableSupplierCode({ productId, supplierId, currentSupplierPricing }:
     setIsSaving(true);
     try {
       // Create a new array with the updated supplier code
-      let updatedPricing = [...currentSupplierPricing];
+      const updatedPricing = [...currentSupplierPricing];
       const entryIndex = updatedPricing.findIndex(sp => sp.supplierId === supplierId);
       
       if (entryIndex >= 0) {

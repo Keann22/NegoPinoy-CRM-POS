@@ -195,7 +195,7 @@ export function OrderDialog(props: OrderDialogProps) {
         open={addProductOpen}
         onOpenChange={setAddProductOpen}
         initialValues={{ name: productSearch }}
-        onProductAdded={(p) => {
+        onProductAdded={(p: { id: string; name: string }) => {
           setProductSearch(p.name);
         }}
       />

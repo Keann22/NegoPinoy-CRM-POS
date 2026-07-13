@@ -39,7 +39,7 @@ export async function POST(req: Request) {
       const issueIdToOrderId = new Map<string, string>();
       (issues || []).forEach(i => issueIdToOrderId.set(i.id, i.order_id));
 
-      let orderIdToReason = new Map<string, string>();
+      const orderIdToReason = new Map<string, string>();
       if (issues && issues.length > 0) {
         const { data: messages } = await supabase
           .from('order_issue_messages')

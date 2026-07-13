@@ -1,6 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import fs from 'fs';
-import path from 'path';
 
 // --- CONFIGURATION ---
 // Please ensure you have your .env loaded or replace these with actual values if running manually.

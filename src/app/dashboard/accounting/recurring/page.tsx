@@ -122,7 +122,7 @@ export default function RecurringExpensesPage() {
             <div className="flex flex-col items-center justify-center text-center border-2 border-dashed rounded-lg p-12 mt-4">
                 <p className="text-lg font-semibold">No recurring expenses defined</p>
                 <p className="text-muted-foreground mt-2">
-                    Click "Add Recurring Expense" to get started.
+                    Click &quot;Add Recurring Expense&quot; to get started.
                 </p>
             </div>
         )}

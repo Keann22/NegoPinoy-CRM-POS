@@ -238,7 +238,7 @@ export default function CustomersPage() {
                         <Users className="h-10 w-10 text-muted-foreground mb-4 opacity-50" />
                         <p className="text-lg font-semibold">No customers yet</p>
                         <p className="text-muted-foreground mt-2">
-                            You haven't added any customers. Click "Add Customer" to get started.
+                            You haven&apos;t added any customers. Click &quot;Add Customer&quot; to get started.
                         </p>
                     </>
                 )}

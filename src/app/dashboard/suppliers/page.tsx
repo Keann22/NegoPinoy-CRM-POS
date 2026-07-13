@@ -188,7 +188,7 @@ export default function SuppliersPage() {
               <div className="flex flex-col items-center justify-center text-center border-2 border-dashed rounded-lg p-12 mt-4">
                   <p className="text-lg font-semibold">No suppliers found</p>
                   <p className="text-muted-foreground mt-2">
-                      Click "Add Supplier" to get started.
+                      Click &quot;Add Supplier&quot; to get started.
                   </p>
               </div>
           )}

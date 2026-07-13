@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSupabase } from '@/lib/supabase/hooks';
-import type { Order, OrderItem, PaymentRecord } from '@/types';
+import type { Order, OrderItem } from '@/types';
 
 type OrderDetailCustomer = {
   id: string;
@@ -33,7 +33,6 @@ export function useOrderDetail(orderId: string) {
   const [customer, setCustomer] = useState<OrderDetailCustomer | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [payments, setPayments] = useState<OrderDetailPayment[]>([]);
-  const [productMap, setProductMap] = useState<Map<string, { name: string; location: string }>>(new Map());
 
   const [isLoadingOrder, setIsLoadingOrder] = useState(true);
   const [isLoadingCustomer, setIsLoadingCustomer] = useState(false);
@@ -174,5 +173,5 @@ export function useOrderDetail(orderId: string) {
 
   const isLoading = isLoadingOrder || isLoadingCustomer || isLoadingItems || isLoadingPayments;
 
-  return { order, customer, orderItems, payments, productMap, isLoading, refetch };
+  return { order, customer, orderItems, payments, isLoading, refetch };
 }

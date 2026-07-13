@@ -57,7 +57,7 @@ export function NotForShippingDialog({ order, open, onOpenChange, onSuccess }: N
         <DialogHeader>
           <DialogTitle>Not For Shipping</DialogTitle>
           <DialogDescription>
-            Provide a reason why this packed order is not yet ready for shipping. It will be moved to the "Waiting to be Shipped" tab.
+            Provide a reason why this packed order is not yet ready for shipping. It will be moved to the &quot;Waiting to be Shipped&quot; tab.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">

@@ -1,9 +1,7 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import { useSupabase, useUser } from '@/lib/supabase/hooks';
-import { Skeleton } from '@/components/ui/skeleton';
-import { format, isValid } from 'date-fns';
+import { useSupabase } from '@/lib/supabase/hooks';
 import {
   Card,
   CardContent,
@@ -12,23 +10,10 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { useUserProfile } from '@/hooks/useUserProfile';
-import Link from 'next/link';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Eye, FileUp, FileSearch, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VerifyStatementDialog } from '@/components/dashboard/accounting/verify-statement-dialog';
 import { PaymentHistoryTable } from '@/components/dashboard/accounting/payment-history-table';
 
@@ -47,7 +32,6 @@ type Payment = {
 
 export default function PaymentsPage() {
   const supabase = useSupabase();
-  const { user } = useUser();
   const { userProfile } = useUserProfile();
   const { toast } = useToast();
 
@@ -184,18 +168,6 @@ export default function PaymentsPage() {
         title: "Error",
         description: "Failed to update payment status.",
       });
-    }
-  };
-
-  const getStatusVariant = (status: string) => {
-    switch (status) {
-      case 'Verified':
-        return 'default';
-      case 'Rejected':
-        return 'destructive';
-      case 'Pending':
-      default:
-        return 'secondary';
     }
   };
 

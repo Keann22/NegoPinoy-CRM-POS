@@ -237,7 +237,7 @@ export default function CategoriesPage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This will permanently delete the category "{deletingCategory?.name}". Products currently assigned to this category will not be deleted, but they may lose their category association.
+                            This will permanently delete the category &quot;{deletingCategory?.name}&quot;. Products currently assigned to this category will not be deleted, but they may lose their category association.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
