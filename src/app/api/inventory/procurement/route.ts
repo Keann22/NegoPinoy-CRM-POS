@@ -106,9 +106,69 @@ async function migrateLeakedBundleDrafts() {
   }
 }
 
+async function autoCleanupStaffDrafts() {
+  const { data: drafts } = await supabase
+    .from('purchase_order_items')
+    .select('id, expected_qty, purchase_orders!inner(notes)')
+    .eq('purchase_orders.notes', 'STAFF_DRAFT')
+    .eq('status', 'pending_receipt');
+
+  if (!drafts || drafts.length === 0) return;
+
+  const draftIds = drafts.map((d: any) => d.id);
+
+  const { data: sources, error: srcErr } = await supabase
+    .from('procurement_request_sources')
+    .select('id, quantity, purchase_order_item_id, orders!inner(status)')
+    .in('purchase_order_item_id', draftIds);
+
+  if (srcErr) {
+    console.error('Skipping auto cleanup (procurement_request_sources might not exist):', srcErr.message);
+    return;
+  }
+
+  if (!sources || sources.length === 0) return;
+
+  const sourcesToDelete: string[] = [];
+  const draftUpdates = new Map<string, number>();
+
+  for (const src of (sources as any[])) {
+    if (!UNFULFILLED_STATUSES.includes(src.orders.status)) {
+      sourcesToDelete.push(src.id);
+      draftUpdates.set(
+        src.purchase_order_item_id, 
+        (draftUpdates.get(src.purchase_order_item_id) || 0) + src.quantity
+      );
+    }
+  }
+
+  if (sourcesToDelete.length > 0) {
+    // Delete the fulfilled source links
+    // Split deletes into chunks of 100 just in case there are many
+    for (let i = 0; i < sourcesToDelete.length; i += 100) {
+      await supabase.from('procurement_request_sources').delete().in('id', sourcesToDelete.slice(i, i + 100));
+    }
+
+    // Update or delete the draft itself based on deducted qty
+    for (const [draftId, qtyToDeduct] of draftUpdates.entries()) {
+      const draft = drafts.find((d: any) => d.id === draftId);
+      if (!draft) continue;
+      
+      const newQty = draft.expected_qty - qtyToDeduct;
+      
+      if (newQty <= 0) {
+        await supabase.from('purchase_order_items').delete().eq('id', draftId);
+      } else {
+        await supabase.from('purchase_order_items').update({ expected_qty: newQty }).eq('id', draftId);
+      }
+    }
+  }
+}
+
 export async function GET(req: Request) {
   try {
     await migrateLeakedBundleDrafts();
+    await autoCleanupStaffDrafts();
 
     // 1. Get all suppliers
     const { data: suppliers, error: sErr } = await supabase

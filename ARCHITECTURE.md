@@ -305,6 +305,7 @@ A fourth, internal-only **Total Open Demand** (every open order regardless of pi
 **Order Validation Rule:** Ad-hoc requests created via the standalone Procurement Request page now strictly require a valid Order Number for each item. The system enforces that:
 1. The typed Order Number (even a short prefix) resolves to a valid order in the database.
 2. The requested product is either directly part of the order (`order_items`) or is an underlying component/part of a bundle product in that order (`assembly_recipe`).
+3. The requested quantity **cannot exceed** the total quantity needed by that order for that item (including expansion logic if the item is a component of a requested bundle).
 
 ---
 

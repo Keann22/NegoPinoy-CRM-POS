@@ -394,7 +394,7 @@ export default function ProcurementSheet() {
         isOpen={!!viewingAllocatedItem}
         onClose={() => setViewingAllocatedItem(null)}
         statusFilter={[
-          'Pending Payment', 'Processing', 'Picked', 'Picked (with issue)', 'Photo',
+          'Pending Payment', 'Processing', 'Picked', 'Picked (with issue)',
           'Packed', 'For Shipping', 'For Pick-up', 'On-Hold', 'Waiting for Stock',
         ]}
         title="Stock Allocation Details"

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import {
   Archive,
   ArrowDownUp,
+  AlertTriangle,
   Bell,
   BookCopy,
   Building,
@@ -138,6 +139,7 @@ export default function DashboardLayout({
         setIsOpen: setOpenAccounting,
         subItems: [
           { href: '/dashboard/accounting/payments', label: 'Payments', icon: CreditCard },
+          { href: '/dashboard/accounting/unpaid-shipped', label: 'Unpaid Shipped Orders', icon: AlertTriangle },
           { href: '/dashboard/accounting/remittances', label: 'SPX Remittances', icon: FileText },
           { href: '/dashboard/accounting/expenses', label: 'Expenses', icon: Wallet },
           { href: '/dashboard/accounting/recurring', label: 'Recurring', icon: Repeat },

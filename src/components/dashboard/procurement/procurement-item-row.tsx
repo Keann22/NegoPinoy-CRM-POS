@@ -121,11 +121,6 @@ export function ProcurementItemRow({
           {item.requestedByName && (
             <div className="text-[10px] font-normal text-slate-400 mt-0.5">by {item.requestedByName}</div>
           )}
-          {item.requestedAt && (
-            <div className="text-[10px] font-normal text-slate-400">
-              {new Date(item.requestedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-            </div>
-          )}
           {item.sourceOrders && item.sourceOrders.length > 0 && (
             <div className="mt-1 space-y-0.5">
               {item.sourceOrders.map((so: any, idx: number) => (

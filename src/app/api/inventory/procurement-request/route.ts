@@ -63,11 +63,11 @@ export async function POST(req: Request) {
       const realOrderId = orderData.id;
 
       // 2. Check if the requested products for this order are actually in the order
-      const productsForThisOrder = requests.filter((r: any) => r.orderId?.trim() === rawOrderId).map((r: any) => r.productId);
+      const requestsForThisOrder = requests.filter((r: any) => r.orderId?.trim() === rawOrderId);
       
       const { data: itemsData, error: itemsErr } = await supabase
         .from('order_items')
-        .select('product_id')
+        .select('product_id, quantity')
         .eq('order_id', realOrderId);
 
       if (itemsErr) {
@@ -83,24 +83,41 @@ export async function POST(req: Request) {
         .in('id', orderProductIds)
         .not('assembly_recipe', 'is', null);
 
-      const validProductIds = new Set<string>(orderProductIds);
-      if (bundleData) {
-        for (const bundle of bundleData) {
-          if (Array.isArray(bundle.assembly_recipe)) {
+      // Build a map of max allowed quantity for each product in this order
+      const maxAllowedMap = new Map<string, number>();
+      if (itemsData) {
+        for (const item of itemsData) {
+          // Add the item itself
+          maxAllowedMap.set(item.product_id, (maxAllowedMap.get(item.product_id) || 0) + item.quantity);
+          
+          // Also add its components if it's a bundle
+          const bundle = bundleData?.find((b: any) => b.id === item.product_id);
+          if (bundle && Array.isArray(bundle.assembly_recipe)) {
             for (const comp of bundle.assembly_recipe) {
-              if (comp.component_id) validProductIds.add(comp.component_id);
-              if (comp.productId) validProductIds.add(comp.productId); // Just in case schema uses productId
+              const compId = comp.component_id || comp.productId;
+              if (compId) {
+                const compQty = comp.quantity || 1;
+                maxAllowedMap.set(compId, (maxAllowedMap.get(compId) || 0) + (item.quantity * compQty));
+              }
             }
           }
         }
       }
 
-      for (const pid of productsForThisOrder) {
-        if (!validProductIds.has(pid)) {
+      for (const r of requestsForThisOrder) {
+        const pid = r.productId;
+        if (!maxAllowedMap.has(pid)) {
           // fetch product name for better error message
           const { data: pData } = await supabase.from('products').select('name').eq('id', pid).single();
           const pName = pData?.name || 'Unknown Product';
           return NextResponse.json({ error: `Product "${pName}" is not part of Order ${rawOrderId} (nor is it a component of any bundle in the order).` }, { status: 400 });
+        }
+
+        const maxAllowed = maxAllowedMap.get(pid)!;
+        if (r.requestedQty > maxAllowed) {
+          const { data: pData } = await supabase.from('products').select('name').eq('id', pid).single();
+          const pName = pData?.name || 'Unknown Product';
+          return NextResponse.json({ error: `Cannot request ${r.requestedQty} of "${pName}" because Order ${rawOrderId} only requires ${maxAllowed}.` }, { status: 400 });
         }
       }
 
