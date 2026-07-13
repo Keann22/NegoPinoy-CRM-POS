@@ -40,26 +40,46 @@ export function OnHoldReasonDialog({ order, open, onOpenChange, onSuccess }: OnH
         
       if (orderError) throw orderError;
 
-      // 2. Create Order Issue
-      const { data: newIssue, error: issueErr } = await supabase
+      // 2. Create Order Issue — but only if this order doesn't already have one
+      // open, so re-opening this dialog on an already On-Hold order doesn't
+      // pile up duplicate order-level issues (same guard editOrder() uses).
+      const { data: existingIssue } = await supabase
         .from('order_issues')
-        .insert({
-          order_id: order.id,
-          status: 'open',
-          reported_by_name: `${userProfile.firstName} ${userProfile.lastName}`.trim()
-        })
         .select('id')
-        .single();
-        
-      if (issueErr) throw issueErr;
+        .eq('order_id', order.id)
+        .eq('status', 'open')
+        .limit(1)
+        .maybeSingle();
 
-      // 3. Create Issue Message
-      if (newIssue) {
+      if (!existingIssue) {
+        const { data: newIssue, error: issueErr } = await supabase
+          .from('order_issues')
+          .insert({
+            order_id: order.id,
+            status: 'open',
+            reported_by_name: `${userProfile.firstName} ${userProfile.lastName}`.trim()
+          })
+          .select('id')
+          .single();
+
+        if (issueErr) throw issueErr;
+
+        // 3. Create Issue Message
+        if (newIssue) {
+          await supabase.from('order_issue_messages').insert({
+            issue_id: newIssue.id,
+            sender_role: 'sales',
+            sender_name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
+            message: `Order was placed On-Hold manually. Reason: ${reason}`
+          });
+        }
+      } else {
+        // Already has an open issue — just log the new reason as a message on it.
         await supabase.from('order_issue_messages').insert({
-          issue_id: newIssue.id,
+          issue_id: existingIssue.id,
           sender_role: 'sales',
           sender_name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
-          message: `Order was placed On-Hold manually. Reason: ${reason}`
+          message: `Order placed On-Hold again. Reason: ${reason}`
         });
       }
 
