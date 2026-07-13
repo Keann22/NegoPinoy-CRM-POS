@@ -9,6 +9,13 @@ import type { Order, OrderStatus } from '@/types';
  * useOrders
  * Fetches all orders (role-filtered) and resolves customer names.
  * Extracted from orders/page.tsx (lines 126–196).
+ *
+ * Pages through with .range() in a loop rather than a single unfiltered
+ * .select() — a single select silently caps at Supabase's 1000-row default
+ * (see ARCHITECTURE.md, "The 1000-row query cap"), which previously made
+ * orders older than the 1000 most recent company-wide invisible to
+ * Admin/Owner accounts (Sales accounts, scoped to their own orders, weren't
+ * affected until their own order count passed 1000).
  */
 export function useOrders() {
   const supabase = useSupabase();
@@ -32,16 +39,22 @@ export function useOrders() {
         const isSalesOnly = !userProfile.roles.some((r: string) =>
           ['Admin', 'Owner', 'Inventory'].includes(r)
         );
-        let q = supabase
-          .from('orders')
-          .select('*')
-          .order('order_date', { ascending: false });
-        if (isSalesOnly) q = q.eq('sales_person_id', userProfile.id);
-        const { data, error } = await q;
-        if (error) throw error;
+        const allRows: any[] = [];
+        for (let from = 0; ; from += 1000) {
+          let q = supabase
+            .from('orders')
+            .select('*')
+            .order('order_date', { ascending: false })
+            .range(from, from + 999);
+          if (isSalesOnly) q = q.eq('sales_person_id', userProfile.id);
+          const { data, error } = await q;
+          if (error) throw error;
+          allRows.push(...(data || []));
+          if (!data || data.length < 1000) break;
+        }
 
         setOrders(
-          (data || []).map((o: any) => ({
+          allRows.map((o: any) => ({
             ...o,
             customerId: o.customer_id,
             orderDate: o.order_date,
