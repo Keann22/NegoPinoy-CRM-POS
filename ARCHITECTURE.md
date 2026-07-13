@@ -374,6 +374,7 @@ The apps never call each other directly — they coordinate entirely through sha
 | `src/app/dashboard/layout.tsx` | Main nav sidebar — role-based menu rendering |
 | `src/app/dashboard/page.tsx` | Dashboard home — metrics, charts |
 | `src/app/dashboard/orders/page.tsx` | Order list page (~714 lines — refactor in Phase 2) |
+| `src/components/dashboard/orders/OverdueOrders.tsx` | Overdue Orders widget & dialog for displaying and managing aging Processing orders |
 | `src/components/dashboard/order-dialog.tsx` | Order create/edit dialog (~1400 lines — refactor in Phase 2) |
 | `src/components/dashboard/product-dialog.tsx`, `src/hooks/useProductDialog.ts` | Product create/edit dialog (~1200 lines — refactor in Phase 2) — see "Product Variants: name vs variant_name" |
 | `src/lib/supabase/hooks.ts` | `useUser()`, `useAuth()`, `useSupabase()` |
