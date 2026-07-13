@@ -22,6 +22,7 @@ export default function ProcurementSheet() {
   const { isManagement } = useRoleCheck();
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [groupedItems, setGroupedItems] = useState<any[]>([]);
+  const [purchasedItems, setPurchasedItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
   const handleCreateBatch = async () => {
@@ -62,6 +63,7 @@ export default function ProcurementSheet() {
       const data = await res.json();
       setSuppliers(data.suppliers || []);
       setGroupedItems(data.groupedOutofStock || []);
+      setPurchasedItems(data.purchasedItems || []);
     } catch (e: any) {
       console.error(e);
       alert("Failed to load procurement data: " + e.message);
@@ -337,6 +339,45 @@ export default function ProcurementSheet() {
         </div>
       )}
 
+      {purchasedItems.length > 0 && (
+        <div className="border rounded-lg overflow-hidden shadow-sm mt-12 border-emerald-200">
+          <div className="px-4 py-3 border-b bg-emerald-50 flex justify-between items-center">
+            <h2 className="text-xl font-bold text-emerald-800">Purchased & Expected to Receive</h2>
+            <span className="text-emerald-600 text-sm font-semibold">{purchasedItems.length} Items</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm min-w-[600px]">
+              <thead>
+                <tr className="bg-emerald-50/50 text-slate-500 text-sm border-b">
+                  <th className="p-3 text-left">Product</th>
+                  <th className="p-3 text-center">Batch / PO Note</th>
+                  <th className="p-3 text-center">Expected Qty</th>
+                  <th className="p-3 text-center">Unit Cost</th>
+                  <th className="p-3 text-right">Date Purchased</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y text-slate-700">
+                {purchasedItems.map((item: any) => (
+                  <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="p-3 font-medium">{item.productName}</td>
+                    <td className="p-3 text-center">
+                      <span className="bg-emerald-100 text-emerald-800 px-2 py-1 rounded text-xs font-semibold">
+                        {item.poNotes || 'Direct Purchase'}
+                      </span>
+                    </td>
+                    <td className="p-3 text-center font-bold">{item.expectedQty}</td>
+                    <td className="p-3 text-center text-slate-500">₱{item.unitCost}</td>
+                    <td className="p-3 text-right text-xs text-slate-400">
+                      {new Date(item.createdAt).toLocaleDateString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       <SingleBuyDialog
         open={buyDialogOpen}
         onOpenChange={setBuyDialogOpen}
@@ -393,11 +434,13 @@ export default function ProcurementSheet() {
         productName={viewingAllocatedItem?.name || ''}
         isOpen={!!viewingAllocatedItem}
         onClose={() => setViewingAllocatedItem(null)}
-        statusFilter={
-          viewingAllocatedItem?.context === 'needToBuy'
-            ? ['Pending Payment', 'Processing', 'Picked (with issue)', 'On-Hold', 'Waiting for Stock']
-            : ['Pending Payment', 'Processing', 'Picked', 'Picked (with issue)', 'Photo', 'Packed', 'For Shipping', 'For Pick-up', 'On-Hold', 'Waiting for Stock']
-        }
+        // Picked/Photo/Packed/For Shipping/For Pick-up are excluded here even
+        // though they still count toward Current Stock's ledger deficit above
+        // — by this point the item has already been physically pulled off
+        // the shelf (Photo/Packed/etc. all happen after Picked), so it no
+        // longer needs allocating. Picked (with issue) stays: the pull may
+        // not have actually succeeded, so it's still effectively open.
+        statusFilter={['Pending Payment', 'Processing', 'Picked (with issue)', 'On-Hold', 'Waiting for Stock']}
         title={viewingAllocatedItem?.context === 'needToBuy' ? "Orders Needing This Item" : "Total Open Demand"}
       />
     </div>

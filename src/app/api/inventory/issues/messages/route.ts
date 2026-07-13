@@ -8,7 +8,7 @@ export async function POST(req: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
     
-    const { issueId, senderRole, senderName, message } = await req.json();
+    const { issueId, senderRole, senderName, message, requiresAttention, mentions } = await req.json();
 
     if (!issueId || !message || !senderRole) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -20,7 +20,9 @@ export async function POST(req: Request) {
         issue_id: issueId,
         sender_role: senderRole,
         sender_name: senderName || (senderRole === 'sales' ? 'Sales' : 'Picker'),
-        message: message
+        message: message,
+        requires_attention: requiresAttention || false,
+        mentions: mentions || []
       });
 
     if (error) throw error;

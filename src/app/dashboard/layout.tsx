@@ -55,6 +55,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Logo } from '@/components/logo';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { NotificationBell } from '@/components/dashboard/notification-bell';
+import { InboxDrawer } from '@/components/dashboard/inbox-drawer';
 
 export default function DashboardLayout({
   children,
@@ -273,7 +274,10 @@ export default function DashboardLayout({
                 <Logo className="h-6 w-6" />
                 <span className="font-headline">NegosyantengPinoy.Ph</span>
               </Link>
-              <NotificationBell />
+              <div className="ml-auto flex items-center">
+                <InboxDrawer />
+                <NotificationBell />
+              </div>
           </div>
           <div className="flex-1 overflow-y-auto">
             <nav className="grid items-start px-2 text-sm font-medium lg:px-4 pb-4">

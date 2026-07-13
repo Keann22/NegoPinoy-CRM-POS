@@ -70,7 +70,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { orderId, productId, note, reportedByName } = await req.json();
+    const { orderId, productId, note, reportedByName, requiresAttention, mentions } = await req.json();
 
     if (!orderId || !productId || !note) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -92,7 +92,9 @@ export async function POST(req: Request) {
         issue_id: issue.id,
         sender_role: 'picker',
         sender_name: reportedByName || 'Picker',
-        message: note
+        message: note,
+        requires_attention: requiresAttention || false,
+        mentions: mentions || []
       });
 
     if (msgErr) throw msgErr;

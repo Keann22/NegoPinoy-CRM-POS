@@ -194,8 +194,31 @@ export async function GET(req: Request) {
       productIdsToFetch.add(d.product_id);
     });
 
+    // 2.5 Get all purchased items (pending receipt, NOT STAFF_DRAFT)
+    const { data: purchased, error: pErr } = await supabase
+      .from('purchase_order_items')
+      .select(`
+        id, 
+        product_id, 
+        expected_qty, 
+        received_qty, 
+        unit_cost, 
+        po_id, 
+        created_at, 
+        supplier_id,
+        purchase_orders!inner(id, notes, status)
+      `)
+      .neq('purchase_orders.notes', 'STAFF_DRAFT')
+      .eq('status', 'pending_receipt');
+      
+    if (pErr) throw pErr;
+
+    purchased?.forEach((p: any) => {
+      productIdsToFetch.add(p.product_id);
+    });
+
     if (productIdsToFetch.size === 0) {
-      return NextResponse.json({ suppliers, groupedOutofStock: [] });
+      return NextResponse.json({ suppliers, groupedOutofStock: [], purchasedItems: [] });
     }
 
     const { data: liveOS, error: lErr } = await supabase
@@ -356,7 +379,28 @@ export async function GET(req: Request) {
     // Convert to array and filter empty groups
     const result = Object.values(grouped).filter(g => g.items.length > 0 || g.id === null);
 
-    return NextResponse.json({ suppliers, groupedOutofStock: result });
+    // Format purchased items
+    const purchasedItems = (purchased || []).map((p: any) => {
+      const prod = liveOS?.find((l: any) => l.id === p.product_id);
+      let displayName = prod?.name || 'Unknown Product';
+      if (prod?.variant_name && !displayName.includes(prod.variant_name)) {
+        displayName = `${displayName} [${prod.variant_name}]`;
+      }
+      return {
+        id: p.id,
+        productId: p.product_id,
+        productName: displayName,
+        expectedQty: p.expected_qty,
+        receivedQty: p.received_qty || 0,
+        unitCost: p.unit_cost,
+        poId: p.po_id,
+        poNotes: p.purchase_orders?.notes,
+        createdAt: p.created_at,
+        supplierId: p.supplier_id || prod?.supplier_id
+      };
+    });
+
+    return NextResponse.json({ suppliers, groupedOutofStock: result, purchasedItems });
   } catch (error: any) {
     console.error('Error in procurement GET:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });

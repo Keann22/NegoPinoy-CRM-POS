@@ -6,6 +6,8 @@ import { format, differenceInDays } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { useSupabase } from "@/lib/supabase/hooks";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import type { Order } from "@/types";
@@ -27,6 +29,9 @@ export function OverdueOrderDialog({ order, customerName, open, onOpenChange, on
   const [issues, setIssues] = useState<any[]>([]);
   const [isLoadingIssues, setIsLoadingIssues] = useState(false);
   const [localNotes, setLocalNotes] = useState("");
+  const [issueReplyText, setIssueReplyText] = useState("");
+  const [issueIsUrgent, setIssueIsUrgent] = useState(false);
+  const [isSendingIssue, setIsSendingIssue] = useState(false);
 
   useEffect(() => {
     if (open && order) {
@@ -87,6 +92,43 @@ export function OverdueOrderDialog({ order, customerName, open, onOpenChange, on
       alert("Error saving note: " + e.message);
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const handleSendIssueMessage = async () => {
+    if (!issueReplyText.trim() || issues.length === 0 || !supabase) return;
+    
+    setIsSendingIssue(true);
+    try {
+      const senderName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : 'Sales';
+      const roles = userProfile?.roles || [];
+      const isSalesUser = roles.some((r: string) => r.toLowerCase() === 'sales');
+      const senderRole = isSalesUser ? 'sales' : 'picker';
+      
+      const extractedMentions = issueReplyText.match(/@\w+/g)?.map(m => m.slice(1)) || [];
+      
+      const res = await fetch('/api/inventory/issues/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          issueId: issues[0].id, // Send to the first active issue for this order
+          senderRole: senderRole,
+          senderName: senderName,
+          message: issueReplyText,
+          requiresAttention: issueIsUrgent,
+          mentions: extractedMentions
+        })
+      });
+      
+      if (!res.ok) throw new Error('Failed to send message');
+      
+      setIssueReplyText("");
+      setIssueIsUrgent(false);
+      fetchIssues(order!.id);
+    } catch (e: any) {
+      alert("Error sending issue message: " + e.message);
+    } finally {
+      setIsSendingIssue(false);
     }
   };
 
@@ -203,6 +245,28 @@ export function OverdueOrderDialog({ order, customerName, open, onOpenChange, on
                       </div>
                     </div>
                   )}
+                  <div className="border-t border-red-200 mt-4 pt-3 flex flex-col gap-2">
+                    <div className="flex items-center space-x-2 px-1">
+                      <Checkbox 
+                        id="urgent" 
+                        checked={issueIsUrgent} 
+                        onCheckedChange={(c) => setIssueIsUrgent(!!c)} 
+                      />
+                      <Label htmlFor="urgent" className="text-xs font-semibold text-red-700 cursor-pointer">Mark as Urgent / Requires Attention</Label>
+                    </div>
+                    <div className="flex gap-2">
+                      <Input 
+                        placeholder="Reply to this issue..." 
+                        value={issueReplyText}
+                        onChange={(e) => setIssueReplyText(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSendIssueMessage()}
+                        className="bg-white"
+                      />
+                      <Button onClick={handleSendIssueMessage} disabled={isSendingIssue || !issueReplyText.trim()} size="icon" className="bg-red-600 hover:bg-red-700">
+                        <Send className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
             ) : (
