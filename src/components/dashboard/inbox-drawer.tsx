@@ -62,6 +62,13 @@ export function InboxDrawer() {
 
     const fullName = `${userProfile.firstName} ${userProfile.lastName}`.trim();
 
+    // Guard against a duplicate subscription on the same topic (e.g. React Strict
+    // Mode's double-invoke in dev), which throws when .on() is called on a channel
+    // that's already past .subscribe().
+    supabase.getChannels()
+      .filter(c => c.topic === 'realtime:order-issues-channel')
+      .forEach(c => supabase.removeChannel(c));
+
     const channel = supabase
       .channel('order-issues-channel')
       .on(
@@ -110,7 +117,7 @@ export function InboxDrawer() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, userProfile, toast, fetchIssues]);
+  }, [supabase, userProfile?.id, userProfile?.firstName, userProfile?.lastName, toast, fetchIssues]);
 
   const openIssueDialog = async (issue: any) => {
     if (!supabase) return;

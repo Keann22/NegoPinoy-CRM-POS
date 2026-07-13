@@ -61,6 +61,13 @@ export function NotificationBell() {
 
     const fullName = `${userProfile.firstName} ${userProfile.lastName}`.trim();
 
+    // Guard against a duplicate subscription on the same topic (e.g. React Strict
+    // Mode's double-invoke in dev), which throws when .on() is called on a channel
+    // that's already past .subscribe().
+    supabase.getChannels()
+      .filter(c => c.topic === 'realtime:notifications-channel')
+      .forEach(c => supabase.removeChannel(c));
+
     const channel = supabase
       .channel('notifications-channel')
       .on(
@@ -102,7 +109,7 @@ export function NotificationBell() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, userProfile, toast]);
+  }, [supabase, userProfile?.id, userProfile?.firstName, userProfile?.lastName, toast]);
 
   const markAsRead = async (id: string) => {
     if (!supabase) return;
