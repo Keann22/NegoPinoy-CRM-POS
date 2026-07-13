@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Flag, ShoppingCart, Trash2 } from "lucide-react";
 
@@ -118,26 +117,6 @@ export function ProcurementItemRow({
         onClick={() => onViewAllocated({ id: item.productId, name: item.productName, context: 'total' })}
       >
           {item.staffRequestedQty !== null ? item.staffRequestedQty : <span className="text-xs text-slate-400 font-normal">Pending</span>}
-          {item.requestedByName && (
-            <div className="text-[10px] font-normal text-slate-400 mt-0.5">by {item.requestedByName}</div>
-          )}
-          {item.sourceOrders && item.sourceOrders.length > 0 && (
-            <div className="mt-1 space-y-0.5">
-              {item.sourceOrders.map((so: any, idx: number) => (
-                <div key={idx} className="text-[10px] font-normal text-slate-500">
-                  for{' '}
-                  <Link
-                    href={`/dashboard/orders/${so.orderId}`}
-                    className="text-primary hover:underline"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    #{so.shortOrderId}
-                  </Link>
-                  {' '}({so.customerName})
-                </div>
-              ))}
-            </div>
-          )}
       </td>
       <td
         className="p-3 font-bold text-center text-lg cursor-pointer text-blue-600 hover:underline hover:text-indigo-600"

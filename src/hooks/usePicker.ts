@@ -249,11 +249,20 @@ export function usePicker() {
             if (msgErr) console.error("Error inserting issue messages:", msgErr);
           }
 
-          await fetch('/api/inventory/procurement-request', {
+          const procRes = await fetch('/api/inventory/procurement-request', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ requests: procurementRequests, requestedByName: userName })
           });
+          if (!procRes.ok) {
+            const procErr = await procRes.json().catch(() => ({}));
+            console.error('Failed to create procurement draft:', procErr.error || procRes.statusText);
+            toast({
+              title: 'Warning',
+              description: 'Issue reported, but the procurement request failed to save. Please notify management.',
+              variant: 'destructive'
+            });
+          }
 
           if (orderDetails?.sales_person_name) {
             await supabase.from('notifications').insert({

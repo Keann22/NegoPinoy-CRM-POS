@@ -44,14 +44,17 @@ export async function POST(req: Request) {
       if (r.orderId) uniqueOrderIds.add(r.orderId.trim());
     }
 
+    const isFullUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+
     for (const rawOrderId of uniqueOrderIds) {
-      // 1. Check if the order exists (staff might type just the first 8 characters)
-      const { data: orderData, error: orderErr } = await supabase
-        .from('orders')
-        .select('id')
-        .ilike('id', `${rawOrderId}%`)
-        .limit(1)
-        .maybeSingle();
+      // 1. Check if the order exists (staff might type just the first 8 characters).
+      // orders.id is a uuid column, so ilike (~~*) can't run directly against it —
+      // it has to be cast to text first for the prefix-match case; a full UUID
+      // (always what the Picker app sends) can just use an exact eq().
+      const orderQuery = supabase.from('orders').select('id');
+      const { data: orderData, error: orderErr } = isFullUuid(rawOrderId)
+        ? await orderQuery.eq('id', rawOrderId).limit(1).maybeSingle()
+        : await orderQuery.filter('id::text', 'ilike', `${rawOrderId}%`).limit(1).maybeSingle();
 
       if (orderErr) {
         return NextResponse.json({ error: `Database error checking order number ${rawOrderId}: ${orderErr.message}` }, { status: 500 });
