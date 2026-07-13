@@ -52,10 +52,10 @@ export function useCourierSync() {
       let trackingCol = -1;
       let statusCol = -1;
       let deliveryCol = -1;
-      let headersFound = false;
+      let headerRowNumber = -1;
 
       worksheet.eachRow((row, rowNumber) => {
-        if (!headersFound) {
+        if (headerRowNumber === -1) {
           row.eachCell((cell, colNumber) => {
             const val = cell.value?.toString().toLowerCase().trim() || '';
             
@@ -71,13 +71,13 @@ export function useCourierSync() {
           });
 
           if (orderCol !== -1 && trackingCol !== -1 && statusCol !== -1) {
-            headersFound = true;
+            headerRowNumber = rowNumber;
           }
           return;
         }
       });
 
-      if (!headersFound) {
+      if (headerRowNumber === -1) {
         toast({
           variant: 'destructive',
           title: 'Invalid File Format',
@@ -88,9 +88,32 @@ export function useCourierSync() {
         return;
       }
 
-      const { data: allOrders, error: fetchError } = await supabase
-        .from('orders')
-        .select('id, status, tracking_number, payment_method, balance_due, next_due_date');
+      let allOrders: any[] = [];
+      let fetchError = null;
+      let from = 0;
+      const step = 1000;
+      
+      while (true) {
+        const { data, error } = await supabase
+          .from('orders')
+          .select('id, status, tracking_number, payment_method, balance_due, next_due_date')
+          .order('id')
+          .range(from, from + step - 1);
+          
+        if (error) {
+          fetchError = error;
+          break;
+        }
+        if (data) {
+          allOrders = allOrders.concat(data);
+          if (data.length < step) {
+            break;
+          }
+        } else {
+          break;
+        }
+        from += step;
+      }
 
       if (fetchError) throw fetchError;
 
@@ -112,7 +135,7 @@ export function useCourierSync() {
       const updatePromises: PromiseLike<any>[] = [];
 
       worksheet.eachRow((row, rowNumber) => {
-        if (rowNumber === 1 || (!headersFound && rowNumber < 5)) return;
+        if (rowNumber <= headerRowNumber) return;
 
         const rawOrderId = row.getCell(orderCol).value?.toString().trim();
         const rawTracking = row.getCell(trackingCol).value?.toString().trim() || '';
