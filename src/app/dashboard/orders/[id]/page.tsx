@@ -18,6 +18,7 @@ import { WaybillSummaryDialog } from '@/components/dashboard/waybill-summary-dia
 import { OrderTrailDialog } from '@/components/dashboard/order-trail-dialog';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useOrderDetail } from '@/hooks/useOrderDetail';
+import { resolveOpenOrderIssues } from '@/lib/services/order-service';
 import type { Order, OrderStatus } from '@/types';
 
 type StatusVariant = 'outline' | 'secondary' | 'destructive' | 'default';
@@ -130,7 +131,10 @@ export default function OrderDetailPage() {
               {order.orderStatus === 'Shipped' && (
                 <Button variant="default" size="sm" onClick={async () => {
                   const { error } = await supabase.from('orders').update({ status: 'Completed', completed_at: new Date().toISOString() }).eq('id', order.id);
-                  if (!error) window.location.reload();
+                  if (!error) {
+                    await resolveOpenOrderIssues(supabase, order.id);
+                    window.location.reload();
+                  }
                 }}>
                   <CheckCircle className="mr-2 h-4 w-4" /> Mark as Completed
                 </Button>

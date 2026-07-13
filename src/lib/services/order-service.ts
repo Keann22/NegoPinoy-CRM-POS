@@ -218,7 +218,7 @@ export async function deductStockForUncancelledOrder(
  */
 export const STATUSES_THAT_CLEAR_ORDER_ISSUES: string[] = [
   'Picked', 'Photo', 'Packed', 'For Shipping', 'For Pick-up',
-  'Shipped', 'Completed', 'Payment Received (COD)',
+  'Shipped', 'Completed', 'Payment Received (COD)', 'Cancelled', 'Returned'
 ];
 
 /**
@@ -237,6 +237,31 @@ export async function resolveOpenOrderIssues(
     .update({ status: 'resolved' })
     .eq('order_id', orderId)
     .eq('status', 'open');
+}
+
+/**
+ * Resolves open order_issues for products that were removed from the order
+ * during an edit. Issues with no product_id (e.g. order-level On-Hold issues)
+ * aren't tied to a specific item, so they're left alone here.
+ */
+export async function resolveOrderIssuesForRemovedProducts(
+  supabase: SupabaseClient,
+  orderId: string,
+  remainingProductIds: string[]
+): Promise<void> {
+  const { data: issues } = await supabase
+    .from('order_issues')
+    .select('id, product_id')
+    .eq('order_id', orderId)
+    .eq('status', 'open');
+
+  if (!issues) return;
+
+  const issuesToResolve = issues.filter(i => i.product_id && !remainingProductIds.includes(i.product_id));
+
+  for (const issue of issuesToResolve) {
+    await supabase.from('order_issues').update({ status: 'resolved' }).eq('id', issue.id);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -387,6 +412,23 @@ export async function editOrder(
     });
   } catch (e) {
     console.error("Failed to log order edit:", e);
+  }
+
+  // -- Auto-resolve issues for removed products --
+  try {
+    const remainingProductIds = values.orderItems.map(i => i.productId);
+    await resolveOrderIssuesForRemovedProducts(supabase, context.orderId, remainingProductIds);
+  } catch (e) {
+    console.error("Failed to auto-resolve issues for removed products:", e);
+  }
+
+  // -- Auto-resolve ALL issues if status clears them --
+  if (STATUSES_THAT_CLEAR_ORDER_ISSUES.includes(finalOrderStatus)) {
+    try {
+      await resolveOpenOrderIssues(supabase, context.orderId);
+    } catch(e) {
+      console.error("Failed to resolve open issues on edit:", e);
+    }
   }
 
   // -- On-Hold Issue Creation --

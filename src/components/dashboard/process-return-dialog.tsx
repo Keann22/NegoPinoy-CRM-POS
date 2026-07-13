@@ -11,6 +11,7 @@ import type { Order } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useSupabase } from '@/lib/supabase/hooks';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { resolveOpenOrderIssues } from '@/lib/services/order-service';
 
 interface OrderItemRow {
   id: string;
@@ -138,6 +139,7 @@ export function ProcessReturnDialog({ order, open, onOpenChange, onSuccess }: Pr
 
       if (allItemsFullyReturned) {
         await supabase.from('orders').update({ status: 'Returned' }).eq('id', order.id);
+        await resolveOpenOrderIssues(supabase, order.id);
         toast({ title: 'Order marked Returned', description: 'All items on this order have been returned.' });
       } else {
         toast({ title: 'Partial return recorded', description: 'Not all items are returned yet — order status unchanged.' });
