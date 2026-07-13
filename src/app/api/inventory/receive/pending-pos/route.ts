@@ -23,7 +23,8 @@ export async function GET(req: Request) {
 
     // Do not filter out STAFF_DRAFT so that inventory can receive them
     // even if management hasn't finalized the amount/qty.
-    const filteredItems = items;
+    // Also, filter out any items that are already fully received but somehow stuck in pending_receipt status.
+    const filteredItems = items.filter((i: any) => Math.max(0, i.expected_qty - (i.received_qty || 0)) > 0);
 
     const mapped = filteredItems.map((i: any) => ({
       id: i.id,
