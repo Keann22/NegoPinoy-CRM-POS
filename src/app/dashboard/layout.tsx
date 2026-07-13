@@ -316,6 +316,10 @@ export default function DashboardLayout({
           </Sheet>
           <div className="w-full flex-1">
           </div>
+          <div className="flex items-center gap-2 md:hidden mr-2">
+            <InboxDrawer />
+            <NotificationBell />
+          </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="secondary" size="icon" className="rounded-full">
