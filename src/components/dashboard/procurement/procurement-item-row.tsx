@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Flag, ShoppingCart, Trash2 } from "lucide-react";
 
@@ -46,6 +47,7 @@ export function ProcurementItemRow({
   // against the full total here, not needToBuyQty, or this would falsely
   // flag every product that simply has a packed order in its queue.
   const hasDiscrepancy = item.systemQty !== (item.totalOpenDemandQty || 0);
+  const [showReassign, setShowReassign] = useState(false);
 
   return (
     <tr className={hasDiscrepancy ? "bg-orange-50 hover:bg-orange-100" : "hover:bg-slate-50 transition-colors"}>
@@ -79,9 +81,9 @@ export function ProcurementItemRow({
                 </Button>
             </div>
         )}
-        {groupId === null && (
+        {groupId === null ? (
           <div className="mt-2 flex items-center gap-2">
-            <select 
+            <select
               className="text-xs border rounded p-1 text-slate-500 bg-white"
               onChange={(e) => setPendingSupplier(e.target.value)}
               value={pendingSupplier || ""}
@@ -90,8 +92,8 @@ export function ProcurementItemRow({
               {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
             {pendingSupplier && (
-              <Button 
-                size="sm" 
+              <Button
+                size="sm"
                 className="h-7 px-2 text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
                 onClick={() => {
                   handleAssignSupplier(item.productId, pendingSupplier, editedCost !== undefined ? editedCost : item.unitCost);
@@ -100,6 +102,47 @@ export function ProcurementItemRow({
               >
                 Save
               </Button>
+            )}
+          </div>
+        ) : (
+          <div className="mt-2">
+            {showReassign ? (
+              <div className="flex items-center gap-2">
+                <select
+                  className="text-xs border rounded p-1 text-slate-500 bg-white"
+                  onChange={(e) => setPendingSupplier(e.target.value)}
+                  value={pendingSupplier || groupId}
+                >
+                  {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+                <Button
+                  size="sm"
+                  className="h-7 px-2 text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
+                  disabled={!pendingSupplier || pendingSupplier === groupId}
+                  onClick={() => {
+                    handleAssignSupplier(item.productId, pendingSupplier, editedCost !== undefined ? editedCost : item.unitCost);
+                    setPendingSupplier("");
+                    setShowReassign(false);
+                  }}
+                >
+                  Save
+                </Button>
+                <button
+                  type="button"
+                  className="text-xs text-slate-400 hover:text-slate-600"
+                  onClick={() => { setShowReassign(false); setPendingSupplier(""); }}
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="text-xs text-indigo-500 hover:text-indigo-700 hover:underline"
+                onClick={() => setShowReassign(true)}
+              >
+                Change Supplier
+              </button>
             )}
           </div>
         )}
