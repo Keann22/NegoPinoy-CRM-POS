@@ -41,7 +41,7 @@ export function ProductSearch({ onProductSelect }: { onProductSelect: (product: 
   }, [supabase, user, search]);
   
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
         <Button variant="outline" className="w-full justify-start font-normal text-left">Select Product...</Button>
       </PopoverTrigger>

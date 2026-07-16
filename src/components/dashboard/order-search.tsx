@@ -50,7 +50,7 @@ export function OrderSearch({ onOrderSelect }: { onOrderSelect: (order: OrderRes
       ).slice(0, 10);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
         <Button variant="outline" className="w-full justify-start font-normal text-left">Select Order...</Button>
       </PopoverTrigger>
