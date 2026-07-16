@@ -136,12 +136,11 @@ export function useSPXRemittance() {
             const availableCod = trackingData[t].cod;
             totalAvailableCod += availableCod;
 
-            let codToApply = 0;
-            if (balanceNeeded > 0) {
-                codToApply = Math.min(balanceNeeded, availableCod);
-            } else if (order.status !== 'Payment Received (COD)' && availableCod > 0) {
-                codToApply = availableCod; 
-            }
+            // If balanceNeeded is already 0, the down payment/balance was already recorded
+            // through another payment (most often a manual entry logged before this file
+            // arrived) — applying the full collected COD on top of that double-books it.
+            // Only ever apply up to what's still actually owed.
+            const codToApply = balanceNeeded > 0 ? Math.min(balanceNeeded, availableCod) : 0;
 
             const shippingFeeToApply = trackingData[t].shippingFee;
             const processingFeeToApply = trackingData[t].processingFee;
@@ -166,9 +165,16 @@ export function useSPXRemittance() {
           const shortOrderId = order.id.substring(0, 7).toUpperCase();
 
           const hasSpxPayment = order.payments?.some((p: any) => p.payment_method === 'SPX COD Remittance');
+          // Real COD was reported for this tracking, but none of it got applied because the
+          // down payment/balance was already covered by an existing payment — most likely a
+          // manual entry logged before this remittance file arrived. Treat as already settled
+          // instead of silently dropping it, so staff can still see it (and any fees still post).
+          const alreadyCoveredElsewhere = totalAvailableCod > 0 && totalCod === 0;
 
-          if (hasSpxPayment || order.status === 'Payment Received (COD)') {
-             let feeMessage = 'Order COD has already been synced or is fully paid.';
+          if (hasSpxPayment || order.status === 'Payment Received (COD)' || alreadyCoveredElsewhere) {
+             let feeMessage = alreadyCoveredElsewhere
+               ? 'Down payment/balance already recorded via another payment — SPX collection was not added again to avoid double counting.'
+               : 'Order COD has already been synced or is fully paid.';
              const explicitShippingFee = Math.abs(totalShippingFee);
              const explicitProcessingFee = Math.abs(totalProcessingFee);
 

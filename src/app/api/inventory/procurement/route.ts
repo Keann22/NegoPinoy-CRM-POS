@@ -61,15 +61,19 @@ export async function GET() {
       productIdsToFetch.add(p.product_id);
     });
 
-    if (productIdsToFetch.size === 0) {
-      return NextResponse.json({ suppliers, groupedOutofStock: [], purchasedItems: [] });
-    }
-
-    const { data: liveOS, error: lErr } = await supabase
+    // 2.6 Candidate out-of-stock products that nobody has filed a draft for
+    // yet. Whether one of these actually belongs on the sheet depends on
+    // whether a *currently open* order is still waiting on it — checked
+    // below once demand is computed. A deficit fully explained by an order
+    // that already shipped/completed is a bookkeeping/cost question (the
+    // purchase to true up its cost never happened), not a live blocker, so
+    // it shouldn't clutter the "what do we need to buy right now" list.
+    const { data: negativeStockProducts, error: negErr } = await supabase
       .from('products')
-      .select('id, name, variant_name, stock_level, supplier_id, initial_unit_cost, supplier_pricing')
-      .in('id', Array.from(productIdsToFetch));
-    if (lErr) throw lErr;
+      .select('id')
+      .lt('stock_level', 0);
+    if (negErr) throw negErr;
+    const negativeStockIds = new Set((negativeStockProducts || []).map(p => p.id));
 
     // 3a. Bundle products consume a target component's physical stock too
     // (e.g. "Wok Pan with Takip" = 1x Wok Pan + 1x Cover) — an order for the
@@ -91,6 +95,11 @@ export async function GET() {
       if (page.length < 1000) break;
     }
 
+    // Covers both staff-requested/purchased products and negative-stock
+    // candidates, since a candidate's demand may only show up via a bundle
+    // parent's order.
+    const candidateIds = new Set([...Array.from(productIdsToFetch), ...Array.from(negativeStockIds)]);
+
     // bundleProductId -> [{ componentId, qtyPerBundle }], limited to recipes
     // that include at least one of our target components.
     const bundleToComponents = new Map<string, { componentId: string; qtyPerBundle: number }[]>();
@@ -99,7 +108,7 @@ export async function GET() {
       if (recipe.length === 0) return;
       const relevant = recipe
         .map((comp: any) => ({ componentId: comp.productId || comp.component_id, qtyPerBundle: comp.quantity || 1 }))
-        .filter((c: any) => c.componentId && productIdsToFetch.has(c.componentId));
+        .filter((c: any) => c.componentId && candidateIds.has(c.componentId));
       if (relevant.length > 0) bundleToComponents.set(bp.id, relevant);
     });
     const bundleProductIds = new Set(bundleToComponents.keys());
@@ -108,7 +117,7 @@ export async function GET() {
     // need), independent of whatever quantity staff manually requested. One
     // query covering both direct orders and orders for bundles that consume
     // a target component, across every open status.
-    const allProductIdsForDemand = new Set([...Array.from(productIdsToFetch), ...Array.from(bundleProductIds)]);
+    const allProductIdsForDemand = new Set([...Array.from(candidateIds), ...Array.from(bundleProductIds)]);
     const { data: demandRows, error: demandErr } = await supabase
       .from('order_items')
       .select('product_id, quantity, orders!inner(status)')
@@ -126,13 +135,94 @@ export async function GET() {
     };
     demandRows?.forEach((row: any) => {
       const isUnfulfilled = UNFULFILLED_STATUSES.includes(row.orders.status);
-      if (productIdsToFetch.has(row.product_id)) {
+      if (candidateIds.has(row.product_id)) {
         addDemand(row.product_id, row.quantity, isUnfulfilled);
       }
       // Expand bundle orders onto whichever target component(s) they consume.
       const components = bundleToComponents.get(row.product_id);
       components?.forEach(c => addDemand(c.componentId, row.quantity * c.qtyPerBundle, isUnfulfilled));
     });
+
+    // Only admit a negative-stock candidate onto the sheet if some order is
+    // still genuinely unfulfilled (not yet picked) and needs it. Once a
+    // picker has already secured a physical unit (Picked/Photo/Packed/For
+    // Shipping/For Pick-up), buying more wouldn't help that order — it's
+    // already handled — so it doesn't belong on a "what do we need to buy"
+    // list even though the ledger still shows a deficit.
+    negativeStockIds.forEach(id => {
+      if ((needToBuyMap.get(id) || 0) > 0) {
+        productIdsToFetch.add(id);
+      }
+    });
+
+    // --- Reconciliation list: negative-stock products left off the
+    // actionable sheet above because no order is currently unfulfilled for
+    // them. These aren't a purchasing task, but the deficit is still real —
+    // either it's explained by an order that already shipped/completed (a
+    // cost was incurred and never recorded, an accounting debt to true up
+    // eventually) or, more rarely, by no order at all (almost certainly a
+    // data error, safe to reset to 0). Surfaced separately so this doesn't
+    // clutter the "what to buy right now" list above.
+    const VOID_STATUSES = ['Cancelled', 'Returned'];
+    const reconciliationIds = Array.from(negativeStockIds).filter(id => !productIdsToFetch.has(id));
+    let reconciliationItems: any[] = [];
+    if (reconciliationIds.length > 0) {
+      const reconciliationIdSet = new Set(reconciliationIds);
+      const reconciliationBundleParentIds = Array.from(bundleToComponents.entries())
+        .filter(([, comps]) => comps.some(c => reconciliationIdSet.has(c.componentId)))
+        .map(([bundleId]) => bundleId);
+      const idsForHistory = Array.from(new Set([...reconciliationIds, ...reconciliationBundleParentIds]));
+
+      const { data: historyRows, error: historyErr } = await supabase
+        .from('order_items')
+        .select('product_id, orders!inner(id, status, created_at)')
+        .in('product_id', idsForHistory);
+      if (historyErr) throw historyErr;
+
+      const explainingOrderByProduct = new Map<string, { shortOrderId: string; status: string; createdAt: string }>();
+      const considerRecord = (productId: string, record: { shortOrderId: string; status: string; createdAt: string }) => {
+        const existing = explainingOrderByProduct.get(productId);
+        if (!existing || new Date(record.createdAt) > new Date(existing.createdAt)) {
+          explainingOrderByProduct.set(productId, record);
+        }
+      };
+      historyRows?.forEach((row: any) => {
+        if (VOID_STATUSES.includes(row.orders.status)) return;
+        const record = { shortOrderId: row.orders.id.substring(0, 7).toUpperCase(), status: row.orders.status, createdAt: row.orders.created_at };
+        if (reconciliationIdSet.has(row.product_id)) considerRecord(row.product_id, record);
+        bundleToComponents.get(row.product_id)?.forEach(c => {
+          if (reconciliationIdSet.has(c.componentId)) considerRecord(c.componentId, record);
+        });
+      });
+
+      const { data: reconciliationProducts, error: rpErr } = await supabase
+        .from('products')
+        .select('id, name, variant_name, stock_level')
+        .in('id', reconciliationIds);
+      if (rpErr) throw rpErr;
+
+      reconciliationItems = (reconciliationProducts || [])
+        .map((p: any) => {
+          const displayName = p.variant_name && !p.name.includes(p.variant_name) ? `${p.name} [${p.variant_name}]` : p.name;
+          return {
+            productId: p.id,
+            productName: displayName,
+            currentStock: p.stock_level,
+            explainingOrder: explainingOrderByProduct.get(p.id) || null,
+          };
+        })
+        .sort((a, b) => a.currentStock - b.currentStock);
+    }
+
+    if (productIdsToFetch.size === 0) {
+      return NextResponse.json({ suppliers, groupedOutofStock: [], purchasedItems: [], reconciliationItems });
+    }
+
+    const { data: liveOS, error: lErr } = await supabase
+      .from('products')
+      .select('id, name, variant_name, stock_level, supplier_id, initial_unit_cost, supplier_pricing')
+      .in('id', Array.from(productIdsToFetch));
+    if (lErr) throw lErr;
 
     // 3c. Fetch which order(s) prompted each staff draft request, if any were
     // recorded (see procurement_request_sources) — lets "Staff Req." trace
@@ -244,7 +334,7 @@ export async function GET() {
       };
     });
 
-    return NextResponse.json({ suppliers, groupedOutofStock: result, purchasedItems });
+    return NextResponse.json({ suppliers, groupedOutofStock: result, purchasedItems, reconciliationItems });
   } catch (error: any) {
     console.error('Error in procurement GET:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });

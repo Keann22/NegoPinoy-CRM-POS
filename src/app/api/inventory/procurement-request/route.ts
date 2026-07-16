@@ -298,12 +298,10 @@ export async function POST(req: Request) {
             .from('inventory_movements')
             .insert({
               product_id: p.id,
-              quantity: discrepancy,
-              type: 'adjustment',
-              reason: 'Procurement Auto-Adjustment (Audit)',
-              previous_stock: currentStockLevel,
-              new_stock: targetStockLevel,
-              user_id: null // System
+              quantity_change: discrepancy,
+              movement_type: 'adjustment',
+              reason: `Procurement Auto-Adjustment (Audit): ${currentStockLevel} -> ${targetStockLevel}`,
+              supplier_name: 'System Adjustment'
             });
         }
       }

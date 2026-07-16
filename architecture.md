@@ -175,6 +175,16 @@ The product edit dialog (`product-dialog.tsx` / `useProductDialog.ts`) only expo
 
 **Known limitation**: this only keeps things in sync going forward. Variants renamed *before* the fix landed still show stale `variant_name` in the list until someone re-opens and re-saves that specific variant (which now correctly syncs it).
 
+### `inventory_movements` schema mismatch (recurring bug source)
+
+The real columns are `product_id`, `quantity_change`, `movement_type`, `timestamp`, `reason`, `supplier_name`, `unit_cost` — **there is no `previous_stock`, `new_stock`, `type`, or `user_id` column.** Several call sites were written against that wrong (more descriptive-sounding) shape and silently failed:
+
+- `POST /api/inventory/procurement-request`'s "Option C: Auto-adjust Negative Inventory" insert.
+- `POST /api/inventory/procurement/sync` (the per-row "Sync Stock" button's audit log).
+- `discrepancy-report.tsx` (the Reports → "Auto-Adjustments" tab) — read the same wrong column names, so the whole tab threw a "column does not exist" error on every load and just showed nothing.
+
+All three were fixed (as of 2026-07-16) to use the real schema — writes now use `quantity_change`/`movement_type`/`supplier_name`, with the before→after transition folded into the free-text `reason` string since there's nowhere else to store it. **Before adding any new `inventory_movements` insert or query, check a live row's actual shape first** (`select('*').limit(1)`) rather than copying an existing call site — several of them were wrong.
+
 ---
 
 ## Supabase Client Usage
@@ -242,6 +252,8 @@ Staff upload SPX's "Account Transaction List" Excel export. For each tracking nu
 
 A duplicate-guard (matches existing Expense descriptions like `SPX ... Fee for Order #XXXXX`) prevents re-uploading an overlapping file from double-recording the same courier fee.
 
+**Double-booking bug (fixed 2026-07-16)**: the actual logic lives in `useSPXRemittance.ts`. For each tracking number, `balanceNeeded` is computed from `order.amount_paid` at fetch time — if a staff member already manually logged the down payment (e.g. an `Installment`-method payment entered as soon as the rider confirmed COD collection, before the remittance Excel was ever processed), `balanceNeeded` correctly comes out to `0`. The code used to then fall into an `else if (order.status !== 'Payment Received (COD)')` branch that applied the *entire* collected COD as a brand-new payment anyway — reasoning "there's still real money here, don't lose it" — which silently double-booked the same down payment as two separate `payments` rows (one `Installment`, one `SPX COD Remittance`) whenever the manual entry preceded the file upload. The fallback branch was removed; `codToApply` is now `0` whenever `balanceNeeded` is already satisfied, matching the older one-off migration script (`scripts/migrations/process_spx.mjs`) which never had this bug. The "already settled" branch (fee-only recording, no new payment) now also fires whenever real COD was reported but none of it could be applied for this reason, so it's still visible in the sync results instead of silently vanishing.
+
 There are also specific rules regarding fees:
 
 1. **Valuation Charge**: (1%) This is charged to the customer (part of the Order Total).
@@ -290,7 +302,14 @@ Both sum `order_items.cost_price_at_sale × quantity` for non-void (`Cancelled`/
 
 **Location**: `src/app/dashboard/reports/procurement/page.tsx`, backed by `GET /api/inventory/procurement`.
 
-The sheet only lists products that have an active **Staff Draft** — a `purchase_order_items` row on the special `purchase_orders.notes = 'STAFF_DRAFT'` PO, created via `POST /api/inventory/procurement-request` (called from the Picker app on out-of-stock report, the "Add Missing Item" dialog, or the standalone Procurement Request page). Each row then shows three numbers that look similar but answer different questions:
+**As of 2026-07-16, the sheet lists a product if *either*:**
+1. It has an active **Staff Draft** — a `purchase_order_items` row on the special `purchase_orders.notes = 'STAFF_DRAFT'` PO, created via `POST /api/inventory/procurement-request` (called from the Picker app on out-of-stock report, the "Add Missing Item" dialog, or the standalone Procurement Request page); **or**
+2. It's already on a real purchase order pending receipt; **or**
+3. `products.stock_level < 0` **and** it has at least one genuinely unfulfilled order (`needToBuyQty > 0` — see the table below), even if nobody has filed a draft for it yet.
+
+(3) exists because a draft is normally only created when a *picker* reports a shortage while picking — an order still sitting in `Processing` (not yet picked) previously left a real, already-oversold shortage completely invisible until someone happened to pick it. The admission check deliberately uses **Need to Buy**, not the broader **Total Open Demand** (see below): a stock deficit fully explained only by an already-`Picked`/`Photo`/`Packed`/`For Shipping`/`For Pick-up`/`Completed`/`Shipped` order is real, but nobody is blocked on it — a picker already secured a physical unit, so buying more wouldn't help. Using Total Open Demand as the admission test was tried first and rejected: it put fully-fulfilled orders' negative stock onto the "what do we need to buy right now" list, which reads as "need to buy 4" when the true answer is "already handled, nothing to buy." Those negative-but-fulfilled products instead show up on the separate **Stock Reconciliation** report (below).
+
+Each row then shows three numbers that look similar but answer different questions:
 
 | Column | Meaning | Source |
 |---|---|---|
@@ -308,6 +327,15 @@ A fourth, internal-only **Total Open Demand** (every open order regardless of pi
 1. The typed Order Number (even a short prefix) resolves to a valid order in the database.
 2. The requested product is either directly part of the order (`order_items`) or is an underlying component/part of a bundle product in that order (`assembly_recipe`).
 3. The requested quantity **cannot exceed** the total quantity needed by that order for that item (including expansion logic if the item is a component of a requested bundle).
+
+### Stock Reconciliation report (added 2026-07-16)
+
+**Location**: Reports → "Stock Reconciliation" tab (`to-order-report.tsx`, still the `to-order` tab value under the hood — only the label changed). Reads `reconciliationItems` from the same `GET /api/inventory/procurement` response used by the sheet above.
+
+This is the deliberate complement of the procurement sheet: every `stock_level < 0` product that did **not** get admitted onto the actionable sheet because `needToBuyMap` is `0` for it — i.e. no order is currently unfulfilled, so there's nothing to buy right now, but the deficit is still real. It's not a purchasing task; it's a periodic cost/inventory review. Split into two groups, computed by checking `order_items` for *any* non-void (`Cancelled`/`Returned` excluded) order ever, regardless of status:
+
+- **"No connected order — likely a data error"**: nothing in order history explains the deficit at all (should be rare — the initial cleanup pass on 2026-07-16 reset 13 such products to `stock_level = 0`, each logged as an `inventory_movements` adjustment). Has a one-click **"Reset to 0"** button per row, which just calls the existing `POST /api/inventory/procurement/sync` with `targetQty: 0`.
+- **"Explained by an already-fulfilled order — accounting debt"**: a real order consumed the stock but already shipped/completed with no purchase ever recorded to true up its cost (see COGS section above — `cost_price_at_sale` stays `0` until a purchase backfills it). No reset button here on purpose: zeroing this would erase the only signal that a real cost still needs recording, and would silently remove the mechanism that would otherwise catch shrinkage/theft or an unpaid supplier. Left negative until someone actually restocks it.
 
 ---
 
@@ -382,6 +410,18 @@ The apps never call each other directly — they coordinate entirely through sha
 
 `orders.status` is the state machine; `order_logs` / `order_issues` / `notifications` are side channels that keep reporting and alerts in sync without the apps knowing about each other.
 
+### Overdue Orders widget ↔ `order_issues`
+
+**Overdue Orders** (`src/components/dashboard/orders/OverdueOrders.tsx`, rendered at the top of `src/app/dashboard/orders/page.tsx`) is a pure date filter over the already-loaded `orders` list — `orderStatus === "Processing" && paymentType !== "Lay-away" && daysSince(orderDate) > 10` — with no query of its own. It doesn't know about `order_issues` by default; an order can be "overdue" for reasons that have nothing to do with a reported stock problem (most currently are — customer waiting on payment, bundled with another order, waiting on a reply — not a logged issue at all).
+
+The two surfaces are linked at the data layer (same `order_issues` table, filtered to `issue_type = 'order'`, `status = 'open'`) but were only linked in the UI **per-order, on click**: `overdue-order-dialog.tsx` fetches `GET /api/inventory/issues`, filters client-side for the opened order's ID, and shows an "Active Inventory Issue" box (missing items + message thread) if one exists.
+
+As of 2026-07-16, `OverdueOrders.tsx` also fetches `/api/inventory/issues` once for the whole grid (in a `useEffect` keyed on `orders`), builds an `order_id → { count, productNames }` map client-side, and renders a red "Stock issue reported" `Badge` (icon: `PackageX`) directly on any card whose order has an open issue, with the affected product name(s) printed inline underneath (not hover-only, so it also works on touch/mobile) — so a stuck-and-flagged order is visible at a glance in the grid, not just after opening it. This reuses the existing endpoint and the existing per-order dialog fetch is unchanged (still refetches on open, so it stays correct even if the grid-level fetch is stale).
+
+**Second, independent check: live stock, not just reported issues.** Cross-referencing confirmed **zero** of the 35 currently-overdue orders had an open `order_issues` entry — the reported-issue badge above had nothing to show. But that doesn't mean the orders aren't blocked by inventory; it means nobody had filed a report. A direct query of `order_items` joined to `products.stock_level` for those same 35 orders found **25 of them (71%)** contain at least one line item whose product is currently at `stock_level <= 0` — the real, current blocker for most of these orders, just never logged as an `order_issues` row. `OverdueOrders.tsx` now runs this as a second, independent `useEffect` (batches `order_id` in chunks of 150 via the client-side `useSupabase()` client, not an API route) and renders an amber "Still out of stock" badge with the specific product name(s) and quantities, alongside — not instead of — the reported-issue badge. The two badges intentionally don't dedupe against each other: one answers "did someone report a problem," the other answers "is a product in this order actually out of stock right now," and an order can be true on one, both, or neither.
+
+**Not connected to any of this**: `excel/not_found_orders.xlsx` is an export from the courier/SPX reconciliation flow (`src/hooks/useCourierSync.ts`'s `'not_found'` category) — tracking numbers SPX couldn't match to an order during a sync. It has no relationship to `order_issues` or the Overdue Orders widget; verified by cross-referencing its real order-ID references against the DB — none were in the overdue list, and the matched orders were already `Completed`/`Returned`/`Payment Received (COD)` (a few sitting in `Photo`/`Picked`, but none `Processing`).
+
 ### Purchase-Receiving Discrepancies → Inbox Drawer
 
 `order_issues` isn't picker-only. Bulk Receive (`src/app/dashboard/inventory/receive`, `POST /api/inventory/receive/pending-pos`) inserts an `order_issues` row with `issue_type: 'purchase_discrepancy'` (`order_id` left null, `po_id` set instead) whenever received qty is less than expected and staff enters a shortage note — same table as picker-reported issues, discriminated by `issue_type` (`'order'` is the default). This reuses the existing realtime plumbing rather than building a parallel system: the Inbox Drawer (`src/components/dashboard/inbox-drawer.tsx`, global in the dashboard header, not scoped to any one role) subscribes to `INSERT` on `order_issue_messages` and fires an urgent toast + browser notification whenever a message has `requires_attention: true`, regardless of issue type. Clicking a purchase-discrepancy card opens `purchase-issue-dialog.tsx` (reply thread + Resolve) instead of `overdue-order-dialog.tsx`, which handles picker-reported issues.
@@ -418,7 +458,7 @@ A third `issue_type` value, `'staff_message'`, extends the same pattern to manua
 | `src/app/dashboard/layout.tsx` | Main nav sidebar — role-based menu rendering |
 | `src/app/dashboard/page.tsx` | Dashboard home — metrics, charts |
 | `src/app/dashboard/orders/page.tsx` | Order list page (~714 lines — refactor in Phase 2) |
-| `src/components/dashboard/orders/OverdueOrders.tsx` | Overdue Orders widget & dialog for displaying and managing aging Processing orders |
+| `src/components/dashboard/orders/OverdueOrders.tsx` | Overdue Orders widget & dialog for displaying and managing aging Processing orders — badges cards with an open `order_issues` entry, see "Overdue Orders widget ↔ order_issues" |
 | `src/components/dashboard/order-dialog.tsx` | Order create/edit dialog (~1400 lines — refactor in Phase 2) |
 | `src/components/dashboard/product-dialog.tsx`, `src/hooks/useProductDialog.ts` | Product create/edit dialog (~1200 lines — refactor in Phase 2) — see "Product Variants: name vs variant_name" |
 | `src/lib/supabase/hooks.ts` | `useUser()`, `useAuth()`, `useSupabase()` |
@@ -428,7 +468,8 @@ A third `issue_type` value, `'staff_message'`, extends the same pattern to manua
 | `src/app/dashboard/accounting/payments/page.tsx` | Payments Log — see "Payments Dashboard" |
 | `src/app/api/payments/extract-ocr/route.ts` | Tesseract + Google Vision fallback OCR on payment proof images |
 | `src/app/api/payments/verify-pdf/route.ts` | Bank/GCash statement PDF matching — see "Payments Dashboard" |
-| `src/app/api/inventory/procurement/route.ts` | Procurement "Buy" action — updates product cost + backfills COGS (see "Cost of Goods Sold"); also self-heals leaked bundle drafts (see "Bundle Products & Assembly Recipes") |
+| `src/app/api/inventory/procurement/route.ts` | Procurement "Buy" action — updates product cost + backfills COGS (see "Cost of Goods Sold"); also self-heals leaked bundle drafts (see "Bundle Products & Assembly Recipes") and computes both the sheet's items and the Reconciliation report's `reconciliationItems` (see "Procurement Sheet: three numbers that must not be confused") |
+| `src/components/dashboard/reports/to-order-report.tsx` | Reports → "Stock Reconciliation" tab — see "Stock Reconciliation report" |
 | `src/app/dashboard/reports/pnl-report.tsx` | P&L Statement report — see "Cost of Goods Sold" |
 | `update_order_func.sql` | `process_order_transaction` Postgres RPC — where `cost_price_at_sale` gets snapshotted |
 | `src/hooks/useProducts.ts` | Products list — paginated fetch, see "1000-row query cap" and "Soft-Deleted Products" |

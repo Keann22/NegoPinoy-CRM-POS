@@ -50,7 +50,7 @@ export default function ReportsPage() {
           
           <TabsTrigger value="sales-product">Sales by Product</TabsTrigger>
           {(isManagement || isInventory) && (
-            <TabsTrigger value="to-order">To Order (Procurement)</TabsTrigger>
+            <TabsTrigger value="to-order">Stock Reconciliation</TabsTrigger>
           )}
           
           {(isManagement || isSales || isInventory) && (

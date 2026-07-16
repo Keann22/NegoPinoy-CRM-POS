@@ -43,12 +43,10 @@ export async function POST(req: Request) {
         .from('inventory_movements')
         .insert({
           product_id: productId,
-          quantity: discrepancy,
-          type: 'adjustment',
-          reason: 'Manual Procurement Auto-Adjustment (Dashboard Sync)',
-          previous_stock: currentStockLevel,
-          new_stock: targetStockLevel,
-          user_id: null
+          quantity_change: discrepancy,
+          movement_type: 'adjustment',
+          reason: `Manual Procurement Auto-Adjustment (Dashboard Sync): ${currentStockLevel} -> ${targetStockLevel}`,
+          supplier_name: 'System Adjustment'
         });
         
       if (logErr) console.error("Failed to log inventory movement:", logErr);
