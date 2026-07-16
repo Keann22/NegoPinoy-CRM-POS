@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, CheckCircle2, MessageSquare, PackageOpen, Send } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { MentionInput } from "@/components/dashboard/mention-input";
 import { useUserProfile } from "@/hooks/useUserProfile";
 
 export function OrderIssues({ }: { isAdmin?: boolean }) {
@@ -12,6 +12,7 @@ export function OrderIssues({ }: { isAdmin?: boolean }) {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedGroup, setSelectedGroup] = useState<any | null>(null);
   const [replyText, setReplyText] = useState("");
+  const [replyMentions, setReplyMentions] = useState<string[]>([]);
   const [isSending, setIsSending] = useState(false);
 
   const { userProfile } = useUserProfile();
@@ -65,7 +66,8 @@ export function OrderIssues({ }: { isAdmin?: boolean }) {
   const openGroup = async (group: any) => {
     setSelectedGroup(group);
     setReplyText("");
-    
+    setReplyMentions([]);
+
     // Fetch detailed issues to get all messages
     try {
       const fullGroupIssues = await Promise.all(
@@ -128,13 +130,15 @@ export function OrderIssues({ }: { isAdmin?: boolean }) {
           issueId: selectedGroup.issues[0].id,
           senderRole: 'sales',
           senderName: userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : 'Sales Team',
-          message: replyText.trim()
+          message: replyText.trim(),
+          mentions: replyMentions
         })
       });
-      
+
       if (!res.ok) throw new Error("Failed to send message");
-      
+
       setReplyText("");
+      setReplyMentions([]);
       // Refresh the group
       openGroup(selectedGroup);
     } catch (e: any) {
@@ -288,11 +292,13 @@ export function OrderIssues({ }: { isAdmin?: boolean }) {
                 )}
               </div>
               <div className="p-3 bg-white border-t flex gap-2">
-                <Input 
-                  placeholder="Type a reply..." 
+                <MentionInput
+                  placeholder="Type a reply... (@ to tag someone)"
                   value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSendReply()}
+                  onChange={setReplyText}
+                  mentions={replyMentions}
+                  onMentionsChange={setReplyMentions}
+                  onSubmit={handleSendReply}
                 />
                 <Button onClick={handleSendReply} disabled={isSending || !replyText.trim()} size="icon" className="bg-indigo-600 hover:bg-indigo-700">
                   <Send className="w-4 h-4" />

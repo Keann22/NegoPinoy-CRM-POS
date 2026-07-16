@@ -59,15 +59,15 @@ export function resolveRecipientNames(names: string[], excludeName?: string): st
 export async function fanOutStaffNotifications(
   supabase: SupabaseClient,
   recipientNames: string[],
-  { senderName, message }: { senderName: string; message: string }
+  { senderName, message, title, link }: { senderName: string; message: string; title?: string; link?: string }
 ) {
   if (recipientNames.length === 0) return;
 
   const notificationRows = recipientNames.map((name) => ({
     sales_person_name: name,
-    title: `New message from ${senderName}`,
+    title: title || `New message from ${senderName}`,
     message: message.length > 140 ? `${message.slice(0, 140)}...` : message,
-    link: '/dashboard',
+    link: link || '/dashboard',
     is_read: false,
     source: 'staff_message',
   }));

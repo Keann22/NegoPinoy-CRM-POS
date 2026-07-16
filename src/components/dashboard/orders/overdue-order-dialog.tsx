@@ -5,12 +5,13 @@ import { format, differenceInDays } from "date-fns";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useSupabase } from "@/lib/supabase/hooks";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { fetchOrderTrail, type OrderTrailEntry } from "@/lib/services/order-trail-service";
+import { fanOutStaffNotifications, resolveRecipientNames } from "@/lib/services/staff-message-service";
+import { MentionInput } from "@/components/dashboard/mention-input";
 import type { Order } from "@/types";
 
 const TRAIL_DOT: Record<OrderTrailEntry['kind'], string> = {
@@ -40,11 +41,13 @@ export function OverdueOrderDialog({ order, customerName, open, onOpenChange, on
   const { userProfile } = useUserProfile();
 
   const [replyText, setReplyText] = useState("");
+  const [noteMentions, setNoteMentions] = useState<string[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [issues, setIssues] = useState<any[]>([]);
   const [isLoadingIssues, setIsLoadingIssues] = useState(false);
   const [localNotes, setLocalNotes] = useState("");
   const [issueReplyText, setIssueReplyText] = useState("");
+  const [issueMentions, setIssueMentions] = useState<string[]>([]);
   const [issueIsUrgent, setIssueIsUrgent] = useState(false);
   const [isSendingIssue, setIsSendingIssue] = useState(false);
   const [outOfStockItems, setOutOfStockItems] = useState<{ name: string; quantity: number }[]>([]);
@@ -61,6 +64,9 @@ export function OverdueOrderDialog({ order, customerName, open, onOpenChange, on
     } else {
       setIssues([]);
       setReplyText("");
+      setNoteMentions([]);
+      setIssueReplyText("");
+      setIssueMentions([]);
       setOutOfStockItems([]);
       setTrail([]);
     }
@@ -143,9 +149,20 @@ export function OverdueOrderDialog({ order, customerName, open, onOpenChange, on
         .eq('id', order.id);
         
       if (error) throw error;
-      
+
+      const recipientNames = resolveRecipientNames(noteMentions, senderName);
+      if (recipientNames.length > 0) {
+        await fanOutStaffNotifications(supabase, recipientNames, {
+          senderName,
+          message: replyText.trim(),
+          title: `${senderName} tagged you in a note on Order #${order.id.substring(0, 7).toUpperCase()}`,
+          link: `/dashboard/orders/${order.id}`,
+        });
+      }
+
       setLocalNotes(updatedNotes);
       setReplyText("");
+      setNoteMentions([]);
       loadTrail(order.id);
       onOrderUpdated(); // Trigger a refetch in the parent to get the latest notes
     } catch (e: any) {
@@ -164,9 +181,7 @@ export function OverdueOrderDialog({ order, customerName, open, onOpenChange, on
       const roles = userProfile?.roles || [];
       const isSalesUser = roles.some((r: string) => r.toLowerCase() === 'sales');
       const senderRole = isSalesUser ? 'sales' : 'picker';
-      
-      const extractedMentions = issueReplyText.match(/@\w+/g)?.map(m => m.slice(1)) || [];
-      
+
       const res = await fetch('/api/inventory/issues/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -176,13 +191,14 @@ export function OverdueOrderDialog({ order, customerName, open, onOpenChange, on
           senderName: senderName,
           message: issueReplyText,
           requiresAttention: issueIsUrgent,
-          mentions: extractedMentions
+          mentions: issueMentions
         })
       });
-      
+
       if (!res.ok) throw new Error('Failed to send message');
-      
+
       setIssueReplyText("");
+      setIssueMentions([]);
       setIssueIsUrgent(false);
       fetchIssues(order!.id);
       loadTrail(order!.id);
@@ -253,11 +269,13 @@ export function OverdueOrderDialog({ order, customerName, open, onOpenChange, on
               )}
             </div>
             <div className="p-3 bg-slate-50 border-t flex gap-2">
-              <Input 
-                placeholder="Add a note to this order..." 
+              <MentionInput
+                placeholder="Add a note to this order... (@ to tag someone)"
                 value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSendNote()}
+                onChange={setReplyText}
+                mentions={noteMentions}
+                onMentionsChange={setNoteMentions}
+                onSubmit={handleSendNote}
               />
               <Button onClick={handleSendNote} disabled={isSending || !replyText.trim()} size="icon" className="bg-indigo-600 hover:bg-indigo-700">
                 <Send className="w-4 h-4" />
@@ -316,11 +334,13 @@ export function OverdueOrderDialog({ order, customerName, open, onOpenChange, on
                       <Label htmlFor="urgent" className="text-xs font-semibold text-red-700 cursor-pointer">Mark as Urgent / Requires Attention</Label>
                     </div>
                     <div className="flex gap-2">
-                      <Input 
-                        placeholder="Reply to this issue..." 
+                      <MentionInput
+                        placeholder="Reply to this issue... (@ to tag someone)"
                         value={issueReplyText}
-                        onChange={(e) => setIssueReplyText(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSendIssueMessage()}
+                        onChange={setIssueReplyText}
+                        mentions={issueMentions}
+                        onMentionsChange={setIssueMentions}
+                        onSubmit={handleSendIssueMessage}
                         className="bg-white"
                       />
                       <Button onClick={handleSendIssueMessage} disabled={isSendingIssue || !issueReplyText.trim()} size="icon" className="bg-red-600 hover:bg-red-700">
