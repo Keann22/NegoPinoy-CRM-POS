@@ -406,7 +406,7 @@ The apps never call each other directly — they coordinate entirely through sha
 |---|---|---|
 | `order_issues` (+ `order_issue_messages`) | Picker app (on out-of-stock report); Bulk Receive (on qty shortfall — see below); `POST /api/staff-messages` (manual staff tagging — see below) | Dashboard `order-issues.tsx` widget via `GET /api/inventory/issues`; `POST /api/inventory/procurement-request` auto-creates restock requests consumed by the Procurement Request page and Procurement Sheet report; Inbox Drawer (all issue types) |
 | `order_logs` | Every stage (Picker, Second check, Packer, Packed orders Delay/Revert, issue resolution — see "Order Trail" below) | `src/lib/services/order-trail-service.ts`'s `fetchOrderTrail()`, consumed by `order-trail-dialog.tsx` and the Overdue Order dialog; Second check and Packer both read the latest `Picked`/`Picked (with issue)` log to detect edits made after picking |
-| `notifications` | Picker app (issue reported), Packer app (order packed), `POST /api/staff-messages` (`source: 'staff_message'`, one row per tagged recipient) | Bell-icon notifications for the sales rep who owns the order |
+| `notifications` | Picker app (issue reported), Packer app (order packed), `POST /api/staff-messages` (`source: 'staff_message'`, one row per tagged recipient), `POST /api/inventory/issues/messages` (`@mention` fan-out — see "@Mention Tagging" below), `overdue-order-dialog.tsx`'s `handleSendNote` (Order Notes `@mention` fan-out, client-side) | Bell-icon notifications for the sales rep who owns the order |
 
 `orders.status` is the state machine; `order_logs` / `order_issues` / `notifications` are side channels that keep reporting and alerts in sync without the apps knowing about each other.
 
@@ -454,6 +454,16 @@ A third `issue_type` value, `'staff_message'`, extends the same pattern to manua
 
 **Staff picker source.** `StaffSearch` (`src/components/dashboard/staff-search.tsx`) calls `supabase.rpc('get_all_users')` — previously only known to be called from the Owner/Admin-gated User Management page (`src/app/dashboard/users/page.tsx`). It's unconfirmed whether the RPC itself restricts by role server-side or whether that page's `canManageUsers` check was the only gate; if the RPC turns out to reject non-Owner/Admin callers, `StaffSearch` will silently show an empty staff list for regular Sales/Inventory accounts.
 
+### @Mention Tagging in Order Notes / Issue Discussion / Order Issue dialog (added 2026-07-16)
+
+Three chat-style composers now support typing `@Name` inline with a live autocomplete dropdown, and tagging someone actually notifies them via the Bell: the **Order Notes** box and the **Issue Discussion** reply box in `overdue-order-dialog.tsx`, and the reply box in `order-issues.tsx`'s Order Issue dialog. Before this, Issue Discussion had a fragile `issueReplyText.match(/@\w+/g)` that only ever matched single-word handles and silently broke on real two-word staff names like "Czarina Suyat"; Order Notes and the Order Issue dialog's reply box had no mention support at all, and none of the three actually created a notification even when `mentions` was captured.
+
+**`MentionInput`** (`src/components/dashboard/mention-input.tsx`) is a drop-in replacement for a plain `<Input>`. It's backed by **`useStaffDirectory`** (`src/hooks/useStaffDirectory.ts`) — the `supabase.rpc('get_all_users')` fetch/parse logic extracted out of `StaffSearch`, which now shares it too. Mentions are tracked as explicit state from dropdown selections (added when a suggestion is clicked/Enter'd), not by regex-parsing the text afterward — this is what makes multi-word names reliable, since there's no ambiguity about where a name ends.
+
+**Notification fan-out is centralized server-side, not per-composer.** `POST /api/inventory/issues/messages` — the one endpoint both the Overdue modal's Issue Discussion box and the Order Issue dialog's reply box post through — now calls `fanOutStaffNotifications()` (generalized with optional `title`/`link` params; see "Message Staff" above for its original shape) whenever the request carries a non-empty `mentions` array, after looking up the message's `order_issues.order_id` to link the notification back to the order. Doing it in the route rather than in each component means any future composer that posts through this same endpoint gets mention notifications for free, with no extra wiring.
+
+**Order Notes is the exception** — it writes straight to `orders.notes` (a single free-text column, no API route — see "Order Trail" above) via a direct client-side Supabase call, so there's nowhere server-side to hook. `handleSendNote` in `overdue-order-dialog.tsx` calls `fanOutStaffNotifications()` directly, client-side, right after the `orders.notes` update succeeds.
+
 **`orders.id` is `uuid`, and this project's PostgREST does not support the `column::type` cast-in-filter trick.** `OrderSearch` (`src/components/dashboard/order-search.tsx`) originally tried `.filter('id::text', 'ilike', ...)` to prefix-search order numbers — confirmed by direct REST testing that this project's PostgREST returns the same `operator does not exist: uuid ~~* unknown` error with or without the cast. Fixed by fetching a bounded batch (`limit(500)`, most recent first) once per popover-open and filtering by ID-prefix/customer-name client-side instead of pushing the `ilike` into Postgres. The same bug (plain `.ilike('id', ...)` with no cast attempt) also exists in `src/app/api/inventory/procurement-request/route.ts`'s order lookup — not yet fixed there as of this writing.
 
 ### Realtime Channel Subscriptions (recurring bug source)
@@ -494,6 +504,7 @@ A third `issue_type` value, `'staff_message'`, extends the same pattern to manua
 | `src/components/dashboard/reserved-stock-dialog.tsx` | "Stock Allocation Details" popup — bundle-aware, see "Bundle Products & Assembly Recipes" |
 | `src/components/dashboard/staff-message-fab.tsx`, `message-staff-dialog.tsx`, `staff-message-thread-dialog.tsx`, `staff-search.tsx`, `order-search.tsx` | "Message Staff" floating compose button, its dialog, thread view, and pickers — see "Message Staff (manual tagging) → Inbox Drawer" |
 | `src/app/api/staff-messages/route.ts` | Creates a `staff_message`-type `order_issues` thread + fans out `notifications` to tagged staff |
+| `src/components/dashboard/mention-input.tsx`, `src/hooks/useStaffDirectory.ts` | `@Name` autocomplete input + shared staff-directory hook — see "@Mention Tagging" |
 
 ---
 
