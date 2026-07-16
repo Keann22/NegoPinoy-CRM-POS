@@ -354,13 +354,12 @@ export default function ProcurementSheet() {
         productName={viewingAllocatedItem?.name || ''}
         isOpen={!!viewingAllocatedItem}
         onClose={() => setViewingAllocatedItem(null)}
-        // Picked/Photo/Packed/For Shipping/For Pick-up are excluded here even
-        // though they still count toward Current Stock's ledger deficit above
-        // — by this point the item has already been physically pulled off
-        // the shelf (Photo/Packed/etc. all happen after Picked), so it no
-        // longer needs allocating. Picked (with issue) stays: the pull may
-        // not have actually succeeded, so it's still effectively open.
-        statusFilter={['Pending Payment', 'Processing', 'Picked (with issue)', 'On-Hold', 'Waiting for Stock']}
+        statusFilter={
+          viewingAllocatedItem?.context === 'needToBuy' 
+            ? ['Processing', 'Picked (with issue)', 'Waiting for Stock'] 
+            : ['Pending Payment', 'Processing', 'Picked (with issue)', 'On-Hold', 'Waiting for Stock']
+        }
+        excludeLayaway={viewingAllocatedItem?.context === 'needToBuy'}
         title={viewingAllocatedItem?.context === 'needToBuy' ? "Orders Needing This Item" : "Total Open Demand"}
       />
     </div>

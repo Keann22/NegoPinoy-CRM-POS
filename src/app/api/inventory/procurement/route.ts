@@ -120,7 +120,7 @@ export async function GET() {
     const allProductIdsForDemand = new Set([...Array.from(candidateIds), ...Array.from(bundleProductIds)]);
     const { data: demandRows, error: demandErr } = await supabase
       .from('order_items')
-      .select('product_id, quantity, orders!inner(status)')
+      .select('product_id, quantity, orders!inner(status, payment_method)')
       .in('product_id', Array.from(allProductIdsForDemand))
       .in('orders.status', ALL_OPEN_STATUSES);
     if (demandErr) throw demandErr;
@@ -134,6 +134,9 @@ export async function GET() {
       }
     };
     demandRows?.forEach((row: any) => {
+      if (row.orders.payment_method === 'Lay-away') {
+        return; // Exclude lay-away orders from automatic system demand
+      }
       const isUnfulfilled = UNFULFILLED_STATUSES.includes(row.orders.status);
       if (candidateIds.has(row.product_id)) {
         addDemand(row.product_id, row.quantity, isUnfulfilled);

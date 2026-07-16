@@ -10,7 +10,7 @@ export const ALL_OPEN_STATUSES = [
 // a staff member already pulled a real unit for it — buying more wouldn't
 // help that order. This narrower set is what actually needs purchasing.
 export const UNFULFILLED_STATUSES = [
-  'Pending Payment', 'Processing', 'Picked (with issue)', 'On-Hold', 'Waiting for Stock',
+  'Processing', 'Picked (with issue)', 'Waiting for Stock',
 ];
 
 /**

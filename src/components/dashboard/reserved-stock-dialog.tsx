@@ -16,6 +16,7 @@ interface ReservedStockDialogProps {
   isOpen: boolean;
   onClose: () => void;
   statusFilter?: string[];
+  excludeLayaway?: boolean;
   title?: string;
 }
 
@@ -32,7 +33,7 @@ type ReservedOrder = {
   viaBundleName: string | null;
 };
 
-export function ReservedStockDialog({ productId, productName, isOpen, onClose, statusFilter = ['Pending Payment', 'Processing'], title = "Reserved Stock Details" }: ReservedStockDialogProps) {
+export function ReservedStockDialog({ productId, productName, isOpen, onClose, statusFilter = ['Pending Payment', 'Processing'], excludeLayaway = false, title = "Reserved Stock Details" }: ReservedStockDialogProps) {
   const supabase = useSupabase();
   const [loading, setLoading] = useState(false);
   const [reservedOrders, setReservedOrders] = useState<ReservedOrder[]>([]);
@@ -107,7 +108,7 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose, s
 
         if (error) throw error;
 
-        const formattedOrders: ReservedOrder[] = (data || []).map((item: any) => {
+        let formattedOrders: ReservedOrder[] = (data || []).map((item: any) => {
           const bundle = bundleInfo.get(item.product_id);
           return {
             id: item.id,
@@ -122,6 +123,10 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose, s
             viaBundleName: bundle?.name || null,
           };
         });
+
+        if (excludeLayaway) {
+          formattedOrders = formattedOrders.filter(o => o.paymentType !== 'Lay-away');
+        }
 
         formattedOrders.sort((a, b) => new Date(a.orderDate).getTime() - new Date(b.orderDate).getTime());
 
