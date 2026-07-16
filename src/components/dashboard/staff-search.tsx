@@ -33,7 +33,7 @@ export function StaffSearch({ selected, onChange }: { selected: string[]; onChan
           ))}
         </div>
       )}
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open} onOpenChange={setOpen} modal={true}>
         <PopoverTrigger asChild>
           <Button variant="outline" className="w-full justify-start font-normal text-left">
             {selected.length > 0 ? `${selected.length} staff tagged` : 'Tag staff...'}
