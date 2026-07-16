@@ -11,21 +11,61 @@ export const STATUSES_THAT_CLEAR_ORDER_ISSUES: string[] = [
 ];
 
 /**
+ * Records a resolved order_issues row into order_logs so it shows up in the Order
+ * Trail — otherwise resolution is invisible: order_issues.status just flips with
+ * no timestamp, actor, or reason for it ever being recorded anywhere.
+ */
+async function logIssueResolution(
+  supabase: SupabaseClient,
+  orderId: string,
+  productName: string | null,
+  actorName: string
+): Promise<void> {
+  await supabase.from('order_logs').insert({
+    order_id: orderId,
+    status: 'Issue Resolved',
+    user_name: actorName,
+    snapshot_data: productName ? { productName } : null,
+  });
+}
+
+/**
  * Resolves any still-open order_issues for an order. Call this whenever an
  * order's status moves to one of STATUSES_THAT_CLEAR_ORDER_ISSUES through any
  * path (Packer app, Mark Shipped, manual status dropdown, bulk status change),
  * not just the one flow that originally reported the issue — otherwise the
  * Order Issues dashboard keeps showing tickets for orders that already shipped.
+ *
+ * `logResolution` defaults to true (a genuine resolution worth recording in the
+ * Order Trail). Pass false for the one case where this isn't really a resolution —
+ * usePicker.ts clears stale issues before a re-pick attempt even when the re-pick
+ * is still partial, so logging "Issue Resolved" there would misleadingly claim the
+ * item was fixed when it may still be missing (a fresh issue gets reported right
+ * after, if so).
  */
 export async function resolveOpenOrderIssues(
   supabase: SupabaseClient,
-  orderId: string
+  orderId: string,
+  actorName: string = 'System',
+  logResolution: boolean = true
 ): Promise<void> {
+  const { data: issues } = await supabase
+    .from('order_issues')
+    .select('id, product_id, products(name)')
+    .eq('order_id', orderId)
+    .eq('status', 'open');
+
   await supabase
     .from('order_issues')
     .update({ status: 'resolved' })
     .eq('order_id', orderId)
     .eq('status', 'open');
+
+  if (!logResolution) return;
+
+  for (const issue of (issues || []) as any[]) {
+    await logIssueResolution(supabase, orderId, issue.products?.name || null, actorName);
+  }
 }
 
 /**
@@ -36,20 +76,22 @@ export async function resolveOpenOrderIssues(
 export async function resolveOrderIssuesForRemovedProducts(
   supabase: SupabaseClient,
   orderId: string,
-  remainingProductIds: string[]
+  remainingProductIds: string[],
+  actorName: string = 'System'
 ): Promise<void> {
   const { data: issues } = await supabase
     .from('order_issues')
-    .select('id, product_id')
+    .select('id, product_id, products(name)')
     .eq('order_id', orderId)
     .eq('status', 'open');
 
   if (!issues) return;
 
-  const issuesToResolve = issues.filter(i => i.product_id && !remainingProductIds.includes(i.product_id));
+  const issuesToResolve = (issues as any[]).filter(i => i.product_id && !remainingProductIds.includes(i.product_id));
 
   for (const issue of issuesToResolve) {
     await supabase.from('order_issues').update({ status: 'resolved' }).eq('id', issue.id);
+    await logIssueResolution(supabase, orderId, issue.products?.name || null, actorName);
   }
 }
 

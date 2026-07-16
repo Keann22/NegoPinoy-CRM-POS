@@ -5,6 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useSupabase } from '@/lib/supabase/hooks';
 import { useToast } from '@/hooks/use-toast';
+import { useUserProfile } from '@/hooks/useUserProfile';
 import { Order } from '@/app/dashboard/orders/page';
 
 interface NotForShippingDialogProps {
@@ -19,10 +20,11 @@ export function NotForShippingDialog({ order, open, onOpenChange, onSuccess }: N
   const [isSubmitting, setIsSubmitting] = useState(false);
   const supabase = useSupabase();
   const { toast } = useToast();
+  const { userProfile } = useUserProfile();
 
   const handleSubmit = async () => {
     if (!order || !supabase) return;
-    
+
     if (!reason.trim()) {
       toast({ variant: 'destructive', title: 'Reason required', description: 'Please enter a reason.' });
       return;
@@ -36,6 +38,14 @@ export function NotForShippingDialog({ order, open, onOpenChange, onSuccess }: N
         .eq('id', order.id);
 
       if (error) throw error;
+
+      const userName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : 'Unknown Staff';
+      await supabase.from('order_logs').insert({
+        order_id: order.id,
+        status: 'Marked Not Ready to Ship',
+        user_name: userName,
+        snapshot_data: { reason },
+      });
 
       toast({
         title: 'Updated Successfully',

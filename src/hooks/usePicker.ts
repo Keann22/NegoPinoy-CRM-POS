@@ -175,13 +175,15 @@ export function usePicker() {
 
       if (orderError) throw orderError;
 
+      const userName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : 'Unknown Staff';
+
       // Whatever was flagged on an earlier pick attempt for this order is
       // stale now — clear it before any new issues (below) get inserted, so
       // the Missing Items list reflects only this attempt's results instead
       // of accumulating every past attempt (clean or partial re-pick alike).
-      await resolveOpenOrderIssues(supabase, scannedOrderId);
-
-      const userName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : 'Unknown Staff';
+      // Only log it as a real "Issue Resolved" trail entry if this attempt is
+      // actually clean — a partial re-pick isn't a resolution, it's a fresh report.
+      await resolveOpenOrderIssues(supabase, scannedOrderId, userName, !hasIssues);
 
       const itemSnapshot = orderItems.map(item => ({
         id: item.id,

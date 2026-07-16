@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { useSupabase } from '@/lib/supabase/hooks';
 import { useToast } from '@/hooks/use-toast';
+import { useUserProfile } from '@/hooks/useUserProfile';
 import { Order } from '@/app/dashboard/orders/page';
 
 interface RevertPendingDialogProps {
@@ -16,6 +17,7 @@ export function RevertPendingDialog({ order, open, onOpenChange, onSuccess }: Re
   const [isSubmitting, setIsSubmitting] = useState(false);
   const supabase = useSupabase();
   const { toast } = useToast();
+  const { userProfile } = useUserProfile();
 
   const handleSubmit = async () => {
     if (!order || !supabase) return;
@@ -24,7 +26,7 @@ export function RevertPendingDialog({ order, open, onOpenChange, onSuccess }: Re
     try {
       const { error } = await supabase
         .from('orders')
-        .update({ 
+        .update({
           status: 'Processing',
           not_for_shipping_reason: null,
           boxes_config: null
@@ -32,6 +34,13 @@ export function RevertPendingDialog({ order, open, onOpenChange, onSuccess }: Re
         .eq('id', order.id);
 
       if (error) throw error;
+
+      const userName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : 'Unknown Staff';
+      await supabase.from('order_logs').insert({
+        order_id: order.id,
+        status: 'Reverted to Processing',
+        user_name: userName,
+      });
 
       toast({
         title: 'Reverted to Processing',

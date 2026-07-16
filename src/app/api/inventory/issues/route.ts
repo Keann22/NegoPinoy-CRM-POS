@@ -11,6 +11,36 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const id = url.searchParams.get('id');
+    const orderId = url.searchParams.get('orderId');
+
+    if (orderId) {
+      // Full issue history (any status) for one order, used by the Order Trail —
+      // purchase_discrepancy issues never carry an order_id, so this naturally
+      // stays scoped to picker/staff-message issues without needing an issue_type filter.
+      const { data, error } = await supabase
+        .from('order_issues')
+        .select(`
+          *,
+          products(name, variant_name),
+          order_issue_messages(id, sender_name, sender_role, message, created_at)
+        `)
+        .eq('order_id', orderId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
+        data.forEach((issue: any) => {
+          if (issue.order_issue_messages) {
+            issue.order_issue_messages.sort((a: any, b: any) =>
+              new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            );
+          }
+        });
+      }
+
+      return NextResponse.json(data);
+    }
 
     if (id) {
       // Get specific issue with messages and order/product info
@@ -110,11 +140,17 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
-    const { issueId, status } = await req.json();
+    const { issueId, status, resolvedByName } = await req.json();
 
     if (!issueId || status !== 'resolved') {
       return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
     }
+
+    const { data: issue } = await supabase
+      .from('order_issues')
+      .select('order_id, products(name)')
+      .eq('id', issueId)
+      .single();
 
     const { error } = await supabase
       .from('order_issues')
@@ -122,6 +158,15 @@ export async function PATCH(req: Request) {
       .eq('id', issueId);
 
     if (error) throw error;
+
+    if (issue?.order_id) {
+      await supabase.from('order_logs').insert({
+        order_id: issue.order_id,
+        status: 'Issue Resolved',
+        user_name: resolvedByName || 'System',
+        snapshot_data: (issue as any).products?.name ? { productName: (issue as any).products.name } : null,
+      });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { format, differenceInDays } from "date-fns";
-import { AlertCircle, Clock } from "lucide-react";
+import { AlertCircle, Clock, PackageX, MessageSquare } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { useSupabase } from "@/lib/supabase/hooks";
 import type { Order } from "@/types";
 import { OverdueOrderDialog } from "./overdue-order-dialog";
 
@@ -16,20 +18,123 @@ interface OverdueOrdersProps {
   onOrderUpdated?: () => void;
 }
 
+interface OrderIssueSummary {
+  count: number;
+  productNames: string[];
+}
+
+interface OutOfStockItem {
+  name: string;
+  quantity: number;
+}
+
+/**
+ * Order notes are appended as "[MMM d, yyyy h:mm a] Sender Name:\nmessage", separated by
+ * blank lines (see handleSendNote in overdue-order-dialog.tsx). Pulls out just the most
+ * recent entry so a card can show a one-line preview without opening the dialog.
+ */
+function getLatestNote(notes?: string | null): { sender: string; message: string } | null {
+  if (!notes || !notes.trim()) return null;
+
+  const entries = notes.split('\n\n').map((e) => e.trim()).filter(Boolean);
+  if (entries.length === 0) return null;
+
+  const last = entries[entries.length - 1];
+  const match = last.match(/^\[.+?\]\s*(.+?):\s*([\s\S]*)$/);
+  if (match) {
+    return { sender: match[1].trim(), message: match[2].trim() };
+  }
+  return { sender: '', message: last };
+}
+
 export function OverdueOrders({ orders, customerMap, isExpanded, onToggleExpand, onOrderUpdated }: OverdueOrdersProps) {
+  const supabase = useSupabase();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [issuesByOrderId, setIssuesByOrderId] = useState<Map<string, OrderIssueSummary>>(new Map());
+  const [outOfStockByOrderId, setOutOfStockByOrderId] = useState<Map<string, OutOfStockItem[]>>(new Map());
+
   // Only orders in "Processing" that are older than 10 days
   const overdueOrders = orders.filter((o) => {
     if (o.orderStatus !== "Processing") return false;
     if (o.paymentType === "Lay-away") return false;
     if (!o.orderDate) return false;
-    
+
     const daysOverdue = differenceInDays(new Date(), new Date(o.orderDate));
     return daysOverdue > 10;
   });
 
   // Sort by oldest first
   overdueOrders.sort((a, b) => new Date(a.orderDate).getTime() - new Date(b.orderDate).getTime());
+
+  // Cross-reference with open inventory/order issues so a card can flag "this one is stuck on a reported issue"
+  useEffect(() => {
+    if (overdueOrders.length === 0) {
+      setIssuesByOrderId(new Map());
+      return;
+    }
+
+    const overdueIds = new Set(overdueOrders.map((o) => o.id));
+
+    fetch('/api/inventory/issues')
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error('Failed to fetch issues'))))
+      .then((allIssues: any[]) => {
+        const map = new Map<string, OrderIssueSummary>();
+        (allIssues || []).forEach((issue) => {
+          const orderId = issue.orders?.id;
+          if (!orderId || !overdueIds.has(orderId)) return;
+
+          const existing = map.get(orderId) || { count: 0, productNames: [] };
+          existing.count += 1;
+          if (issue.products?.name) existing.productNames.push(issue.products.name);
+          map.set(orderId, existing);
+        });
+        setIssuesByOrderId(map);
+      })
+      .catch((e) => console.error("Failed to load order issues for overdue orders", e));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders]);
+
+  // Independent of any reported issue: check whether the products actually inside these
+  // overdue orders are currently out of stock, so a card can flag it even if nobody filed a report.
+  useEffect(() => {
+    if (!supabase || overdueOrders.length === 0) {
+      setOutOfStockByOrderId(new Map());
+      return;
+    }
+
+    const overdueIds = overdueOrders.map((o) => o.id);
+
+    (async () => {
+      try {
+        const rows: any[] = [];
+        const chunkSize = 150;
+        for (let i = 0; i < overdueIds.length; i += chunkSize) {
+          const chunk = overdueIds.slice(i, i + chunkSize);
+          const { data, error } = await supabase
+            .from('order_items')
+            .select('order_id, quantity, product_name, products(name, stock_level)')
+            .in('order_id', chunk);
+          if (error) throw error;
+          rows.push(...(data || []));
+        }
+
+        const map = new Map<string, OutOfStockItem[]>();
+        rows.forEach((row: any) => {
+          const stock = row.products?.stock_level;
+          if (stock === undefined || stock === null || stock > 0) return;
+
+          const name = row.products?.name || row.product_name || 'Unknown product';
+          const existing = map.get(row.order_id) || [];
+          existing.push({ name, quantity: row.quantity });
+          map.set(row.order_id, existing);
+        });
+        setOutOfStockByOrderId(map);
+      } catch (e) {
+        console.error("Failed to check live stock for overdue orders", e);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders, supabase]);
 
   if (overdueOrders.length === 0) {
     return null;
@@ -62,6 +167,9 @@ export function OverdueOrders({ orders, customerMap, isExpanded, onToggleExpand,
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {displayedOrders.map((order) => {
             const daysOverdue = differenceInDays(new Date(), new Date(order.orderDate));
+            const issueSummary = issuesByOrderId.get(order.id);
+            const outOfStockItems = outOfStockByOrderId.get(order.id);
+            const latestNote = getLatestNote(order.notes);
             return (
               <div 
                 key={order.id} 
@@ -85,7 +193,45 @@ export function OverdueOrders({ orders, customerMap, isExpanded, onToggleExpand,
                   <p className="text-xs text-slate-600 font-medium mt-1 truncate">
                     {customerMap.get(order.customerId) || 'Unknown Customer'}
                   </p>
-                  
+
+                  {issueSummary && (
+                    <div className="mt-2">
+                      <Badge variant="destructive" className="gap-1 font-normal">
+                        <PackageX className="w-3 h-3" />
+                        {issueSummary.count === 1 ? 'Stock issue reported' : `${issueSummary.count} stock issues reported`}
+                      </Badge>
+                      {issueSummary.productNames.length > 0 && (
+                        <p className="text-[11px] text-red-600 leading-snug mt-1">
+                          {issueSummary.productNames.join(', ')}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {outOfStockItems && outOfStockItems.length > 0 && (
+                    <div className="mt-2">
+                      <Badge variant="outline" className="gap-1 font-normal bg-amber-100 text-amber-800 border-amber-300">
+                        <PackageX className="w-3 h-3" />
+                        Still out of stock
+                      </Badge>
+                      <p className="text-[11px] text-amber-700 leading-snug mt-1">
+                        {outOfStockItems.map((i) => `${i.name} (x${i.quantity})`).join(', ')}
+                      </p>
+                    </div>
+                  )}
+
+                  {latestNote && (
+                    <div className="mt-2 bg-slate-50 border border-slate-200 rounded px-2 py-1.5">
+                      <p className="text-[11px] text-slate-500 flex items-center gap-1 font-medium">
+                        <MessageSquare className="w-3 h-3" />
+                        {latestNote.sender || 'Latest note'}
+                      </p>
+                      <p className="text-xs text-slate-700 leading-snug line-clamp-2 mt-0.5">
+                        {latestNote.message}
+                      </p>
+                    </div>
+                  )}
+
                   <div className="text-xs text-slate-500 mt-3 pt-3 border-t border-slate-100">
                     <p>
                       Placed on: <span className="font-medium text-slate-800">{format(new Date(order.orderDate), "MMM d, yyyy")}</span>

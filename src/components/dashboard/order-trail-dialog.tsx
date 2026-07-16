@@ -2,52 +2,27 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useSupabase } from "@/lib/supabase/hooks";
 import { format } from "date-fns";
-import { Loader2, Activity } from "lucide-react";
+import { Loader2, Activity, MessageSquare, PackageX } from "lucide-react";
+import { fetchOrderTrail, type OrderTrailEntry } from "@/lib/services/order-trail-service";
+
+const ENTRY_STYLES: Record<OrderTrailEntry['kind'], { dot: string; icon?: typeof MessageSquare }> = {
+  status: { dot: 'bg-indigo-500' },
+  note: { dot: 'bg-slate-400', icon: MessageSquare },
+  issue_reported: { dot: 'bg-red-500', icon: PackageX },
+  issue_message: { dot: 'bg-amber-400', icon: MessageSquare },
+};
 
 export function OrderTrailDialog({ open, onOpenChange, orderId }: { open: boolean; onOpenChange: (open: boolean) => void; orderId: string }) {
   const supabase = useSupabase();
-  const [logs, setLogs] = useState<any[]>([]);
+  const [logs, setLogs] = useState<OrderTrailEntry[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (open && orderId && supabase) {
       setLoading(true);
-      Promise.all([
-        supabase
-          .from('order_logs')
-          .select('*')
-          .eq('order_id', orderId)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('orders')
-          .select('created_at, sales_person_name')
-          .eq('id', orderId)
-          .single()
-      ]).then(([logsRes, orderRes]) => {
-        let combinedLogs: any[] = [];
-        if (!logsRes.error && logsRes.data) {
-          combinedLogs = [...logsRes.data];
-        }
-        
-        if (!orderRes.error && orderRes.data) {
-          // Check if there's already an initial creation log to prevent duplicates
-          const hasOrderPlacedLog = combinedLogs.some(
-            log => log.status === 'Order Placed' || log.status === 'Order Created'
-          );
-          
-          if (!hasOrderPlacedLog) {
-            combinedLogs.push({
-              id: 'initial_order_creation',
-              status: 'Order Placed',
-              created_at: orderRes.data.created_at,
-              user_name: orderRes.data.sales_person_name || 'System / Customer',
-            });
-          }
-        }
-        
-        setLogs(combinedLogs);
-        setLoading(false);
-      });
+      fetchOrderTrail(supabase, orderId)
+        .then(setLogs)
+        .finally(() => setLoading(false));
     }
   }, [open, orderId, supabase]);
 
@@ -71,26 +46,36 @@ export function OrderTrailDialog({ open, onOpenChange, orderId }: { open: boolea
             </div>
           ) : (
             <div className="space-y-6">
-              {logs.map((log, index) => (
-                <div key={log.id} className="relative pl-6">
-                  {/* Timeline line */}
-                  {index !== logs.length - 1 && (
-                    <div className="absolute left-[11px] top-6 bottom-[-24px] w-[2px] bg-slate-200" />
-                  )}
-                  {/* Timeline dot */}
-                  <div className="absolute left-0 top-1.5 h-6 w-6 rounded-full border-4 border-white bg-indigo-500 shadow-sm" />
-                  
-                  <div className="bg-slate-50 border rounded-md p-3">
-                    <div className="flex justify-between items-start mb-1">
-                      <span className="font-semibold text-slate-800">{log.status}</span>
-                      <span className="text-xs text-slate-500">{format(new Date(log.created_at), 'PPp')}</span>
-                    </div>
-                    <div className="text-sm text-slate-600">
-                      Processed by: <span className="font-medium text-slate-800">{log.user_name || 'System / Unknown'}</span>
+              {logs.map((entry, index) => {
+                const style = ENTRY_STYLES[entry.kind];
+                return (
+                  <div key={entry.id} className="relative pl-6">
+                    {/* Timeline line */}
+                    {index !== logs.length - 1 && (
+                      <div className="absolute left-[11px] top-6 bottom-[-24px] w-[2px] bg-slate-200" />
+                    )}
+                    {/* Timeline dot */}
+                    <div className={`absolute left-0 top-1.5 h-6 w-6 rounded-full border-4 border-white shadow-sm ${style.dot}`} />
+
+                    <div className="bg-slate-50 border rounded-md p-3">
+                      <div className="flex justify-between items-start mb-1 gap-2">
+                        <span className="font-semibold text-slate-800 flex items-center gap-1">
+                          {style.icon && <style.icon className="w-3.5 h-3.5 shrink-0" />}
+                          {entry.title}
+                        </span>
+                        <span className="text-xs text-slate-500 shrink-0">{format(new Date(entry.createdAt), 'PPp')}</span>
+                      </div>
+                      {entry.detail && (
+                        <div className="text-sm text-slate-700 whitespace-pre-wrap mb-1">{entry.detail}</div>
+                      )}
+                      <div className="text-xs text-slate-600">
+                        {entry.kind === 'issue_message' ? 'From: ' : 'By: '}
+                        <span className="font-medium text-slate-800">{entry.actor || 'System / Unknown'}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

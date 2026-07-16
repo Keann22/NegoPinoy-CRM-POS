@@ -331,9 +331,9 @@ export function usePacker() {
 
       if (error) throw error;
 
-      await resolveOpenOrderIssues(supabase, scannedOrderId);
-
       const userName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : 'Unknown Staff';
+      await resolveOpenOrderIssues(supabase, scannedOrderId, userName);
+
       await supabase.from('order_logs').insert({
         order_id: scannedOrderId,
         status: 'Packed',

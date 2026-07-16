@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { AlertCircle, PackageOpen, Send, Clock } from "lucide-react";
+import { AlertCircle, PackageOpen, Send, Clock, Activity, MessageSquare, PackageX } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -10,7 +10,22 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useSupabase } from "@/lib/supabase/hooks";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { fetchOrderTrail, type OrderTrailEntry } from "@/lib/services/order-trail-service";
 import type { Order } from "@/types";
+
+const TRAIL_DOT: Record<OrderTrailEntry['kind'], string> = {
+  status: 'bg-indigo-500',
+  note: 'bg-slate-400',
+  issue_reported: 'bg-red-500',
+  issue_message: 'bg-amber-400',
+};
+
+const TRAIL_ICON: Record<OrderTrailEntry['kind'], typeof MessageSquare | undefined> = {
+  status: undefined,
+  note: MessageSquare,
+  issue_reported: PackageX,
+  issue_message: MessageSquare,
+};
 
 interface OverdueOrderDialogProps {
   order: Order | null;
@@ -32,17 +47,61 @@ export function OverdueOrderDialog({ order, customerName, open, onOpenChange, on
   const [issueReplyText, setIssueReplyText] = useState("");
   const [issueIsUrgent, setIssueIsUrgent] = useState(false);
   const [isSendingIssue, setIsSendingIssue] = useState(false);
+  const [outOfStockItems, setOutOfStockItems] = useState<{ name: string; quantity: number }[]>([]);
+  const [isLoadingStock, setIsLoadingStock] = useState(false);
+  const [trail, setTrail] = useState<OrderTrailEntry[]>([]);
+  const [isLoadingTrail, setIsLoadingTrail] = useState(false);
 
   useEffect(() => {
     if (open && order) {
       setLocalNotes(order.notes || "");
       fetchIssues(order.id);
+      fetchLiveStock(order.id);
+      loadTrail(order.id);
     } else {
       setIssues([]);
       setReplyText("");
+      setOutOfStockItems([]);
+      setTrail([]);
     }
-     
+
   }, [open, order]);
+
+  const loadTrail = async (orderId: string) => {
+    if (!supabase) return;
+    setIsLoadingTrail(true);
+    try {
+      setTrail(await fetchOrderTrail(supabase, orderId));
+    } catch (e) {
+      console.error("Failed to load order trail", e);
+    } finally {
+      setIsLoadingTrail(false);
+    }
+  };
+
+  // Independent of order_issues: checks whether the products actually in this order are
+  // currently out of stock, even if nobody has formally reported it yet.
+  const fetchLiveStock = async (orderId: string) => {
+    if (!supabase) return;
+    try {
+      setIsLoadingStock(true);
+      const { data, error } = await supabase
+        .from('order_items')
+        .select('quantity, product_name, products(name, stock_level)')
+        .eq('order_id', orderId);
+      if (error) throw error;
+
+      const outOfStock = (data || [])
+        .filter((row: any) => row.products?.stock_level !== undefined && row.products?.stock_level !== null && row.products.stock_level <= 0)
+        .map((row: any) => ({ name: row.products?.name || row.product_name || 'Unknown product', quantity: row.quantity }));
+
+      setOutOfStockItems(outOfStock);
+    } catch (e) {
+      console.error("Failed to check live stock for order", e);
+    } finally {
+      setIsLoadingStock(false);
+    }
+  };
 
   const fetchIssues = async (orderId: string) => {
     try {
@@ -87,6 +146,7 @@ export function OverdueOrderDialog({ order, customerName, open, onOpenChange, on
       
       setLocalNotes(updatedNotes);
       setReplyText("");
+      loadTrail(order.id);
       onOrderUpdated(); // Trigger a refetch in the parent to get the latest notes
     } catch (e: any) {
       alert("Error saving note: " + e.message);
@@ -125,6 +185,7 @@ export function OverdueOrderDialog({ order, customerName, open, onOpenChange, on
       setIssueReplyText("");
       setIssueIsUrgent(false);
       fetchIssues(order!.id);
+      loadTrail(order!.id);
     } catch (e: any) {
       alert("Error sending issue message: " + e.message);
     } finally {
@@ -205,15 +266,15 @@ export function OverdueOrderDialog({ order, customerName, open, onOpenChange, on
           </div>
 
           {/* Right side: Order Information & Issues */}
-          <div className="flex flex-col h-[50vh] md:h-[60vh] gap-4">
-            
+          <div className="flex flex-col h-[50vh] md:h-[60vh] gap-4 overflow-y-auto pr-1">
+
             {/* Active Issues Box */}
             {isLoadingIssues ? (
                <div className="p-4 bg-white border rounded-lg shadow-sm text-center text-sm text-slate-500">
                  Checking for active issues...
                </div>
             ) : issues.length > 0 ? (
-              <div className="flex flex-col border border-red-200 rounded-lg overflow-hidden bg-red-50 shadow-sm flex-1">
+              <div className="flex flex-col border border-red-200 rounded-lg overflow-hidden bg-red-50 shadow-sm shrink-0">
                 <div className="p-3 bg-red-100 text-red-800 font-semibold text-sm border-b border-red-200 flex items-center gap-2">
                   <AlertCircle className="w-4 h-4"/> Active Inventory Issue
                 </div>
@@ -269,11 +330,70 @@ export function OverdueOrderDialog({ order, customerName, open, onOpenChange, on
                   </div>
                 </div>
               </div>
+            ) : outOfStockItems.length > 0 ? (
+              <div className="flex flex-col border border-amber-200 rounded-lg overflow-hidden bg-amber-50 shadow-sm">
+                <div className="p-3 bg-amber-100 text-amber-800 font-semibold text-sm border-b border-amber-200 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4"/> Out of Stock (Not Yet Reported)
+                </div>
+                <div className="p-4">
+                  <p className="text-xs text-amber-700 mb-2">
+                    No one has filed an inventory issue for this order, but the item(s) below are currently at 0 stock:
+                  </p>
+                  <ul className="list-disc pl-4 space-y-0.5 text-amber-800 text-sm">
+                    {outOfStockItems.map((item, idx) => (
+                      <li key={idx}>{item.name} (x{item.quantity})</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
             ) : (
               <div className="p-4 bg-green-50 border border-green-200 rounded-lg shadow-sm text-center text-sm text-green-700">
-                No active inventory issues reported for this order.
+                {isLoadingStock ? 'Checking current stock…' : 'No active inventory issues reported, and all items in this order are currently in stock.'}
               </div>
             )}
+
+            {/* Order Trail — every comment, note, stock issue, and status change on this order, merged and chronological */}
+            <div className="flex flex-col border rounded-lg overflow-hidden bg-white shadow-sm shrink-0">
+              <div className="p-3 bg-slate-100 font-semibold text-slate-700 text-sm border-b flex items-center gap-2">
+                <Activity className="w-4 h-4 text-indigo-600" /> Order Trail
+              </div>
+              <div className="p-4 max-h-72 overflow-y-auto">
+                {isLoadingTrail ? (
+                  <div className="text-center text-sm text-slate-400 py-4">Loading trail…</div>
+                ) : trail.length === 0 ? (
+                  <div className="text-center text-sm text-slate-400 py-4">No trail entries yet.</div>
+                ) : (
+                  <div className="space-y-4">
+                    {trail.map((entry, index) => {
+                      const Icon = TRAIL_ICON[entry.kind];
+                      return (
+                        <div key={entry.id} className="relative pl-5">
+                          {index !== trail.length - 1 && (
+                            <div className="absolute left-[7px] top-5 bottom-[-16px] w-[2px] bg-slate-200" />
+                          )}
+                          <div className={`absolute left-0 top-1 h-3.5 w-3.5 rounded-full border-2 border-white shadow-sm ${TRAIL_DOT[entry.kind]}`} />
+                          <div className="flex justify-between items-start gap-2">
+                            <span className="text-xs font-semibold text-slate-800 flex items-center gap-1">
+                              {Icon && <Icon className="w-3 h-3 shrink-0" />}
+                              {entry.title}
+                            </span>
+                            <span className="text-[10px] text-slate-500 shrink-0">{format(new Date(entry.createdAt), 'MMM d, h:mm a')}</span>
+                          </div>
+                          {entry.detail && (
+                            <p className="text-xs text-slate-600 whitespace-pre-wrap mt-0.5">{entry.detail}</p>
+                          )}
+                          {entry.actor && (
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              {entry.kind === 'issue_message' ? 'From' : 'By'}: {entry.actor}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
 
             {/* Order Summary Box */}
             <div className="flex flex-col border rounded-lg overflow-hidden bg-white shadow-sm shrink-0">

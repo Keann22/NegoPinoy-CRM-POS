@@ -98,11 +98,12 @@ export function OrderIssues({ }: { isAdmin?: boolean }) {
     if (!confirm("This only dismisses the issue from this dashboard for record-keeping — it will NOT unblock Second Check or Packing. The order stays blocked until the item is actually re-picked in stock. Continue?")) return;
 
     try {
+      const resolvedByName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : 'Sales Team';
       for (const issue of selectedGroup.issues) {
           const res = await fetch('/api/inventory/issues', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ issueId: issue.id, status: 'resolved' })
+            body: JSON.stringify({ issueId: issue.id, status: 'resolved', resolvedByName })
           });
           if (!res.ok) throw new Error("Failed to resolve an issue");
       }
