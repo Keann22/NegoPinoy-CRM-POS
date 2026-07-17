@@ -120,7 +120,7 @@ export async function GET() {
     const allProductIdsForDemand = new Set([...Array.from(candidateIds), ...Array.from(bundleProductIds)]);
     const { data: demandRows, error: demandErr } = await supabase
       .from('order_items')
-      .select('product_id, quantity, orders!inner(id, status, payment_method)')
+      .select('product_id, quantity, is_packed, orders!inner(id, status, payment_method)')
       .in('product_id', Array.from(allProductIdsForDemand))
       .in('orders.status', ALL_OPEN_STATUSES);
     if (demandErr) throw demandErr;
@@ -152,7 +152,10 @@ export async function GET() {
       }
 
       let isUnfulfilled = false;
-      if (row.orders.status === 'Picked (with issue)') {
+      if (row.is_packed) {
+        // If the item is already physically packed, it doesn't need to be bought!
+        isUnfulfilled = false;
+      } else if (row.orders.status === 'Picked (with issue)') {
         // For partial fulfillment statuses, only consider the specific item unfulfilled if it has an open issue
         isUnfulfilled = openIssueKeys.has(`${row.orders.id}-${row.product_id}`);
       } else {

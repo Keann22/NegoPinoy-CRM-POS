@@ -330,7 +330,15 @@ export function usePacker() {
         .eq('id', scannedOrderId);
 
       if (error) throw error;
-
+      const { error: orderItemsError } = await supabase
+        .from('order_items')
+        .update({ is_packed: true })
+        .eq('order_id', scannedOrderId);
+        
+      if (orderItemsError) {
+        console.error('Failed to set is_packed on order_items:', orderItemsError);
+        // We'll proceed, but this might cause procurement mismatch if it fails.
+      }
       const userName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : 'Unknown Staff';
       await resolveOpenOrderIssues(supabase, scannedOrderId, userName);
 

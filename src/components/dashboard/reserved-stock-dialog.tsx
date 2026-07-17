@@ -94,6 +94,7 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose, s
             id,
             product_id,
             quantity,
+            is_packed,
             orders!inner(
               id,
               order_date,
@@ -123,6 +124,8 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose, s
 
         let formattedOrders: ReservedOrder[] = (data || [])
           .filter((item: any) => {
+            if (item.is_packed) return false;
+            
             if (item.orders.status === 'Picked (with issue)') {
               return openIssueKeys.has(`${item.orders.id}-${item.product_id}`);
             }
