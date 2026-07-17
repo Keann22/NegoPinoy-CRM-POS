@@ -155,9 +155,8 @@ export function ProcurementItemRow({
         {item.currentStock}
       </td>
       <td
-        className="p-3 font-bold text-center text-lg cursor-pointer text-slate-500 hover:underline hover:text-indigo-600"
+        className="p-3 font-bold text-center text-lg text-slate-500"
         title="Manual note from staff — not used to calculate the Buy quantity"
-        onClick={() => onViewAllocated({ id: item.productId, name: item.productName, context: 'total' })}
       >
           {item.staffRequestedQty !== null ? item.staffRequestedQty : <span className="text-xs text-slate-400 font-normal">Pending</span>}
       </td>
