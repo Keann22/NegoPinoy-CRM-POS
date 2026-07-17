@@ -53,9 +53,17 @@ export function OverdueOrders({ orders, customerMap, isExpanded, onToggleExpand,
   const [issuesByOrderId, setIssuesByOrderId] = useState<Map<string, OrderIssueSummary>>(new Map());
   const [outOfStockByOrderId, setOutOfStockByOrderId] = useState<Map<string, OutOfStockItem[]>>(new Map());
 
-  // Only orders in "Processing" that are older than 10 days
+  // Orders still waiting on fulfillment (not yet picked clean) that are older than 10 days.
+  // "Picked (with issue)", "Waiting for Stock", and "On-Hold" are included because those
+  // are exactly the orders most likely to be stuck (e.g. waiting on missing stock).
+  const STUCK_STATUSES: Order["orderStatus"][] = [
+    "Processing",
+    "Picked (with issue)",
+    "Waiting for Stock",
+    "On-Hold",
+  ];
   const overdueOrders = orders.filter((o) => {
-    if (o.orderStatus !== "Processing") return false;
+    if (!STUCK_STATUSES.includes(o.orderStatus)) return false;
     if (o.paymentType === "Lay-away") return false;
     if (!o.orderDate) return false;
 
