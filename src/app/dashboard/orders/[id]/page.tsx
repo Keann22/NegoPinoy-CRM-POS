@@ -119,7 +119,12 @@ export default function OrderDetailPage() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <CardTitle className="text-2xl font-headline">Order #{order.id.substring(0, 7).toUpperCase()}</CardTitle>
-              <CardDescription>Placed on {format(new Date(order.orderDate), 'PPP')}</CardDescription>
+              <CardDescription>
+                Placed on {format(new Date(order.orderDate), 'PPP')}
+                {order.salesPersonName && (
+                  <span className="block mt-1">Processed by: {order.salesPersonName}</span>
+                )}
+              </CardDescription>
             </div>
             <div className="flex flex-wrap items-center gap-2 mt-4 sm:mt-0">
               {(order.orderStatus === 'Processing' || order.orderStatus === 'Pending Payment' || order.orderStatus === 'Shipped') && (
