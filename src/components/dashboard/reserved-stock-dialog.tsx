@@ -108,7 +108,27 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose, s
 
         if (error) throw error;
 
-        let formattedOrders: ReservedOrder[] = (data || []).map((item: any) => {
+        // 4. If filtering by 'Picked (with issue)', we must ensure the specific item actually has an issue.
+        // Otherwise, it was successfully picked and we shouldn't show it as needing stock.
+        let openIssueKeys = new Set<string>();
+        if (statusFilter.includes('Picked (with issue)')) {
+          const { data: issuesData } = await supabase
+            .from('order_issues')
+            .select('order_id, product_id')
+            .eq('status', 'open')
+            .in('product_id', allIdsToQuery);
+            
+          openIssueKeys = new Set(issuesData?.map((i: any) => `${i.order_id}-${i.product_id}`));
+        }
+
+        let formattedOrders: ReservedOrder[] = (data || [])
+          .filter((item: any) => {
+            if (item.orders.status === 'Picked (with issue)') {
+              return openIssueKeys.has(`${item.orders.id}-${item.product_id}`);
+            }
+            return true;
+          })
+          .map((item: any) => {
           const bundle = bundleInfo.get(item.product_id);
           return {
             id: item.id,

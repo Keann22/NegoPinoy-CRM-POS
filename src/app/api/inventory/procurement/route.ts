@@ -120,10 +120,23 @@ export async function GET() {
     const allProductIdsForDemand = new Set([...Array.from(candidateIds), ...Array.from(bundleProductIds)]);
     const { data: demandRows, error: demandErr } = await supabase
       .from('order_items')
-      .select('product_id, quantity, orders!inner(status, payment_method)')
+      .select('product_id, quantity, orders!inner(id, status, payment_method)')
       .in('product_id', Array.from(allProductIdsForDemand))
       .in('orders.status', ALL_OPEN_STATUSES);
     if (demandErr) throw demandErr;
+
+    // 3c. Fetch open issues to accurately gauge "Picked (with issue)" demand.
+    // If an order is "Picked (with issue)", only the specific items that have
+    // an open issue logged against them should be considered unfulfilled.
+    // Items in that order without an issue were successfully picked and don't need buying.
+    const { data: openIssues, error: issuesErr } = await supabase
+      .from('order_issues')
+      .select('order_id, product_id')
+      .eq('status', 'open')
+      .in('product_id', Array.from(allProductIdsForDemand));
+    if (issuesErr) throw issuesErr;
+
+    const openIssueKeys = new Set(openIssues?.map(i => `${i.order_id}-${i.product_id}`));
 
     const totalOpenDemandMap = new Map<string, number>();
     const needToBuyMap = new Map<string, number>();
@@ -137,7 +150,15 @@ export async function GET() {
       if (row.orders.payment_method === 'Lay-away') {
         return; // Exclude lay-away orders from automatic system demand
       }
-      const isUnfulfilled = UNFULFILLED_STATUSES.includes(row.orders.status);
+
+      let isUnfulfilled = false;
+      if (row.orders.status === 'Picked (with issue)') {
+        // For partial fulfillment statuses, only consider the specific item unfulfilled if it has an open issue
+        isUnfulfilled = openIssueKeys.has(`${row.orders.id}-${row.product_id}`);
+      } else {
+        isUnfulfilled = UNFULFILLED_STATUSES.includes(row.orders.status);
+      }
+
       if (candidateIds.has(row.product_id)) {
         addDemand(row.product_id, row.quantity, isUnfulfilled);
       }
