@@ -36,11 +36,17 @@ export function RevertPendingDialog({ order, open, onOpenChange, onSuccess }: Re
       if (error) throw error;
 
       const userName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : 'Unknown Staff';
-      await supabase.from('order_logs').insert({
+      const { error: logError } = await supabase.from('order_logs').insert({
         order_id: order.id,
         status: 'Reverted to Processing',
         user_name: userName,
       });
+
+      if (logError) {
+        console.error('Failed to insert order log:', logError);
+        // We don't throw here because the main update already succeeded,
+        // but we should at least log it. A better approach would be an RPC transaction.
+      }
 
       toast({
         title: 'Reverted to Processing',
