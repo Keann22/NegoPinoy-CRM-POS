@@ -193,6 +193,19 @@ This causes the system state to become out-of-sync with the audit trail. For exa
 
 **Rule**: Always capture and handle the `error` object when inserting logs. If the logging is not wrapped in a transaction with the main update, at least explicitly log the failure to `console.error` to assist in debugging.
 
+### Item-Level Fulfillment (`is_packed`)
+
+Because an order can be reverted to `Processing` after it has already been physically packed (e.g. to add a new item or edit customer details), checking `orders.status` is not sufficient to know if the physical stock has been allocated. This caused issues where reverting an order would incorrectly trigger a fake stock shortage in Procurement.
+
+To solve this, fulfillment is tracked at the **item level**.
+- `order_items` has an `is_packed` boolean column.
+- When `usePacker.ts` packs an order, it sets `is_packed = true` on all of its items.
+- If the order is reverted, these items *keep* their `is_packed = true` status, so they don't reappear in Procurement.
+- Any newly added items to a reverted order default to `is_packed = false`, meaning they correctly trigger Procurement demand.
+- If a staff member needs to "steal" stock from a packed order for another customer, they use the "Release Stock to Warehouse" option when reverting, which explicitly resets `is_packed = false`.
+
+**Rule**: Whenever calculating "unfulfilled demand" (like in `api/inventory/procurement`), you MUST filter out items where `is_packed = true`. Order-level status is only for workflow stages, not stock allocation.
+
 ---
 
 ## Supabase Client Usage
