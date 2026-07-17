@@ -35,7 +35,7 @@ export function OrderTrailDialog({ open, onOpenChange, orderId }: { open: boolea
             Order Trail
           </DialogTitle>
         </DialogHeader>
-        <div className="py-4">
+        <div className="py-4 max-h-[70vh] overflow-y-auto pr-2">
           {loading ? (
             <div className="flex justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
