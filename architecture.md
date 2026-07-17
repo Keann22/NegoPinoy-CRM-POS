@@ -185,6 +185,14 @@ The real columns are `product_id`, `quantity_change`, `movement_type`, `timestam
 
 All three were fixed (as of 2026-07-16) to use the real schema — writes now use `quantity_change`/`movement_type`/`supplier_name`, with the before→after transition folded into the free-text `reason` string since there's nowhere else to store it. **Before adding any new `inventory_movements` insert or query, check a live row's actual shape first** (`select('*').limit(1)`) rather than copying an existing call site — several of them were wrong.
 
+### Silent Failures on Logging (`order_logs`, `notifications`, etc.)
+
+A recurring pattern in the codebase involves updating a core table (e.g. `orders`) and then inserting an audit log (e.g. into `order_logs`). If the insert statement does not explicitly check and handle its error (`if (error) throw error;` or log it), a failure in the log insertion (e.g. due to an RLS policy, transient DB lock, or invalid ENUM) will fail silently. 
+
+This causes the system state to become out-of-sync with the audit trail. For example, if a status is updated to `Processing` but the `order_logs` insert fails silently, the UI Order Trail will incorrectly show the last state (e.g. `Packed`), causing major confusion for staff who rely on the Order Trail to understand the current state. 
+
+**Rule**: Always capture and handle the `error` object when inserting logs. If the logging is not wrapped in a transaction with the main update, at least explicitly log the failure to `console.error` to assist in debugging.
+
 ---
 
 ## Supabase Client Usage
