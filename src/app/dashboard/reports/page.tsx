@@ -16,6 +16,8 @@ import { StaleReservationsReport } from '@/components/dashboard/reports/stale-re
 import { PackedOrdersReport } from '@/components/dashboard/reports/packed-orders-report';
 import { DiscrepancyReport } from '@/components/dashboard/reports/discrepancy-report';
 import { ComplianceReport } from '@/components/dashboard/reports/compliance-report';
+import { PurchasesReport } from '@/components/dashboard/reports/purchases-report';
+import { MissingTrackingReport } from '@/components/dashboard/reports/missing-tracking-report';
 import { useMemo } from 'react';
 
 export default function ReportsPage() {
@@ -64,6 +66,10 @@ export default function ReportsPage() {
           {(isManagement || isInventory) && (
             <TabsTrigger value="discrepancies">Auto-Adjustments</TabsTrigger>
           )}
+
+          {(isManagement || isInventory) && (
+            <TabsTrigger value="purchases">Purchases</TabsTrigger>
+          )}
           
           {isManagement && (
             <>
@@ -74,6 +80,9 @@ export default function ReportsPage() {
           )}
           {isManagement && (
             <TabsTrigger value="compliance">Agent Compliance</TabsTrigger>
+          )}
+          {isManagement && (
+            <TabsTrigger value="missing-tracking">Missing Tracking</TabsTrigger>
           )}
         </TabsList>
       </div>
@@ -118,6 +127,12 @@ export default function ReportsPage() {
         </TabsContent>
       )}
 
+      {(isManagement || isInventory) && (
+        <TabsContent value="purchases">
+          <PurchasesReport />
+        </TabsContent>
+      )}
+
       {(isManagement || isSales || isInventory) && (
         <TabsContent value="stale-reservations">
           <StaleReservationsReport />
@@ -148,6 +163,11 @@ export default function ReportsPage() {
       {isManagement && (
         <TabsContent value="compliance">
           <ComplianceReport />
+        </TabsContent>
+      )}
+      {isManagement && (
+        <TabsContent value="missing-tracking">
+          <MissingTrackingReport />
         </TabsContent>
       )}
     </Tabs>
