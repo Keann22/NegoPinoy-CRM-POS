@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { getStaffByName, joinThreadMembers, type StaffIdentity } from '@/lib/services/thread-service';
 
 export type StaffMessageInput = {
   issueType: 'order' | 'product';
@@ -8,6 +9,8 @@ export type StaffMessageInput = {
   senderName: string;
   senderRole?: string;
   recipientNames: string[];
+  /** Optional per-recipient notification link (keyed by recipient name), e.g. each rep's affected order. */
+  linkByRecipient?: Map<string, string>;
 };
 
 // Always tagged on staff/inventory escalations, regardless of which staff
@@ -59,15 +62,26 @@ export function resolveRecipientNames(names: string[], excludeName?: string): st
 export async function fanOutStaffNotifications(
   supabase: SupabaseClient,
   recipientNames: string[],
-  { senderName, message, title, link }: { senderName: string; message: string; title?: string; link?: string }
+  { senderName, message, title, link, linkByRecipient }: {
+    senderName: string;
+    message: string;
+    title?: string;
+    link?: string;
+    /** Per-recipient link (keyed by recipient name); falls back to `link` for names not in the map. */
+    linkByRecipient?: Map<string, string>;
+  }
 ) {
   if (recipientNames.length === 0) return;
+
+  // Name matching is case-insensitive, consistent with dedupeNames/resolveRecipientNames
+  const linkLookup = new Map<string, string>();
+  linkByRecipient?.forEach((value, name) => linkLookup.set(name.trim().toLowerCase(), value));
 
   const notificationRows = recipientNames.map((name) => ({
     sales_person_name: name,
     title: title || `New message from ${senderName}`,
     message: message.length > 140 ? `${message.slice(0, 140)}...` : message,
-    link: link || '/dashboard',
+    link: linkLookup.get(name.trim().toLowerCase()) || link || '/dashboard',
     is_read: false,
     source: 'staff_message',
   }));
@@ -83,7 +97,7 @@ export async function fanOutStaffNotifications(
  * recipient so each gets their own independently read/unread Bell entry.
  */
 export async function createStaffMessage(supabase: SupabaseClient, input: StaffMessageInput) {
-  const { issueType, orderId, productId, message, senderName, senderRole, recipientNames } = input;
+  const { issueType, orderId, productId, message, senderName, senderRole, recipientNames, linkByRecipient } = input;
 
   const { data: issue, error: issueErr } = await supabase
     .from('order_issues')
@@ -112,7 +126,25 @@ export async function createStaffMessage(supabase: SupabaseClient, input: StaffM
 
   if (msgErr) throw msgErr;
 
-  await fanOutStaffNotifications(supabase, recipientNames, { senderName, message });
+  // Register sender + recipients as thread members so the Messages page shows
+  // them as involved and tracks their unread state. Names that can't be
+  // resolved to a user id (system senders like 'Picker') are skipped.
+  try {
+    const staffByName = await getStaffByName(supabase);
+    const members: StaffIdentity[] = [];
+    for (const name of [senderName, ...recipientNames]) {
+      const match = staffByName.get(name.trim().toLowerCase());
+      if (match && !members.some((m) => m.userId === match.userId)) members.push(match);
+    }
+    const sender = staffByName.get(senderName.trim().toLowerCase());
+    await joinThreadMembers(supabase, issue.id, members, sender?.userId);
+  } catch (e) {
+    console.error('Error registering thread members (message still sent):', e);
+  }
+
+  // Order-type staff messages always link to the order itself
+  const link = issueType === 'order' && orderId ? `/dashboard/orders/${orderId}` : undefined;
+  await fanOutStaffNotifications(supabase, recipientNames, { senderName, message, link, linkByRecipient });
 
   return issue.id as string;
 }

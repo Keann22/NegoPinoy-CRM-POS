@@ -42,6 +42,8 @@ export function InboxDrawer() {
         order_issue_messages(id, sender_name, message, created_at, requires_attention, mentions)
       `)
       .eq('status', 'open')
+      // Direct (1:1) threads are private to their two members — Messages page only
+      .neq('issue_type', 'direct')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -83,7 +85,16 @@ export function InboxDrawer() {
         },
         async (payload) => {
           const newMsg = payload.new;
-          
+
+          // Private 1:1 messages must never be toasted to the whole team —
+          // the Messages page and its badge handle those for the recipient.
+          const { data: parentIssue } = await supabase
+            .from('order_issues')
+            .select('issue_type')
+            .eq('id', newMsg.issue_id)
+            .single();
+          if (parentIssue?.issue_type === 'direct') return;
+
           // Refresh issues list to get latest messages
           fetchIssues();
 

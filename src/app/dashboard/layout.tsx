@@ -86,6 +86,7 @@ export default function DashboardLayout({
     }
 
     links.push({ href: '/dashboard/orders', label: 'Orders', icon: ShoppingCart });
+    links.push({ href: '/dashboard/messages', label: 'Messages', icon: MessageCircle });
     
     if (isManagement || isSales || isInventory) {
       links.push({ href: '/dashboard/packed-orders', label: 'Packed Orders', icon: PackageCheck });
