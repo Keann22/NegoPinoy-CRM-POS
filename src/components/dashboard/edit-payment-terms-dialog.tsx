@@ -65,6 +65,10 @@ export function EditPaymentTermsDialog({ order, open, onOpenChange, onSuccess }:
   const supabase = useSupabase();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Live financials fetched on open. amountPaid in this form means "payment collected NOW",
+  // which is ADDED to existingPaid — it never overwrites payments already logged on the order.
+  const [existingPaid, setExistingPaid] = useState(0);
+  const [cashTotal, setCashTotal] = useState<number | null>(null);
 
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentSchema),
@@ -80,7 +84,7 @@ export function EditPaymentTermsDialog({ order, open, onOpenChange, onSuccess }:
     if (order && open) {
       form.reset({
         paymentType: order.paymentType,
-        amountPaid: Number(order.amountPaid) || 0,
+        amountPaid: 0,
         installmentMonths: order.installmentMonths || undefined,
         monthlyPayment: order.monthlyPayment || undefined,
         // Since we don't have isDownpaymentCOD in order DB directly, we'll assume false when opening
@@ -91,94 +95,97 @@ export function EditPaymentTermsDialog({ order, open, onOpenChange, onSuccess }:
   }, [order, open, form]);
 
   useEffect(() => {
+    if (!order || !open || !supabase) return;
+    let cancelled = false;
+    setExistingPaid(Number(order.amountPaid) || 0);
+    setCashTotal(null);
+    (async () => {
+      const { data } = await supabase
+        .from('orders')
+        .select('subtotal, total_discount, insurance_fee, shipping_fee, amount_paid')
+        .eq('id', order.id)
+        .single();
+      if (cancelled || !data) return;
+      setExistingPaid(Number(data.amount_paid) || 0);
+      setCashTotal((data.subtotal || 0) - (data.total_discount || 0) + (data.insurance_fee || 0) + (data.shipping_fee || 0));
+    })();
+    return () => { cancelled = true; };
+  }, [order, open, supabase]);
+
+  useEffect(() => {
     if (!order) return;
     const pType = form.watch('paymentType');
     if (pType === 'Full Payment') {
-        form.setValue('amountPaid', Number(order.totalAmount) || 0);
+        // Amount still owed under the new terms: cash basis when leaving installment,
+        // otherwise the current order total — minus everything already paid.
+        const targetTotal = order.paymentType === 'Installment'
+            ? (cashTotal ?? (Number(order.totalAmount) || 0))
+            : (Number(order.totalAmount) || 0);
+        form.setValue('amountPaid', Math.max(0, targetTotal - existingPaid));
     } else if (pType === 'COD' || pType === 'Pending') {
         form.setValue('amountPaid', 0);
     }
-  }, [form.watch('paymentType'), order, form]);
+  }, [form.watch('paymentType'), order, form, cashTotal, existingPaid]);
 
   async function onSubmit(values: PaymentFormValues) {
     if (!order || !supabase) return;
     
     setIsSubmitting(true);
     try {
-        let actualAmountPaid = values.amountPaid ?? 0;
+        let paymentNow = values.amountPaid ?? 0;
         if (values.isDownpaymentCOD && (values.paymentType === 'Installment' || values.paymentType === 'Lay-away')) {
-            actualAmountPaid = 0;
+            paymentNow = 0;
         }
-
-        let totalAmount = Number(order.totalAmount) || 0;
-        
-        // If it's an installment, recalculate total amount based on terms (assuming base price isn't changed)
-        // Actually, changing payment type means the total might change if they are moving to installment
-        // The original logic: totalAmount = downpayment + (monthly * months)
-        if (values.paymentType === 'Installment' && values.monthlyPayment && values.installmentMonths) {
-            totalAmount = (values.amountPaid ?? 0) + (values.monthlyPayment * values.installmentMonths);
-        } else if (order.paymentType === 'Installment' && values.paymentType !== 'Installment') {
-            // Revert total amount to subtotal - discount if moving away from installment
-            const { data: dbOrder } = await supabase.from('orders').select('subtotal, total_discount').eq('id', order.id).single();
-            if (dbOrder) {
-                totalAmount = (dbOrder.subtotal || 0) - (dbOrder.total_discount || 0);
-            }
-        }
-        
-        const balanceDue = totalAmount - actualAmountPaid;
 
         // 0. Upload proof of payment if exists
         let proofUrl = null;
-        if (actualAmountPaid > 0 && values.proofOfPayment && values.proofOfPayment.length > 0) {
+        if (paymentNow > 0 && values.proofOfPayment && values.proofOfPayment.length > 0) {
             const file = values.proofOfPayment[0];
             const fileExt = file.name.split('.').pop();
             const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
-            
+
             const { data: uploadData, error: uploadError } = await supabase.storage
                 .from('proof_of_payment')
                 .upload(fileName, file, { upsert: false });
-                
+
             if (uploadError) throw uploadError;
-            
+
             const { data: { publicUrl } } = supabase.storage.from('proof_of_payment').getPublicUrl(uploadData.path);
             proofUrl = publicUrl;
         }
 
-        const { error: updateError } = await supabase
-            .from('orders')
-            .update({
-                payment_method: values.paymentType,
-                installment_months: values.paymentType === 'Installment' ? values.installmentMonths : null,
-                monthly_payment: values.paymentType === 'Installment' ? values.monthlyPayment : null,
-                amount_paid: actualAmountPaid,
-                balance_due: balanceDue,
-                total_amount: totalAmount,
-            })
-            .eq('id', order.id);
+        // 1. Update terms atomically: the RPC locks the order row, reads live financials
+        // (so payments logged elsewhere are never clobbered), computes the new total —
+        // reverting to the cash price when leaving installment — and logs the payment
+        // collected now, all in a single DB transaction.
+        const { data, error: rpcError } = await supabase.rpc('update_payment_terms', {
+            payload: {
+                orderId: order.id,
+                paymentType: values.paymentType,
+                installmentMonths: values.paymentType === 'Installment' ? values.installmentMonths : null,
+                monthlyPayment: values.paymentType === 'Installment' ? values.monthlyPayment : null,
+                paymentNow,
+                paymentDate: new Date().toISOString(),
+                proofUrl,
+            }
+        });
+        if (rpcError) throw rpcError;
+        const result = data as { paymentId: string | null; totalAmount: number; balanceDue: number } | null;
 
-        if (updateError) throw updateError;
-        
-        // If there's an actual amount paid during this edit, log it!
-        // (Wait, we only log if they just added it now. Since Edit Payment Terms might be called multiple times, we should only log if proof is uploaded to avoid duplicates, or better yet, EditPaymentTerms is usually used to set the INITIAL terms).
-        if (actualAmountPaid > 0 && proofUrl) {
-            const { error: paymentError } = await supabase
-                .from('payments')
-                .insert({
-                    order_id: order.id,
-                    payment_date: new Date().toISOString(),
-                    amount: actualAmountPaid,
-                    payment_method: values.paymentType === 'Full Payment' ? 'Full Payment' : 'Downpayment',
-                    proof_url: proofUrl,
-                    notes: 'Initial Order Payment (Added via Edit Terms)'
-                });
-            if (paymentError) console.error("Failed to log payment during edit", paymentError);
+        // Trigger OCR in the background when a payment was logged with proof
+        if (proofUrl && result?.paymentId) {
+            fetch('/api/payments/extract-ocr', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ proofUrl, paymentId: result.paymentId })
+            }).catch(err => console.error("OCR trigger failed:", err));
         }
-        
+
         toast({
             title: "Payment Terms Updated",
             description: `Order is now set to ${values.paymentType}.`,
         });
-        
+
         onSuccess();
     } catch (error: any) {
         console.error("Failed to update payment terms:", error);
@@ -283,6 +290,11 @@ export function EditPaymentTermsDialog({ order, open, onOpenChange, onSuccess }:
                             <FormItem>
                             <FormLabel>Downpayment (₱)</FormLabel>
                             <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} /></FormControl>
+                            {existingPaid > 0 && (
+                                <p className="text-xs text-muted-foreground">
+                                    ₱{existingPaid.toFixed(2)} already paid on this order — enter only the additional amount collected now.
+                                </p>
+                            )}
                             <FormMessage />
                             </FormItem>
                         )}

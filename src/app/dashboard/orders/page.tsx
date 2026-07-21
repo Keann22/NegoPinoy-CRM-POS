@@ -17,6 +17,7 @@ import { AddOrderDialog } from '@/components/dashboard/order-dialog';
 import { LogPaymentDialog } from '@/components/dashboard/log-payment-dialog';
 import { CompleteCodPaymentDialog } from '@/components/dashboard/complete-cod-payment-dialog';
 import { EditPaymentTermsDialog } from '@/components/dashboard/edit-payment-terms-dialog';
+import { EarlySettlementDialog } from '@/components/dashboard/early-settlement-dialog';
 import { SetDueDateDialog } from '@/components/dashboard/set-due-date-dialog';
 import { MarkShippedDialog } from '@/components/dashboard/mark-shipped-dialog';
 import { WaybillSummaryDialog } from '@/components/dashboard/waybill-summary-dialog';
@@ -55,6 +56,7 @@ export default function OrdersPage() {
   const [logPaymentOrder, setLogPaymentOrder] = useState<Order | null>(null);
   const [codPaymentOrder, setCodPaymentOrder] = useState<Order | null>(null);
   const [editPaymentOrder, setEditPaymentOrder] = useState<Order | null>(null);
+  const [earlySettlementOrder, setEarlySettlementOrder] = useState<Order | null>(null);
   const [dueDateOrder, setDueDateOrder] = useState<Order | null>(null);
   const [markShippedOrder, setMarkShippedOrder] = useState<Order | null>(null);
   const [viewWaybillOrder, setViewWaybillOrder] = useState<Order | null>(null);
@@ -255,6 +257,7 @@ export default function OrdersPage() {
                 onViewDetails={(order) => router.push(`/dashboard/orders/${order.id}`)}
                 onLogPayment={setLogPaymentOrder}
                 onEditPaymentTerms={setEditPaymentOrder}
+                onEarlySettlement={setEarlySettlementOrder}
                 onMarkShipped={setMarkShippedOrder}
                 onViewWaybill={setViewWaybillOrder}
                 onCodPayment={setCodPaymentOrder}
@@ -316,6 +319,7 @@ export default function OrdersPage() {
       )}
       <CompleteCodPaymentDialog order={codPaymentOrder} open={!!codPaymentOrder} onOpenChange={(open) => !open && setCodPaymentOrder(null)} onSuccess={() => { refetch(); setCodPaymentOrder(null); }} />
       <EditPaymentTermsDialog order={editPaymentOrder} open={!!editPaymentOrder} onOpenChange={(open) => !open && setEditPaymentOrder(null)} onSuccess={() => { refetch(); setEditPaymentOrder(null); }} />
+      <EarlySettlementDialog order={earlySettlementOrder} open={!!earlySettlementOrder} onOpenChange={(open) => !open && setEarlySettlementOrder(null)} onSuccess={() => { refetch(); setEarlySettlementOrder(null); }} />
       {dueDateOrder && (
         <SetDueDateDialog open={!!dueDateOrder} onOpenChange={(open) => !open && setDueDateOrder(null)} orderId={dueDateOrder.id} onSuccess={() => { refetch(); setDueDateOrder(null); }} />
       )}

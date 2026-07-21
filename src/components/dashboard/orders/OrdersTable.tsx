@@ -42,6 +42,7 @@ interface OrdersTableProps {
   onViewDetails: (order: FormattedOrder) => void;
   onLogPayment: (order: FormattedOrder) => void;
   onEditPaymentTerms: (order: FormattedOrder) => void;
+  onEarlySettlement: (order: FormattedOrder) => void;
   onMarkShipped: (order: FormattedOrder) => void;
   onViewWaybill: (order: FormattedOrder) => void;
   onCodPayment: (order: FormattedOrder) => void;
@@ -57,7 +58,7 @@ interface OrdersTableProps {
 export function OrdersTable({
   orders, isLoading, selectedOrderIds,
   onSelectAll, onSelectOne, onViewDetails,
-  onLogPayment, onEditPaymentTerms, onMarkShipped,
+  onLogPayment, onEditPaymentTerms, onEarlySettlement, onMarkShipped,
   onViewWaybill, onCodPayment, onDueDate, onStatusChange, onProcessReturn,
   isAdminOrOwner, isInventoryOnly, userRoles,
 }: OrdersTableProps) {
@@ -172,6 +173,9 @@ export function OrdersTable({
                         <>
                           <DropdownMenuItem onClick={() => onLogPayment(order)}>Log Payment</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => onEditPaymentTerms(order)}>Edit Payment Terms</DropdownMenuItem>
+                          {(order.paymentType === 'Installment' && order.balanceDue > 0 && !['Cancelled', 'Returned'].includes(order.orderStatus)) && (
+                            <DropdownMenuItem onClick={() => onEarlySettlement(order)}>Early Settlement (Pay in Full)</DropdownMenuItem>
+                          )}
                           {((order.paymentType === 'Installment' || order.paymentType === 'Lay-away') && order.balanceDue > 0) && (
                             <DropdownMenuItem onClick={() => onDueDate(order)}>Set Next Due Date</DropdownMenuItem>
                           )}
