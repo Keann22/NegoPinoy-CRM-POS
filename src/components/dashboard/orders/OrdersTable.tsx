@@ -173,7 +173,7 @@ export function OrdersTable({
                         <>
                           <DropdownMenuItem onClick={() => onLogPayment(order)}>Log Payment</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => onEditPaymentTerms(order)}>Edit Payment Terms</DropdownMenuItem>
-                          {(order.paymentType === 'Installment' && order.balanceDue > 0 && !['Cancelled', 'Returned'].includes(order.orderStatus)) && (
+                          {(order.paymentType === 'Installment' && (Number(order.totalAmount) - Number(order.amountPaid)) > 0.01 && !['Cancelled', 'Returned'].includes(order.orderStatus)) && (
                             <DropdownMenuItem onClick={() => onEarlySettlement(order)}>Early Settlement (Pay in Full)</DropdownMenuItem>
                           )}
                           {((order.paymentType === 'Installment' || order.paymentType === 'Lay-away') && order.balanceDue > 0) && (
