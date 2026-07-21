@@ -75,12 +75,8 @@ export function OverdueOrders({ orders, customerMap, isExpanded, onToggleExpand,
   overdueOrders.sort((a, b) => new Date(a.orderDate).getTime() - new Date(b.orderDate).getTime());
 
   // Cross-reference with open inventory/order issues so a card can flag "this one is stuck on a reported issue"
-  useEffect(() => {
-    if (overdueOrders.length === 0) {
-      setIssuesByOrderId(new Map());
-      return;
-    }
-
+  const fetchOrderIssues = () => {
+    if (overdueOrders.length === 0) return;
     const overdueIds = new Set(overdueOrders.map((o) => o.id));
 
     fetch('/api/inventory/issues')
@@ -99,6 +95,17 @@ export function OverdueOrders({ orders, customerMap, isExpanded, onToggleExpand,
         setIssuesByOrderId(map);
       })
       .catch((e) => console.error("Failed to load order issues for overdue orders", e));
+  };
+
+  useEffect(() => {
+    if (overdueOrders.length === 0) {
+      setIssuesByOrderId(new Map());
+      return;
+    }
+
+    fetchOrderIssues();
+    const interval = setInterval(fetchOrderIssues, 30000);
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orders]);
 
@@ -110,14 +117,32 @@ export function OverdueOrders({ orders, customerMap, isExpanded, onToggleExpand,
       return;
     }
 
-    const overdueIds = overdueOrders.map((o) => o.id);
-
-    (async () => {
+    const checkLiveStock = async () => {
+      const overdueIds = overdueOrders.map((o) => o.id);
+      if (overdueIds.length === 0) return;
       try {
+        // 1. Find which orders have already been picked (so we don't flag them for out of stock)
+        const { data: logData, error: logError } = await supabase
+          .from('order_logs')
+          .select('order_id')
+          .in('order_id', overdueIds)
+          .in('status', ['Picked', 'Photo', 'Packed', 'For Shipping', 'For Pick-up']);
+          
+        if (logError) throw logError;
+        
+        const alreadyPickedIds = new Set((logData || []).map(l => l.order_id));
+        const idsToCheck = overdueIds.filter(id => !alreadyPickedIds.has(id));
+
+        if (idsToCheck.length === 0) {
+          setOutOfStockByOrderId(new Map());
+          return;
+        }
+
+        // 2. Check live stock only for un-picked orders
         const rows: any[] = [];
         const chunkSize = 150;
-        for (let i = 0; i < overdueIds.length; i += chunkSize) {
-          const chunk = overdueIds.slice(i, i + chunkSize);
+        for (let i = 0; i < idsToCheck.length; i += chunkSize) {
+          const chunk = idsToCheck.slice(i, i + chunkSize);
           const { data, error } = await supabase
             .from('order_items')
             .select('order_id, quantity, product_name, products(name, stock_level)')
@@ -140,7 +165,11 @@ export function OverdueOrders({ orders, customerMap, isExpanded, onToggleExpand,
       } catch (e) {
         console.error("Failed to check live stock for overdue orders", e);
       }
-    })();
+    };
+
+    checkLiveStock();
+    const interval = setInterval(checkLiveStock, 30000);
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orders, supabase]);
 
@@ -206,7 +235,9 @@ export function OverdueOrders({ orders, customerMap, isExpanded, onToggleExpand,
                     <div className="mt-2">
                       <Badge variant="destructive" className="gap-1 font-normal">
                         <PackageX className="w-3 h-3" />
-                        {issueSummary.count === 1 ? 'Stock issue reported' : `${issueSummary.count} stock issues reported`}
+                        {issueSummary.productNames.length > 0 
+                          ? (issueSummary.count === 1 ? 'Stock issue reported' : `${issueSummary.count} stock issues reported`)
+                          : (issueSummary.count === 1 ? 'Manual issue reported' : `${issueSummary.count} manual issues reported`)}
                       </Badge>
                       {issueSummary.productNames.length > 0 && (
                         <p className="text-[11px] text-red-600 leading-snug mt-1">

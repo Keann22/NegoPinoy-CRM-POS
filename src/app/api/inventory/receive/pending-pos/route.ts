@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createStaffMessage, getAdminAndInventoryLeadNames, fanOutStaffNotifications, resolveRecipientNames } from '@/lib/services/staff-message-service';
-import { getAffectedSalesReps } from '@/lib/services/procurement-service';
+import { getAffectedSalesRepOrders } from '@/lib/services/procurement-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -160,8 +160,9 @@ export async function POST(req: Request) {
           // message (not the PO/batch-oriented purchase_discrepancy thread above,
           // which is purchasing-ops internal) so the sales rep sees something
           // relevant to them rather than PO batch details they don't need.
+          const repOrders = await getAffectedSalesRepOrders(supabase, poItem.product_id);
           const affectedSalesReps = resolveRecipientNames(
-            await getAffectedSalesReps(supabase, poItem.product_id),
+            Array.from(repOrders.keys()),
             reportedByName || 'Inventory Staff'
           );
           if (affectedSalesReps.length > 0) {
@@ -172,6 +173,11 @@ export async function POST(req: Request) {
               senderName: reportedByName || 'Inventory Staff',
               senderRole: 'inventory',
               recipientNames: affectedSalesReps,
+              // Link each rep's notification to their own affected order so the
+              // Bell can pop the order card for it
+              linkByRecipient: new Map(
+                Array.from(repOrders, ([name, orderIdForRep]) => [name, `/dashboard/orders/${orderIdForRep}`])
+              ),
             });
           }
         }

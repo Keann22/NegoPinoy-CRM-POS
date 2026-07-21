@@ -16,6 +16,28 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import Link from 'next/link';
+import { OverdueOrderDialog } from '@/components/dashboard/orders/overdue-order-dialog';
+import { UNFULFILLED_STATUSES } from '@/lib/services/procurement-service';
+import type { Order, OrderStatus } from '@/types';
+
+type OrderRef = { kind: 'id' | 'prefix'; value: string };
+
+/**
+ * Pulls an order reference out of a notification, if it has one:
+ * either a full order UUID in the link (/dashboard/orders/<uuid>) or the
+ * short "Order #XXXXXXX" id (first 7 hex chars of the UUID) in the text.
+ */
+function extractOrderRef(notif: any): OrderRef | null {
+  const uuidMatch = String(notif.link || '').match(
+    /\/dashboard\/orders\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i
+  );
+  if (uuidMatch) return { kind: 'id', value: uuidMatch[1] };
+
+  const shortMatch = `${notif.title || ''} ${notif.message || ''}`.match(/Order #([0-9A-Fa-f]{7})/);
+  if (shortMatch) return { kind: 'prefix', value: shortMatch[1].toLowerCase() };
+
+  return null;
+}
 
 export function NotificationBell() {
   const supabase = useSupabase();
@@ -23,6 +45,8 @@ export function NotificationBell() {
   const { toast } = useToast();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedCustomerName, setSelectedCustomerName] = useState('');
 
   const fetchNotifications = useCallback(async () => {
     if (!supabase || !userProfile?.firstName) return;
@@ -137,6 +161,136 @@ export function NotificationBell() {
       .eq('is_read', false);
   };
 
+  // Opens the same order card pop-up used by the Overdue Orders section,
+  // instead of navigating away, for notifications that reference an order.
+  const openOrderFromNotification = async (ref: OrderRef) => {
+    if (!supabase) return;
+
+    let query = supabase.from('orders').select('*');
+    if (ref.kind === 'id') {
+      query = query.eq('id', ref.value);
+    } else {
+      // A 7-hex-char prefix of the UUID. PostgREST rejects `id::text` cast
+      // filters (404), but uuids compare bytewise, so a prefix match is just a
+      // range check over the 8th hex digit: [prefix0-000..., prefixf-fff...]
+      query = query
+        .gte('id', `${ref.value}0-0000-0000-0000-000000000000`)
+        .lte('id', `${ref.value}f-ffff-ffff-ffff-ffffffffffff`);
+    }
+
+    const { data: orderRow, error } = await query.limit(1).maybeSingle();
+
+    if (error || !orderRow) {
+      console.error('Failed to load order for notification:', error);
+      toast({
+        title: 'Order not found',
+        description: 'Could not find the order referenced by this notification.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    let customerName = 'Unknown Customer';
+    if (orderRow.customer_id) {
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('full_name')
+        .eq('id', orderRow.customer_id)
+        .maybeSingle();
+      if (customer?.full_name) customerName = customer.full_name;
+    }
+
+    setSelectedCustomerName(customerName);
+    setSelectedOrder({
+      ...orderRow,
+      customerId: orderRow.customer_id,
+      orderDate: orderRow.order_date,
+      totalAmount: orderRow.total_amount,
+      amountPaid: orderRow.amount_paid,
+      balanceDue: orderRow.balance_due,
+      orderStatus: orderRow.status as OrderStatus,
+      paymentType: orderRow.payment_method,
+      installmentMonths: orderRow.installment_months,
+      monthlyPayment: orderRow.monthly_payment,
+      salesPersonName: orderRow.sales_person_name,
+      totalDiscount: orderRow.total_discount,
+    });
+  };
+
+  /**
+   * Fallback for staff-message notifications that carry no order reference at
+   * all (e.g. product-level discrepancy reports created before per-recipient
+   * order links existed): find the matching order_issue_messages row by sender +
+   * message text, then resolve its issue to an order — directly via order_id,
+   * or via product_id → the user's own (else oldest) unfulfilled order
+   * containing that product.
+   */
+  const resolveStaffMessageOrder = async (notif: any) => {
+    if (!supabase) return;
+    try {
+      const senderName = String(notif.title || '').match(/^New message from (.+)$/)?.[1];
+      // Bell messages are truncated to 140 chars + '...' — match on the prefix
+      const messagePrefix = String(notif.message || '').replace(/\.\.\.$/, '');
+      if (!messagePrefix.trim()) throw new Error('Empty notification message');
+
+      let query = supabase
+        .from('order_issue_messages')
+        .select('created_at, order_issues!inner(order_id, product_id)')
+        .ilike('message', `${messagePrefix.replace(/([%_\\])/g, '\\$1')}%`)
+        .order('created_at', { ascending: false })
+        .limit(5);
+      if (senderName) query = query.eq('sender_name', senderName);
+
+      const { data: candidates, error } = await query;
+      if (error) throw error;
+
+      // Same text can be posted more than once — take the row closest in time
+      // to when this notification was created
+      const notifTime = new Date(notif.created_at).getTime();
+      const best = (candidates || []).sort(
+        (a: any, b: any) =>
+          Math.abs(new Date(a.created_at).getTime() - notifTime) -
+          Math.abs(new Date(b.created_at).getTime() - notifTime)
+      )[0] as any;
+
+      if (best?.order_issues?.order_id) {
+        return openOrderFromNotification({ kind: 'id', value: best.order_issues.order_id });
+      }
+
+      if (best?.order_issues?.product_id) {
+        const { data: rows, error: itemsError } = await supabase
+          .from('order_items')
+          .select('orders!inner(id, order_date, status, sales_person_name)')
+          .eq('product_id', best.order_issues.product_id)
+          .in('orders.status', UNFULFILLED_STATUSES);
+        if (itemsError) throw itemsError;
+
+        const openOrders = (rows || [])
+          .map((r: any) => r.orders)
+          .filter(Boolean)
+          .sort((a: any, b: any) => new Date(a.order_date).getTime() - new Date(b.order_date).getTime());
+
+        const fullName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : '';
+        const target = openOrders.find((o: any) => o.sales_person_name === fullName) || openOrders[0];
+        if (target) {
+          return openOrderFromNotification({ kind: 'id', value: target.id });
+        }
+      }
+
+      toast({
+        title: 'No related order',
+        description: 'This message is not tied to a specific order.',
+      });
+    } catch (err) {
+      console.error('Failed to resolve order for staff-message notification:', err);
+      toast({
+        title: 'Could not open order',
+        description: 'No order could be found for this notification.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const deleteNotification = async (e: React.MouseEvent, id: string) => {
     e.preventDefault();
     e.stopPropagation();
@@ -152,6 +306,7 @@ export function NotificationBell() {
   };
 
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="icon" className="relative ml-auto h-8 w-8 bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground">
@@ -180,7 +335,25 @@ export function NotificationBell() {
           </div>
         ) : (
           notifications.map(notif => (
-            <DropdownMenuItem key={notif.id} className="flex flex-col items-start gap-1 p-3 cursor-pointer relative group" onClick={() => markAsRead(notif.id)} asChild>
+            <DropdownMenuItem
+              key={notif.id}
+              className="flex flex-col items-start gap-1 p-3 cursor-pointer relative group"
+              onClick={(e) => {
+                markAsRead(notif.id);
+                const orderRef = extractOrderRef(notif);
+                if (orderRef) {
+                  // Show the order card pop-up instead of navigating away
+                  e.preventDefault();
+                  openOrderFromNotification(orderRef);
+                } else if (notif.source === 'staff_message') {
+                  // Older staff-message notifications carry no order reference —
+                  // resolve one from the issue thread instead of navigating
+                  e.preventDefault();
+                  resolveStaffMessageOrder(notif);
+                }
+              }}
+              asChild
+            >
               <Link href={notif.link || '#'}>
                 <div className="flex w-full justify-between items-start">
                   <span className={`font-semibold text-sm ${notif.is_read ? 'text-muted-foreground' : 'text-foreground'}`}>
@@ -208,5 +381,18 @@ export function NotificationBell() {
         )}
       </DropdownMenuContent>
     </DropdownMenu>
+
+    <OverdueOrderDialog
+      variant="notification"
+      order={selectedOrder}
+      customerName={selectedCustomerName}
+      open={!!selectedOrder}
+      onOpenChange={(open) => !open && setSelectedOrder(null)}
+      onOrderUpdated={() => {
+        // Re-fetch the order so the dialog reflects freshly added notes
+        if (selectedOrder) openOrderFromNotification({ kind: 'id', value: selectedOrder.id });
+      }}
+    />
+    </>
   );
 }

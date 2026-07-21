@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getAdminAndInventoryLeadNames, resolveRecipientNames, fanOutStaffNotifications } from '@/lib/services/staff-message-service';
-import { getAffectedSalesReps } from '@/lib/services/procurement-service';
+import { getAffectedSalesRepOrders } from '@/lib/services/procurement-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,19 +44,24 @@ export async function POST(req: Request) {
 
     // 2. Separately, still ping the people who need to know via the Bell —
     // Admin/Jas/Jasmin plus any sales rep with an order waiting on this product.
-    const [adminAndLeadNames, salesRepNames] = await Promise.all([
+    const [adminAndLeadNames, repOrders] = await Promise.all([
       getAdminAndInventoryLeadNames(supabase),
-      getAffectedSalesReps(supabase, productId),
+      getAffectedSalesRepOrders(supabase, productId),
     ]);
 
     const recipientNames = resolveRecipientNames(
-      [...adminAndLeadNames, ...salesRepNames, ...(Array.isArray(extraRecipientNames) ? extraRecipientNames : [])],
+      [...adminAndLeadNames, ...Array.from(repOrders.keys()), ...(Array.isArray(extraRecipientNames) ? extraRecipientNames : [])],
       resolvedSenderName
     );
 
     await fanOutStaffNotifications(supabase, recipientNames, {
       senderName: resolvedSenderName,
       message: note,
+      // Sales reps get linked straight to their affected order so the Bell can
+      // pop the order card; admins/leads keep the default dashboard link
+      linkByRecipient: new Map(
+        Array.from(repOrders, ([name, orderId]) => [name, `/dashboard/orders/${orderId}`])
+      ),
     });
 
     return NextResponse.json({ success: true, issueId: issue.id });

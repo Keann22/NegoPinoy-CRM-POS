@@ -68,10 +68,42 @@ export async function POST(req: Request) {
         }).filter(item => item.expected_qty > 0);
 
         if (rollOverItems.length > 0) {
-            const { error: insErr } = await supabase
+            // Fetch existing sources for all these items from the batch
+            const oldItemIdsToRollOver = items
+                .filter(i => (i.expected_qty || 0) - (i.received_qty || 0) > 0)
+                .map(i => i.id);
+                
+            const { data: oldSources } = await supabase
+                .from('procurement_request_sources')
+                .select('purchase_order_item_id, order_id, quantity, created_at')
+                .in('purchase_order_item_id', oldItemIdsToRollOver);
+
+            const { data: insertedRolloverItems, error: insErr } = await supabase
                 .from('purchase_order_items')
-                .insert(rollOverItems);
+                .insert(rollOverItems)
+                .select('id, product_id');
             if (insErr) throw insErr;
+            
+            // Map the old purchase_order_item_id to the new one (via product_id)
+            if (oldSources && oldSources.length > 0 && insertedRolloverItems) {
+                const oldItemToProduct = new Map(items.map(i => [i.id, i.product_id]));
+                const newProductToItem = new Map(insertedRolloverItems.map(i => [i.product_id, i.id]));
+                
+                const sourcesToInsert = oldSources.map(s => {
+                    const productId = oldItemToProduct.get(s.purchase_order_item_id);
+                    const newItemId = newProductToItem.get(productId);
+                    return {
+                        purchase_order_item_id: newItemId,
+                        order_id: s.order_id,
+                        quantity: s.quantity,
+                        created_at: s.created_at
+                    };
+                }).filter(s => s.purchase_order_item_id);
+                
+                if (sourcesToInsert.length > 0) {
+                    await supabase.from('procurement_request_sources').insert(sourcesToInsert);
+                }
+            }
         }
 
         // 5. Mark the old items as 'received' (completed for this batch)

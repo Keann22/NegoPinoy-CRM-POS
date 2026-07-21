@@ -46,15 +46,28 @@ export async function POST(req: Request) {
 
     const isFullUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 
+    // Prefix-match against the uuid id column. PostgREST rejects `id::text`
+    // cast filters (404), but uuids compare bytewise, so a hex prefix match is
+    // a range check between the prefix padded with 0s and padded with fs.
+    const uuidRangeForPrefix = (prefix: string) => {
+      const hex = prefix.toLowerCase().replace(/[^0-9a-f]/g, '');
+      if (!hex) return null;
+      const pad = (fill: string) => {
+        const full = (hex + fill.repeat(32)).slice(0, 32);
+        return `${full.slice(0, 8)}-${full.slice(8, 12)}-${full.slice(12, 16)}-${full.slice(16, 20)}-${full.slice(20)}`;
+      };
+      return { min: pad('0'), max: pad('f') };
+    };
+
     for (const rawOrderId of uniqueOrderIds) {
       // 1. Check if the order exists (staff might type just the first 8 characters).
-      // orders.id is a uuid column, so ilike (~~*) can't run directly against it —
-      // it has to be cast to text first for the prefix-match case; a full UUID
-      // (always what the Picker app sends) can just use an exact eq().
       const orderQuery = supabase.from('orders').select('id');
+      const range = isFullUuid(rawOrderId) ? null : uuidRangeForPrefix(rawOrderId);
       const { data: orderData, error: orderErr } = isFullUuid(rawOrderId)
         ? await orderQuery.eq('id', rawOrderId).limit(1).maybeSingle()
-        : await orderQuery.filter('id::text', 'ilike', `${rawOrderId}%`).limit(1).maybeSingle();
+        : range
+          ? await orderQuery.gte('id', range.min).lte('id', range.max).limit(1).maybeSingle()
+          : { data: null, error: null };
 
       if (orderErr) {
         return NextResponse.json({ error: `Database error checking order number ${rawOrderId}: ${orderErr.message}` }, { status: 500 });
@@ -213,23 +226,12 @@ export async function POST(req: Request) {
 
     for (const p of finalRequests) {
       if (existingMap.has(p.productId)) {
-        // Update existing item
-        const existingItem = existingMap.get(p.productId)!;
-        await supabase
-          .from('purchase_order_items')
-          .update({
-            expected_qty: existingItem.expected_qty + p.requestedQty,
-            status: 'pending_receipt',
-            ...(requestedByName ? { requested_by_name: requestedByName } : {})
-          })
-          .eq('id', existingItem.id);
-        purchaseOrderItemIdByProduct.set(p.productId, existingItem.id);
+        purchaseOrderItemIdByProduct.set(p.productId, existingMap.get(p.productId)!.id);
       } else {
-        // Insert new item
         itemsToInsert.push({
           po_id: poId,
           product_id: p.productId,
-          expected_qty: p.requestedQty,
+          expected_qty: 0,
           unit_cost: 0,
           status: 'pending_receipt',
           requested_by_name: requestedByName || null
@@ -246,20 +248,65 @@ export async function POST(req: Request) {
       insertedItems?.forEach(i => purchaseOrderItemIdByProduct.set(i.product_id, i.id));
     }
 
-    // Record which order(s) prompted this request, if any were provided.
-    const sourceRowsToInsert = [];
-    for (const [productId, contributions] of Array.from(productOrderContributions.entries())) {
-      const purchaseOrderItemId = purchaseOrderItemIdByProduct.get(productId);
+    // Process each request safely to avoid duplicate accumulation
+    for (const p of finalRequests) {
+      const purchaseOrderItemId = purchaseOrderItemIdByProduct.get(p.productId);
       if (!purchaseOrderItemId) continue;
-      for (const [orderId, qty] of Array.from(contributions.entries())) {
-        sourceRowsToInsert.push({ purchase_order_item_id: purchaseOrderItemId, order_id: orderId, quantity: qty });
+      
+      const contributions = productOrderContributions.get(p.productId);
+      let totalQtyToAdd = p.requestedQty;
+      
+      if (contributions && contributions.size > 0) {
+        // This is tied to specific orders, we must avoid duplicates
+        totalQtyToAdd = 0;
+        for (const [orderId, qty] of Array.from(contributions.entries())) {
+          const { data: existingSrc } = await supabase
+            .from('procurement_request_sources')
+            .select('id, quantity')
+            .eq('purchase_order_item_id', purchaseOrderItemId)
+            .eq('order_id', orderId)
+            .maybeSingle();
+            
+          if (existingSrc) {
+            // Already reported. Update to the new quantity if it's higher.
+            if (qty > existingSrc.quantity) {
+              const delta = qty - existingSrc.quantity;
+              totalQtyToAdd += delta;
+              await supabase
+                .from('procurement_request_sources')
+                .update({ quantity: qty })
+                .eq('id', existingSrc.id);
+            }
+          } else {
+            // New order source
+            totalQtyToAdd += qty;
+            await supabase
+              .from('procurement_request_sources')
+              .insert({ purchase_order_item_id: purchaseOrderItemId, order_id: orderId, quantity: qty });
+          }
+        }
       }
-    }
-    if (sourceRowsToInsert.length > 0) {
-      const { error: sourceErr } = await supabase
-        .from('procurement_request_sources')
-        .insert(sourceRowsToInsert);
-      if (sourceErr) console.error('Error recording procurement request sources:', sourceErr);
+
+      if (totalQtyToAdd > 0 || !existingMap.has(p.productId)) {
+        const currentQty = existingMap.has(p.productId) ? existingMap.get(p.productId)!.expected_qty : 0;
+        await supabase
+          .from('purchase_order_items')
+          .update({
+            expected_qty: currentQty + totalQtyToAdd,
+            status: 'pending_receipt',
+            ...(requestedByName ? { requested_by_name: requestedByName } : {})
+          })
+          .eq('id', purchaseOrderItemId);
+      } else if (existingMap.has(p.productId)) {
+        // Just update status/name if needed without inflating quantity
+        await supabase
+          .from('purchase_order_items')
+          .update({
+            status: 'pending_receipt',
+            ...(requestedByName ? { requested_by_name: requestedByName } : {})
+          })
+          .eq('id', purchaseOrderItemId);
+      }
     }
 
     // --- Option C: Auto-adjust Negative Inventory ---

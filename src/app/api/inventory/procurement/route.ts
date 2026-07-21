@@ -170,6 +170,25 @@ export async function GET() {
       components?.forEach(c => addDemand(c.componentId, row.quantity * c.qtyPerBundle, isUnfulfilled));
     });
 
+    // Subtract pending purchases from the need to buy calculation
+    // so we don't double-buy items already on order
+    const pendingReceiptMap = new Map<string, number>();
+    purchased?.forEach((p: any) => {
+      pendingReceiptMap.set(p.product_id, (pendingReceiptMap.get(p.product_id) || 0) + p.expected_qty);
+    });
+
+    for (const [id, qty] of Array.from(needToBuyMap.entries())) {
+      const pendingQty = pendingReceiptMap.get(id) || 0;
+      if (pendingQty > 0) {
+        const remainingNeed = qty - pendingQty;
+        if (remainingNeed > 0) {
+          needToBuyMap.set(id, remainingNeed);
+        } else {
+          needToBuyMap.delete(id);
+        }
+      }
+    }
+
     // Only admit a negative-stock candidate onto the sheet if some order is
     // still genuinely unfulfilled (not yet picked) and needs it. Once a
     // picker has already secured a physical unit (Picked/Photo/Packed/For
@@ -257,11 +276,11 @@ export async function GET() {
     // while picking. Tolerate the table not existing yet (pre-migration)
     // rather than breaking the whole sheet.
     const draftItemIds = (drafts || []).map(d => d.id);
-    const sourceOrdersByDraftId = new Map<string, { orderId: string; shortOrderId: string; customerName: string; quantity: number }[]>();
+    const sourceOrdersByDraftId = new Map<string, { orderId: string; shortOrderId: string; customerId: string | null; customerName: string; quantity: number; orderDate: string | null; status: string | null; paymentType: string | null; }[]>();
     if (draftItemIds.length > 0) {
       const { data: sourceRows, error: sourceErr } = await supabase
         .from('procurement_request_sources')
-        .select('purchase_order_item_id, quantity, orders(id, customers(full_name))')
+        .select('purchase_order_item_id, quantity, orders(id, order_date, status, payment_method, customer_id, customers(full_name))')
         .in('purchase_order_item_id', draftItemIds);
       if (sourceErr) {
         console.error('procurement_request_sources unavailable (has the migration been run?):', sourceErr.message);
@@ -271,8 +290,12 @@ export async function GET() {
           list.push({
             orderId: row.orders.id,
             shortOrderId: row.orders.id.split('-')[0].toUpperCase(),
+            customerId: row.orders.customer_id,
             customerName: row.orders.customers?.full_name || 'Unknown',
-            quantity: row.quantity
+            quantity: row.quantity,
+            orderDate: row.orders.order_date,
+            status: row.orders.status,
+            paymentType: row.orders.payment_method
           });
           sourceOrdersByDraftId.set(row.purchase_order_item_id, list);
         });

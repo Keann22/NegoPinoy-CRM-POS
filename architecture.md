@@ -206,6 +206,14 @@ To solve this, fulfillment is tracked at the **item level**.
 
 **Rule**: Whenever calculating "unfulfilled demand" (like in `api/inventory/procurement`), you MUST filter out items where `is_packed = true`. Order-level status is only for workflow stages, not stock allocation.
 
+### Orphaned Staff Requests (Procurement Cleanup)
+
+When a staff member reports an issue (e.g. "Missing item") while picking an order, the system creates a "Staff Request" (a Draft PO) mapped to that order so it appears on the Procurement Sheet. 
+
+However, if the missing item is later found or restocked, and the item gets physically packed (`is_packed = true`), or if the order is completed, the manual Staff Request is no longer needed. Previously, the system's cleanup script only checked if the overall order was still "unfulfilled," which caused ghost items to linger on the Procurement Sheet if the order was partially fulfilled but the specific requested item was already packed.
+
+**The Fix:** The `autoCleanupStaffDrafts` script in `procurement-service.ts` now explicitly checks item-level status (including bundle expansion). If the specific item mapped to the Staff Request is either `is_packed = true` or has no active `open` issue against it, the script automatically deletes the orphaned Staff Request. This ensures the Procurement Sheet's "Staff Request" column perfectly matches physical reality.
+
 ---
 
 ## Supabase Client Usage

@@ -14,6 +14,18 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, Save, PackageSearch } from 'lucide-react';
 import { format } from 'date-fns';
 
+// Tracking numbers are only assigned once an order is dispatched, so orders
+// still moving through the warehouse (Processing, Picked, Packed, Photo,
+// On-Hold, For Shipping) legitimately have none yet. Only these statuses mean
+// the parcel actually left.
+const DISPATCHED_STATUSES = [
+  'Payment Received (COD)',
+  'Completed',
+  'Shipped',
+  'Returned',
+  'For Pick-up',
+];
+
 type MissingTrackingOrder = {
   id: string;
   shortId: string;
@@ -32,6 +44,7 @@ export function MissingTrackingReport() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [orders, setOrders] = useState<MissingTrackingOrder[]>([]);
+  const [scopeFilter, setScopeFilter] = useState<'dispatched' | 'all'>('dispatched');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [paymentFilter, setPaymentFilter] = useState<string>('all');
   const [editingTracking, setEditingTracking] = useState<Record<string, string>>({});
@@ -41,24 +54,39 @@ export function MissingTrackingReport() {
     if (!supabase) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select(`
-          id,
-          order_date,
-          status,
-          payment_method,
-          total_amount,
-          amount_paid,
-          balance_due,
-          tracking_number,
-          customers ( id, full_name )
-        `)
-        .order('order_date', { ascending: false });
+      // Narrow to blank tracking numbers server-side and page through the
+      // results — Supabase caps a single response at 1000 rows, which silently
+      // truncated this report once the orders table grew past that.
+      // Cancelled orders are dropped outright: they never ship, so a missing
+      // tracking number on one is never something to act on.
+      const PAGE_SIZE = 1000;
+      const rows: any[] = [];
+      for (let page = 0; ; page++) {
+        const { data, error } = await supabase
+          .from('orders')
+          .select(`
+            id,
+            order_date,
+            status,
+            payment_method,
+            total_amount,
+            amount_paid,
+            balance_due,
+            tracking_number,
+            customers ( id, full_name )
+          `)
+          .or('tracking_number.is.null,tracking_number.eq.')
+          .neq('status', 'Cancelled')
+          .order('order_date', { ascending: false })
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
-      if (error) throw error;
+        if (error) throw error;
+        rows.push(...(data || []));
+        if (!data || data.length < PAGE_SIZE) break;
+      }
 
-      const filtered = (data || []).filter(
+      // Guard against whitespace-only values the server-side filter can't catch
+      const filtered = rows.filter(
         (o: any) => !o.tracking_number || o.tracking_number.trim() === ''
       );
 
@@ -88,23 +116,33 @@ export function MissingTrackingReport() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase]);
 
-  // Derive unique filter options from data
+  const scopedOrders = useMemo(
+    () =>
+      scopeFilter === 'all'
+        ? orders
+        : orders.filter((o) => DISPATCHED_STATUSES.includes(o.status)),
+    [orders, scopeFilter]
+  );
+
+  const hiddenCount = orders.length - scopedOrders.length;
+
+  // Derive unique filter options from the orders currently in scope
   const statusOptions = useMemo(
-    () => Array.from(new Set(orders.map((o) => o.status))).sort(),
-    [orders]
+    () => Array.from(new Set(scopedOrders.map((o) => o.status))).sort(),
+    [scopedOrders]
   );
   const paymentOptions = useMemo(
-    () => Array.from(new Set(orders.map((o) => o.paymentMethod))).sort(),
-    [orders]
+    () => Array.from(new Set(scopedOrders.map((o) => o.paymentMethod))).sort(),
+    [scopedOrders]
   );
 
   const filteredOrders = useMemo(() => {
-    return orders.filter((o) => {
+    return scopedOrders.filter((o) => {
       if (statusFilter !== 'all' && o.status !== statusFilter) return false;
       if (paymentFilter !== 'all' && o.paymentMethod !== paymentFilter) return false;
       return true;
     });
-  }, [orders, statusFilter, paymentFilter]);
+  }, [scopedOrders, statusFilter, paymentFilter]);
 
   const handleSave = async (orderId: string) => {
     const trackingValue = editingTracking[orderId]?.trim();
@@ -165,15 +203,43 @@ export function MissingTrackingReport() {
               Missing Tracking Numbers
             </CardTitle>
             <CardDescription>
-              Orders that have no tracking number assigned. You can update tracking numbers directly from this table.
+              {scopeFilter === 'dispatched'
+                ? 'Dispatched orders that left without a tracking number recorded. You can update tracking numbers directly from this table.'
+                : 'Every open order with no tracking number, including ones still in the warehouse that are not expected to have one yet. Cancelled orders are excluded.'}
             </CardDescription>
           </div>
-          <Badge variant="outline" className="text-sm px-3 py-1">
-            {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
-          </Badge>
+          <div className="flex flex-col items-end gap-1">
+            <Badge variant="outline" className="text-sm px-3 py-1">
+              {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
+            </Badge>
+            {scopeFilter === 'dispatched' && hiddenCount > 0 && (
+              <span className="text-xs text-muted-foreground">
+                {hiddenCount} not yet dispatched, hidden
+              </span>
+            )}
+          </div>
         </div>
         {/* Filters */}
         <div className="flex flex-wrap gap-3 pt-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-muted-foreground">Show</label>
+            <Select
+              value={scopeFilter}
+              onValueChange={(v) => {
+                setScopeFilter(v as 'dispatched' | 'all');
+                setStatusFilter('all');
+                setPaymentFilter('all');
+              }}
+            >
+              <SelectTrigger className="w-[240px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="dispatched">Dispatched orders only</SelectItem>
+                <SelectItem value="all">All open orders</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-muted-foreground">Order Status</label>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -235,7 +301,9 @@ export function MissingTrackingReport() {
               {!loading && filteredOrders.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
-                    No orders without tracking numbers found for the selected filters.
+                    {scopeFilter === 'dispatched' && hiddenCount > 0
+                      ? `No dispatched orders are missing a tracking number. ${hiddenCount} order${hiddenCount !== 1 ? 's are' : ' is'} still in the warehouse — switch "Show" to All open orders to see them.`
+                      : 'No orders without tracking numbers found for the selected filters.'}
                   </TableCell>
                 </TableRow>
               )}

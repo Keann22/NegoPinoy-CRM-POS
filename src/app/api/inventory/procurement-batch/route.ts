@@ -35,6 +35,17 @@ export async function POST() {
         return NextResponse.json({ error: 'No pending items found in staff requests.' }, { status: 400 });
     }
 
+    const itemIdsToDelete = draftItems.map(i => i.id);
+    const oldItemToProduct = new Map(draftItems.map(i => [i.id, i.product_id]));
+
+    // Fetch existing sources for all draft items we are about to consolidate
+    const { data: oldSources, error: sourcesErr } = await supabase
+        .from('procurement_request_sources')
+        .select('purchase_order_item_id, order_id, quantity, created_at')
+        .in('purchase_order_item_id', itemIdsToDelete);
+        
+    if (sourcesErr) throw sourcesErr;
+
     // 3. Consolidate items by product_id
     const consolidatedMap = new Map();
     for (const item of draftItems) {
@@ -89,14 +100,36 @@ export async function POST() {
     
     // 6. Insert consolidated items
     const itemsToInsert = consolidatedItems.map(item => ({ ...item, po_id: newPo.id }));
-    const { error: insErr } = await supabase
+    const { data: insertedItems, error: insErr } = await supabase
         .from('purchase_order_items')
-        .insert(itemsToInsert);
+        .insert(itemsToInsert)
+        .select('id, product_id');
         
     if (insErr) throw insErr;
     
+    // 6.5 Remap and insert sources
+    if (oldSources && oldSources.length > 0 && insertedItems) {
+        const newProductToItem = new Map(insertedItems.map((i: any) => [i.product_id, i.id]));
+        const sourcesToInsert = oldSources.map((s: any) => {
+            const productId = oldItemToProduct.get(s.purchase_order_item_id);
+            const newItemId = newProductToItem.get(productId);
+            return {
+                purchase_order_item_id: newItemId,
+                order_id: s.order_id,
+                quantity: s.quantity,
+                created_at: s.created_at
+            };
+        }).filter((s: any) => s.purchase_order_item_id); // Sanity check
+
+        if (sourcesToInsert.length > 0) {
+            const { error: newSourcesErr } = await supabase
+                .from('procurement_request_sources')
+                .insert(sourcesToInsert);
+            if (newSourcesErr) throw newSourcesErr;
+        }
+    }
+    
     // 7. Delete the old pending items from STAFF_DRAFTs
-    const itemIdsToDelete = draftItems.map(i => i.id);
     await supabase.from('purchase_order_items').delete().in('id', itemIdsToDelete);
     
     // 8. Delete empty STAFF_DRAFT POs

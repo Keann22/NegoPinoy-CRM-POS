@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Flag, ShoppingCart, Trash2 } from "lucide-react";
+import { StaffRequestDialog } from "./staff-request-dialog";
 
 export function ProcurementItemRow({
   item,
@@ -48,6 +49,7 @@ export function ProcurementItemRow({
   // flag every product that simply has a packed order in its queue.
   const hasDiscrepancy = item.systemQty !== (item.totalOpenDemandQty || 0);
   const [showReassign, setShowReassign] = useState(false);
+  const [staffRequestOpen, setStaffRequestOpen] = useState(false);
 
   return (
     <tr className={hasDiscrepancy ? "bg-orange-50 hover:bg-orange-100" : "hover:bg-slate-50 transition-colors"}>
@@ -155,10 +157,29 @@ export function ProcurementItemRow({
         {item.currentStock}
       </td>
       <td
-        className="p-3 font-bold text-center text-lg text-slate-500"
+        className="p-3 text-center"
         title="Manual note from staff — not used to calculate the Buy quantity"
       >
-          {item.staffRequestedQty !== null ? item.staffRequestedQty : <span className="text-xs text-slate-400 font-normal">-</span>}
+        {item.staffRequestedQty !== null ? (
+          <>
+            <button 
+              className="font-bold text-lg text-slate-500 hover:text-indigo-600 hover:underline"
+              onClick={() => setStaffRequestOpen(true)}
+            >
+              {item.staffRequestedQty}
+            </button>
+            <StaffRequestDialog
+              productName={item.productName}
+              isOpen={staffRequestOpen}
+              onClose={() => setStaffRequestOpen(false)}
+              staffRequestedQty={item.staffRequestedQty}
+              requestedByName={item.requestedByName}
+              sourceOrders={item.sourceOrders || []}
+            />
+          </>
+        ) : (
+          <span className="font-bold text-lg text-slate-500 text-xs text-slate-400 font-normal">-</span>
+        )}
       </td>
       <td
         className="p-3 font-bold text-center text-lg cursor-pointer text-blue-600 hover:underline hover:text-indigo-600"

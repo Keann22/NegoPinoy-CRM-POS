@@ -20,23 +20,38 @@ export const UNFULFILLED_STATUSES = [
  * product, not just the Admin/Inventory leads who handle purchasing generally.
  */
 export async function getAffectedSalesReps(supabase: SupabaseClient, productId: string): Promise<string[]> {
+  return Array.from((await getAffectedSalesRepOrders(supabase, productId)).keys());
+}
+
+/**
+ * Same as getAffectedSalesReps, but keeps each rep's affected order (the oldest
+ * still-unfulfilled one containing the product), so a notification sent to that
+ * rep can link straight to their order.
+ */
+export async function getAffectedSalesRepOrders(supabase: SupabaseClient, productId: string): Promise<Map<string, string>> {
   const { data, error } = await supabase
     .from('order_items')
-    .select('quantity, orders!inner(status, sales_person_name)')
+    .select('quantity, orders!inner(id, order_date, status, sales_person_name)')
     .eq('product_id', productId)
     .in('orders.status', UNFULFILLED_STATUSES);
 
   if (error) {
     console.error('Error fetching affected sales reps:', error);
-    return [];
+    return new Map();
   }
 
-  const names = new Set<string>();
+  const ordersByRep = new Map<string, { id: string; orderDate: string }>();
   (data || []).forEach((row: any) => {
     const name = row.orders?.sales_person_name;
-    if (name) names.add(name);
+    if (!name || !row.orders?.id) return;
+
+    const existing = ordersByRep.get(name);
+    if (!existing || new Date(row.orders.order_date).getTime() < new Date(existing.orderDate).getTime()) {
+      ordersByRep.set(name, { id: row.orders.id, orderDate: row.orders.order_date });
+    }
   });
-  return Array.from(names);
+
+  return new Map(Array.from(ordersByRep, ([name, order]) => [name, order.id]));
 }
 
 /**
@@ -116,7 +131,7 @@ export async function migrateLeakedBundleDrafts(supabase: SupabaseClient) {
 export async function autoCleanupStaffDrafts(supabase: SupabaseClient) {
   const { data: drafts } = await supabase
     .from('purchase_order_items')
-    .select('id, expected_qty, purchase_orders!inner(notes)')
+    .select('id, product_id, expected_qty, purchase_orders!inner(notes)')
     .eq('purchase_orders.notes', 'STAFF_DRAFT')
     .eq('status', 'pending_receipt');
 
@@ -126,7 +141,7 @@ export async function autoCleanupStaffDrafts(supabase: SupabaseClient) {
 
   const { data: sources, error: srcErr } = await supabase
     .from('procurement_request_sources')
-    .select('id, quantity, purchase_order_item_id, orders!inner(status)')
+    .select('id, quantity, purchase_order_item_id, order_id, orders!inner(status)')
     .in('purchase_order_item_id', draftIds);
 
   if (srcErr) {
@@ -136,11 +151,75 @@ export async function autoCleanupStaffDrafts(supabase: SupabaseClient) {
 
   if (!sources || sources.length === 0) return;
 
+  const orderIds = Array.from(new Set(sources.map((s: any) => s.order_id)));
+  
+  // Fetch order items to check is_packed and get the parent product_id for bundles
+  const { data: orderItems } = await supabase
+    .from('order_items')
+    .select('order_id, product_id, is_packed')
+    .in('order_id', orderIds);
+
+  const { data: openIssues } = await supabase
+    .from('order_issues')
+    .select('order_id, product_id')
+    .eq('status', 'open')
+    .in('order_id', orderIds);
+
+  // We need to know if a draft product is a component of the order item's product.
+  // To keep it simple and performant, we'll fetch assembly_recipes for the order items' products.
+  const orderProductIds = Array.from(new Set(orderItems?.map(oi => oi.product_id) || []));
+  const { data: products } = await supabase
+    .from('products')
+    .select('id, assembly_recipe')
+    .in('id', orderProductIds);
+
+  const bundleToComponents = new Map<string, Set<string>>();
+  products?.forEach(p => {
+    const recipe = Array.isArray(p.assembly_recipe) ? p.assembly_recipe : [];
+    const comps = new Set<string>();
+    recipe.forEach((c: any) => {
+      if (c.productId || c.component_id) comps.add(c.productId || c.component_id);
+    });
+    bundleToComponents.set(p.id, comps);
+  });
+
   const sourcesToDelete: string[] = [];
   const draftUpdates = new Map<string, number>();
 
   for (const src of (sources as any[])) {
+    const draft = drafts.find((d: any) => d.id === src.purchase_order_item_id);
+    if (!draft) continue;
+
+    let shouldDelete = false;
+
     if (!UNFULFILLED_STATUSES.includes(src.orders.status)) {
+      shouldDelete = true;
+    } else {
+      // Find the specific order item that requires this draft's product
+      const matchingOi = orderItems?.find(oi => {
+        if (oi.order_id !== src.order_id) return false;
+        if (oi.product_id === draft.product_id) return true;
+        const comps = bundleToComponents.get(oi.product_id);
+        return comps?.has(draft.product_id);
+      });
+
+      if (!matchingOi) {
+        // If the order doesn't even contain the product (e.g. it was removed), delete the source
+        shouldDelete = true;
+      } else if (matchingOi.is_packed) {
+        // The item is physically packed!
+        shouldDelete = true;
+      } else if (src.orders.status === 'Picked (with issue)') {
+        // Unfulfilled only if this specific product (or its bundle parent) has an open issue
+        const hasIssue = openIssues?.some(iss => 
+          iss.order_id === src.order_id && 
+          (iss.product_id === matchingOi.product_id || iss.product_id === draft.product_id)
+        );
+        if (!hasIssue) shouldDelete = true;
+      }
+    }
+
+    if (shouldDelete) {
       sourcesToDelete.push(src.id);
       draftUpdates.set(
         src.purchase_order_item_id, 

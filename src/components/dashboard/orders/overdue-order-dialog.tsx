@@ -34,9 +34,16 @@ interface OverdueOrderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onOrderUpdated: () => void;
+  /**
+   * 'overdue' (default) shows the red "Overdue Order / N days overdue" header.
+   * 'notification' shows a neutral "Order Details" header with the order status
+   * instead — used when the same card is opened from a Bell notification, where
+   * the order isn't necessarily overdue.
+   */
+  variant?: 'overdue' | 'notification';
 }
 
-export function OverdueOrderDialog({ order, customerName, open, onOpenChange, onOrderUpdated }: OverdueOrderDialogProps) {
+export function OverdueOrderDialog({ order, customerName, open, onOpenChange, onOrderUpdated, variant = 'overdue' }: OverdueOrderDialogProps) {
   const supabase = useSupabase();
   const { userProfile } = useUserProfile();
 
@@ -91,6 +98,20 @@ export function OverdueOrderDialog({ order, customerName, open, onOpenChange, on
     if (!supabase) return;
     try {
       setIsLoadingStock(true);
+      
+      // 1. Check if the order has already been picked. If yes, the items are already secured.
+      const { data: logData, error: logError } = await supabase
+          .from('order_logs')
+          .select('id')
+          .eq('order_id', orderId)
+          .in('status', ['Picked', 'Photo', 'Packed', 'For Shipping', 'For Pick-up'])
+          .limit(1);
+          
+      if (!logError && logData && logData.length > 0) {
+        setOutOfStockItems([]);
+        return; // Already picked, so it's not out of stock for this customer
+      }
+
       const { data, error } = await supabase
         .from('order_items')
         .select('quantity, product_name, products(name, stock_level)')
@@ -228,8 +249,12 @@ export function OverdueOrderDialog({ order, customerName, open, onOpenChange, on
         <DialogHeader className="p-6 border-b bg-white shrink-0">
           <div>
             <DialogTitle className="flex items-center gap-2 text-xl">
-              <AlertCircle className="text-red-600 w-6 h-6" />
-              Overdue Order:{' '}
+              {variant === 'overdue' ? (
+                <AlertCircle className="text-red-600 w-6 h-6" />
+              ) : (
+                <PackageOpen className="text-indigo-600 w-6 h-6" />
+              )}
+              {variant === 'overdue' ? 'Overdue Order:' : 'Order Details:'}{' '}
               <Link href={`/dashboard/orders/${order.id}`} className="text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
                 Order #{order.id.substring(0, 7).toUpperCase()}
               </Link>
@@ -240,10 +265,16 @@ export function OverdueOrderDialog({ order, customerName, open, onOpenChange, on
                   {customerName}
                 </Link>
               </p>
-              <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full flex items-center gap-1">
-                <Clock className="w-3 h-3" />
-                {daysOverdue} days overdue
-              </span>
+              {variant === 'overdue' ? (
+                <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {daysOverdue} days overdue
+                </span>
+              ) : (
+                <span className="text-xs font-bold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full">
+                  {order.orderStatus}
+                </span>
+              )}
             </div>
             <div className="text-xs text-slate-500 mt-1 pl-8">
               Placed on: <span className="font-medium text-slate-700">{order.orderDate ? format(new Date(order.orderDate), "MMM d, yyyy") : 'Unknown'}</span>
@@ -294,17 +325,19 @@ export function OverdueOrderDialog({ order, customerName, open, onOpenChange, on
             ) : issues.length > 0 ? (
               <div className="flex flex-col border border-red-200 rounded-lg overflow-hidden bg-red-50 shadow-sm shrink-0">
                 <div className="p-3 bg-red-100 text-red-800 font-semibold text-sm border-b border-red-200 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4"/> Active Inventory Issue
+                  <AlertCircle className="w-4 h-4"/> {issues.some(i => i.product_id || i.products?.name) ? 'Active Inventory Issue' : 'Manual Order Issue'}
                 </div>
                 <div className="p-4 overflow-y-auto">
-                  <div className="mb-4">
-                    <span className="text-xs font-semibold text-red-700">Missing Items:</span>
-                    <ul className="list-disc pl-4 mt-1 space-y-0.5 text-red-600 text-sm">
-                        {issues.map((issue: any) => (
-                          <li key={issue.id}>{issue.products?.name} (x{issue.out_of_stock_qty})</li>
-                        ))}
-                    </ul>
-                  </div>
+                  {issues.some(i => i.product_id || i.products?.name) && (
+                    <div className="mb-4">
+                      <span className="text-xs font-semibold text-red-700">Missing Items:</span>
+                      <ul className="list-disc pl-4 mt-1 space-y-0.5 text-red-600 text-sm">
+                          {issues.filter(i => i.product_id || i.products?.name).map((issue: any) => (
+                            <li key={issue.id}>{issue.products?.name || 'Unknown Product'} (x{issue.out_of_stock_qty || 1})</li>
+                          ))}
+                      </ul>
+                    </div>
+                  )}
                   
                   {allIssueMessages.length > 0 && (
                     <div className="border-t border-red-200 pt-4">
