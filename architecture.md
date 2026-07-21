@@ -296,6 +296,33 @@ Shows all logged payments across three tabs (Pending / Verified / Rejected). Pay
 
 ---
 
+## Installment Pricing, Early Settlement & Payment-Terms Edits (added 2026-07-21)
+
+Installment "interest" exists in **two different places**, and they are NOT the same thing:
+
+1. **Order-level markup** — for an Installment order, `orders.total_amount = downpayment + (monthly_payment × installment_months)`, which staff set higher than the cash price. This applies to every installment order.
+2. **Item-level markup** — for installment **first-timers only** (`isInstallmentFirstTimer` in the order dialog), items are priced at `products.installment_price` instead of `selling_price`, so the markup is **baked into `subtotal`** via `selling_price_at_sale`.
+
+**The "cash basis" formula** used everywhere: `subtotal − total_discount + insurance_fee + shipping_fee`. Reverting an installment order to this waives markup #1 automatically, but NOT markup #2 (first-timer item pricing stays in `subtotal`) — which is why the Early Settlement dialog makes the settlement total editable.
+
+### Early Settlement (customer pays off an installment plan early)
+
+Business policy: a customer who received their item may pay the remaining balance in full; the unearned installment interest is **waived by reverting the order to the cash price** — never by recording a discount (discounts would distort margin/sales reports).
+
+- **UI**: Orders table → ⋮ menu → "Early Settlement (Pay in Full)" (`src/components/dashboard/early-settlement-dialog.tsx`). Shown only for Installment orders with `balance_due > 0` that aren't Cancelled/Returned.
+- **DB**: `settle_installment_order(payload)` RPC — locks the order row (`FOR UPDATE`), refuses non-installment orders, computes the payment due from the **live** `amount_paid`, inserts the final payment (note records the plan and waived interest), converts the order to `Full Payment` / `Completed` with `balance_due = 0`, and routes any excess prior payments to `customers.store_credit` (+ an `accounting_expenses` "Customer Store Credit Liability" row) — all in one transaction.
+
+### Edit Payment Terms (`src/components/dashboard/edit-payment-terms-dialog.tsx`)
+
+Backed by the `update_payment_terms(payload)` RPC (same atomic/locking approach). Two invariants that were once bugs — do not reintroduce them:
+
+- The dialog's amount field means **"payment collected now"** and is **added** to `orders.amount_paid` server-side. It must never overwrite the accumulated total (the old client-side version wiped prior payments when switching to COD).
+- Moving **away** from Installment reverts `total_amount` to the cash basis (including insurance + shipping fees); `balance_due` is capped at ≥ 0 (the old version could go negative when switching to Full Payment). Moving **to** Installment sets `total_amount = amount_paid + payment_now + monthly × months` (the schedule covers only the *remaining* balance).
+
+Both RPCs live in `scripts/migrations/add_settlement_and_terms_rpcs.sql` (applied 2026-07-21 via the Supabase Management API — `SUPABASE_ACCESS_TOKEN` + `SUPABASE_PROJECT_REF` in `.env.local`). Payment-proof uploads and the fire-and-forget OCR trigger stay client-side; everything that touches money is inside the RPCs.
+
+---
+
 ## Cost of Goods Sold (COGS) & Just-In-Time Costing
 
 This business runs **just-in-time inventory** — a product is bought only after a customer orders it, so the real cost is not known at order-creation time. `order_items.cost_price_at_sale` is snapshotted from `products.initial_unit_cost` the moment an order is created (in the `process_order_transaction` Postgres RPC, defined in `update_order_func.sql` at the repo root) and **never updated automatically after that** — so for a JIT business this snapshot is usually `0` until something explicitly backfills it.
