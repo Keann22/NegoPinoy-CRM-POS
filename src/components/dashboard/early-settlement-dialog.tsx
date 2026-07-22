@@ -82,8 +82,31 @@ export function EarlySettlementDialog({ order, open, onOpenChange, onSuccess }: 
         onOpenChange(false);
         return;
       }
-      // Cash basis: the order's price without the monthly-payment markup.
-      const cashTotal = (data.subtotal || 0) - (data.total_discount || 0) + (data.insurance_fee || 0) + (data.shipping_fee || 0);
+
+      // For installment first-timers, items were sold at products.installment_price
+      // instead of the true cash selling_price, so subtotal/insurance_fee on the order
+      // row are inflated. Detect that per line item and substitute the real cash price
+      // before computing the settlement default, instead of trusting the stored subtotal.
+      const { data: items } = await supabase
+        .from('order_items')
+        .select('quantity, selling_price_at_sale, discount, products(selling_price, installment_price)')
+        .eq('order_id', order.id);
+
+      let cashSubtotal = Number(data.subtotal) || 0;
+      if (items && items.length > 0) {
+        cashSubtotal = items.reduce((sum, item: any) => {
+          const soldAt = Number(item.selling_price_at_sale) || 0;
+          const installmentPrice = Number(item.products?.installment_price) || 0;
+          const cashPrice = installmentPrice > 0 && Math.abs(soldAt - installmentPrice) < 0.01
+            ? Number(item.products?.selling_price) || soldAt
+            : soldAt;
+          return sum + (cashPrice - (Number(item.discount) || 0)) * (Number(item.quantity) || 1);
+        }, 0);
+      }
+      const hadInsurance = (Number(data.insurance_fee) || 0) > 0;
+      const cashInsurance = hadInsurance ? (cashSubtotal - (Number(data.total_discount) || 0)) * 0.01 : 0;
+      const cashTotal = cashSubtotal - (Number(data.total_discount) || 0) + cashInsurance + (Number(data.shipping_fee) || 0);
+
       setFinancials({
         cashTotal,
         alreadyPaid: Number(data.amount_paid) || 0,
