@@ -8,6 +8,7 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PU
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 import { ALL_OPEN_STATUSES, UNFULFILLED_STATUSES, migrateLeakedBundleDrafts, autoCleanupStaffDrafts } from '@/lib/services/procurement-service';
+import { backfillOrderItemCosts } from '@/lib/services/cost-backfill-service';
 
 export async function GET() {
   try {
@@ -391,47 +392,6 @@ export async function GET() {
   }
 }
 
-const VOID_ORDER_STATUSES = ['Cancelled', 'Returned'];
-
-/**
- * This business runs just-in-time inventory: they buy a product only after a
- * customer orders it, so order_items.cost_price_at_sale gets frozen at 0 (the
- * product's cost is unknown yet) when the order is created. Recording a real
- * purchase here is the moment the true cost becomes known, so backfill it
- * onto whichever pending orders were actually waiting on this product -
- * oldest first, only fully covering an order line if the purchased quantity
- * can cover it entirely (a line's cost isn't split across two purchases).
- * Any quantity left over after covering waiting orders was bought ahead of
- * demand - it's already handled correctly by the initial_unit_cost update
- * above, since future orders snapshot whatever that value is when created.
- */
-async function backfillOrderItemCosts(productId: string, purchasedQty: number, cost: number) {
-  const { data: items } = await supabase
-    .from('order_items')
-    .select('id, quantity, order_id, orders(status, created_at)')
-    .eq('product_id', productId)
-    .or('cost_price_at_sale.is.null,cost_price_at_sale.eq.0');
-
-  if (!items || items.length === 0) return;
-
-  const waiting = items
-    .filter((i: any) => i.orders && !VOID_ORDER_STATUSES.includes(i.orders.status))
-    .sort((a: any, b: any) => new Date(a.orders.created_at).getTime() - new Date(b.orders.created_at).getTime());
-
-  let remainingQty = purchasedQty;
-  for (const item of waiting) {
-    if (remainingQty <= 0) break;
-    if (item.quantity > remainingQty) continue;
-
-    await supabase
-      .from('order_items')
-      .update({ cost_price_at_sale: cost })
-      .eq('id', item.id);
-
-    remainingQty -= item.quantity;
-  }
-}
-
 export async function POST(req: Request) {
   try {
     const { purchases } = await req.json(); // Array of { productId, supplierId, qty, cost, draftItemId }
@@ -488,7 +448,7 @@ export async function POST(req: Request) {
           .eq('id', p.productId);
 
         // Backfill the real cost onto pending orders that were waiting on this product
-        await backfillOrderItemCosts(p.productId, Number(p.qty) || 0, parsedCost);
+        await backfillOrderItemCosts(supabase, p.productId, Number(p.qty) || 0, parsedCost);
       }
 
       // Auto-resolve any open procurement issues for this product

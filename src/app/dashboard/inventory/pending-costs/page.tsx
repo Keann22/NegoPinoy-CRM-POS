@@ -61,7 +61,9 @@ export default function PendingCostsPage() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><PhilippinePeso className="h-5 w-5" /> Encode Pending Costs</CardTitle>
         <CardDescription>
-          Review inventory that was received without a supplier cost and encode the correct pricing to update your expenses.
+          Stock that was received before anyone knew its price. Encoding the supplier and unit cost here fixes the
+          inventory ledger, backfills COGS onto anything already sold from it, and makes the purchase appear in the
+          Purchases Report.
         </CardDescription>
       </CardHeader>
       <CardContent>

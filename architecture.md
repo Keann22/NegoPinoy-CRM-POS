@@ -185,6 +185,16 @@ The real columns are `product_id`, `quantity_change`, `movement_type`, `timestam
 
 All three were fixed (as of 2026-07-16) to use the real schema — writes now use `quantity_change`/`movement_type`/`supplier_name`, with the before→after transition folded into the free-text `reason` string since there's nowhere else to store it. **Before adding any new `inventory_movements` insert or query, check a live row's actual shape first** (`select('*').limit(1)`) rather than copying an existing call site — several of them were wrong.
 
+### `purchase_orders.status` check constraint (recurring bug source)
+
+`purchase_orders_status_check` permits exactly three values: **`pending_receipt`, `partially_received`, `received`**. There is no `completed`, despite the word reading naturally for a finished batch. Writing it raises Postgres `23514` and the insert/update fails.
+
+Two call sites were written against the imagined `'completed'` value:
+- `POST /api/inventory/procurement-batch/close` ([close/route.ts](src/app/api/inventory/procurement-batch/close/route.ts)) — threw on its **last** step, *after* rolling unbought items over to the staff draft and marking the old ones received. Staff saw an error and reasonably assumed nothing had happened, while the rollover had already committed. Dormant in practice: no `BATCH_*` PO has ever existed in production, so the route always exited earlier at "Active batch not found".
+- The uncosted-receipt repair below, when it creates a backfill PO. Same failure, but it fired for real on 2026-07-22 and left a half-applied write.
+
+Both fixed to `'received'` (as of 2026-07-22). **Rule**: when a write can fail on a constraint, order the mutations so the constraint-prone one runs *first* — the repair service now creates its PO before touching the ledger, product cost, or stock, so a rejection aborts cleanly instead of leaving a partial write.
+
 ### Silent Failures on Logging (`order_logs`, `notifications`, etc.)
 
 A recurring pattern in the codebase involves updating a core table (e.g. `orders`) and then inserting an audit log (e.g. into `order_logs`). If the insert statement does not explicitly check and handle its error (`if (error) throw error;` or log it), a failure in the log insertion (e.g. due to an RLS policy, transient DB lock, or invalid ENUM) will fail silently. 
@@ -346,11 +356,52 @@ Products that have genuinely never been purchased (no cost on file anywhere) can
 - Dashboard home (`src/app/dashboard/page.tsx`) — Net Profit widget, scoped to the selected date range at the query level.
 - P&L Statement report (`src/app/dashboard/reports/pnl-report.tsx`) — same calculation, its own date-range picker.
 
-Both sum `order_items.cost_price_at_sale × quantity` for non-void (`Cancelled`/`Returned` excluded) orders in the period, then subtract expenses (excluding category `"Cost of Goods Sold"`, to avoid double-counting the one-time COGS corrections some inventory screens create as Expense rows — see [pending-costs/page.tsx](src/app/dashboard/inventory/pending-costs/page.tsx)).
+Both sum `order_items.cost_price_at_sale × quantity` for non-void (`Cancelled`/`Returned` excluded) orders in the period, then subtract expenses **excluding category `"Cost of Goods Sold"`**.
+
+⚠️ **That exclusion used to be described as avoiding double-counting. It wasn't** (corrected 2026-07-22). COGS is computed *only* from `cost_price_at_sale`; the `expenses` table is never read back for it. So an expense row written under category `"Cost of Goods Sold"` was excluded from operating expenses **and** never counted as COGS — it landed nowhere and silently vanished from the P&L. The old Encode Pending Costs handler wrote exactly such a row on every save, stranding **171 rows / ₱229,983 (2026-05-27 → 2026-06-17)**. It no longer writes them; `cost_price_at_sale` is the single path that moves COGS. The historical rows are still unreconciled — see the backfill note below.
 
 **Gotcha worth remembering**: expense records use the column `expense_date`, not `date` or `created_at` (both of those were used by mistake in different files and either error outright or silently return nothing). Every `expenses` insert in the codebase writes to `expense_date` — filter by that column, always.
 
 **Gotcha**: this data is exactly what tripped the 1000-row query cap described under "Supabase Client Usage" — always scope these queries by date range at the query level, never fetch-everything-then-filter.
+
+### Uncosted receipts: stock that arrives before anyone knows the price (added 2026-07-22)
+
+The JIT loop above assumes every purchase goes through "Buy", which is where `supplier_id` and `unit_cost` are set. **One path deliberately bypasses it.** `GET /api/inventory/receive/pending-pos` does *not* filter out `STAFF_DRAFT` items ("so that inventory can receive them even if management hasn't finalized the amount/qty"), so inventory staff can receive goods straight off the to-order sheet. The POST then calls `increment_stock` with `new_unit_cost: poItem.unit_cost || 0` — **stock enters inventory costed at ₱0, with no supplier**, and the buy never reaches the Purchases Report. This is intended: staff genuinely don't know the price, and suppliers are management-confidential (see below). The cost is meant to be encoded afterwards.
+
+Backlog when this was first measured (2026-07-22): **495 zero-cost RESTOCK movements / 11,804 pcs** since 2026-06-05, and 39 `purchase_order_items` rows received with no supplier or cost.
+
+**Two surfaces fix it, keyed off different tables:**
+
+| Surface | Keyed by | Use when |
+|---|---|---|
+| Purchases Report warning banner ([purchases-report.tsx](src/components/dashboard/reports/purchases-report.tsx)) | `purchase_order_items` | The buy is missing from the report |
+| Encode Pending Costs (`/dashboard/inventory/pending-costs`) | `inventory_movements` | Stock entered at ₱0 from any path |
+
+They don't list identical sets — a row missing *only* a supplier (cost already present) never appears on the Encode screen, which filters `unit_cost = 0`. Shared steps live in [purchase-repair-service.ts](src/lib/services/purchase-repair-service.ts) precisely so the two can't drift; the COGS half is [cost-backfill-service.ts](src/lib/services/cost-backfill-service.ts), also called by the normal Buy flow.
+
+**A repair touches four things** — miss any one and the money stays unaccounted:
+1. The `inventory_movements` ledger row (cost + supplier name), *amended in place* rather than offset by a compensating adjustment. If no uncosted receipt exists to amend, a quantity fix books its own `adjustment` movement — stock never moves without a trail.
+2. `products.initial_unit_cost` + the `supplier_pricing` price book.
+3. **`order_items.cost_price_at_sale`** via `backfillOrderItemCosts` — the only thing that actually moves the P&L.
+4. The `purchase_order_items` row, moved onto a real PO **dated to when the goods landed**. Required because the report buckets by the parent PO's `created_at` and skips `STAFF_DRAFT` POs entirely — setting supplier/cost in place is not enough. An item already on a real PO is left where it is; moving it would rewrite a purchase date already known to be correct.
+
+**Date attribution**, in priority order: the date a human entered → the uncosted receipt movement → *any* RESTOCK movement → the item's `created_at`. **Never `now()`** — an early version fell through to the default and filed a Jul 18 buy under Jul 22. `inventory_movements` has no FK back to `purchase_order_items`, so matching is best-effort on `product_id`; the date field is editable in the banner for exactly that reason.
+
+**⚠️ `expected_qty` is demand, not a purchase quantity.** On a `STAFF_DRAFT` line it's a live counter of how many units customers are waiting for — `POST /api/inventory/procurement-request` adds to it, `autoCleanupStaffDrafts` subtracts and deletes the line at zero. The Purchases Report values purchases at `expected_qty`, so leaving it alone meant **reported spend could drift on a day nothing was bought** (a cancelled order lowers the counter, shrinking a historical purchase total). Recording a purchase therefore pins `expected_qty = received_qty` — **but only for `STAFF_DRAFT` lines**. On a real PO `expected_qty` means "what we ordered", and a shortfall against it is genuine information about an undelivered balance; overwriting it would erase that.
+
+**Still open**: the 171 stranded expense rows. The reconciliation is a one-time script, not a screen — the recoverable slice is ~**₱61,777 across 113 zero-cost sold order lines**, priced from the latest costed RESTOCK movement per product (`initial_unit_cost` recovers only ₱5,030, since later product edits reset it). 21 further lines have no cost recorded anywhere and need a human. The expense rows should be *recategorised*, not deleted, so they can never double-count if the P&L logic changes.
+
+**UI gotcha (recurring):** shadcn's `<ScrollArea>` puts `overflow-hidden` on its root while the viewport is `h-full`, so a `max-h-*` class **clips** content instead of scrolling it — the banner silently showed 4 of 39 rows. Use a plain `div` with `overflow-y-auto` for a max-height scroll region. The "By Product (Consolidated)" tab still has the same latent pattern.
+
+---
+
+## Buying days on the Receive screen (added 2026-07-22)
+
+Management taps **Buy** item by item, so each purchase creates its own PO with `notes = null`. The receive screen groups by `notes`, which meant every buy fell through to a hardcoded `'Unknown Batch'` heading with no date. `GET /api/inventory/receive/pending-pos` now derives the heading instead: `STAFF_DRAFT` → "Pending Staff Requests", a named batch → its own name, otherwise **"Purchases — <PHT date of the PO>"**. Sorted newest buying day first, staff requests last (they're the not-yet-bought backlog, not a delivery).
+
+This is display-level only — no change to PO structure, so the Purchases Report keeps a distinct timestamp per buy, and it fixed all existing rows retroactively.
+
+**⚠️ Supplier confidentiality**: staff must not learn who the business buys from. `pending-pos` returns only product name, quantities and `batchName` — **no supplier field**, and nothing on the staff-facing receive path exposes `purchase_order_items.supplier_id`. `procurement-batch`'s consolidation omitting `supplier_id` is deliberate for the same reason, not an oversight. (The manual "Record a new shipment" form's `supplierName` is unrelated — staff typing what they observed about a delivery in front of them, written to that new movement only.) **Never add a supplier column to a staff-facing inventory screen.**
 
 ---
 
@@ -566,6 +617,11 @@ A Slack-style two-pane messaging page (`src/app/dashboard/messages/page.tsx`: th
 | `src/app/api/payments/extract-ocr/route.ts` | Tesseract + Google Vision fallback OCR on payment proof images |
 | `src/app/api/payments/verify-pdf/route.ts` | Bank/GCash statement PDF matching — see "Payments Dashboard" |
 | `src/app/api/inventory/procurement/route.ts` | Procurement "Buy" action — updates product cost + backfills COGS (see "Cost of Goods Sold"); also self-heals leaked bundle drafts (see "Bundle Products & Assembly Recipes") and computes both the sheet's items and the Reconciliation report's `reconciliationItems` (see "Procurement Sheet: three numbers that must not be confused") |
+| `src/lib/services/cost-backfill-service.ts` | `backfillOrderItemCosts()` — the **only** path that moves COGS; called by both the Buy flow and the uncosted-receipt repair, see "Cost of Goods Sold" |
+| `src/lib/services/purchase-repair-service.ts` | Shared repair for stock received before its price was known — ledger row, product cost, COGS, and PO linking, see "Uncosted receipts" |
+| `src/app/api/reports/purchases/route.ts`, `record/route.ts` | Purchases Report data + the warning banner's inline "record missing supplier/cost" action — see "Uncosted receipts" |
+| `src/app/api/inventory/pending-costs/save/route.ts`, `src/hooks/usePendingCosts.ts` | Encode Pending Costs save path — replaced the old handler that wrote a `"Cost of Goods Sold"` expense row the P&L never read |
+| `src/app/api/inventory/receive/pending-pos/route.ts` | Pending-receipt list — allows receiving `STAFF_DRAFT` items at ₱0 (root cause of uncosted receipts) and groups by buying day, see "Buying days on the Receive screen" |
 | `src/components/dashboard/reports/to-order-report.tsx` | Reports → "Stock Reconciliation" tab — see "Stock Reconciliation report" |
 | `src/app/dashboard/reports/pnl-report.tsx` | P&L Statement report — see "Cost of Goods Sold" |
 | `update_order_func.sql` | `process_order_transaction` Postgres RPC — where `cost_price_at_sale` gets snapshotted |

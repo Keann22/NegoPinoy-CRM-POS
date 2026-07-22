@@ -106,19 +106,46 @@ export async function POST(req: Request) {
             }
         }
 
-        // 5. Mark the old items as 'received' (completed for this batch)
-        const oldItemIds = items.map(i => i.id);
-        const { error: updItemsErr } = await supabase
-            .from('purchase_order_items')
-            .update({ status: 'received' })
-            .in('id', oldItemIds);
-        if (updItemsErr) throw updItemsErr;
+        // 5. Close out the old items. Only those that actually took delivery of
+        // something are marked 'received' - a line whose full quantity just
+        // rolled over received nothing, and stamping it 'received' would leave a
+        // phantom receipt (status 'received', received_qty 0) that reads as a
+        // real delivery in the Purchases Report and stock history.
+        const partiallyReceivedIds = items
+            .filter(i => (i.received_qty || 0) > 0)
+            .map(i => i.id);
+
+        if (partiallyReceivedIds.length > 0) {
+            const { error: updItemsErr } = await supabase
+                .from('purchase_order_items')
+                .update({ status: 'received' })
+                .in('id', partiallyReceivedIds);
+            if (updItemsErr) throw updItemsErr;
+        }
+
+        // Lines that got nothing have been superseded by their rollover copy on
+        // the staff draft, so delete them rather than leaving a duplicate claim
+        // on the same demand.
+        const rolledOverOnlyIds = items
+            .filter(i => (i.received_qty || 0) === 0)
+            .map(i => i.id);
+
+        if (rolledOverOnlyIds.length > 0) {
+            await supabase.from('procurement_request_sources').delete().in('purchase_order_item_id', rolledOverOnlyIds);
+            const { error: delErr } = await supabase
+                .from('purchase_order_items')
+                .delete()
+                .in('id', rolledOverOnlyIds);
+            if (delErr) throw delErr;
+        }
     }
 
-    // 6. Mark the Batch as completed
+    // 6. Mark the Batch as done. purchase_orders_status_check only permits
+    // pending_receipt / partially_received / received - 'completed' is not a
+    // legal value and threw here, after the rollover above had already committed.
     const { error: updPoErr } = await supabase
         .from('purchase_orders')
-        .update({ status: 'completed' })
+        .update({ status: 'received' })
         .eq('id', po.id);
     if (updPoErr) throw updPoErr;
 
