@@ -121,67 +121,38 @@ export function usePendingCosts() {
 
     setSavingId(movement.id);
     try {
-      const qtyDifference = newQuantity - movement.quantity_change;
-
-      const { error: moveError } = await supabase
-        .from('inventory_movements')
-        .update({ 
-            unit_cost: costValue,
-            supplier_name: supplierValue || null,
-            quantity_change: newQuantity
-        })
-        .eq('id', movement.id);
-      
-      if (moveError) throw moveError;
-
-      if (qtyDifference !== 0) {
-        const { error: updateErr } = await supabase.rpc('increment_stock', { p_product_id: movement.product_id, qty: qtyDifference });
-        if (updateErr) throw updateErr;
-      }
-
-      const updatedSupplierPricing = movement.products.supplier_pricing || [];
+      // The whole repair runs server-side in one place: ledger row, product
+      // cost, COGS on already-sold lines, and linking the buy into the
+      // Purchases Report. Doing it here piecemeal is what previously let the
+      // cost land in an expenses row that the P&L never reads.
       const supplierObj = allSuppliers.find(s => s.name === supplierValue);
-      
-      if (supplierObj) {
-         const existingIndex = updatedSupplierPricing.findIndex((sp: any) => sp.supplierId === supplierObj.id);
-         if (existingIndex >= 0) {
-             updatedSupplierPricing[existingIndex].unitCost = costValue;
-         } else {
-             updatedSupplierPricing.push({
-                 supplierId: supplierObj.id,
-                 supplierName: supplierObj.name,
-                 unitCost: costValue
-             });
-         }
+
+      const res = await fetch('/api/inventory/pending-costs/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          movementId: movement.id,
+          unitCost: costValue,
+          supplierId: supplierObj?.id || null,
+          quantity: newQuantity,
+        }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Save failed');
+
+      const parts = [`₱${costValue.toLocaleString('en-PH')} × ${newQuantity} recorded.`];
+      if (result.linesUpdated > 0) {
+        parts.push(`COGS backfilled onto ${result.linesUpdated} sold order line${result.linesUpdated === 1 ? '' : 's'} (₱${Number(result.cogsAdded).toLocaleString('en-PH')}).`);
       }
+      if (result.linkedPurchase) {
+        parts.push('Now shows in the Purchases Report.');
+      }
+      toast({ title: 'Cost Saved', description: parts.join(' ') });
 
-      const { error: prodError } = await supabase
-        .from('products')
-        .update({ 
-            initial_unit_cost: costValue,
-            supplier_pricing: updatedSupplierPricing 
-        })
-        .eq('id', movement.product_id);
-
-      if (prodError) throw prodError;
-
-      const { error: expError } = await supabase
-        .from('expenses')
-        .insert({
-          expense_date: movement.timestamp,
-          amount: costValue * newQuantity,
-          category: 'Cost of Goods Sold',
-          description: `[${movement.products.name}] ${movement.reason} (Cost Encoded Later)`
-        });
-
-      if (expError) throw expError;
-
-      toast({ title: 'Cost Saved', description: 'The inventory cost and expense have been successfully recorded.' });
-      
       setMovements(prev => prev.filter(m => m.id !== movement.id));
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving cost:", error);
-      toast({ variant: 'destructive', title: 'Save Failed', description: 'Could not save the cost.' });
+      toast({ variant: 'destructive', title: 'Save Failed', description: error.message || 'Could not save the cost.' });
     } finally {
       setSavingId(null);
     }

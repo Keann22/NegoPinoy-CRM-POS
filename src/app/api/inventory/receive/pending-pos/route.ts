@@ -16,7 +16,7 @@ export async function GET() {
       .select(`
         id, expected_qty, received_qty,
         products (name, variant_name),
-        purchase_orders!inner(notes)
+        purchase_orders!inner(notes, created_at)
       `)
       .eq('status', 'pending_receipt')
       .order('created_at', { ascending: false });
@@ -28,17 +28,52 @@ export async function GET() {
     // Also, filter out any items that are already fully received but somehow stuck in pending_receipt status.
     const filteredItems = items.filter((i: any) => Math.max(0, i.expected_qty - (i.received_qty || 0)) > 0);
 
-    const mapped = filteredItems.map((i: any) => ({
-      id: i.id,
-      productName: (i.products.variant_name && !i.products.name.includes(i.products.variant_name)) ? `${i.products.name} [${i.products.variant_name}]` : i.products.name,
-      expectedQty: i.expected_qty,
-      alreadyReceivedQty: i.received_qty || 0,
-      remainingQty: Math.max(0, i.expected_qty - (i.received_qty || 0)),
-      batchName: i.purchase_orders?.notes === 'STAFF_DRAFT' ? 'Pending Staff Requests' : i.purchase_orders?.notes || 'Unknown Batch'
-    }));
+    // Buying days are the unit staff actually receive against: management taps
+    // Buy item by item, so each purchase gets its own PO with no notes. Grouping
+    // those by the day they were bought turns a pile of anonymous rows into the
+    // batch that physically arrives together. Deliberately no supplier anywhere
+    // in this payload - buying sources are management-only.
+    const phtDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila' });
+    const phtLabel = new Intl.DateTimeFormat('en-PH', {
+      timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric',
+    });
+    const STAFF_REQUEST_SORT_KEY = '0000-00-00';
 
-    // Sort alphabetically
-    mapped.sort((a, b) => a.productName.localeCompare(b.productName));
+    const mapped = filteredItems.map((i: any) => {
+      const notes = i.purchase_orders?.notes;
+      const boughtAt = i.purchase_orders?.created_at ? new Date(i.purchase_orders.created_at) : null;
+
+      let batchName: string;
+      let batchSortKey: string;
+      if (notes === 'STAFF_DRAFT') {
+        batchName = 'Pending Staff Requests';
+        batchSortKey = STAFF_REQUEST_SORT_KEY;
+      } else if (notes) {
+        batchName = notes;
+        batchSortKey = boughtAt ? phtDay.format(boughtAt) : STAFF_REQUEST_SORT_KEY;
+      } else if (boughtAt) {
+        batchName = `Purchases — ${phtLabel.format(boughtAt)}`;
+        batchSortKey = phtDay.format(boughtAt);
+      } else {
+        batchName = 'Unknown Batch';
+        batchSortKey = STAFF_REQUEST_SORT_KEY;
+      }
+
+      return {
+        id: i.id,
+        productName: (i.products.variant_name && !i.products.name.includes(i.products.variant_name)) ? `${i.products.name} [${i.products.variant_name}]` : i.products.name,
+        expectedQty: i.expected_qty,
+        alreadyReceivedQty: i.received_qty || 0,
+        remainingQty: Math.max(0, i.expected_qty - (i.received_qty || 0)),
+        batchName,
+        batchSortKey,
+      };
+    });
+
+    // Most recent buying day first, then alphabetical within it. Staff requests
+    // sort last - they are the not-yet-bought backlog, not a delivery.
+    mapped.sort((a, b) =>
+      b.batchSortKey.localeCompare(a.batchSortKey) || a.productName.localeCompare(b.productName));
 
     return NextResponse.json({ pendingItems: mapped });
   } catch (error: any) {
