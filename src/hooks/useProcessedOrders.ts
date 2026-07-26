@@ -49,20 +49,40 @@ export function useProcessedOrders() {
     setSelectedOrderIds(new Set());
   }, [activeTab]);
 
-  // Step 1: Load all orders
+  // Step 1: Load orders for the selected date range and print status.
+  // Filters are pushed to the DB (not applied client-side on a truncated set)
+  // and the response is paginated so the PostgREST 1000-row cap can never
+  // silently hide older orders.
   useEffect(() => {
-    if (!supabase || !user) return;
+    if (!supabase || !user || !date?.from || !date?.to) return;
     const fetchOrders = async () => {
       setIsLoadingOrders(true);
       try {
-        const { data, error } = await supabase
-          .from('orders')
-          .select('id, customer_id, created_at, status, payment_method, total_amount, notes, sales_person_name, is_printed')
-          .order('created_at', { ascending: false });
+        const fromIso = new Date(date.from!).toISOString();
+        const toDate = new Date(date.to!);
+        toDate.setHours(23, 59, 59, 999);
+        const toIso = toDate.toISOString();
 
-        if (error) throw error;
+        const PAGE_SIZE = 1000;
+        let all: any[] = [];
+        let page = 0;
+        while (true) {
+          const { data, error } = await supabase
+            .from('orders')
+            .select('id, customer_id, created_at, status, payment_method, total_amount, notes, sales_person_name, is_printed')
+            .gte('created_at', fromIso)
+            .lte('created_at', toIso)
+            .eq('is_printed', activeTab === 'printed')
+            .order('created_at', { ascending: false })
+            .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
 
-        const mapped = (data || []).map((o: any) => ({
+          if (error) throw error;
+          all = all.concat(data || []);
+          if (!data || data.length < PAGE_SIZE) break;
+          page++;
+        }
+
+        const mapped = all.map((o: any) => ({
           id: o.id,
           customerId: o.customer_id,
           orderDate: o.created_at,
@@ -81,7 +101,7 @@ export function useProcessedOrders() {
       }
     };
     fetchOrders();
-  }, [supabase, user]);
+  }, [supabase, user, date, activeTab]);
 
   // Step 2: Filter orders by date range and status
   const filteredOrders = useMemo(() => {
