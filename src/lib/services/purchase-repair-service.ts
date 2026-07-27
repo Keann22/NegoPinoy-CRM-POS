@@ -22,6 +22,87 @@ export async function resolveSupplierName(
 }
 
 /**
+ * Best guess at what a receipt should be costed/sourced at, from what we already
+ * know about the product. Same cascade the Purchases Report banner shows as its
+ * pre-fill (last real purchase → product default cost → supplier price book),
+ * lifted here so the receive path can act on it automatically instead of leaving
+ * every to-order receipt for a human to confirm by hand.
+ *
+ * `source` is non-null only when a positive cost was actually found; callers use
+ * it as the "we're confident enough to auto-record" signal.
+ */
+export type CostSuggestion = {
+  supplierId: string | null;
+  supplierName: string | null;
+  unitCost: number;
+  source: string | null;
+};
+
+export async function suggestSupplierAndCost(
+  supabase: SupabaseClient,
+  productId: string,
+  lineUnitCost: number | null,
+  lineSupplierId: string | null,
+): Promise<CostSuggestion> {
+  // Most recent purchase that actually carried a price. STAFF_DRAFT lines sit at
+  // unit_cost 0, so the >0 filter excludes them automatically.
+  const { data: priced } = await supabase
+    .from('purchase_order_items')
+    .select('unit_cost, supplier_id, purchase_orders!inner(created_at), suppliers(name)')
+    .eq('product_id', productId)
+    .gt('unit_cost', 0);
+
+  let lastPurchase: { at: string | null; unitCost: number; supplierId: string | null; supplierName: string | null } | null = null;
+  (priced || []).forEach((row: any) => {
+    const at = row.purchase_orders?.created_at || null;
+    if (!lastPurchase || (at && lastPurchase.at && new Date(at) > new Date(lastPurchase.at)) || (at && !lastPurchase.at)) {
+      lastPurchase = {
+        at,
+        unitCost: Number(row.unit_cost) || 0,
+        supplierId: row.supplier_id || null,
+        supplierName: row.suppliers?.name || null,
+      };
+    }
+  });
+
+  const { data: prod } = await supabase
+    .from('products')
+    .select('supplier_id, initial_unit_cost, supplier_pricing')
+    .eq('id', productId)
+    .single();
+  const pricing: any[] = prod?.supplier_pricing || [];
+  const book = pricing.length > 0 ? pricing[pricing.length - 1] : null;
+
+  let unitCost = 0;
+  let source: string | null = null;
+  let supplierId: string | null = lineSupplierId || null;
+  let supplierName: string | null = null;
+
+  if (Number(lineUnitCost) > 0) {
+    unitCost = Number(lineUnitCost);
+    source = 'already on this receipt';
+  } else if (lastPurchase && (lastPurchase as any).unitCost > 0) {
+    const lp = lastPurchase as any;
+    unitCost = lp.unitCost;
+    source = 'last purchase';
+    if (!supplierId) { supplierId = lp.supplierId; supplierName = lp.supplierName; }
+  } else if (Number(prod?.initial_unit_cost) > 0) {
+    unitCost = Number(prod!.initial_unit_cost);
+    source = 'product default cost';
+  } else if (Number(book?.unitCost) > 0) {
+    unitCost = Number(book.unitCost);
+    source = 'supplier price book';
+    if (!supplierId) { supplierId = book.supplierId || null; supplierName = book.supplierName || null; }
+  }
+
+  // Fall back to the product's own supplier if the cost source didn't carry one.
+  if (!supplierId) supplierId = prod?.supplier_id || null;
+  if (supplierId && !supplierName) supplierName = await resolveSupplierName(supabase, supplierId);
+
+  return { supplierId, supplierName, unitCost, source };
+}
+
+/**
  * Product-level cost, so orders created from here on snapshot the right number,
  * plus the per-supplier price book used to pre-fill these screens next time.
  */

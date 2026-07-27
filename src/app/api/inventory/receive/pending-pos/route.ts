@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createStaffMessage, getAdminAndInventoryLeadNames, fanOutStaffNotifications, resolveRecipientNames } from '@/lib/services/staff-message-service';
 import { getAffectedSalesRepOrders } from '@/lib/services/procurement-service';
+import { suggestSupplierAndCost, repairFromPurchaseItem } from '@/lib/services/purchase-repair-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -109,10 +110,10 @@ export async function POST(req: Request) {
         // 1. Get PO item
         const { data: poItem, error: poErr } = await supabase
           .from('purchase_order_items')
-          .select('po_id, product_id, unit_cost, expected_qty, received_qty')
+          .select('po_id, product_id, supplier_id, unit_cost, expected_qty, received_qty')
           .eq('id', r.itemId)
           .single();
-          
+
         if (poErr) throw poErr;
 
         const newReceivedQty = (poItem.received_qty || 0) + r.receivedQty;
@@ -123,16 +124,33 @@ export async function POST(req: Request) {
           .from('purchase_order_items')
           .update({ received_qty: newReceivedQty, status: newStatus })
           .eq('id', r.itemId);
-          
+
         if (updErr) throw updErr;
 
-        // 3. Update Live Stock safely
+        // A to-order line received straight off the staff sheet arrives with no
+        // supplier and no cost. If we already know both from history, record the
+        // purchase properly below instead of banking the stock at ₱0 and leaving
+        // it for someone to fix by hand in the Purchases Report.
+        const lineMissing = !poItem.supplier_id || !(Number(poItem.unit_cost) > 0);
+        const suggestion = lineMissing
+          ? await suggestSupplierAndCost(supabase, poItem.product_id, poItem.unit_cost, poItem.supplier_id)
+          : { supplierId: poItem.supplier_id, supplierName: null, unitCost: Number(poItem.unit_cost) || 0, source: 'already on this receipt' };
+        const canAutoRecord = lineMissing && suggestion.unitCost > 0 && !!suggestion.supplierId;
+
+        // 3. Update Live Stock safely. Value it at the best cost we have; pass
+        // null (not 0) when unknown so increment_stock's coalesce keeps the
+        // product's existing cost rather than clobbering it to zero. When we're
+        // about to auto-record, leave the cost to the repair step (which also
+        // amends the ledger entry below) and just move the units.
+        const stockCost = canAutoRecord
+          ? null
+          : (Number(poItem.unit_cost) > 0 ? Number(poItem.unit_cost) : null);
         const { error: updateError } = await supabase.rpc('increment_stock', {
             p_product_id: poItem.product_id,
             qty: r.receivedQty,
-            new_unit_cost: poItem.unit_cost || 0
+            new_unit_cost: stockCost
         });
-        
+
         if (updateError) throw updateError;
 
         let reason = 'Received from PO';
@@ -140,14 +158,15 @@ export async function POST(req: Request) {
             reason = `Discrepancy reported: ${r.discrepancyReason} (Received ${r.receivedQty} out of ${poItem.expected_qty - (poItem.received_qty || 0)} remaining)`;
         }
 
-        // 4. Log Movement
+        // 4. Log Movement. Booked uncosted when auto-recording so the repair step
+        // can find this exact receipt and stamp the cost/supplier onto it.
         await supabase
           .from('inventory_movements')
           .insert({
             product_id: poItem.product_id,
             quantity_change: r.receivedQty,
             movement_type: 'RESTOCK',
-            unit_cost: poItem.unit_cost,
+            unit_cost: canAutoRecord ? 0 : poItem.unit_cost,
             reason: reason
           });
 
@@ -239,6 +258,22 @@ export async function POST(req: Request) {
                 sender_name: 'System',
                 message: 'Issue automatically resolved because the item was accepted into inventory.'
               });
+          }
+        }
+
+        // 7. Auto-record the purchase when history told us the supplier and cost.
+        // repairFromPurchaseItem is exactly what the Purchases Report "Save"
+        // button runs: it amends the uncosted receipt movement booked above,
+        // sets the product cost, moves a STAFF_DRAFT line onto a real dated PO,
+        // aligns its expected qty, and backfills COGS onto waiting orders — so
+        // the item stops surfacing as "missing a supplier or cost". Quantity is
+        // left untouched (already applied in steps 2–3). Failure here must not
+        // undo the receipt, so it's best-effort and logged.
+        if (canAutoRecord) {
+          try {
+            await repairFromPurchaseItem(supabase, r.itemId, suggestion.supplierId, suggestion.unitCost);
+          } catch (autoErr: any) {
+            console.error(`Auto-record on receive failed for item ${r.itemId} (left for manual entry):`, autoErr?.message || autoErr);
           }
         }
       }
