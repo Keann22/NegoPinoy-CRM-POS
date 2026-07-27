@@ -337,6 +337,14 @@ export async function repairFromPurchaseItem(
     await applyProductCost(supabase, item.product_id, cost, supplierId, supplierName);
   }
 
+  // Set the product's PRIMARY supplier too, not just the price book. The
+  // procurement sheet groups on products.supplier_id, so without this a repaired
+  // item keeps showing under "Unassigned (No Supplier)" even though we now know
+  // who supplies it. Cost-only saves (no supplier picked) leave it untouched.
+  if (supplierId) {
+    await supabase.from('products').update({ supplier_id: supplierId }).eq('id', item.product_id);
+  }
+
   if (qtyDelta !== 0) {
     const { error: stockErr } = await supabase.rpc('increment_stock', {
       p_product_id: item.product_id,
