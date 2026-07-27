@@ -119,8 +119,12 @@ export function AddMissingItemDialog({
               productResults.map((product) => (
                 <button
                   key={product.id}
-                  className="w-full text-left px-4 py-3 hover:bg-slate-50 rounded-lg border text-sm flex justify-between items-center group transition-colors"
-                  onClick={() => handleAddAdhocProduct(product)}
+                  className="w-full text-left px-4 py-3 hover:bg-slate-50 rounded-lg border text-sm flex justify-between items-center group transition-colors disabled:opacity-50"
+                  disabled={isSearchingProducts}
+                  onClick={() => {
+                    if (isSearchingProducts) return;
+                    handleAddAdhocProduct(product);
+                  }}
                 >
                   <div>
                     <div className="font-medium text-slate-900 group-hover:text-indigo-600 transition-colors">

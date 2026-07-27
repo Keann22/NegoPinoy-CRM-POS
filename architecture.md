@@ -405,6 +405,35 @@ This is display-level only — no change to PO structure, so the Purchases Repor
 
 ---
 
+## Pending-receive queue: the draft-line lifecycle (recurring bug source)
+
+**Location**: "Pending Incoming Items" on the Receive screen (`pending-purchases.tsx` → `usePendingPurchases.ts`), backed by `GET /api/inventory/receive/pending-pos`.
+
+**What the queue lists**: every `purchase_order_items` row with `status = 'pending_receipt'`, filtered to those with something left to receive — `remaining = expected_qty - received_qty > 0`. A row whose `received_qty` has caught up to (or passed) `expected_qty` has `remaining = 0` and is **filtered out**, even if its status is still `pending_receipt`.
+
+**Display quirk**: the bold number under the "Expected Qty" column is actually the **remaining** (`expected_qty - received_qty`), and "(N prev. received)" is `received_qty` — not the raw `expected_qty`. So "1 / (6 prev. received)" means `expected_qty = 7, received_qty = 6`.
+
+**The one-shared-line model**: out-of-stock reports funnel into a single `STAFF_DRAFT` `purchase_order_items` row **per product** (created/updated by `POST /api/inventory/procurement-request`). Historically that same row was reused for every subsequent request for that product. Receiving increments `received_qty` on it; `autoCleanupStaffDrafts()` can lower `expected_qty` on it without touching `received_qty`.
+
+### Borrow/replace cycle stranded re-requests (fixed 2026-07-27)
+
+Real workflow that exposed this: an item is pulled back **out** of an already-picked order because it's needed elsewhere before that order ships; staff re-scan the order to re-flag it out of stock (re-request); the replacement arrives and is received; then the item gets pulled again — the same loop repeats several times per order.
+
+Because every cycle reused the one shared draft line, `received_qty` accumulated past `expected_qty` (e.g. `received 4 / expected 1`), so the line's `remaining` sat permanently at 0. A re-scan still re-flagged the order (new open `order_issues` row, sales rep notified) and flipped the line back to `pending_receipt`, but produced **no receivable line** — the queue's `remaining > 0` filter hid it. Symptom: "I scanned an old order and it didn't show up in the pending-received list." Only *old* orders (ones that had already been through a full request→receive cycle) hit it.
+
+**Fix** ([procurement-request/route.ts](src/app/api/inventory/procurement-request/route.ts)): only merge a new request into a draft line that is still an **open request** — `received_qty === 0 || received_qty < expected_qty`. A line already received against belongs to a *completed* cycle, so it's left alone and a **fresh line** is started for the new cycle, keeping each cycle's `expected`/`received` aligned. There's no unique constraint on `(po_id, product_id)`, so multiple lines per product on the STAFF_DRAFT PO are allowed; because a finished line becomes `status = 'received'`, only ever **one open (`pending_receipt`) line per product** exists at a time — the invariant the Procurement Sheet's `draftMap` (keyed by `product_id`) relies on still holds.
+
+### Short-delivery phantom remainder (purchaser encoding mistakes)
+
+A genuine purchase received short leaves a correct non-zero remainder: receiving 6 against an expected 7 logs `inventory_movements` "Received 6 out of 7 remaining — <reason>" and leaves the line at `remaining = 1`, still waiting. But if the over-order was a **purchaser typo** (they encoded 7 when only 6 were ever coming), that "1 waiting" lingers in the queue forever — nothing more will arrive to receive against it. Two ways to clear it:
+
+- **Close it at the received qty** — set `expected_qty := received_qty`, `status := 'received'`. Keeps the buy in the **Purchases report** and records the truth (ordered 6, received 6). Preferred, but there is **no UI to edit `expected_qty` down** today, so it's a manual data correction.
+- **Delete it** — the trash button calls `POST /api/inventory/receive/pending-pos/cancel`, which only `DELETE`s the `purchase_order_items` row. Stock (`products.stock_level`), `inventory_movements`, and product cost (`initial_unit_cost`) are **untouched** — the already-received units stay counted. The only loss: that buy no longer appears in the **Purchases report** (the PO line *is* the record). Fine for a pure mis-encode the business doesn't want on the books.
+
+**Gap worth closing**: the Receive screen only offers "receive more" or "delete" — there's no "delivery complete / close the short remainder" action that would set `expected_qty := received_qty` from the UI. Until that exists, closing a short line without deleting the purchase record is a manual DB edit.
+
+---
+
 ## Procurement Sheet: three numbers that must not be confused
 
 **Location**: `src/app/dashboard/reports/procurement/page.tsx`, backed by `GET /api/inventory/procurement`.
