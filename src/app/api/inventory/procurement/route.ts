@@ -440,13 +440,45 @@ export async function POST(req: Request) {
         if (insErr) throw insErr;
       }
 
-      // Update unit cost system-wide (initial_unit_cost)
+      // Persist supplier + cost back onto the product record so it doesn't
+      // land in "Unassigned (No Supplier)" the next time it goes out of stock.
+      // The buy flow used to only write initial_unit_cost, leaving
+      // products.supplier_id null — so every previously-bought item kept
+      // reappearing as unassigned. Mirror what the manual reassign (PATCH) does.
+      const productUpdate: any = {};
       if (parsedCost > 0) {
-        await supabase
-          .from('products')
-          .update({ initial_unit_cost: parsedCost })
-          .eq('id', p.productId);
+        productUpdate.initial_unit_cost = parsedCost;
+      }
+      if (p.supplierId) {
+        productUpdate.supplier_id = p.supplierId;
 
+        // Merge this supplier's price into supplier_pricing (upsert by supplierId).
+        const { data: currentProduct } = await supabase
+          .from('products')
+          .select('supplier_pricing')
+          .eq('id', p.productId)
+          .single();
+        const pricing = currentProduct?.supplier_pricing || [];
+        const { data: sup } = await supabase
+          .from('suppliers')
+          .select('name')
+          .eq('id', p.supplierId)
+          .single();
+        const supplierName = sup?.name || 'Unknown Supplier';
+        const idx = pricing.findIndex((sp: any) => sp.supplierId === p.supplierId);
+        if (idx >= 0) {
+          if (parsedCost > 0) pricing[idx].unitCost = parsedCost;
+          pricing[idx].supplierName = supplierName;
+        } else {
+          pricing.push({ supplierId: p.supplierId, supplierName, unitCost: parsedCost });
+        }
+        productUpdate.supplier_pricing = pricing;
+      }
+      if (Object.keys(productUpdate).length > 0) {
+        await supabase.from('products').update(productUpdate).eq('id', p.productId);
+      }
+
+      if (parsedCost > 0) {
         // Backfill the real cost onto pending orders that were waiting on this product
         await backfillOrderItemCosts(supabase, p.productId, Number(p.qty) || 0, parsedCost);
       }
