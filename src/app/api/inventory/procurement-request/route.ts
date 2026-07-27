@@ -173,12 +173,27 @@ export async function POST(req: Request) {
     // Fetch existing items for this PO
     const { data: existingItems, error: itemsErrFetch } = await supabase
       .from('purchase_order_items')
-      .select('id, product_id, expected_qty')
+      .select('id, product_id, expected_qty, received_qty')
       .eq('po_id', poId);
-    
+
     if (itemsErrFetch) throw itemsErrFetch;
 
-    const existingMap = new Map(existingItems?.map(i => [i.product_id, i]) || []);
+    // Only merge into a draft line that is still an OPEN request. A line that
+    // has already been received against (received_qty caught up to or passed
+    // expected_qty) belongs to a *completed* borrow/replace cycle — e.g. an
+    // item was pulled from a picked order, re-requested, the replacement
+    // arrived and was received, then the item got pulled again. Reusing that
+    // finished line would strand the new request behind a row whose remaining
+    // to receive (expected - received) is already 0, so it never reappears in
+    // the receiving queue and the order silently stops flowing. Start a fresh
+    // line for the new cycle instead so each cycle's expected/received stay
+    // aligned. Only completed lines are excluded, so at most one open line per
+    // product exists at a time (the invariant draftMap elsewhere relies on).
+    const isOpenDraftLine = (i: any) =>
+      (i.received_qty || 0) === 0 || (i.received_qty || 0) < i.expected_qty;
+    const existingMap = new Map(
+      (existingItems || []).filter(isOpenDraftLine).map(i => [i.product_id, i])
+    );
 
     // 2. Expand requests to components if they have an assembly_recipe,
     // carrying the originating orderId (if any) onto each expanded component
