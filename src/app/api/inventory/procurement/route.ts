@@ -96,6 +96,21 @@ export async function GET() {
       if (page.length < 1000) break;
     }
 
+    // A bundle carries no purchasable stock of its own — suppliers only sell
+    // the raw components. If a bundle's stock_level has drifted negative (e.g.
+    // it sold as a standalone SKU before its assembly_recipe was configured, so
+    // the sale decremented the bundle instead of exploding onto components), it
+    // must NOT be offered as a buy line: there's nothing to actually purchase,
+    // and its demand is already expanded onto its components below. Strip every
+    // bundle out of the negative-stock candidates. Direct sales/drafts on a
+    // bundle are self-healed separately (see migrateLeakedBundleDrafts).
+    const allBundleIds = new Set(
+      bundleProducts
+        .filter((bp: any) => (Array.isArray(bp.assembly_recipe) ? bp.assembly_recipe : []).length > 0)
+        .map((bp: any) => bp.id)
+    );
+    allBundleIds.forEach(id => negativeStockIds.delete(id));
+
     // Covers both staff-requested/purchased products and negative-stock
     // candidates, since a candidate's demand may only show up via a bundle
     // parent's order.
