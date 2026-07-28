@@ -60,19 +60,40 @@ export async function POST(req: Request) {
     // Exchange (reshipped) and writeoff (damaged/unsellable) leave stock_level untouched —
     // the original sale deduction already correctly reflects the item is no longer available.
     if (returnType === 'restock') {
-      const { error: rpcError } = await supabase.rpc('increment_stock', {
-        p_product_id: productId,
-        qty: quantity,
-        new_unit_cost: 0,
-      });
-      if (rpcError) throw rpcError;
+      // A bundle holds no stock of its own — the sale decremented its
+      // components (see process_order_transaction), so restoring must credit
+      // those same components, not the bundle SKU. Crediting the bundle
+      // directly would leave it drifting into phantom stock. Expand via the
+      // product's current assembly_recipe, mirroring the sale-time explosion.
+      const { data: product, error: prodErr } = await supabase
+        .from('products')
+        .select('name, assembly_recipe')
+        .eq('id', productId)
+        .single();
+      if (prodErr) throw prodErr;
 
-      await supabase.from('inventory_movements').insert({
-        product_id: productId,
-        quantity_change: quantity,
-        movement_type: 'return',
-        reason: `Return to Stock: Order #${orderId}`,
-      });
+      const recipe = Array.isArray(product?.assembly_recipe) ? product.assembly_recipe : [];
+      const targets = recipe.length > 0
+        ? recipe
+            .map((c: any) => ({ id: c.productId || c.component_id, qty: quantity * (c.quantity || 1), bundle: product?.name }))
+            .filter((t: any) => t.id)
+        : [{ id: productId, qty: quantity, bundle: null }];
+
+      for (const t of targets) {
+        const { error: rpcError } = await supabase.rpc('increment_stock', {
+          p_product_id: t.id,
+          qty: t.qty,
+          new_unit_cost: 0,
+        });
+        if (rpcError) throw rpcError;
+
+        await supabase.from('inventory_movements').insert({
+          product_id: t.id,
+          quantity_change: t.qty,
+          movement_type: 'return',
+          reason: t.bundle ? `Return to Stock: Order #${orderId} (Bundle: ${t.bundle})` : `Return to Stock: Order #${orderId}`,
+        });
+      }
     }
 
     return NextResponse.json({ success: true, returnId: returnRecord.id });

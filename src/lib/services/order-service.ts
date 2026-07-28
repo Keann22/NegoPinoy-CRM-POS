@@ -154,6 +154,73 @@ export async function createOrder(
 // ---------------------------------------------------------------------------
 
 /**
+ * Applies a stock delta for every item on an order, exploding bundle products
+ * onto their components exactly the way process_order_transaction does at sale
+ * time. `sign` is +1 to restore stock (cancel) or -1 to re-deduct (un-cancel).
+ *
+ * A bundle carries no real stock of its own — a sale decrements its components,
+ * so the reversal must decrement/restore those same components. Touching the
+ * bundle's own product_id here (the old behaviour) was asymmetric with creation
+ * and left bundle SKUs drifting into phantom negative stock, which then leaked
+ * onto the procurement sheet as an un-buyable line. Always expand via the
+ * product's *current* assembly_recipe, matching the RPC's own edit-reversal path.
+ */
+async function applyOrderStockDelta(
+  supabase: SupabaseClient,
+  orderId: string,
+  sign: 1 | -1,
+  reason: string
+): Promise<void> {
+  const { data: items, error } = await supabase
+    .from('order_items')
+    .select('product_id, quantity')
+    .eq('order_id', orderId);
+  if (error) throw error;
+  if (!items || items.length === 0) return;
+
+  const productIds = Array.from(new Set(items.map(i => i.product_id)));
+  const { data: products, error: prodErr } = await supabase
+    .from('products')
+    .select('id, name, assembly_recipe')
+    .in('id', productIds);
+  if (prodErr) throw prodErr;
+
+  const recipeMap = new Map(
+    (products || []).map(p => [p.id, { name: p.name, recipe: Array.isArray(p.assembly_recipe) ? p.assembly_recipe : [] }])
+  );
+
+  const applyOne = async (productId: string, qtyChange: number, movementReason: string) => {
+    const { error: rpcError } = await supabase.rpc('increment_stock', {
+      p_product_id: productId,
+      qty: qtyChange,
+      new_unit_cost: 0,
+    });
+    if (rpcError) throw rpcError;
+    await supabase.from('inventory_movements').insert({
+      product_id: productId,
+      quantity_change: qtyChange,
+      movement_type: 'adjustment',
+      reason: movementReason,
+    });
+  };
+
+  for (const item of items) {
+    const entry = recipeMap.get(item.product_id);
+    const recipe = entry?.recipe || [];
+    if (recipe.length > 0) {
+      for (const comp of recipe) {
+        const componentId = comp.productId || comp.component_id;
+        if (!componentId) continue;
+        const compQty = sign * item.quantity * (comp.quantity || 1);
+        await applyOne(componentId, compQty, `${reason} (Bundle: ${entry?.name || item.product_id})`);
+      }
+    } else {
+      await applyOne(item.product_id, sign * item.quantity, reason);
+    }
+  }
+}
+
+/**
  * Restores stock for every item on an order that is being cancelled.
  * Stock is deducted immediately at order creation (see createOrder above), so
  * cancelling must reverse that deduction or the item is permanently lost from stock.
@@ -162,27 +229,7 @@ export async function restoreStockForCancelledOrder(
   supabase: SupabaseClient,
   orderId: string
 ): Promise<void> {
-  const { data: items, error } = await supabase
-    .from('order_items')
-    .select('product_id, quantity')
-    .eq('order_id', orderId);
-  if (error) throw error;
-
-  for (const item of items || []) {
-    const { error: rpcError } = await supabase.rpc('increment_stock', {
-      p_product_id: item.product_id,
-      qty: item.quantity,
-      new_unit_cost: 0,
-    });
-    if (rpcError) throw rpcError;
-
-    await supabase.from('inventory_movements').insert({
-      product_id: item.product_id,
-      quantity_change: item.quantity,
-      movement_type: 'adjustment',
-      reason: `Order Cancelled: #${orderId}`,
-    });
-  }
+  await applyOrderStockDelta(supabase, orderId, 1, `Order Cancelled: #${orderId}`);
 }
 
 /** Symmetric reversal for when a Cancelled order is moved back to an active status. */
@@ -190,27 +237,7 @@ export async function deductStockForUncancelledOrder(
   supabase: SupabaseClient,
   orderId: string
 ): Promise<void> {
-  const { data: items, error } = await supabase
-    .from('order_items')
-    .select('product_id, quantity')
-    .eq('order_id', orderId);
-  if (error) throw error;
-
-  for (const item of items || []) {
-    const { error: rpcError } = await supabase.rpc('increment_stock', {
-      p_product_id: item.product_id,
-      qty: -item.quantity,
-      new_unit_cost: 0,
-    });
-    if (rpcError) throw rpcError;
-
-    await supabase.from('inventory_movements').insert({
-      product_id: item.product_id,
-      quantity_change: -item.quantity,
-      movement_type: 'adjustment',
-      reason: `Order Un-cancelled: #${orderId}`,
-    });
-  }
+  await applyOrderStockDelta(supabase, orderId, -1, `Order Un-cancelled: #${orderId}`);
 }
 
 
