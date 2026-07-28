@@ -108,6 +108,7 @@ export type FormattedProduct = Product & {
   shelfLocation?: string;
   supplierPricing?: any[];
   children?: FormattedProduct[];
+  parentName?: string;
   reservedStock?: number;
   packedStock?: number;
   installment_price?: number;

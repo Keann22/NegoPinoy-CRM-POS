@@ -121,7 +121,9 @@ export function useProducts({ searchTerm, stockFilter, page, pageSize }: UseProd
 
         const formattedChildren = children.map(c => formatProduct(c, reserved, packed));
         const formatted = (parents || []).map((p: any) => {
-          const productChildren = formattedChildren.filter(c => c.parent_id === p.id);
+          const productChildren = formattedChildren
+            .filter(c => c.parent_id === p.id)
+            .map(c => ({ ...c, parentName: p.name }));
           return {
             ...formatProduct(p, reserved, packed),
             children: productChildren.length > 0 ? productChildren : undefined,

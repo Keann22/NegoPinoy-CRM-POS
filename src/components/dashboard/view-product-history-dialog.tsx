@@ -35,6 +35,8 @@ type InventoryMovement = {
 type Product = {
   id: string;
   name: string;
+  parentName?: string;
+  variantName?: string;
 };
 
 interface ViewProductHistoryDialogProps {
@@ -101,7 +103,9 @@ export function ViewProductHistoryDialog({ product, open, onOpenChange }: ViewPr
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Inventory History: {displayProduct.name}</DialogTitle>
+          <DialogTitle>Inventory History: {displayProduct.parentName
+            ? `${displayProduct.parentName} — ${displayProduct.variantName || displayProduct.name}`
+            : displayProduct.name}</DialogTitle>
           <DialogDescription>
             Audit log of all stock changes for this product.
           </DialogDescription>
