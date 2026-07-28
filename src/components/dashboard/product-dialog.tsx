@@ -66,7 +66,11 @@ export function ProductDialog(props: ProductDialogProps) {
       )}
       <DialogContent className="w-[calc(100%-2rem)] sm:max-w-[600px] md:max-w-[700px] lg:max-w-[800px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEdit ? `Edit Product: ${displayProduct?.name}` : 'Add New Product'}</DialogTitle>
+          <DialogTitle>{isEdit
+            ? `Edit Product: ${displayProduct?.parentName
+                ? `${displayProduct.parentName} — ${displayProduct.variantName || displayProduct.name}`
+                : displayProduct?.name}`
+            : 'Add New Product'}</DialogTitle>
           <DialogDescription>{isEdit ? 'Make changes to the product details below.' : 'Fill in the details below to add a new product to your catalog.'}</DialogDescription>
         </DialogHeader>
         <Form {...form}>

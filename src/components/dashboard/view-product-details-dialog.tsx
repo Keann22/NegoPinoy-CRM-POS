@@ -37,7 +37,14 @@ export function ViewProductDetailsDialog({ product, open, onOpenChange }: ViewPr
           <div className="grid grid-cols-2 gap-4">
               <div>
                   <h4 className="text-sm font-medium text-muted-foreground">Product Name</h4>
-                  <p className="font-medium text-base">{product.name}</p>
+                  {product.parentName ? (
+                    <p className="font-medium text-base">
+                      {product.parentName}
+                      <span className="text-muted-foreground"> — {product.variantName || product.name}</span>
+                    </p>
+                  ) : (
+                    <p className="font-medium text-base">{product.name}</p>
+                  )}
               </div>
               <div>
                   <h4 className="text-sm font-medium text-muted-foreground">Status</h4>
