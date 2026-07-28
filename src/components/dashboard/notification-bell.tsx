@@ -15,29 +15,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import Link from 'next/link';
 import { OverdueOrderDialog } from '@/components/dashboard/orders/overdue-order-dialog';
-import { UNFULFILLED_STATUSES } from '@/lib/services/procurement-service';
+import { NotificationDetailsDialog } from '@/components/dashboard/notification-details-dialog';
 import type { Order, OrderStatus } from '@/types';
 
 type OrderRef = { kind: 'id' | 'prefix'; value: string };
-
-/**
- * Pulls an order reference out of a notification, if it has one:
- * either a full order UUID in the link (/dashboard/orders/<uuid>) or the
- * short "Order #XXXXXXX" id (first 7 hex chars of the UUID) in the text.
- */
-function extractOrderRef(notif: any): OrderRef | null {
-  const uuidMatch = String(notif.link || '').match(
-    /\/dashboard\/orders\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i
-  );
-  if (uuidMatch) return { kind: 'id', value: uuidMatch[1] };
-
-  const shortMatch = `${notif.title || ''} ${notif.message || ''}`.match(/Order #([0-9A-Fa-f]{7})/);
-  if (shortMatch) return { kind: 'prefix', value: shortMatch[1].toLowerCase() };
-
-  return null;
-}
 
 export function NotificationBell() {
   const supabase = useSupabase();
@@ -47,6 +29,7 @@ export function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [selectedCustomerName, setSelectedCustomerName] = useState('');
+  const [selectedNotification, setSelectedNotification] = useState<any | null>(null);
 
   const fetchNotifications = useCallback(async () => {
     if (!supabase || !userProfile?.firstName) return;
@@ -217,80 +200,6 @@ export function NotificationBell() {
     });
   };
 
-  /**
-   * Fallback for staff-message notifications that carry no order reference at
-   * all (e.g. product-level discrepancy reports created before per-recipient
-   * order links existed): find the matching order_issue_messages row by sender +
-   * message text, then resolve its issue to an order — directly via order_id,
-   * or via product_id → the user's own (else oldest) unfulfilled order
-   * containing that product.
-   */
-  const resolveStaffMessageOrder = async (notif: any) => {
-    if (!supabase) return;
-    try {
-      const senderName = String(notif.title || '').match(/^New message from (.+)$/)?.[1];
-      // Bell messages are truncated to 140 chars + '...' — match on the prefix
-      const messagePrefix = String(notif.message || '').replace(/\.\.\.$/, '');
-      if (!messagePrefix.trim()) throw new Error('Empty notification message');
-
-      let query = supabase
-        .from('order_issue_messages')
-        .select('created_at, order_issues!inner(order_id, product_id)')
-        .ilike('message', `${messagePrefix.replace(/([%_\\])/g, '\\$1')}%`)
-        .order('created_at', { ascending: false })
-        .limit(5);
-      if (senderName) query = query.eq('sender_name', senderName);
-
-      const { data: candidates, error } = await query;
-      if (error) throw error;
-
-      // Same text can be posted more than once — take the row closest in time
-      // to when this notification was created
-      const notifTime = new Date(notif.created_at).getTime();
-      const best = (candidates || []).sort(
-        (a: any, b: any) =>
-          Math.abs(new Date(a.created_at).getTime() - notifTime) -
-          Math.abs(new Date(b.created_at).getTime() - notifTime)
-      )[0] as any;
-
-      if (best?.order_issues?.order_id) {
-        return openOrderFromNotification({ kind: 'id', value: best.order_issues.order_id });
-      }
-
-      if (best?.order_issues?.product_id) {
-        const { data: rows, error: itemsError } = await supabase
-          .from('order_items')
-          .select('orders!inner(id, order_date, status, sales_person_name)')
-          .eq('product_id', best.order_issues.product_id)
-          .in('orders.status', UNFULFILLED_STATUSES);
-        if (itemsError) throw itemsError;
-
-        const openOrders = (rows || [])
-          .map((r: any) => r.orders)
-          .filter(Boolean)
-          .sort((a: any, b: any) => new Date(a.order_date).getTime() - new Date(b.order_date).getTime());
-
-        const fullName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : '';
-        const target = openOrders.find((o: any) => o.sales_person_name === fullName) || openOrders[0];
-        if (target) {
-          return openOrderFromNotification({ kind: 'id', value: target.id });
-        }
-      }
-
-      toast({
-        title: 'No related order',
-        description: 'This message is not tied to a specific order.',
-      });
-    } catch (err) {
-      console.error('Failed to resolve order for staff-message notification:', err);
-      toast({
-        title: 'Could not open order',
-        description: 'No order could be found for this notification.',
-        variant: 'destructive',
-      });
-    }
-  };
-
   const deleteNotification = async (e: React.MouseEvent, id: string) => {
     e.preventDefault();
     e.stopPropagation();
@@ -339,48 +248,46 @@ export function NotificationBell() {
               key={notif.id}
               className="flex flex-col items-start gap-1 p-3 cursor-pointer relative group"
               onClick={(e) => {
+                // Always open the details pop-up so the notification explains
+                // itself (full message + resolved order/product/thread context)
+                // instead of navigating away or dead-ending.
+                e.preventDefault();
                 markAsRead(notif.id);
-                const orderRef = extractOrderRef(notif);
-                if (orderRef) {
-                  // Show the order card pop-up instead of navigating away
-                  e.preventDefault();
-                  openOrderFromNotification(orderRef);
-                } else if (notif.source === 'staff_message') {
-                  // Older staff-message notifications carry no order reference —
-                  // resolve one from the issue thread instead of navigating
-                  e.preventDefault();
-                  resolveStaffMessageOrder(notif);
-                }
+                setSelectedNotification(notif);
               }}
-              asChild
             >
-              <Link href={notif.link || '#'}>
-                <div className="flex w-full justify-between items-start">
-                  <span className={`font-semibold text-sm ${notif.is_read ? 'text-muted-foreground' : 'text-foreground'}`}>
-                    {notif.title}
-                  </span>
-                  {!notif.is_read && <span className="h-2 w-2 rounded-full bg-blue-500 mt-1 flex-shrink-0" />}
-                </div>
-                <span className={`text-xs ${notif.is_read ? 'text-muted-foreground/70' : 'text-muted-foreground'}`}>
-                  {notif.message}
+              <div className="flex w-full justify-between items-start">
+                <span className={`font-semibold text-sm ${notif.is_read ? 'text-muted-foreground' : 'text-foreground'}`}>
+                  {notif.title}
                 </span>
-                <span className="text-[10px] text-muted-foreground/50 mt-1">
-                  {new Date(notif.created_at).toLocaleString()}
-                </span>
-                <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="absolute right-2 top-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-600 hover:bg-red-50"
-                    onClick={(e) => deleteNotification(e, notif.id)}
-                >
-                    <Trash2 className="h-3 w-3" />
-                </Button>
-              </Link>
+                {!notif.is_read && <span className="h-2 w-2 rounded-full bg-blue-500 mt-1 flex-shrink-0" />}
+              </div>
+              <span className={`text-xs ${notif.is_read ? 'text-muted-foreground/70' : 'text-muted-foreground'}`}>
+                {notif.message}
+              </span>
+              <span className="text-[10px] text-muted-foreground/50 mt-1">
+                {new Date(notif.created_at).toLocaleString()}
+              </span>
+              <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-2 top-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-600 hover:bg-red-50"
+                  onClick={(e) => deleteNotification(e, notif.id)}
+              >
+                  <Trash2 className="h-3 w-3" />
+              </Button>
             </DropdownMenuItem>
           ))
         )}
       </DropdownMenuContent>
     </DropdownMenu>
+
+    <NotificationDetailsDialog
+      notification={selectedNotification}
+      open={!!selectedNotification}
+      onOpenChange={(open) => !open && setSelectedNotification(null)}
+      onOpenOrder={(orderId) => openOrderFromNotification({ kind: 'id', value: orderId })}
+    />
 
     <OverdueOrderDialog
       variant="notification"
