@@ -61,6 +61,9 @@ export function PurchasesReport() {
   const roles = useMemo(() => userProfile?.roles || [], [userProfile]);
   // Inventory staff see quantities/status only; Owner/Admin also see costs.
   const canSeeCosts = useMemo(() => roles.includes('Owner') || roles.includes('Admin'), [roles]);
+  // Supplier identities are confidential — hidden from inventory staff everywhere
+  // in this report (same tier as costs).
+  const canSeeSuppliers = canSeeCosts;
 
   const [date, setDate] = useState<DateRange | undefined>({ from: new Date(), to: new Date() });
   const [loading, setLoading] = useState(true);
@@ -223,46 +226,65 @@ export function PurchasesReport() {
   const handleExportExcel = () => {
     const wb = xlsx.utils.book_new();
 
-    const supplierRows: any[] = [];
-    bySupplier.forEach(group => {
-      group.items.forEach(item => {
+    if (canSeeSuppliers) {
+      const supplierRows: any[] = [];
+      bySupplier.forEach(group => {
+        group.items.forEach(item => {
+          supplierRows.push({
+            'Supplier': group.supplierName,
+            'Product': item.productName,
+            'Qty': item.qty,
+            ...(canSeeCosts ? { 'Unit Cost': item.unitCost, 'Total': item.totalCost } : {}),
+            'Received': item.receivedQty,
+            'Status': item.status === 'received' ? 'Received' : 'Pending Receipt',
+            'Batch': item.batchName || '',
+            'Date & Time': format(new Date(item.purchasedAt), 'yyyy-MM-dd hh:mm a'),
+          });
+        });
         supplierRows.push({
-          'Supplier': group.supplierName,
-          'Product': item.productName,
-          'Qty': item.qty,
-          ...(canSeeCosts ? { 'Unit Cost': item.unitCost, 'Total': item.totalCost } : {}),
-          'Received': item.receivedQty,
-          'Status': item.status === 'received' ? 'Received' : 'Pending Receipt',
-          'Batch': item.batchName || '',
-          'Date & Time': format(new Date(item.purchasedAt), 'yyyy-MM-dd hh:mm a'),
+          'Supplier': `${group.supplierName} — SUBTOTAL`,
+          'Product': '', 'Qty': group.pieces,
+          ...(canSeeCosts ? { 'Unit Cost': '', 'Total': group.totalCost } : {}),
+          'Received': '', 'Status': '', 'Batch': '', 'Date & Time': '',
         });
       });
       supplierRows.push({
-        'Supplier': `${group.supplierName} — SUBTOTAL`,
-        'Product': '', 'Qty': group.pieces,
-        ...(canSeeCosts ? { 'Unit Cost': '', 'Total': group.totalCost } : {}),
+        'Supplier': 'GRAND TOTAL', 'Product': '', 'Qty': totals.pieces,
+        ...(canSeeCosts ? { 'Unit Cost': '', 'Total': totals.spend } : {}),
         'Received': '', 'Status': '', 'Batch': '', 'Date & Time': '',
       });
-    });
-    supplierRows.push({
-      'Supplier': 'GRAND TOTAL', 'Product': '', 'Qty': totals.pieces,
-      ...(canSeeCosts ? { 'Unit Cost': '', 'Total': totals.spend } : {}),
-      'Received': '', 'Status': '', 'Batch': '', 'Date & Time': '',
-    });
-    xlsx.utils.book_append_sheet(wb, xlsx.utils.json_to_sheet(supplierRows), 'By Supplier');
+      xlsx.utils.book_append_sheet(wb, xlsx.utils.json_to_sheet(supplierRows), 'By Supplier');
+    } else {
+      // Staff export: flat itemized list, no supplier dimension at all.
+      const itemRows: any[] = purchases.map(item => ({
+        'Product': item.productName,
+        'Qty': item.qty,
+        'Received': item.receivedQty,
+        'Status': item.status === 'received'
+          ? 'Received'
+          : item.receivedQty > 0 ? `Partial (${item.receivedQty}/${item.qty})` : 'Pending Receipt',
+        'Batch': item.batchName || '',
+        'Date & Time': format(new Date(item.purchasedAt), 'yyyy-MM-dd hh:mm a'),
+      }));
+      itemRows.push({
+        'Product': 'GRAND TOTAL', 'Qty': totals.pieces,
+        'Received': '', 'Status': '', 'Batch': '', 'Date & Time': '',
+      });
+      xlsx.utils.book_append_sheet(wb, xlsx.utils.json_to_sheet(itemRows), 'Purchases');
+    }
 
     const productRows: any[] = byProduct.map(p => ({
       'Product': p.productName,
       'Total Qty': p.qty,
       ...(canSeeCosts ? { 'Avg Unit Cost': Number(p.avgCost.toFixed(2)), 'Total Cost': p.totalCost } : {}),
       'Purchases': p.entries,
-      'Suppliers': Array.from(p.suppliers).join(', '),
+      ...(canSeeSuppliers ? { 'Suppliers': Array.from(p.suppliers).join(', ') } : {}),
       'Received': p.receivedQty,
     }));
     productRows.push({
       'Product': 'GRAND TOTAL', 'Total Qty': totals.pieces,
       ...(canSeeCosts ? { 'Avg Unit Cost': '', 'Total Cost': totals.spend } : {}),
-      'Purchases': totals.entries, 'Suppliers': '', 'Received': '',
+      'Purchases': totals.entries, ...(canSeeSuppliers ? { 'Suppliers': '' } : {}), 'Received': '',
     });
     xlsx.utils.book_append_sheet(wb, xlsx.utils.json_to_sheet(productRows), 'By Product');
 
@@ -326,7 +348,7 @@ export function PurchasesReport() {
                         <TableRow>
                           <TableHead>Product</TableHead>
                           <TableHead className="text-right">Received</TableHead>
-                          <TableHead className="min-w-[180px]">Supplier</TableHead>
+                          {canSeeSuppliers && <TableHead className="min-w-[180px]">Supplier</TableHead>}
                           <TableHead className="w-[120px]">Unit Cost (₱)</TableHead>
                           <TableHead className="w-[150px]">Received On</TableHead>
                           <TableHead>Source</TableHead>
@@ -358,16 +380,18 @@ export function PurchasesReport() {
                                   </span>
                                 )}
                               </TableCell>
-                              <TableCell>
-                                <select
-                                  className={`w-full border p-2 rounded-md bg-white text-sm ${u.missingSupplier && !draft.supplierId ? 'border-amber-400' : ''}`}
-                                  value={draft.supplierId}
-                                  onChange={e => setDrafts(prev => ({ ...prev, [u.id]: { ...draft, supplierId: e.target.value } }))}
-                                >
-                                  <option value="">-- Select supplier --</option>
-                                  {supplierOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                </select>
-                              </TableCell>
+                              {canSeeSuppliers && (
+                                <TableCell>
+                                  <select
+                                    className={`w-full border p-2 rounded-md bg-white text-sm ${u.missingSupplier && !draft.supplierId ? 'border-amber-400' : ''}`}
+                                    value={draft.supplierId}
+                                    onChange={e => setDrafts(prev => ({ ...prev, [u.id]: { ...draft, supplierId: e.target.value } }))}
+                                  >
+                                    <option value="">-- Select supplier --</option>
+                                    {supplierOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                  </select>
+                                </TableCell>
+                              )}
                               <TableCell>
                                 <input
                                   type="number"
@@ -377,7 +401,8 @@ export function PurchasesReport() {
                                   value={draft.unitCost}
                                   onChange={e => setDrafts(prev => ({ ...prev, [u.id]: { ...draft, unitCost: e.target.value } }))}
                                 />
-                                {u.costSource && (
+                                {/* costSource can name a supplier ("last bought from X"), so keep it off staff screens. */}
+                                {canSeeSuppliers && u.costSource && (
                                   <span className="block text-xs text-muted-foreground mt-1">
                                     {u.costSource}
                                     {u.costSourceDate && ` · ${format(new Date(u.costSourceDate), 'MMM d')}`}
@@ -455,38 +480,74 @@ export function PurchasesReport() {
         ) : (
           <Tabs defaultValue="by-supplier">
             <TabsList>
-              <TabsTrigger value="by-supplier">By Supplier</TabsTrigger>
+              <TabsTrigger value="by-supplier">{canSeeSuppliers ? 'By Supplier' : 'Itemized'}</TabsTrigger>
               <TabsTrigger value="by-product">By Product (Consolidated)</TabsTrigger>
             </TabsList>
 
             <TabsContent value="by-supplier" className="space-y-6 mt-4">
-              {bySupplier.map(group => (
-                <div key={group.supplierName} className="border rounded-md">
-                  <div className="flex flex-wrap justify-between items-center gap-2 px-4 py-3 bg-slate-50 border-b rounded-t-md">
-                    <p className="font-semibold">{group.supplierName}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {group.pieces.toLocaleString()} pcs
-                      {canSeeCosts && <> · <span className="font-semibold text-foreground">{peso(group.totalCost)}</span></>}
-                    </p>
+              {canSeeSuppliers ? (
+                bySupplier.map(group => (
+                  <div key={group.supplierName} className="border rounded-md">
+                    <div className="flex flex-wrap justify-between items-center gap-2 px-4 py-3 bg-slate-50 border-b rounded-t-md">
+                      <p className="font-semibold">{group.supplierName}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {group.pieces.toLocaleString()} pcs
+                        {canSeeCosts && <> · <span className="font-semibold text-foreground">{peso(group.totalCost)}</span></>}
+                      </p>
+                    </div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Product</TableHead>
+                          <TableHead className="text-right">Qty</TableHead>
+                          {canSeeCosts && <TableHead className="text-right">Unit Cost</TableHead>}
+                          {canSeeCosts && <TableHead className="text-right">Total</TableHead>}
+                          <TableHead>Status</TableHead>
+                          <TableHead>Time</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {group.items.map(item => (
+                          <TableRow key={item.id}>
+                            <TableCell className="font-medium">{item.productName}</TableCell>
+                            <TableCell className="text-right">{item.qty}</TableCell>
+                            {canSeeCosts && <TableCell className="text-right">{peso(item.unitCost)}</TableCell>}
+                            {canSeeCosts && <TableCell className="text-right font-semibold">{peso(item.totalCost)}</TableCell>}
+                            <TableCell>
+                              {item.status === 'received' ? (
+                                <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Received</Badge>
+                              ) : item.receivedQty > 0 ? (
+                                <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Partial ({item.receivedQty}/{item.qty})</Badge>
+                              ) : (
+                                <Badge variant="secondary">Pending Receipt</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+                              {format(new Date(item.purchasedAt), 'MMM d, hh:mm a')}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </div>
+                ))
+              ) : (
+                // Staff view: a flat itemized list with no supplier dimension.
+                <div className="border rounded-md">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Product</TableHead>
                         <TableHead className="text-right">Qty</TableHead>
-                        {canSeeCosts && <TableHead className="text-right">Unit Cost</TableHead>}
-                        {canSeeCosts && <TableHead className="text-right">Total</TableHead>}
                         <TableHead>Status</TableHead>
                         <TableHead>Time</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {group.items.map(item => (
+                      {purchases.map(item => (
                         <TableRow key={item.id}>
                           <TableCell className="font-medium">{item.productName}</TableCell>
                           <TableCell className="text-right">{item.qty}</TableCell>
-                          {canSeeCosts && <TableCell className="text-right">{peso(item.unitCost)}</TableCell>}
-                          {canSeeCosts && <TableCell className="text-right font-semibold">{peso(item.totalCost)}</TableCell>}
                           <TableCell>
                             {item.status === 'received' ? (
                               <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Received</Badge>
@@ -504,7 +565,7 @@ export function PurchasesReport() {
                     </TableBody>
                   </Table>
                 </div>
-              ))}
+              )}
             </TabsContent>
 
             <TabsContent value="by-product" className="mt-4">
@@ -517,7 +578,7 @@ export function PurchasesReport() {
                       {canSeeCosts && <TableHead className="text-right">Avg Unit Cost</TableHead>}
                       {canSeeCosts && <TableHead className="text-right">Total Cost</TableHead>}
                       <TableHead className="text-right">Purchases</TableHead>
-                      <TableHead>Suppliers</TableHead>
+                      {canSeeSuppliers && <TableHead>Suppliers</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -528,9 +589,11 @@ export function PurchasesReport() {
                         {canSeeCosts && <TableCell className="text-right">{peso(p.avgCost)}</TableCell>}
                         {canSeeCosts && <TableCell className="text-right font-semibold">{peso(p.totalCost)}</TableCell>}
                         <TableCell className="text-right">{p.entries}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {Array.from(p.suppliers).join(', ') || '—'}
-                        </TableCell>
+                        {canSeeSuppliers && (
+                          <TableCell className="text-sm text-muted-foreground">
+                            {Array.from(p.suppliers).join(', ') || '—'}
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
