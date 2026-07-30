@@ -6,9 +6,11 @@ import { useSupabase } from '@/lib/supabase/hooks';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, Activity } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { OrderTrailDialog } from '@/components/dashboard/order-trail-dialog';
 
 interface ReservedStockDialogProps {
   productId: string;
@@ -37,6 +39,7 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose, s
   const supabase = useSupabase();
   const [loading, setLoading] = useState(false);
   const [reservedOrders, setReservedOrders] = useState<ReservedOrder[]>([]);
+  const [trailOrderId, setTrailOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchReservedOrders() {
@@ -192,6 +195,7 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose, s
                   <TableHead>Order ID</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Quantity</TableHead>
+                  <TableHead className="text-right">Trail</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -229,6 +233,15 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose, s
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right font-bold text-lg">{order.quantity}</TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setTrailOrderId(order.fullOrderId)}
+                      >
+                        <Activity className="mr-2 h-4 w-4" /> View Trail
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -236,6 +249,14 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose, s
           </ScrollArea>
         )}
       </DialogContent>
+
+      {trailOrderId && (
+        <OrderTrailDialog
+          open={!!trailOrderId}
+          onOpenChange={(open) => !open && setTrailOrderId(null)}
+          orderId={trailOrderId}
+        />
+      )}
     </Dialog>
   );
 }
