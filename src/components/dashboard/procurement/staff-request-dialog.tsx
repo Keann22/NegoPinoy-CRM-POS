@@ -1,11 +1,15 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Activity } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { OrderTrailDialog } from '@/components/dashboard/order-trail-dialog';
 
 interface StaffRequestDialogProps {
   productName: string;
@@ -24,6 +28,8 @@ export function StaffRequestDialog({
   requestedByName,
   sourceOrders
 }: StaffRequestDialogProps) {
+  const [trailOrderId, setTrailOrderId] = useState<string | null>(null);
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-3xl">
@@ -53,6 +59,7 @@ export function StaffRequestDialog({
                   <TableHead>Order ID</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Quantity</TableHead>
+                  <TableHead className="text-right">Trail</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -99,6 +106,19 @@ export function StaffRequestDialog({
                       )}
                     </TableCell>
                     <TableCell className="text-right font-bold text-lg">{order.quantity}</TableCell>
+                    <TableCell className="text-right">
+                      {order.orderId ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setTrailOrderId(order.orderId)}
+                        >
+                          <Activity className="mr-2 h-4 w-4" /> View Trail
+                        </Button>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">-</span>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -106,6 +126,14 @@ export function StaffRequestDialog({
           </ScrollArea>
         )}
       </DialogContent>
+
+      {trailOrderId && (
+        <OrderTrailDialog
+          open={!!trailOrderId}
+          onOpenChange={(open) => !open && setTrailOrderId(null)}
+          orderId={trailOrderId}
+        />
+      )}
     </Dialog>
   );
 }
