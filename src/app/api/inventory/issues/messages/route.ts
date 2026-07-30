@@ -30,7 +30,24 @@ export async function POST(req: Request) {
 
     if (error) throw error;
 
-    const recipientNames = resolveRecipientNames(mentions || [], resolvedSenderName);
+    // Everyone already in this issue thread: prior message senders + anyone tagged
+    // in earlier messages. This makes a reply reach the whole group even when the
+    // replier tags no one back — the thread behaves like a group chat.
+    const { data: priorMessages } = await supabase
+      .from('order_issue_messages')
+      .select('sender_name, mentions')
+      .eq('issue_id', issueId);
+
+    const participantNames: string[] = [];
+    for (const row of priorMessages || []) {
+      if (row.sender_name) participantNames.push(row.sender_name);
+      if (Array.isArray(row.mentions)) participantNames.push(...row.mentions);
+    }
+
+    const recipientNames = resolveRecipientNames(
+      [...(mentions || []), ...participantNames],
+      resolvedSenderName
+    );
     if (recipientNames.length > 0) {
       const { data: issue } = await supabase
         .from('order_issues')
@@ -38,12 +55,31 @@ export async function POST(req: Request) {
         .eq('id', issueId)
         .single();
 
-      await fanOutStaffNotifications(supabase, recipientNames, {
-        senderName: resolvedSenderName,
-        message,
-        title: `${resolvedSenderName} tagged you in an order issue`,
-        link: issue?.order_id ? `/dashboard/orders/${issue.order_id}` : '/dashboard',
-      });
+      // Keep the "tagged you" wording only for people the sender actually @-tagged
+      // in this message; everyone else is looped in as a thread participant.
+      const taggedKeys = new Set(
+        resolveRecipientNames(mentions || [], resolvedSenderName).map((n) => n.toLowerCase())
+      );
+      const taggedNames = recipientNames.filter((n) => taggedKeys.has(n.toLowerCase()));
+      const groupNames = recipientNames.filter((n) => !taggedKeys.has(n.toLowerCase()));
+      const link = issue?.order_id ? `/dashboard/orders/${issue.order_id}` : '/dashboard';
+
+      if (taggedNames.length > 0) {
+        await fanOutStaffNotifications(supabase, taggedNames, {
+          senderName: resolvedSenderName,
+          message,
+          title: `${resolvedSenderName} tagged you in an order issue`,
+          link,
+        });
+      }
+      if (groupNames.length > 0) {
+        await fanOutStaffNotifications(supabase, groupNames, {
+          senderName: resolvedSenderName,
+          message,
+          title: `${resolvedSenderName} replied in an order issue`,
+          link,
+        });
+      }
     }
 
     return NextResponse.json({ success: true });

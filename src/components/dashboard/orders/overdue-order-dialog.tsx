@@ -12,7 +12,36 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import { fetchOrderTrail, type OrderTrailEntry } from "@/lib/services/order-trail-service";
 import { fanOutStaffNotifications, resolveRecipientNames } from "@/lib/services/staff-message-service";
 import { MentionInput } from "@/components/dashboard/mention-input";
+import { useStaffDirectory } from "@/hooks/useStaffDirectory";
 import type { Order } from "@/types";
+
+// Matches an order-note author header line, e.g. "[Jul 30, 2026 3:45 PM] Czary Reyes:".
+// Used to reconstruct everyone who has spoken in a note thread so a reply pings the
+// whole group, not just whoever the replier happened to re-tag.
+const NOTE_AUTHOR_RE = /^\[[A-Z][a-z]{2} \d{1,2}, \d{4} \d{1,2}:\d{2} (?:AM|PM)\]\s*(.+?):\s*$/gm;
+
+/**
+ * Everyone already involved in an order-note thread: past authors (parsed from the
+ * note headers) plus any staff explicitly @-mentioned anywhere in the notes. Names
+ * are matched case-insensitively against the known staff directory for the @-mentions
+ * so multi-word names resolve reliably.
+ */
+function extractNoteParticipants(notes: string, knownFullNames: string[]): string[] {
+  const found = new Map<string, string>(); // lowercased -> original casing
+
+  for (const match of notes.matchAll(NOTE_AUTHOR_RE)) {
+    const name = match[1].trim();
+    if (name) found.set(name.toLowerCase(), name);
+  }
+
+  const lowerNotes = notes.toLowerCase();
+  for (const fullName of knownFullNames) {
+    const key = fullName.trim().toLowerCase();
+    if (key && lowerNotes.includes(`@${key}`)) found.set(key, fullName);
+  }
+
+  return [...found.values()];
+}
 
 const TRAIL_DOT: Record<OrderTrailEntry['kind'], string> = {
   status: 'bg-indigo-500',
@@ -46,6 +75,7 @@ interface OverdueOrderDialogProps {
 export function OverdueOrderDialog({ order, customerName, open, onOpenChange, onOrderUpdated, variant = 'overdue' }: OverdueOrderDialogProps) {
   const supabase = useSupabase();
   const { userProfile } = useUserProfile();
+  const { staff } = useStaffDirectory();
 
   const [replyText, setReplyText] = useState("");
   const [noteMentions, setNoteMentions] = useState<string[]>([]);
@@ -171,13 +201,37 @@ export function OverdueOrderDialog({ order, customerName, open, onOpenChange, on
         
       if (error) throw error;
 
-      const recipientNames = resolveRecipientNames(noteMentions, senderName);
-      if (recipientNames.length > 0) {
-        await fanOutStaffNotifications(supabase, recipientNames, {
+      const orderRef = `Order #${order.id.substring(0, 7).toUpperCase()}`;
+      const link = `/dashboard/orders/${order.id}`;
+
+      // People the sender explicitly @-tagged in this note.
+      const taggedNames = resolveRecipientNames(noteMentions, senderName);
+
+      // Everyone already in the thread — prior authors + anyone tagged earlier —
+      // so a reply reaches the whole group even when the replier tags no one.
+      // `localNotes` here is the thread *before* this new note was appended.
+      const knownFullNames = staff.map((s) => s.fullName);
+      const threadParticipants = resolveRecipientNames(
+        extractNoteParticipants(localNotes, knownFullNames),
+        senderName
+      );
+      const taggedKeys = new Set(taggedNames.map((n) => n.toLowerCase()));
+      const groupNames = threadParticipants.filter((n) => !taggedKeys.has(n.toLowerCase()));
+
+      if (taggedNames.length > 0) {
+        await fanOutStaffNotifications(supabase, taggedNames, {
           senderName,
           message: replyText.trim(),
-          title: `${senderName} tagged you in a note on Order #${order.id.substring(0, 7).toUpperCase()}`,
-          link: `/dashboard/orders/${order.id}`,
+          title: `${senderName} tagged you in a note on ${orderRef}`,
+          link,
+        });
+      }
+      if (groupNames.length > 0) {
+        await fanOutStaffNotifications(supabase, groupNames, {
+          senderName,
+          message: replyText.trim(),
+          title: `${senderName} replied on ${orderRef}`,
+          link,
         });
       }
 
