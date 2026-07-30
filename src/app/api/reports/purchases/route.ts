@@ -1,11 +1,27 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createClient as createSessionClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Supplier identities and costs are management-only. Roles live in the user's
+// metadata (same source the dashboard reads via useUserProfile). We check both
+// app_metadata (server-controlled, preferred) and user_metadata, and default to
+// deny — no session, or no recognised role, means staff-level access.
+function isManagementUser(user: any): boolean {
+  const collect = (meta: any): string[] => {
+    if (!meta) return [];
+    if (Array.isArray(meta.roles)) return meta.roles.map((r: string) => String(r).toLowerCase());
+    if (meta.role) return [String(meta.role).toLowerCase()];
+    return [];
+  };
+  const roles = [...collect(user?.app_metadata), ...collect(user?.user_metadata)];
+  return roles.includes('owner') || roles.includes('admin');
+}
 
 export async function GET(req: Request) {
   try {
@@ -206,6 +222,32 @@ export async function GET(req: Request) {
       .from('suppliers')
       .select('id, name')
       .order('name');
+
+    // Enforce the confidentiality tier server-side so supplier names and costs
+    // never leave the server for non-management callers (the client also hides
+    // them, but that alone leaks the values in the network response).
+    const sessionClient = await createSessionClient();
+    const { data: { user } } = await sessionClient.auth.getUser();
+
+    if (!isManagementUser(user)) {
+      const safePurchases = purchases.map(p => ({
+        ...p,
+        supplierId: null,
+        supplierName: null,
+        unitCost: 0,
+        totalCost: 0,
+      }));
+      const safeUnrecorded = unrecorded.map(u => ({
+        ...u,
+        unitCost: 0,
+        suggestedSupplierId: null,
+        suggestedUnitCost: null,
+        costSource: null,
+        costSourceDate: null,
+        costConflict: null,
+      }));
+      return NextResponse.json({ purchases: safePurchases, unrecorded: safeUnrecorded, suppliers: [] });
+    }
 
     return NextResponse.json({ purchases, unrecorded, suppliers: supplierRows || [] });
   } catch (error: any) {
