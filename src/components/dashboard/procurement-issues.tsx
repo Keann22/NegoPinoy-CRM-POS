@@ -247,6 +247,11 @@ export function ProcurementIssues({ isAdmin }: { isAdmin?: boolean }) {
                           </span>
                           <span className="capitalize">{order.status.replace('_', ' ')}</span>
                         </div>
+                        {order.viaBundleName && (
+                          <div className="text-xs text-indigo-600 mt-1">
+                            via bundle: <span className="font-medium">{order.viaBundleName}</span>
+                          </div>
+                        )}
                       </li>
                     ))}
                   </ul>
