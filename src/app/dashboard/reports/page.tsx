@@ -81,7 +81,7 @@ export default function ReportsPage() {
           {isManagement && (
             <TabsTrigger value="compliance">Agent Compliance</TabsTrigger>
           )}
-          {isManagement && (
+          {(isManagement || isInventory) && (
             <TabsTrigger value="missing-tracking">Missing Tracking</TabsTrigger>
           )}
         </TabsList>
@@ -165,7 +165,7 @@ export default function ReportsPage() {
           <ComplianceReport />
         </TabsContent>
       )}
-      {isManagement && (
+      {(isManagement || isInventory) && (
         <TabsContent value="missing-tracking">
           <MissingTrackingReport />
         </TabsContent>
