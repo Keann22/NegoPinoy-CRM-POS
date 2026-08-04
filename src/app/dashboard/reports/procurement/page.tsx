@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { ViewProductDetailsDialog } from "@/components/dashboard/view-product-details-dialog";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, RefreshCw } from "lucide-react";
 
 import { SingleBuyDialog } from "@/components/dashboard/procurement/single-buy-dialog";
 import { BulkBuyDialog } from "@/components/dashboard/procurement/bulk-buy-dialog";
@@ -25,6 +25,7 @@ export default function ProcurementSheet() {
   const [groupedItems, setGroupedItems] = useState<any[]>([]);
   const [purchasedItems, setPurchasedItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   
   const handleCreateBatch = async () => {
       try {
@@ -58,7 +59,11 @@ export default function ProcurementSheet() {
 
   const [viewingAllocatedItem, setViewingAllocatedItem] = useState<{ id: string; name: string; context?: 'total' | 'needToBuy' } | null>(null);
 
-  const fetchData = async () => {
+  // isManual keeps the current numbers on screen while re-fetching (only the
+  // Refresh button spins), instead of blanking the whole sheet behind the
+  // full-page loading state used on first mount.
+  const fetchData = async (isManual = false) => {
+    if (isManual) setRefreshing(true);
     try {
       const res = await fetch(`/api/inventory/procurement?t=${Date.now()}`, { cache: 'no-store' });
       const data = await res.json();
@@ -70,6 +75,7 @@ export default function ProcurementSheet() {
       alert("Failed to load procurement data: " + e.message);
     } finally {
       setLoading(false);
+      if (isManual) setRefreshing(false);
     }
   };
 
@@ -249,6 +255,15 @@ export default function ProcurementSheet() {
           <p className="text-slate-600 text-sm md:text-base">Your on-the-go shopping list. Click &apos;Buy&apos; to record items as you shop.</p>
         </div>
         <div className="flex flex-col md:flex-row gap-2">
+            <Button
+              onClick={() => fetchData(true)}
+              disabled={refreshing}
+              variant="outline"
+              className="font-bold px-4 py-2 flex items-center justify-center gap-2"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              {refreshing ? 'Refreshing...' : 'Refresh'}
+            </Button>
             {isManagement && (
                 <Button onClick={handleCreateBatch} variant="secondary" className="font-bold px-4 py-2">
                     Create Procurement Batch
