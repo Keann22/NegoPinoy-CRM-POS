@@ -99,6 +99,26 @@ export async function fanOutStaffNotifications(
 export async function createStaffMessage(supabase: SupabaseClient, input: StaffMessageInput) {
   const { issueType, orderId, productId, message, senderName, senderRole, recipientNames, linkByRecipient } = input;
 
+  // For an order-scoped message, always loop in the order's own sales rep — the
+  // person actually affected by that order — even if the sender didn't tag them.
+  // Deduped case-insensitively and never the sender themselves.
+  let recipients = recipientNames;
+  if (issueType === 'order' && orderId) {
+    const { data: orderRow } = await supabase
+      .from('orders')
+      .select('sales_person_name')
+      .eq('id', orderId)
+      .maybeSingle();
+    const repName = orderRow?.sales_person_name?.trim();
+    if (
+      repName &&
+      repName.toLowerCase() !== senderName.trim().toLowerCase() &&
+      !recipients.some((n) => n.trim().toLowerCase() === repName.toLowerCase())
+    ) {
+      recipients = [...recipients, repName];
+    }
+  }
+
   const { data: issue, error: issueErr } = await supabase
     .from('order_issues')
     .insert({
@@ -121,7 +141,7 @@ export async function createStaffMessage(supabase: SupabaseClient, input: StaffM
       sender_name: senderName,
       message,
       requires_attention: true,
-      mentions: recipientNames,
+      mentions: recipients,
     });
 
   if (msgErr) throw msgErr;
@@ -132,7 +152,7 @@ export async function createStaffMessage(supabase: SupabaseClient, input: StaffM
   try {
     const staffByName = await getStaffByName(supabase);
     const members: StaffIdentity[] = [];
-    for (const name of [senderName, ...recipientNames]) {
+    for (const name of [senderName, ...recipients]) {
       const match = staffByName.get(name.trim().toLowerCase());
       if (match && !members.some((m) => m.userId === match.userId)) members.push(match);
     }
@@ -144,7 +164,7 @@ export async function createStaffMessage(supabase: SupabaseClient, input: StaffM
 
   // Order-type staff messages always link to the order itself
   const link = issueType === 'order' && orderId ? `/dashboard/orders/${orderId}` : undefined;
-  await fanOutStaffNotifications(supabase, recipientNames, { senderName, message, link, linkByRecipient });
+  await fanOutStaffNotifications(supabase, recipients, { senderName, message, link, linkByRecipient });
 
   return issue.id as string;
 }

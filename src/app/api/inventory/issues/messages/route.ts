@@ -30,6 +30,14 @@ export async function POST(req: Request) {
 
     if (error) throw error;
 
+    // Resolve the thread's order up front — needed both for the notification link
+    // and to loop in the order's own sales rep as an affected party.
+    const { data: issue } = await supabase
+      .from('order_issues')
+      .select('order_id')
+      .eq('id', issueId)
+      .single();
+
     // Everyone already in this issue thread: prior message senders + anyone tagged
     // in earlier messages. This makes a reply reach the whole group even when the
     // replier tags no one back — the thread behaves like a group chat.
@@ -44,17 +52,22 @@ export async function POST(req: Request) {
       if (Array.isArray(row.mentions)) participantNames.push(...row.mentions);
     }
 
+    // The order's own sales rep is always an affected party on an order-linked
+    // thread, whether or not they've posted or been tagged.
+    if (issue?.order_id) {
+      const { data: orderRow } = await supabase
+        .from('orders')
+        .select('sales_person_name')
+        .eq('id', issue.order_id)
+        .maybeSingle();
+      if (orderRow?.sales_person_name) participantNames.push(orderRow.sales_person_name);
+    }
+
     const recipientNames = resolveRecipientNames(
       [...(mentions || []), ...participantNames],
       resolvedSenderName
     );
     if (recipientNames.length > 0) {
-      const { data: issue } = await supabase
-        .from('order_issues')
-        .select('order_id')
-        .eq('id', issueId)
-        .single();
-
       // Keep the "tagged you" wording only for people the sender actually @-tagged
       // in this message; everyone else is looped in as a thread participant.
       const taggedKeys = new Set(
