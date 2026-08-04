@@ -15,86 +15,80 @@ export async function GET() {
     await migrateLeakedBundleDrafts(supabase);
     await autoCleanupStaffDrafts(supabase);
 
-    // 1. Get all suppliers
-    const { data: suppliers, error: sErr } = await supabase
-      .from('suppliers')
-      .select('id, name')
-      .order('name');
+    // These five reads don't depend on each other, so fire them together and
+    // wait once instead of paying a serial round-trip for each. (The two
+    // self-heal cleanups above must still run first — they mutate the drafts
+    // these queries read.)
+    //
+    // 3a. Bundle products consume a target component's physical stock too
+    // (e.g. "Wok Pan with Takip" = 1x Wok Pan + 1x Cover) — an order for the
+    // bundle never references the component's product_id directly in
+    // order_items, so it has to be found via assembly_recipe and expanded.
+    // Only a genuinely non-empty assembly_recipe makes a product a bundle, so
+    // ask the DB for just those (`neq.[]`) rather than hauling the entire
+    // products table on every load. The Array.isArray guard below still drops
+    // any stray non-array value.
+    const [
+      { data: suppliers, error: sErr },
+      { data: drafts, error: dErr },
+      { data: purchased, error: pErr },
+      { data: negativeStockProducts, error: negErr },
+      { data: bundleData, error: bundleErr },
+    ] = await Promise.all([
+      // 1. All suppliers
+      supabase.from('suppliers').select('id, name').order('name'),
+      // 2. Draft requests from Staff
+      supabase
+        .from('purchase_order_items')
+        .select('id, product_id, expected_qty, po_id, requested_by_name, created_at, purchase_orders!inner(notes)')
+        .eq('purchase_orders.notes', 'STAFF_DRAFT')
+        .eq('status', 'pending_receipt'),
+      // 2.5 Purchased items (pending receipt, NOT STAFF_DRAFT)
+      supabase
+        .from('purchase_order_items')
+        .select(`
+          id,
+          product_id,
+          expected_qty,
+          received_qty,
+          unit_cost,
+          po_id,
+          created_at,
+          supplier_id,
+          purchase_orders!inner(id, notes, status)
+        `)
+        .neq('purchase_orders.notes', 'STAFF_DRAFT')
+        .eq('status', 'pending_receipt'),
+      // 2.6 Candidate out-of-stock products. Whether one actually belongs on
+      // the sheet depends on whether a *currently open* order still waits on
+      // it — checked below once demand is computed. A deficit fully explained
+      // by an order that already shipped/completed is a bookkeeping/cost
+      // question, not a live blocker, so it shouldn't clutter the list.
+      supabase.from('products').select('id').lt('stock_level', 0),
+      // 3a. Bundle products (non-empty recipe only).
+      supabase.from('products').select('id, assembly_recipe').neq('assembly_recipe', '[]'),
+    ]);
     if (sErr) throw sErr;
-    console.log('API Hit! Suppliers fetched length:', suppliers?.length);
-
-    // 2. Get all draft requests from Staff
-    const { data: drafts, error: dErr } = await supabase
-      .from('purchase_order_items')
-      .select('id, product_id, expected_qty, po_id, requested_by_name, created_at, purchase_orders!inner(notes)')
-      .eq('purchase_orders.notes', 'STAFF_DRAFT')
-      .eq('status', 'pending_receipt');
     if (dErr) throw dErr;
+    if (pErr) throw pErr;
+    if (negErr) throw negErr;
+    if (bundleErr) throw bundleErr;
+    console.log('API Hit! Suppliers fetched length:', suppliers?.length);
 
     const draftMap = new Map();
     const productIdsToFetch = new Set<string>();
-    
     drafts?.forEach(d => {
       draftMap.set(d.product_id, d);
       productIdsToFetch.add(d.product_id);
     });
 
-    // 2.5 Get all purchased items (pending receipt, NOT STAFF_DRAFT)
-    const { data: purchased, error: pErr } = await supabase
-      .from('purchase_order_items')
-      .select(`
-        id, 
-        product_id, 
-        expected_qty, 
-        received_qty, 
-        unit_cost, 
-        po_id, 
-        created_at, 
-        supplier_id,
-        purchase_orders!inner(id, notes, status)
-      `)
-      .neq('purchase_orders.notes', 'STAFF_DRAFT')
-      .eq('status', 'pending_receipt');
-      
-    if (pErr) throw pErr;
-
     purchased?.forEach((p: any) => {
       productIdsToFetch.add(p.product_id);
     });
 
-    // 2.6 Candidate out-of-stock products that nobody has filed a draft for
-    // yet. Whether one of these actually belongs on the sheet depends on
-    // whether a *currently open* order is still waiting on it — checked
-    // below once demand is computed. A deficit fully explained by an order
-    // that already shipped/completed is a bookkeeping/cost question (the
-    // purchase to true up its cost never happened), not a live blocker, so
-    // it shouldn't clutter the "what do we need to buy right now" list.
-    const { data: negativeStockProducts, error: negErr } = await supabase
-      .from('products')
-      .select('id')
-      .lt('stock_level', 0);
-    if (negErr) throw negErr;
     const negativeStockIds = new Set((negativeStockProducts || []).map(p => p.id));
 
-    // 3a. Bundle products consume a target component's physical stock too
-    // (e.g. "Wok Pan with Takip" = 1x Wok Pan + 1x Cover) — an order for the
-    // bundle never references the component's product_id directly in
-    // order_items, so it has to be found via assembly_recipe and expanded.
-    // assembly_recipe defaults to `[]` (not null) on most products, so a
-    // `.not(is, null)` filter matches nearly the whole table and silently
-    // truncates at Supabase's 1000-row cap. Page through everything instead
-    // and filter for a genuinely non-empty recipe client-side.
-    const bundleProducts: { id: string; assembly_recipe: any }[] = [];
-    for (let from = 0; ; from += 1000) {
-      const { data: page, error: bundleErr } = await supabase
-        .from('products')
-        .select('id, assembly_recipe')
-        .range(from, from + 999);
-      if (bundleErr) throw bundleErr;
-      if (!page || page.length === 0) break;
-      bundleProducts.push(...page);
-      if (page.length < 1000) break;
-    }
+    const bundleProducts: { id: string; assembly_recipe: any }[] = bundleData || [];
 
     // A bundle carries no purchasable stock of its own — suppliers only sell
     // the raw components. If a bundle's stock_level has drifted negative (e.g.
@@ -134,22 +128,28 @@ export async function GET() {
     // query covering both direct orders and orders for bundles that consume
     // a target component, across every open status.
     const allProductIdsForDemand = new Set([...Array.from(candidateIds), ...Array.from(bundleProductIds)]);
-    const { data: demandRows, error: demandErr } = await supabase
-      .from('order_items')
-      .select('product_id, quantity, is_packed, orders!inner(id, status, payment_method)')
-      .in('product_id', Array.from(allProductIdsForDemand))
-      .in('orders.status', ALL_OPEN_STATUSES);
+    // Demand and open-issues share the same id set but don't depend on each
+    // other, so fetch them together.
+    // 3c. Open issues let us accurately gauge "Picked (with issue)" demand: for
+    // such orders, only the specific items with an open issue logged against
+    // them count as unfulfilled — items without an issue were successfully
+    // picked and don't need buying.
+    const [
+      { data: demandRows, error: demandErr },
+      { data: openIssues, error: issuesErr },
+    ] = await Promise.all([
+      supabase
+        .from('order_items')
+        .select('product_id, quantity, is_packed, orders!inner(id, status, payment_method)')
+        .in('product_id', Array.from(allProductIdsForDemand))
+        .in('orders.status', ALL_OPEN_STATUSES),
+      supabase
+        .from('order_issues')
+        .select('order_id, product_id')
+        .eq('status', 'open')
+        .in('product_id', Array.from(allProductIdsForDemand)),
+    ]);
     if (demandErr) throw demandErr;
-
-    // 3c. Fetch open issues to accurately gauge "Picked (with issue)" demand.
-    // If an order is "Picked (with issue)", only the specific items that have
-    // an open issue logged against them should be considered unfulfilled.
-    // Items in that order without an issue were successfully picked and don't need buying.
-    const { data: openIssues, error: issuesErr } = await supabase
-      .from('order_issues')
-      .select('order_id, product_id')
-      .eq('status', 'open')
-      .in('product_id', Array.from(allProductIdsForDemand));
     if (issuesErr) throw issuesErr;
 
     const openIssueKeys = new Set(openIssues?.map(i => `${i.order_id}-${i.product_id}`));

@@ -64,21 +64,16 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose, s
         // 2. Find bundle/kit products that consume this item as a component
         // (e.g. "Wok Pan with Takip" = 1x Wok Pan + 1x Cover). An order for
         // the bundle never references this product_id directly in
-        // order_items, so it has to be found via assembly_recipe. Most
-        // products default assembly_recipe to `[]` (not null), so a plain
-        // is-null filter would match nearly the whole catalog and get
-        // truncated at Supabase's 1000-row cap — page through instead.
+        // order_items, so it has to be found via assembly_recipe. Only a
+        // genuinely non-empty recipe makes a product a bundle, so ask the DB
+        // for just those (`neq.[]`) instead of scanning the whole catalog on
+        // every open. The Array.isArray guard below still drops stray values.
         const targetIdSet = new Set(targetProductIds);
-        const bundleProducts: { id: string; name: string; assembly_recipe: any }[] = [];
-        for (let from = 0; ; from += 1000) {
-          const { data: page } = await supabase
-            .from('products')
-            .select('id, name, assembly_recipe')
-            .range(from, from + 999);
-          if (!page || page.length === 0) break;
-          bundleProducts.push(...page as any);
-          if (page.length < 1000) break;
-        }
+        const { data: bundleData } = await supabase
+          .from('products')
+          .select('id, name, assembly_recipe')
+          .neq('assembly_recipe', '[]');
+        const bundleProducts: { id: string; name: string; assembly_recipe: any }[] = (bundleData || []) as any;
 
         // bundleProductId -> { name, qtyPerBundle }
         const bundleInfo = new Map<string, { name: string; qtyPerBundle: number }>();
