@@ -163,12 +163,11 @@ export async function GET() {
       }
     };
     demandRows?.forEach((row: any) => {
-      if (row.orders.payment_method === 'Lay-away') {
-        return; // Exclude lay-away orders from automatic system demand
-      }
-
       let isUnfulfilled = false;
-      if (row.is_packed) {
+      
+      if (row.orders.payment_method === 'Lay-away') {
+        isUnfulfilled = false; // Don't auto-buy for layaways, but they still consume stock
+      } else if (row.is_packed) {
         // If the item is already physically packed, it doesn't need to be bought!
         isUnfulfilled = false;
       } else if (row.orders.status === 'Picked (with issue)') {
