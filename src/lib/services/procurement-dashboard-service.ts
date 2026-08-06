@@ -70,7 +70,11 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
     .select('product_id')
     .eq('status', 'open');
   if (openIssuesErr) throw openIssuesErr;
-  const openIssueProductIds = new Set((openIssuesInitial || []).map((i: any) => i.product_id));
+  const openIssueProductIds = new Set(
+    (openIssuesInitial || [])
+      .map((i: any) => i.product_id)
+      .filter((id: any) => id != null)
+  );
 
   // 3a. Bundle products
   const bundleProducts: { id: string; assembly_recipe: any }[] = [];
