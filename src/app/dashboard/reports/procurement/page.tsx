@@ -226,40 +226,18 @@ export default function ProcurementSheet() {
   };
 
   const handleCopyOrder = async (supplierId: string | null, supplierName: string, groupItems: any[]) => {
-    if (!supplierId) return; // Should not happen based on UI
+    let text = "";
+    
+    groupItems.forEach((item: any) => {
+      const qty = item.needToBuyQty ? Number(item.needToBuyQty) : 0;
+      text += `${qty}x ${item.productName}\n`;
+    });
+
+    if (!text) {
+      return alert("No items found to copy!");
+    }
 
     try {
-      const { data: allProducts, error } = await supabase
-        .from('products')
-        .select('id, name, variant_name')
-        .eq('supplier_id', supplierId)
-        .not('name', 'ilike', '[DELETED]%')
-        .order('name');
-        
-      if (error) throw error;
-
-      let text = "";
-      const neededMap = new Map();
-      
-      groupItems.forEach((item: any) => {
-        if (item.neededQty && Number(item.neededQty) > 0) {
-          neededMap.set(item.productId, Number(item.neededQty));
-        }
-      });
-
-      allProducts?.forEach((p: any) => {
-        const neededQty = neededMap.get(p.id) || 0;
-        let displayName = p.name;
-        if (p.variant_name && !p.name.includes(p.variant_name)) {
-          displayName = `${p.name} [${p.variant_name}]`;
-        }
-        text += `${neededQty}x ${displayName}\n`;
-      });
-
-      if (!text) {
-        return alert("No products found for this supplier!");
-      }
-
       await navigator.clipboard.writeText(text.trim());
       alert("Order copied to clipboard! You can now paste it into Messenger.");
     } catch (err: any) {
