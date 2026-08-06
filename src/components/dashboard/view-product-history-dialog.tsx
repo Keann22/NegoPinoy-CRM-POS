@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import Link from 'next/link';
 import {
   Table,
   TableBody,
@@ -147,7 +148,35 @@ export function ViewProductHistoryDialog({ product, open, onOpenChange }: ViewPr
                     {m.quantityChange > 0 ? `+${m.quantityChange}` : m.quantityChange}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground italic">
-                    {m.reason || '—'}
+                    {(() => {
+                      if (!m.reason) return '—';
+                      const uuidRegex = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/gi;
+                      if (!uuidRegex.test(m.reason)) {
+                        return m.reason;
+                      }
+                      
+                      uuidRegex.lastIndex = 0;
+                      const parts = m.reason.split(uuidRegex);
+                      
+                      return (
+                        <>
+                          {parts.map((part, index) => {
+                            if (part.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+                              return (
+                                <Link 
+                                  key={index}
+                                  href={`/dashboard/orders/${part}`}
+                                  className="text-primary hover:underline font-medium not-italic"
+                                >
+                                  #{part.split('-')[0].toUpperCase()}
+                                </Link>
+                              );
+                            }
+                            return <span key={index}>{part}</span>;
+                          })}
+                        </>
+                      );
+                    })()}
                   </TableCell>
                 </TableRow>
               ))}

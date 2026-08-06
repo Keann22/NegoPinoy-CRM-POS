@@ -103,14 +103,34 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
   ]);
 
   const bundleToComponents = new Map<string, { componentId: string; qtyPerBundle: number }[]>();
+  
+  // If a bundle itself was somehow directly drafted or had an open issue, 
+  // it will be in candidateIds. We must NEVER buy a bundle directly. 
+  // We must expand it into its components and add those to candidateIds instead,
+  // then remove the bundle from candidateIds.
   bundleProducts.forEach((bp: any) => {
     const recipe = Array.isArray(bp.assembly_recipe) ? bp.assembly_recipe : [];
     if (recipe.length === 0) return;
-    const relevant = recipe
-      .map((comp: any) => ({ componentId: comp.productId || comp.component_id, qtyPerBundle: comp.quantity || 1 }))
-      .filter((c: any) => c.componentId && candidateIds.has(c.componentId));
+    
+    const components = recipe.map((comp: any) => ({ 
+      componentId: comp.productId || comp.component_id, 
+      qtyPerBundle: comp.quantity || 1 
+    }));
+
+    if (candidateIds.has(bp.id)) {
+      // The bundle itself was flagged/drafted. Expand it!
+      components.forEach((c: any) => {
+        if (c.componentId) candidateIds.add(c.componentId);
+      });
+      candidateIds.delete(bp.id);
+      productIdsToFetch.delete(bp.id); // also remove from the fetch set so it doesn't render
+    }
+
+    // Now determine if this bundle is relevant to any component we want to buy
+    const relevant = components.filter((c: any) => c.componentId && candidateIds.has(c.componentId));
     if (relevant.length > 0) bundleToComponents.set(bp.id, relevant);
   });
+
   const bundleProductIds = new Set(bundleToComponents.keys());
 
   // 3b. Get live order demand
