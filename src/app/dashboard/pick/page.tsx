@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -15,7 +16,7 @@ export default function PickerApp() {
     scannedOrderId,
     setScannedOrderId,
     orderDetails,
-    orderItems,
+    pickGroups,
     outOfStockQty,
     qtyDrafts,
     loading,
@@ -109,42 +110,76 @@ export default function PickerApp() {
                       </tr>
                     </thead>
                     <tbody>
-                      {orderItems.map(item => {
-                        const isFlagged = outOfStockQty.has(item.id);
+                      {pickGroups.map(group => {
+                        const renderRow = (
+                          key: string,
+                          name: React.ReactNode,
+                          qty: number,
+                          indent: boolean
+                        ) => {
+                          const isFlagged = outOfStockQty.has(key);
+                          return (
+                            <tr key={key} className={`border-b last:border-0 ${isFlagged ? 'bg-red-50' : ''}`}>
+                              <td className={`p-3 ${indent ? 'pl-8' : ''}`}>{name}</td>
+                              <td className="p-3 text-center">
+                                <span className="font-bold">{qty}</span>
+                              </td>
+                              <td className="p-3 text-center">
+                                <Checkbox
+                                  checked={isFlagged}
+                                  onCheckedChange={() => toggleOutOfStock(key, qty)}
+                                />
+                              </td>
+                              <td className="p-3 text-center">
+                                {isFlagged && (
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    max={qty}
+                                    value={qtyDrafts.get(key) ?? ''}
+                                    onChange={(e) => handleQtyDraftChange(key, e.target.value)}
+                                    onBlur={() => commitOutOfStockQty(key, qty)}
+                                    className="w-16 text-center border rounded-md px-1 py-1 text-sm"
+                                  />
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        };
+
+                        const setNameButton = (
+                          <button
+                            type="button"
+                            onClick={() => setViewingPhotoItem({ product_name: group.productName, images: group.images } as any)}
+                            className="font-medium text-slate-800 underline decoration-dotted underline-offset-2 hover:text-primary text-left"
+                          >
+                            {group.productName}
+                          </button>
+                        );
+
+                        if (!group.isSet) {
+                          const row = group.rows[0];
+                          return renderRow(row.key, setNameButton, row.quantity, false);
+                        }
+
+                        // Set: a display-only header, then a flaggable row per part.
                         return (
-                        <tr key={item.id} className={`border-b last:border-0 ${isFlagged ? 'bg-red-50' : ''}`}>
-                          <td className="p-3">
-                            <button
-                              type="button"
-                              onClick={() => setViewingPhotoItem(item)}
-                              className="font-medium text-slate-800 underline decoration-dotted underline-offset-2 hover:text-primary text-left"
-                            >
-                              {item.product_name}
-                            </button>
-                          </td>
-                          <td className="p-3 text-center">
-                            <span className="font-bold">{item.quantity}</span>
-                          </td>
-                          <td className="p-3 text-center">
-                            <Checkbox
-                              checked={isFlagged}
-                              onCheckedChange={() => toggleOutOfStock(item.id, item.quantity)}
-                            />
-                          </td>
-                          <td className="p-3 text-center">
-                            {isFlagged && (
-                              <input
-                                type="number"
-                                min={1}
-                                max={item.quantity}
-                                value={qtyDrafts.get(item.id) ?? ''}
-                                onChange={(e) => handleQtyDraftChange(item.id, e.target.value)}
-                                onBlur={() => commitOutOfStockQty(item.id, item.quantity)}
-                                className="w-16 text-center border rounded-md px-1 py-1 text-sm"
-                              />
-                            )}
-                          </td>
-                        </tr>
+                          <React.Fragment key={group.orderItemId}>
+                            <tr className="border-b bg-muted/30">
+                              <td className="p-3">
+                                <div className="flex items-center gap-2">
+                                  {setNameButton}
+                                  <Badge variant="secondary" className="text-[10px]">Set</Badge>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-0.5">Flag any part below that&apos;s out of stock.</p>
+                              </td>
+                              <td className="p-3 text-center">
+                                <span className="font-bold">{group.quantity}</span>
+                              </td>
+                              <td className="p-3" colSpan={2}></td>
+                            </tr>
+                            {group.rows.map(row => renderRow(row.key, <span className="text-slate-700">{row.productName}</span>, row.quantity, true))}
+                          </React.Fragment>
                         );
                       })}
                     </tbody>

@@ -232,6 +232,14 @@ However, if the missing item is later found or restocked, and the item gets phys
 
 **The Fix:** The `autoCleanupStaffDrafts` script in `procurement-service.ts` now explicitly checks item-level status (including bundle expansion). If the specific item mapped to the Staff Request is either `is_packed = true` or has no active `open` issue against it, the script automatically deletes the orphaned Staff Request. This ensures the Procurement Sheet's "Staff Request" column perfectly matches physical reality.
 
+### Picker App Ghost Stock Prevention (added 2026-08-06)
+
+When a picker scans an order to re-pick it (e.g., after it was edited to add a new item), the `usePickerData.ts` hook automatically resolves all previously open `order_issues` for that order the moment the picker submits their new pick list. 
+
+**The Bug:** Previously, the UI defaulted all items to "in stock" upon scanning. If a picker only flagged the newly added item as missing, they inadvertently failed to re-flag older missing items. The system interpreted this as the old items being "found" and quietly resolved their `order_issues`. This left those products with negative stock but no active demand issue — creating "ghost stock" that vanished from the Procurement Sheet.
+
+**The Fix:** During `handleScanSuccess`, `usePickerData.ts` now actively fetches any currently `open` issues for that order and pre-populates `outOfStockQty` in the UI. By automatically checking the "out of stock" boxes for items that were already known to be missing, the system ensures they are safely carried over into the new pick session without requiring the picker to memorize and re-flag them.
+
 ---
 
 ## Supabase Client Usage

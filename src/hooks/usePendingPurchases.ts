@@ -110,6 +110,28 @@ export function usePendingPurchases(onReceiveComplete: () => void) {
       }
   };
 
+  const handleCloseShort = async (item: any) => {
+      if (!confirm(`Are you sure you want to close this short delivery for ${item.productName}? This will set expected quantity to match received quantity (${item.alreadyReceivedQty || 0}).`)) return;
+      
+      setSubmittingId(item.id);
+      try {
+        const res = await fetch("/api/inventory/receive/pending-pos/close-short", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ itemId: item.id })
+        });
+        
+        if (!res.ok) throw new Error(await res.text());
+        
+        toast({ title: 'Short Delivery Closed', description: `Successfully closed remainder for ${item.productName}.` });
+        fetchPending();
+      } catch (e: any) {
+        toast({ variant: 'destructive', title: 'Error', description: e.message });
+      } finally {
+        setSubmittingId(null);
+      }
+  };
+
   const handleReceive = async () => {
     const toReceive = items.filter(i => i.receivedQty && Number(i.receivedQty) > 0).map(i => ({
       itemId: i.id,
@@ -181,6 +203,7 @@ export function usePendingPurchases(onReceiveComplete: () => void) {
     handleReasonChange,
     handleReceiveSingle,
     handleCancel,
+    handleCloseShort,
     handleReceive,
     closeBatch
   };

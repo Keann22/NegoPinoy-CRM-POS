@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import Link from "next/link";
 import { AlertCircle, PackageOpen, Send, Clock, Activity, MessageSquare, PackageX } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
@@ -7,41 +6,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { useSupabase } from "@/lib/supabase/hooks";
-import { useUserProfile } from "@/hooks/useUserProfile";
-import { fetchOrderTrail, type OrderTrailEntry } from "@/lib/services/order-trail-service";
-import { fanOutStaffNotifications, resolveRecipientNames } from "@/lib/services/staff-message-service";
 import { MentionInput } from "@/components/dashboard/mention-input";
-import { useStaffDirectory } from "@/hooks/useStaffDirectory";
 import type { Order } from "@/types";
-
-// Matches an order-note author header line, e.g. "[Jul 30, 2026 3:45 PM] Czary Reyes:".
-// Used to reconstruct everyone who has spoken in a note thread so a reply pings the
-// whole group, not just whoever the replier happened to re-tag.
-const NOTE_AUTHOR_RE = /^\[[A-Z][a-z]{2} \d{1,2}, \d{4} \d{1,2}:\d{2} (?:AM|PM)\]\s*(.+?):\s*$/gm;
-
-/**
- * Everyone already involved in an order-note thread: past authors (parsed from the
- * note headers) plus any staff explicitly @-mentioned anywhere in the notes. Names
- * are matched case-insensitively against the known staff directory for the @-mentions
- * so multi-word names resolve reliably.
- */
-function extractNoteParticipants(notes: string, knownFullNames: string[]): string[] {
-  const found = new Map<string, string>(); // lowercased -> original casing
-
-  for (const match of notes.matchAll(NOTE_AUTHOR_RE)) {
-    const name = match[1].trim();
-    if (name) found.set(name.toLowerCase(), name);
-  }
-
-  const lowerNotes = notes.toLowerCase();
-  for (const fullName of knownFullNames) {
-    const key = fullName.trim().toLowerCase();
-    if (key && lowerNotes.includes(`@${key}`)) found.set(key, fullName);
-  }
-
-  return [...found.values()];
-}
+import { useOverdueOrderDialog } from "@/hooks/useOverdueOrderDialog";
+import { type OrderTrailEntry } from "@/lib/services/order-trail-service";
 
 const TRAIL_DOT: Record<OrderTrailEntry['kind'], string> = {
   status: 'bg-indigo-500',
@@ -73,229 +41,26 @@ interface OverdueOrderDialogProps {
 }
 
 export function OverdueOrderDialog({ order, customerName, open, onOpenChange, onOrderUpdated, variant = 'overdue' }: OverdueOrderDialogProps) {
-  const supabase = useSupabase();
-  const { userProfile } = useUserProfile();
-  const { staff } = useStaffDirectory();
-
-  const [replyText, setReplyText] = useState("");
-  const [noteMentions, setNoteMentions] = useState<string[]>([]);
-  const [isSending, setIsSending] = useState(false);
-  const [issues, setIssues] = useState<any[]>([]);
-  const [isLoadingIssues, setIsLoadingIssues] = useState(false);
-  const [localNotes, setLocalNotes] = useState("");
-  const [issueReplyText, setIssueReplyText] = useState("");
-  const [issueMentions, setIssueMentions] = useState<string[]>([]);
-  const [issueIsUrgent, setIssueIsUrgent] = useState(false);
-  const [isSendingIssue, setIsSendingIssue] = useState(false);
-  const [outOfStockItems, setOutOfStockItems] = useState<{ name: string; quantity: number }[]>([]);
-  const [isLoadingStock, setIsLoadingStock] = useState(false);
-  const [trail, setTrail] = useState<OrderTrailEntry[]>([]);
-  const [isLoadingTrail, setIsLoadingTrail] = useState(false);
-
-  useEffect(() => {
-    if (open && order) {
-      setLocalNotes(order.notes || "");
-      fetchIssues(order.id);
-      fetchLiveStock(order.id);
-      loadTrail(order.id);
-    } else {
-      setIssues([]);
-      setReplyText("");
-      setNoteMentions([]);
-      setIssueReplyText("");
-      setIssueMentions([]);
-      setOutOfStockItems([]);
-      setTrail([]);
-    }
-
-  }, [open, order]);
-
-  const loadTrail = async (orderId: string) => {
-    if (!supabase) return;
-    setIsLoadingTrail(true);
-    try {
-      setTrail(await fetchOrderTrail(supabase, orderId));
-    } catch (e) {
-      console.error("Failed to load order trail", e);
-    } finally {
-      setIsLoadingTrail(false);
-    }
-  };
-
-  // Independent of order_issues: checks whether the products actually in this order are
-  // currently out of stock, even if nobody has formally reported it yet.
-  const fetchLiveStock = async (orderId: string) => {
-    if (!supabase) return;
-    try {
-      setIsLoadingStock(true);
-      
-      // 1. Check if the order has already been picked. If yes, the items are already secured.
-      const { data: logData, error: logError } = await supabase
-          .from('order_logs')
-          .select('id')
-          .eq('order_id', orderId)
-          .in('status', ['Picked', 'Photo', 'Packed', 'For Shipping', 'For Pick-up'])
-          .limit(1);
-          
-      if (!logError && logData && logData.length > 0) {
-        setOutOfStockItems([]);
-        return; // Already picked, so it's not out of stock for this customer
-      }
-
-      const { data, error } = await supabase
-        .from('order_items')
-        .select('quantity, product_name, products(name, stock_level)')
-        .eq('order_id', orderId);
-      if (error) throw error;
-
-      const outOfStock = (data || [])
-        .filter((row: any) => row.products?.stock_level !== undefined && row.products?.stock_level !== null && row.products.stock_level <= 0)
-        .map((row: any) => ({ name: row.products?.name || row.product_name || 'Unknown product', quantity: row.quantity }));
-
-      setOutOfStockItems(outOfStock);
-    } catch (e) {
-      console.error("Failed to check live stock for order", e);
-    } finally {
-      setIsLoadingStock(false);
-    }
-  };
-
-  const fetchIssues = async (orderId: string) => {
-    try {
-      setIsLoadingIssues(true);
-      const res = await fetch('/api/inventory/issues');
-      if (!res.ok) throw new Error('Failed to fetch issues');
-      const allIssues = await res.json();
-      
-      // Filter issues for this specific order
-      const orderIssues = (allIssues || []).filter((i: any) => i.orders?.id === orderId);
-      
-      // Fetch full details for these issues (to get messages)
-      const fullIssues = await Promise.all(
-        orderIssues.map((i: any) => fetch(`/api/inventory/issues?id=${i.id}`).then(r => r.json()))
-      );
-      
-      setIssues(fullIssues);
-    } catch (e) {
-      console.error("Failed to load full issues", e);
-    } finally {
-      setIsLoadingIssues(false);
-    }
-  };
-
-  const handleSendNote = async () => {
-    if (!replyText.trim() || !order || !supabase) return;
-    
-    setIsSending(true);
-    try {
-      const senderName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : 'Sales';
-      const timestamp = format(new Date(), 'MMM d, yyyy h:mm a');
-      const newNoteEntry = `[${timestamp}] ${senderName}:\n${replyText.trim()}`;
-      
-      const updatedNotes = localNotes ? `${localNotes}\n\n${newNoteEntry}` : newNoteEntry;
-      
-      const { error } = await supabase
-        .from('orders')
-        .update({ notes: updatedNotes })
-        .eq('id', order.id);
-        
-      if (error) throw error;
-
-      const orderRef = `Order #${order.id.substring(0, 7).toUpperCase()}`;
-      const link = `/dashboard/orders/${order.id}`;
-
-      // People the sender explicitly @-tagged in this note.
-      const taggedNames = resolveRecipientNames(noteMentions, senderName);
-
-      // Everyone already in the thread — prior authors + anyone tagged earlier —
-      // so a reply reaches the whole group even when the replier tags no one.
-      // `localNotes` here is the thread *before* this new note was appended.
-      const knownFullNames = staff.map((s) => s.fullName);
-      const threadParticipants = resolveRecipientNames(
-        extractNoteParticipants(localNotes, knownFullNames),
-        senderName
-      );
-      const taggedKeys = new Set(taggedNames.map((n) => n.toLowerCase()));
-      const groupNames = threadParticipants.filter((n) => !taggedKeys.has(n.toLowerCase()));
-
-      if (taggedNames.length > 0) {
-        await fanOutStaffNotifications(supabase, taggedNames, {
-          senderName,
-          message: replyText.trim(),
-          title: `${senderName} tagged you in a note on ${orderRef}`,
-          link,
-        });
-      }
-      if (groupNames.length > 0) {
-        await fanOutStaffNotifications(supabase, groupNames, {
-          senderName,
-          message: replyText.trim(),
-          title: `${senderName} replied on ${orderRef}`,
-          link,
-        });
-      }
-
-      setLocalNotes(updatedNotes);
-      setReplyText("");
-      setNoteMentions([]);
-      loadTrail(order.id);
-      onOrderUpdated(); // Trigger a refetch in the parent to get the latest notes
-    } catch (e: any) {
-      alert("Error saving note: " + e.message);
-    } finally {
-      setIsSending(false);
-    }
-  };
-
-  const handleSendIssueMessage = async () => {
-    if (!issueReplyText.trim() || issues.length === 0 || !supabase) return;
-    
-    setIsSendingIssue(true);
-    try {
-      const senderName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : 'Sales';
-      const roles = userProfile?.roles || [];
-      const isSalesUser = roles.some((r: string) => r.toLowerCase() === 'sales');
-      const senderRole = isSalesUser ? 'sales' : 'picker';
-
-      const res = await fetch('/api/inventory/issues/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          issueId: issues[0].id, // Send to the first active issue for this order
-          senderRole: senderRole,
-          senderName: senderName,
-          message: issueReplyText,
-          requiresAttention: issueIsUrgent,
-          mentions: issueMentions
-        })
-      });
-
-      if (!res.ok) throw new Error('Failed to send message');
-
-      setIssueReplyText("");
-      setIssueMentions([]);
-      setIssueIsUrgent(false);
-      fetchIssues(order!.id);
-      loadTrail(order!.id);
-    } catch (e: any) {
-      alert("Error sending issue message: " + e.message);
-    } finally {
-      setIsSendingIssue(false);
-    }
-  };
+  const {
+    replyText, setReplyText,
+    noteMentions, setNoteMentions,
+    isSending,
+    issues, isLoadingIssues,
+    localNotes,
+    issueReplyText, setIssueReplyText,
+    issueMentions, setIssueMentions,
+    issueIsUrgent, setIssueIsUrgent,
+    isSendingIssue,
+    outOfStockItems, isLoadingStock,
+    trail, isLoadingTrail,
+    handleSendNote,
+    handleSendIssueMessage,
+    allIssueMessages
+  } = useOverdueOrderDialog({ order, open, onOrderUpdated });
 
   if (!order) return null;
 
   const daysOverdue = order.orderDate ? differenceInDays(new Date(), new Date(order.orderDate)) : 0;
-  
-  // Flatten all messages from all issues for this order
-  const allIssueMessages: any[] = [];
-  issues.forEach(issue => {
-    if (issue.order_issue_messages) {
-      allIssueMessages.push(...issue.order_issue_messages);
-    }
-  });
-  allIssueMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

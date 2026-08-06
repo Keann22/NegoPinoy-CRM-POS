@@ -4,7 +4,7 @@ import { Fragment } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Trash2 } from "lucide-react";
+import { Loader2, Trash2, CheckSquare } from "lucide-react";
 import { usePendingPurchases } from "@/hooks/usePendingPurchases";
 import { PendingProductSearch } from "@/components/dashboard/inventory/pending-product-search";
 
@@ -21,6 +21,7 @@ export function PendingPurchases({ onReceiveComplete }: { onReceiveComplete: () 
     handleReasonChange,
     handleReceiveSingle,
     handleCancel,
+    handleCloseShort,
     handleReceive,
     closeBatch
   } = usePendingPurchases(onReceiveComplete);
@@ -130,9 +131,20 @@ export function PendingPurchases({ onReceiveComplete }: { onReceiveComplete: () 
                                 className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 px-2"
                                 onClick={() => handleCancel(item)}
                                 disabled={submittingId === item.id}
-                                title="Cancel this request"
+                                title="Cancel this request (deletes the record)"
                             >
                                 <Trash2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="border-amber-200 text-amber-600 hover:bg-amber-50 hover:text-amber-700 px-2 ml-1"
+                                onClick={() => handleCloseShort(item)}
+                                disabled={submittingId === item.id}
+                                title="Close Short (received less than expected, complete delivery)"
+                            >
+                                <CheckSquare className="h-4 w-4" />
                             </Button>
                           </td>
                         </tr>
