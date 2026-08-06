@@ -18,6 +18,7 @@ import { WaybillSummaryDialog } from '@/components/dashboard/waybill-summary-dia
 import { OrderTrailDialog } from '@/components/dashboard/order-trail-dialog';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useOrderDetail } from '@/hooks/useOrderDetail';
+import { OrderItemsCard } from '@/components/dashboard/orders/order-items-card';
 import { resolveOpenOrderIssues } from '@/lib/services/order-issues-service';
 import type { OrderStatus } from '@/types';
 
@@ -195,35 +196,7 @@ export default function OrderDetailPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader><CardTitle>Order Items</CardTitle></CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Product</TableHead>
-                <TableHead className="text-center">Qty</TableHead>
-                <TableHead className="text-right">Price</TableHead>
-                <TableHead className="text-right">Discount</TableHead>
-                <TableHead className="text-right">Line Total</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rawItems.length > 0 ? rawItems.map(item => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.productName}</TableCell>
-                  <TableCell className="text-center">{item.quantity}</TableCell>
-                  <TableCell className="text-right">₱{(item.sellingPriceAtSale || 0).toFixed(2)}</TableCell>
-                  <TableCell className="text-right text-destructive">- ₱{(item.discount || 0).toFixed(2)}</TableCell>
-                  <TableCell className="text-right font-medium">₱{(((item.sellingPriceAtSale || 0) - (item.discount || 0)) * (item.quantity || 1)).toFixed(2)}</TableCell>
-                </TableRow>
-              )) : (
-                <TableRow><TableCell colSpan={5} className="h-24 text-center">No items found for this order.</TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <OrderItemsCard orderId={order.id} orderStatus={order.orderStatus} items={rawItems} />
 
       <div className="grid gap-6 md:grid-cols-5">
         <Card className="md:col-span-3">
