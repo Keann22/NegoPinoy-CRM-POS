@@ -64,6 +64,14 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
   if (negErr) throw negErr;
   const negativeStockIds = new Set((negativeStockProducts || []).map((p: any) => p.id));
 
+  // 2.7 Products with explicitly open order issues (missing items)
+  const { data: openIssuesInitial, error: openIssuesErr } = await supabase
+    .from('order_issues')
+    .select('product_id')
+    .eq('status', 'open');
+  if (openIssuesErr) throw openIssuesErr;
+  const openIssueProductIds = new Set((openIssuesInitial || []).map((i: any) => i.product_id));
+
   // 3a. Bundle products
   const bundleProducts: { id: string; assembly_recipe: any }[] = [];
   for (let from = 0; ; from += 1000) {
@@ -84,7 +92,11 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
   );
   allBundleIds.forEach(id => negativeStockIds.delete(id));
 
-  const candidateIds = new Set([...Array.from(productIdsToFetch), ...Array.from(negativeStockIds)]);
+  const candidateIds = new Set([
+    ...Array.from(productIdsToFetch), 
+    ...Array.from(negativeStockIds),
+    ...Array.from(openIssueProductIds)
+  ]);
 
   const bundleToComponents = new Map<string, { componentId: string; qtyPerBundle: number }[]>();
   bundleProducts.forEach((bp: any) => {
@@ -162,6 +174,12 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
   }
 
   negativeStockIds.forEach(id => {
+    if ((needToBuyMap.get(id) || 0) > 0) {
+      productIdsToFetch.add(id);
+    }
+  });
+
+  openIssueProductIds.forEach(id => {
     if ((needToBuyMap.get(id) || 0) > 0) {
       productIdsToFetch.add(id);
     }
