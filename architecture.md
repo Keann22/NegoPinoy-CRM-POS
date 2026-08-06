@@ -136,6 +136,14 @@ The app has 4 user roles stored in Supabase user metadata:
 
 Role checks are done via `useUserProfile()` hook and helper functions in `user.types.ts`.
 
+### Reports tab access by role
+
+The Reports page ([reports/page.tsx](src/app/dashboard/reports/page.tsx)) gates each tab on three derived flags: `isManagement` (Owner or Admin), `isSales`, and `isInventory` (has `Inventory` **and** is not Owner/Admin). Inventory staff see an operational subset — Processed Orders, Sales by Product, Stock Reconciliation, Stale Reservations, Packed Orders, Auto-Adjustments, Purchases, and **Missing Tracking** (opened to Inventory 2026-08-04; the report carries no supplier or cost columns, so nothing confidential is exposed and they can enter tracking numbers inline). Management-only tabs: P&L, Sales by Person, Lay-away, AR, Cash Flow, and Agent Compliance.
+
+**Confidential-data rule for inventory staff**: supplier identities and purchase costs are hidden from them everywhere. The Purchases report enforces this in [usePurchasesReport.ts](src/hooks/usePurchasesReport.ts) via `canSeeCosts` (Owner/Admin only) and `canSeeSuppliers`, which drop the supplier and cost columns and swap the "By Supplier" view for a flat itemized list.
+
+**Client-side hiding is not enough on its own** — it removes the columns, but the values still travel in the JSON and are readable in devtools. So the same rule is enforced **server-side** in [api/reports/purchases/route.ts](src/app/api/reports/purchases/route.ts) (added 2026-08-04): it resolves the caller's role from the Supabase session (`app_metadata`/`user_metadata`, **default-deny** — no session or a non-Owner/Admin role is treated as staff) and, for non-management callers, strips `supplierName`/`supplierId`, unit/total costs, the cost-source suggestions, and the suppliers dropdown list out of the response before it leaves the server. Note this endpoint otherwise has **no auth gate** (like the rest of the reports API) — the role check exists only to strip confidential fields, not to reject the request. Any new report shown to Inventory must not surface supplier or cost data, and any endpoint feeding one must strip it server-side rather than trust the UI to hide it.
+
 ---
 
 ## Database (Supabase)
@@ -464,6 +472,17 @@ A fourth, internal-only **Total Open Demand** (every open order regardless of pi
 2. The requested product is either directly part of the order (`order_items`) or is an underlying component/part of a bundle product in that order (`assembly_recipe`).
 3. The requested quantity **cannot exceed** the total quantity needed by that order for that item (including expansion logic if the item is a component of a requested bundle).
 
+### "Affected Active Orders" panel on a procurement issue (fixed 2026-08-04)
+
+Opening a procurement issue (Dashboard → Procurement Issues widget, `src/components/dashboard/procurement-issues.tsx`) shows an **Affected Active Orders** panel — the orders still waiting on the flagged product. It's backed by `GET /api/inventory/procurement-issues/orders?productId=` ([route.ts](src/app/api/inventory/procurement-issues/orders/route.ts)), **separate** from the procurement sheet's own demand query but meant to answer the same "who's blocked on this item" question.
+
+**The bug**: the route filtered orders against a hard-coded **lowercase/underscore** status list — `['pending', 'processing', 'for_pick_up', 'for_shipping']` — but orders store the **capitalized/spaced** values (`Processing`, `For Pick-up`, `Picked (with issue)`, `Waiting for Stock`, …). Nothing ever matched, so the panel **always showed 0** even while the same product sat on the procurement sheet with real demand. Confirmed against prod: product `White Non stick Egg Pan Steak Pan 2in1` had one genuinely-waiting `Picked (with issue)` order yet the panel read "No active orders found."
+
+**The fix** brings the panel into parity with the sheet:
+- Filters by the shared **`UNFULFILLED_STATUSES`** constant (`procurement-service.ts`) — the same "not yet picked, still needs buying" set the sheet's **Need to Buy** uses — instead of a private status list. Do not re-inline status strings here; import the constant so the two can't drift.
+- **Expands bundle demand**: an order for a bundle whose `assembly_recipe` consumes this product never references the product's own `product_id`, so the route also matches bundle-parent ids and scales by `qty-per-bundle`, tagging those rows "via bundle" in the UI (same pattern as the sheet — see Bundle Products below).
+- **Mirrors the sheet's two guards** so it doesn't over-count: skips `order_items.is_packed` lines (unit already secured), and for `Picked (with issue)` only counts a line when an **open `order_issue`** exists for that `order_id` + ordered `product_id` (a sibling line's issue must not drag an already-picked item onto the panel).
+
 ### Stock Reconciliation report (added 2026-07-16)
 
 **Location**: Reports → "Stock Reconciliation" tab (`to-order-report.tsx`, still the `to-order` tab value under the hood — only the label changed). Reads `reconciliationItems` from the same `GET /api/inventory/procurement` response used by the sheet above.
@@ -479,9 +498,10 @@ This is the deliberate complement of the procurement sheet: every `stock_level <
 
 Some products are **bundles** assembled from other real, purchasable products — e.g. "Cy19 Stainless Pan 32cm with Takip" = 1x pan + 1x glass cover. This is modeled via `products.assembly_recipe` (a JSON array of `{ productId, quantity }`), configured per bundle product. A bundle's own `stock_level` is not meaningful for purchasing — suppliers only sell the components, never the bundle itself.
 
-**Expansion happens in four places:**
+**Expansion happens in five places:**
 - `POST /api/inventory/procurement-request` — when a picker/staff reports a bundle out of stock **by the bundle's own id**, the request is expanded onto its components (`requestedQty × component.quantity`) before being written to `purchase_order_items`, so the resulting draft targets something a supplier can actually sell. (A request already keyed to a leaf component id passes through unexpanded.)
 - `GET /api/inventory/procurement` ([route.ts](src/app/api/inventory/procurement/route.ts)) — separately expands *order demand* for a bundle onto its components (section "3a/3b" in the route) so both Total Open Demand and Need to Buy reflect real customer orders for the bundle, not just direct component orders.
+- `GET /api/inventory/procurement-issues/orders` ([route.ts](src/app/api/inventory/procurement-issues/orders/route.ts)) — the "Affected Active Orders" panel (above) expands the same way, in reverse: given a component id, it finds bundle parents whose recipe consumes it and scales their order demand by `qty-per-bundle`, so a bundle-only order still surfaces against the component's issue.
 - `reserved-stock-dialog.tsx` (Stock Allocation Details popup) — does the same expansion client-side, tagging each bundle-driven row with "via <bundle name>", so its customer list matches the number shown on the procurement sheet.
 - **Picker app UI** (`usePicker.ts` / `pick/page.tsx`, added 2026-07-30) — expands a set into its component rows *at flag time* so a picker can report a **single missing part** rather than the whole set. Unlike the other three (which expand a bundle-level number into components), this one never sends the bundle id at all: it flags and requests the chosen component's own `product_id` directly. See "Order Fulfillment Pipeline → Picker app" for the full behavior and the sales-notification rule.
 
@@ -498,6 +518,12 @@ Products are never hard-deleted — they're renamed with a `[DELETED] ` prefix. 
 **Rule going forward**: every product search box in the app must apply this same filter, or literal `[DELETED]`-named products become fully searchable and orderable again. This filter was missing from 6 different search components in one audit — order "Add Product" (`useProductSearch.ts`), Bulk Receive (`product-search.tsx`), Receive's "Add Unexpected Item" (`pending-product-search.tsx`), `scan-product-search.tsx`, Procurement's "Add Missing Item" dialog, and `view-supplier-products-dialog.tsx` — check any new product-search UI against this pattern before shipping it.
 
 **Orphaned children (recurring data bug)**: `useProducts.ts` only fetches variant children for parent IDs that survived the `[DELETED]` filter — so if a parent was renamed to `[DELETED]` without first reassigning its children to a new parent, those children become invisible on the Products page (not a top-level row, and not fetched as anyone's child either) even though they still carry real stock and order history. One cleanup pass found and merged 23 such orphans, several with real inventory (one had 4,200 units sitting invisible). If a product seems to have vanished from the Products page, or shows stock/orders with no visible source product, check `products.parent_id` against a `[DELETED]`-named parent first.
+
+---
+
+## Products page stock dialogs — Reserved vs Packed (`ReservedStockDialog`)
+
+The Products page shows Reserved / Packed / Allocated counts per product, each opening the shared `ReservedStockDialog` ([reserved-stock-dialog.tsx](src/components/dashboard/reserved-stock-dialog.tsx)) with a different `statusFilter`. The dialog **excludes `is_packed` rows by default** — correct for the Reserved and Allocation views, where a packed unit is already secured and shouldn't show as "waiting." But the **"Packed Stock Details"** reuse wants the opposite, so it passes the **`packedOnly`** prop (added 2026-08-06): with it the dialog keeps *only* `is_packed = true` rows. Before the prop, the packed popup queried `status = 'Packed'` and then filtered out every packed row, so it always rendered "No active reservations found" no matter how many packed units existed. If you add another packed-oriented view pass `packedOnly`; do **not** drop the default `is_packed` exclusion — the Reserved/Allocation views depend on it.
 
 ---
 
@@ -621,7 +647,7 @@ Three chat-style composers now support typing `@Name` inline with a live autocom
 
 Both paths keep the **"tagged you"** wording only for names the sender actually @-mentioned in *this* message and send everyone else a **"… replied on Order #XXXX"** notification, so a looped-in participant isn't misleadingly told they were tagged. The Bell still matches on `sales_person_name` (full name), which is what both the parsed note authors and `get_all_users` names resolve to.
 
-**`orders.id` is `uuid`, and this project's PostgREST does not support the `column::type` cast-in-filter trick.** `OrderSearch` (`src/components/dashboard/order-search.tsx`) originally tried `.filter('id::text', 'ilike', ...)` to prefix-search order numbers — confirmed by direct REST testing that this project's PostgREST returns the same `operator does not exist: uuid ~~* unknown` error with or without the cast. Fixed by fetching a bounded batch (`limit(500)`, most recent first) once per popover-open and filtering by ID-prefix/customer-name client-side instead of pushing the `ilike` into Postgres. The same bug (plain `.ilike('id', ...)` with no cast attempt) also exists in `src/app/api/inventory/procurement-request/route.ts`'s order lookup — not yet fixed there as of this writing.
+**`orders.id` is `uuid`, and this project's PostgREST does not support the `column::type` cast-in-filter trick.** `OrderSearch` (`src/components/dashboard/order-search.tsx`) originally tried `.filter('id::text', 'ilike', ...)` to prefix-search order numbers — confirmed by direct REST testing that this project's PostgREST returns the same `operator does not exist: uuid ~~* unknown` error with or without the cast. Fixed by fetching a bounded batch (`limit(500)`, most recent first) once per popover-open and filtering by ID-prefix/customer-name client-side instead of pushing the `ilike` into Postgres. The same bug (plain `.ilike('id', ...)` with no cast attempt) was also fixed in `src/app/api/inventory/procurement-request/route.ts` by using a UUID prefix range match.
 
 ### Messaging Center — `/dashboard/messages` (added 2026-07-21)
 
