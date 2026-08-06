@@ -20,6 +20,13 @@ interface ReservedStockDialogProps {
   statusFilter?: string[];
   excludeLayaway?: boolean;
   title?: string;
+  /**
+   * When true, show ONLY items that have been packed (`is_packed = true`) — used
+   * by the "Packed Stock Details" view. When false (default), packed items are
+   * excluded, since the Reserved/Allocation views treat packed stock as already
+   * handled.
+   */
+  packedOnly?: boolean;
 }
 
 type ReservedOrder = {
@@ -35,7 +42,7 @@ type ReservedOrder = {
   viaBundleName: string | null;
 };
 
-export function ReservedStockDialog({ productId, productName, isOpen, onClose, statusFilter = ['Pending Payment', 'Processing'], excludeLayaway = false, title = "Reserved Stock Details" }: ReservedStockDialogProps) {
+export function ReservedStockDialog({ productId, productName, isOpen, onClose, statusFilter = ['Pending Payment', 'Processing'], excludeLayaway = false, title = "Reserved Stock Details", packedOnly = false }: ReservedStockDialogProps) {
   const supabase = useSupabase();
   const [loading, setLoading] = useState(false);
   const [reservedOrders, setReservedOrders] = useState<ReservedOrder[]>([]);
@@ -122,8 +129,12 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose, s
 
         let formattedOrders: ReservedOrder[] = (data || [])
           .filter((item: any) => {
+            // Packed view wants exactly the packed rows; every other view treats
+            // packed stock as already handled and excludes it.
+            if (packedOnly) return item.is_packed === true;
+
             if (item.is_packed) return false;
-            
+
             if (item.orders.status === 'Picked (with issue)') {
               return openIssueKeys.has(`${item.orders.id}-${item.product_id}`);
             }
@@ -160,7 +171,7 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose, s
     }
 
     fetchReservedOrders();
-  }, [isOpen, productId, supabase]);
+  }, [isOpen, productId, supabase, packedOnly]);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
