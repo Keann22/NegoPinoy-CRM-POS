@@ -16,3 +16,5 @@ export * from './customer.types';
 export * from './supplier.types';
 export * from './accounting.types';
 export * from './agent.types';
+export * from './report.types';
+export * from './message.types';
