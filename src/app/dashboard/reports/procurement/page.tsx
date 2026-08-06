@@ -225,24 +225,46 @@ export default function ProcurementSheet() {
     }
   };
 
-  const handleCopyOrder = (supplierName: string, groupItems: any[]) => {
-    let text = "";
-    
-    groupItems.forEach((item: any) => {
-      if (item.neededQty && Number(item.neededQty) > 0) {
-        text += `${item.neededQty}x ${item.productName}\n`;
+  const handleCopyOrder = async (supplierId: string | null, supplierName: string, groupItems: any[]) => {
+    if (!supplierId) return; // Should not happen based on UI
+
+    try {
+      const { data: allProducts, error } = await supabase
+        .from('products')
+        .select('id, name, variant_name')
+        .eq('supplier_id', supplierId)
+        .not('name', 'ilike', '[DELETED]%')
+        .order('name');
+        
+      if (error) throw error;
+
+      let text = "";
+      const neededMap = new Map();
+      
+      groupItems.forEach((item: any) => {
+        if (item.neededQty && Number(item.neededQty) > 0) {
+          neededMap.set(item.productId, Number(item.neededQty));
+        }
+      });
+
+      allProducts?.forEach((p: any) => {
+        const neededQty = neededMap.get(p.id) || 0;
+        let displayName = p.name;
+        if (p.variant_name && !p.name.includes(p.variant_name)) {
+          displayName = `${p.name} [${p.variant_name}]`;
+        }
+        text += `${neededQty}x ${displayName}\n`;
+      });
+
+      if (!text) {
+        return alert("No products found for this supplier!");
       }
-    });
 
-    if (!text) {
-      return alert("No items have a quantity to order!");
-    }
-
-    navigator.clipboard.writeText(text.trim()).then(() => {
+      await navigator.clipboard.writeText(text.trim());
       alert("Order copied to clipboard! You can now paste it into Messenger.");
-    }).catch(err => {
-      alert("Failed to copy text: " + err);
-    });
+    } catch (err: any) {
+      alert("Failed to copy text: " + err.message);
+    }
   };
 
   if (loading) return <div className="p-8 text-center text-slate-500">Loading Procurement Sheet...</div>;

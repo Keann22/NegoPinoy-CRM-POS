@@ -33,7 +33,7 @@ export function SupplierGroupCard({
           {group.id !== null && (
             <Button 
               variant="outline"
-              onClick={() => handleCopyOrder(group.name, group.items)}
+              onClick={() => handleCopyOrder(group.id, group.name, group.items)}
               className="text-slate-600 font-bold px-3 py-1 h-auto flex items-center gap-2 text-xs md:text-sm"
             >
               <Copy className="w-4 h-4" /> Copy Order
