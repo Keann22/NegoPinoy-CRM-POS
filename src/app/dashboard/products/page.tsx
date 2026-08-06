@@ -246,6 +246,7 @@ export default function ProductsPage() {
           isOpen={!!viewingPackedProduct}
           onClose={() => setViewingPackedProduct(null)}
           statusFilter={['Packed']}
+          packedOnly
           title="Packed Stock Details"
       />
       <ReservedStockDialog
