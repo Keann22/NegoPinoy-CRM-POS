@@ -73,20 +73,71 @@ export function ViewProductHistoryDialog({ product, open, onOpenChange }: ViewPr
     const fetchMovements = async () => {
       setIsLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('inventory_movements')
-          .select('*')
-          .eq('product_id', displayProduct.id)
-          .order('timestamp', { ascending: false });
-        if (error) throw error;
-        setMovements((data || []).map((m: any) => ({
+        const [movementsRes, itemsRes] = await Promise.all([
+          supabase
+            .from('inventory_movements')
+            .select('*')
+            .eq('product_id', displayProduct.id)
+            .order('timestamp', { ascending: false }),
+          supabase
+            .from('order_items')
+            .select('order_id')
+            .eq('product_id', displayProduct.id)
+        ]);
+
+        if (movementsRes.error) throw movementsRes.error;
+        if (itemsRes.error) throw itemsRes.error;
+
+        const baseMovements = (movementsRes.data || []).map((m: any) => ({
           id: m.id,
           productId: m.product_id,
           quantityChange: m.quantity_change,
           movementType: m.movement_type,
           timestamp: m.timestamp,
           reason: m.reason,
-        })));
+        }));
+
+        let logMovements: InventoryMovement[] = [];
+        const orderIds = Array.from(new Set((itemsRes.data || []).map((i: any) => i.order_id)));
+        
+        if (orderIds.length > 0) {
+          // Chunk orderIds to avoid URL too long errors on Supabase GET
+          const chunkSize = 150;
+          const chunks = [];
+          for (let i = 0; i < orderIds.length; i += chunkSize) {
+            chunks.push(orderIds.slice(i, i + chunkSize));
+          }
+
+          const logsPromises = chunks.map(chunk => 
+            supabase
+              .from('order_logs')
+              .select('*')
+              .in('order_id', chunk)
+          );
+
+          const logsResults = await Promise.all(logsPromises);
+          const allLogs = logsResults.flatMap(res => res.data || []);
+
+          // Filter to physical/operational statuses that mean something for the item lifecycle
+          const relevantStatuses = ['Picked', 'Packed', 'Shipped', 'Completed', 'Returned', 'Picked (with issue)', 'Waiting for Stock', 'Cancelled'];
+          
+          logMovements = allLogs
+            .filter((log: any) => relevantStatuses.includes(log.status))
+            .map((log: any) => ({
+              id: `log-${log.id}`,
+              productId: displayProduct.id,
+              quantityChange: 0,
+              movementType: log.status, // We use the status as the movement type so the UI badge reflects it
+              timestamp: log.created_at,
+              reason: `Order #${log.order_id.substring(0, 8).toUpperCase()} ${log.status.toLowerCase()}${log.user_name ? ` by ${log.user_name}` : ''}`
+            }));
+        }
+
+        const combined = [...baseMovements, ...logMovements].sort((a, b) => 
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+
+        setMovements(combined);
       } catch (err) {
         console.error('Inventory movement fetch error:', err);
       } finally {
