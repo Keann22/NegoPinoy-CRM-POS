@@ -206,16 +206,22 @@ export async function autoCleanupStaffDrafts(supabase: SupabaseClient) {
       if (!matchingOi) {
         // If the order doesn't even contain the product (e.g. it was removed), delete the source
         shouldDelete = true;
-      } else if (matchingOi.is_packed) {
-        // The item is physically packed!
-        shouldDelete = true;
       } else if (src.orders.status === 'Picked (with issue)') {
-        // Unfulfilled only if this specific product (or its bundle parent) has an open issue
-        const hasIssue = openIssues?.some(iss => 
-          iss.order_id === src.order_id && 
+        // An open out-of-stock issue is the authoritative signal that the item is
+        // still genuinely missing, so it must win over a stale is_packed flag. An
+        // item can't be both packed and out of stock at once; is_packed lingers
+        // from an earlier pack when the item is later re-picked and flagged short,
+        // and the old order (is_packed check first) silently deleted the very
+        // procurement request the shortage created. Keep the draft while the issue
+        // is open (packed or not); only clean it up once the issue is resolved.
+        const hasIssue = openIssues?.some(iss =>
+          iss.order_id === src.order_id &&
           (iss.product_id === matchingOi.product_id || iss.product_id === draft.product_id)
         );
         if (!hasIssue) shouldDelete = true;
+      } else if (matchingOi.is_packed) {
+        // Non-issue order whose item is physically packed — already secured, don't buy.
+        shouldDelete = true;
       }
     }
 

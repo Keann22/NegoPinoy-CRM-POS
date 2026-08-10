@@ -230,7 +230,14 @@ When a staff member reports an issue (e.g. "Missing item") while picking an orde
 
 However, if the missing item is later found or restocked, and the item gets physically packed (`is_packed = true`), or if the order is completed, the manual Staff Request is no longer needed. Previously, the system's cleanup script only checked if the overall order was still "unfulfilled," which caused ghost items to linger on the Procurement Sheet if the order was partially fulfilled but the specific requested item was already packed.
 
-**The Fix:** The `autoCleanupStaffDrafts` script in `procurement-service.ts` now explicitly checks item-level status (including bundle expansion). If the specific item mapped to the Staff Request is either `is_packed = true` or has no active `open` issue against it, the script automatically deletes the orphaned Staff Request. This ensures the Procurement Sheet's "Staff Request" column perfectly matches physical reality.
+**The Fix:** The `autoCleanupStaffDrafts` script in `procurement-service.ts` explicitly checks item-level status (including bundle expansion) before deleting a Staff Request.
+
+**Precedence correction (2026-08-10):** an earlier version checked `is_packed` *before* the open-issue check, so an item that was **both** `is_packed = true` **and** had an `open` out-of-stock issue got its Staff Request silently deleted on the next Procurement Sheet load (`autoCleanupStaffDrafts` runs on every `GET /api/inventory/procurement`). `is_packed = true` is stale in that state — an item can't be both packed and out of stock; the flag lingers from an earlier pack when the item is later re-picked and flagged short. The picker recreated the draft each pick (its `POST` returned 200), and each dashboard load wiped it again — so the shortage never reached procurement (real case: order #ECB5662's *kitchen boss – Slotted/Sandok*). The logic now checks in this order:
+- **No matching order item** (product removed from the order) → delete.
+- **`Picked (with issue)` order** → an `open` `order_issue` for that `order_id` + product (or its bundle parent) **keeps** the draft, regardless of `is_packed`; delete only once the issue is resolved.
+- **Other unfulfilled status** (`Processing`, `Waiting for Stock`) → `is_packed = true` still means "already secured, don't buy" → delete.
+
+Where an item is genuinely in the contradictory state, the stale `is_packed = true` should also be cleared on the `order_items` row (it otherwise zeroes the item's demand in the sheet's Need-to-Buy calc, per **Item-Level Fulfillment** above).
 
 ### Picker App Ghost Stock Prevention (added 2026-08-06)
 
