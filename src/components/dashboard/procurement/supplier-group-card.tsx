@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { Copy } from "lucide-react";
+import { Copy, ScanLine } from "lucide-react";
 import { ProcurementItemRow } from "@/components/dashboard/procurement/procurement-item-row";
 
 export function SupplierGroupCard({
@@ -9,6 +9,7 @@ export function SupplierGroupCard({
   toggleItemSelection,
   toggleGroupSelection,
   handleCopyOrder,
+  handleScanReceipt,
   openBulkBuyDialog,
   handleProductClick,
   isLoadingProduct,
@@ -31,13 +32,22 @@ export function SupplierGroupCard({
         <h2 className="text-xl font-bold text-slate-800">{group.name}</h2>
         <div className="flex items-center gap-2">
           {group.id !== null && (
-            <Button 
-              variant="outline"
-              onClick={() => handleCopyOrder(group.id, group.name, group.items)}
-              className="text-slate-600 font-bold px-3 py-1 h-auto flex items-center gap-2 text-xs md:text-sm"
-            >
-              <Copy className="w-4 h-4" /> Copy Order
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                onClick={() => handleCopyOrder(group.id, group.name, group.items)}
+                className="text-slate-600 font-bold px-3 py-1 h-auto flex items-center gap-2 text-xs md:text-sm"
+              >
+                <Copy className="w-4 h-4" /> Copy Order
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => handleScanReceipt(group.id, group.name, group.items)}
+                className="text-emerald-700 border-emerald-200 font-bold px-3 py-1 h-auto flex items-center gap-2 text-xs md:text-sm"
+              >
+                <ScanLine className="w-4 h-4" /> Scan Receipt
+              </Button>
+            </>
           )}
           <Button 
             onClick={() => openBulkBuyDialog(group.id, group.items, group.name)} 

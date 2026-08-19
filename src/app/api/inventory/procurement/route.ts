@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getProcurementDashboardData } from '@/lib/services/procurement-dashboard-service';
-import { processProcurementPurchases, updateProductSupplierPricing } from '@/lib/services/procurement-purchase-service';
+import { processProcurementPurchases, updateProductSupplierPricing, setSupplierProductCode } from '@/lib/services/procurement-purchase-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,11 +32,20 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
-    const { productId, newSupplierId, unitCost } = await req.json();
+    const { productId, newSupplierId, unitCost, supplierCode } = await req.json();
     if (!productId || !newSupplierId) {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
     }
-    await updateProductSupplierPricing(supabase, productId, newSupplierId, unitCost);
+    // Code-only request (from the receipt scanner): just learn the supplier's
+    // product code without reassigning the product's supplier.
+    if (supplierCode !== undefined && unitCost === undefined) {
+      await setSupplierProductCode(supabase, productId, newSupplierId, supplierCode);
+    } else {
+      await updateProductSupplierPricing(supabase, productId, newSupplierId, unitCost);
+      if (supplierCode !== undefined) {
+        await setSupplierProductCode(supabase, productId, newSupplierId, supplierCode);
+      }
+    }
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('Error in procurement PATCH:', error);

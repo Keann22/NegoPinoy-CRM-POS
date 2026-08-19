@@ -13,6 +13,7 @@ import { ReportIssueDialog } from "@/components/dashboard/procurement/report-iss
 import { ReservedStockDialog } from "@/components/dashboard/reserved-stock-dialog";
 import { PurchasedItemsTable } from "@/components/dashboard/procurement/purchased-items-table";
 import { SupplierGroupCard } from "@/components/dashboard/procurement/supplier-group-card";
+import { ScanReceiptDialog } from "@/components/dashboard/procurement/scan-receipt-dialog";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -58,6 +59,9 @@ export default function ProcurementSheet() {
   const [issueProduct, setIssueProduct] = useState<any>(null);
 
   const [viewingAllocatedItem, setViewingAllocatedItem] = useState<{ id: string; name: string; context?: 'total' | 'needToBuy' } | null>(null);
+
+  const [scanDialogOpen, setScanDialogOpen] = useState(false);
+  const [scanGroup, setScanGroup] = useState<{ id: string; name: string; items: any[] } | null>(null);
 
   // isManual keeps the current numbers on screen while re-fetching (only the
   // Refresh button spins), instead of blanking the whole sheet behind the
@@ -225,6 +229,21 @@ export default function ProcurementSheet() {
     }
   };
 
+  const handleScanReceipt = (supplierId: string, supplierName: string, groupItems: any[]) => {
+    setScanGroup({ id: supplierId, name: supplierName, items: groupItems });
+    setScanDialogOpen(true);
+  };
+
+  // After matching a scanned receipt, reuse the existing bulk Record flow so the
+  // whole receipt can be recorded as purchases in one confirm step.
+  const handleScanConfirm = (purchases: any[]) => {
+    if (!scanGroup) return;
+    setScanDialogOpen(false);
+    setBulkBuyGroup({ id: scanGroup.id, name: scanGroup.name });
+    setBulkBuyPurchases(purchases);
+    setBulkBuyDialogOpen(true);
+  };
+
   const handleCopyOrder = async (supplierId: string | null, supplierName: string, groupItems: any[]) => {
     let text = "";
     
@@ -289,6 +308,7 @@ export default function ProcurementSheet() {
               toggleItemSelection={toggleItemSelection}
               toggleGroupSelection={toggleGroupSelection}
               handleCopyOrder={handleCopyOrder}
+              handleScanReceipt={handleScanReceipt}
               openBulkBuyDialog={openBulkBuyDialog}
               handleProductClick={handleProductClick}
               isLoadingProduct={isLoadingProduct}
@@ -363,6 +383,18 @@ export default function ProcurementSheet() {
           setIssueProduct(null);
         }}
       />
+
+      {scanGroup && (
+        <ScanReceiptDialog
+          open={scanDialogOpen}
+          onOpenChange={setScanDialogOpen}
+          supplierId={scanGroup.id}
+          supplierName={scanGroup.name}
+          tableItems={scanGroup.items}
+          isManagement={isManagement}
+          onConfirm={handleScanConfirm}
+        />
+      )}
 
       <ReservedStockDialog
         productId={viewingAllocatedItem?.id || ''}

@@ -120,6 +120,46 @@ export async function processProcurementPurchases(supabase: SupabaseClient, purc
   return po.id;
 }
 
+/**
+ * Records the supplier's own product code for a product, keyed by supplier, in
+ * the product's `supplier_pricing` JSONB array. This is what lets a scanned
+ * receipt auto-match the same item next time by its supplier code. It only
+ * touches the supplier code (creating the pricing entry if none exists yet) and
+ * deliberately does NOT reassign `products.supplier_id`.
+ */
+export async function setSupplierProductCode(
+  supabase: SupabaseClient,
+  productId: string,
+  supplierId: string,
+  supplierCode: string
+) {
+  const code = (supplierCode || '').trim();
+  if (!code) return;
+
+  const { data: currentProduct } = await supabase
+    .from('products')
+    .select('supplier_pricing')
+    .eq('id', productId)
+    .single();
+  const pricing = currentProduct?.supplier_pricing || [];
+
+  const idx = pricing.findIndex((sp: any) => sp.supplierId === supplierId);
+  if (idx >= 0) {
+    pricing[idx].supplierCode = code;
+  } else {
+    const { data: sup } = await supabase.from('suppliers').select('name').eq('id', supplierId).single();
+    pricing.push({
+      supplierId,
+      supplierName: sup?.name || 'Unknown Supplier',
+      unitCost: 0,
+      supplierCode: code,
+    });
+  }
+
+  const { error } = await supabase.from('products').update({ supplier_pricing: pricing }).eq('id', productId);
+  if (error) throw error;
+}
+
 export async function updateProductSupplierPricing(supabase: SupabaseClient, productId: string, newSupplierId: string, unitCost: number | undefined) {
   const { data: currentProduct } = await supabase.from('products').select('supplier_pricing, initial_unit_cost').eq('id', productId).single();
   const newPricing = currentProduct?.supplier_pricing || [];

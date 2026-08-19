@@ -39,6 +39,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ['genkit', '@genkit-ai/google-genai', '@genkit-ai/googleai', 'pdfjs-dist', 'canvas', 'pdf-parse', 'tesseract.js', 'tesseract.js-core'],
   outputFileTracingIncludes: {
     '/api/payments/extract-ocr': ['./node_modules/tesseract.js-core/**/*.wasm'],
+    '/api/inventory/scan-receipt': ['./node_modules/tesseract.js-core/**/*.wasm'],
   },
   webpack: (config) => {
     config.resolve.alias.canvas = false;
