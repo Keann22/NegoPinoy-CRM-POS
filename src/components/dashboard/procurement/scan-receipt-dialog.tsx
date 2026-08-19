@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
-import { Loader2, Trash2, Upload, Sparkles } from "lucide-react";
+import { Loader2, Trash2, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AddProductDialog } from "@/components/dashboard/product-dialog";
 
@@ -159,7 +159,6 @@ export function ScanReceiptDialog({
   const [isScanning, setIsScanning] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [lastImage, setLastImage] = useState<string | null>(null);
   const [engine, setEngine] = useState<string | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
 
@@ -172,7 +171,6 @@ export function ScanReceiptDialog({
     if (!open) {
       setRows([]);
       setPreviewUrl(null);
-      setLastImage(null);
       setEngine(null);
       setIsScanning(false);
     }
@@ -197,7 +195,7 @@ export function ScanReceiptDialog({
     };
   };
 
-  const runScan = async (dataUri: string, forceAi: boolean) => {
+  const runScan = async (dataUri: string) => {
     setIsScanning(true);
     setRows([]);
     try {
@@ -208,7 +206,6 @@ export function ScanReceiptDialog({
           imageBase64: dataUri,
           supplierId,
           tableItems: (tableItems || []).map((i) => ({ productId: i.productId, productName: i.productName })),
-          forceAi,
         }),
       });
       const data = await res.json();
@@ -220,15 +217,10 @@ export function ScanReceiptDialog({
         toast({
           variant: "destructive",
           title: "No items found",
-          description: forceAi
-            ? "The AI couldn't read line items either. Try a clearer photo."
-            : "Couldn't read it. Tap “Read with AI” or try a clearer photo.",
+          description: "Couldn't read line items from that photo. Try a clearer, flatter shot.",
         });
       } else {
-        toast({
-          title: forceAi ? "Read with AI" : "Receipt scanned",
-          description: `Found ${scanned.length} line(s)${data.engine ? ` via ${data.engine}` : ""}. Review below.`,
-        });
+        toast({ title: "Receipt scanned", description: `Found ${scanned.length} line(s). Review below.` });
       }
       setRows(scanned.map(lineToRow));
     } catch (err: any) {
@@ -244,10 +236,9 @@ export function ScanReceiptDialog({
     if (!file) return;
     setPreviewUrl(URL.createObjectURL(file));
     const dataUri = await fileToDataUri(file);
-    setLastImage(dataUri);
     // allow re-selecting the same file
     e.target.value = "";
-    await runScan(dataUri, false); // free OCR first
+    await runScan(dataUri);
   };
 
   const updateRow = useCallback((idx: number, patch: Partial<Row>) => {
@@ -349,21 +340,9 @@ export function ScanReceiptDialog({
                   <Loader2 className="w-4 h-4 animate-spin" /> Reading receipt...
                 </span>
               )}
-              {lastImage && !isScanning && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => runScan(lastImage, true)}
-                  className="text-violet-700 border-violet-200 gap-2"
-                  title="Uses Gemini AI — better on hard/handwritten receipts, but costs a small amount per scan."
-                >
-                  <Sparkles className="w-4 h-4" /> Read with AI
-                </Button>
-              )}
               {engine && !isScanning && (
                 <span className="text-xs text-slate-400">
-                  read by {engine === "gemini" ? "AI" : engine === "vision" ? "Google Vision" : "Tesseract (free)"}
+                  read by {engine === "gemini" ? "AI" : engine === "vision" ? "Google Vision" : "Tesseract"}
                 </span>
               )}
               {previewUrl && !isScanning && (

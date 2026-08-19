@@ -29,50 +29,36 @@ type Candidate = {
 
 export async function POST(request: Request) {
   try {
-    const { imageBase64, supplierId, tableItems, forceAi } = await request.json();
+    const { imageBase64, supplierId, tableItems } = await request.json();
 
     if (!imageBase64) {
       return NextResponse.json({ error: 'Missing imageBase64' }, { status: 400 });
     }
 
-    // 1. Read the receipt into line items — free-first to keep costs down.
-    //    Tesseract (free, local) reads by default, with Google Vision as a
-    //    light fallback when its text is too thin. Gemini (paid, per image) is
-    //    only used when the caller explicitly asks via `forceAi` — i.e. the
-    //    user taps "Read with AI" because the free read came out wrong.
-    const runFreeOcr = async (): Promise<{ lines: ParsedReceiptLine[]; engine: string }> => {
+    // 1. Read the receipt into line items. Gemini vision is the primary reader:
+    //    it returns already-structured items and handles hard/handwritten
+    //    receipts that flat OCR can't. Only if it's unavailable or reads nothing
+    //    (no key, quota, network) do we fall back automatically to the free
+    //    Tesseract OCR, then Google Vision when Tesseract's text is too thin.
+    let engine = 'gemini';
+    let lines: ParsedReceiptLine[] = (await runGeminiReceipt(imageBase64)) || [];
+
+    if (lines.length === 0) {
+      engine = 'tesseract';
       const text = await runTesseractBase64(imageBase64);
-      let l = parseReceiptLines(text);
-      let eng = 'tesseract';
-      if (l.length < 2) {
+      lines = parseReceiptLines(text);
+      if (lines.length < 2) {
         const visionText = await runGoogleVisionBase64(imageBase64);
         if (visionText) {
-          const vl = parseReceiptLines(visionText);
-          if (vl.length > l.length) {
-            eng = 'vision';
-            l = vl;
+          const visionLines = parseReceiptLines(visionText);
+          if (visionLines.length > lines.length) {
+            engine = 'vision';
+            lines = visionLines;
           }
         }
       }
-      return { lines: l, engine: eng };
-    };
-
-    let engine: string;
-    let lines: ParsedReceiptLine[];
-
-    if (forceAi) {
-      const ai = await runGeminiReceipt(imageBase64);
-      if (ai && ai.length > 0) {
-        engine = 'gemini';
-        lines = ai;
-      } else {
-        // AI unavailable/failed — don't leave the user empty-handed.
-        ({ engine, lines } = await runFreeOcr());
-      }
-    } else {
-      ({ engine, lines } = await runFreeOcr());
     }
-    console.log(`[ScanReceipt] Read ${lines.length} line(s) via ${engine}${forceAi ? ' (AI requested)' : ''}`);
+    console.log(`[ScanReceipt] Read ${lines.length} line(s) via ${engine}`);
 
     // 2. Build the supplier-scoped candidate set.
     //    (a) items currently on the procurement table for this supplier.

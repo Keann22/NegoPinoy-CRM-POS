@@ -80,7 +80,7 @@ export interface ParsedReceiptLine {
 
 /** Split a data URI into its mime type and raw base64 (defaults to image/jpeg). */
 function splitDataUri(input: string): { mimeType: string; data: string } {
-  const m = input.match(/^data:([^;]+);base64,(.*)$/s);
+  const m = input.match(/^data:([^;]+);base64,([\s\S]*)$/);
   if (m) return { mimeType: m[1], data: m[2] };
   return { mimeType: 'image/jpeg', data: input };
 }
