@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { format, differenceInDays } from "date-fns";
-import { AlertCircle, Clock, PackageX, MessageSquare } from "lucide-react";
+import { AlertCircle, Clock, PackageX, MessageSquare, PauseCircle } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -230,6 +230,15 @@ export function OverdueOrders({ orders, customerMap, isExpanded, onToggleExpand,
                   <p className="text-xs text-slate-600 font-medium mt-1 truncate">
                     {customerMap.get(order.customerId) || 'Unknown Customer'}
                   </p>
+
+                  {order.orderStatus === 'On-Hold' && (
+                    <div className="mt-2">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded">
+                        <PauseCircle className="w-3 h-3" />
+                        On Hold
+                      </span>
+                    </div>
+                  )}
 
                   {issueSummary && (
                     <div className="mt-2">

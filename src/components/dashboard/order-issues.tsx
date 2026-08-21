@@ -2,7 +2,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, CheckCircle2, MessageSquare, PackageOpen, Send } from "lucide-react";
+import { AlertCircle, CheckCircle2, MessageSquare, PackageOpen, PauseCircle, Send } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { MentionInput } from "@/components/dashboard/mention-input";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -45,6 +45,7 @@ export function OrderIssues({ }: { isAdmin?: boolean }) {
         orderTitle: issue.orders ? `Order #${issue.orders.id.substring(0,7).toUpperCase()}` : 'Unknown Order',
         customerId: issue.orders?.customer_id || null,
         customerName: issue.orders?.customers?.full_name || '',
+        orderStatus: issue.orders?.status || null,
         reporter: issue.reported_by_name || issue.order_issue_messages?.[0]?.sender_name || 'Unknown',
         createdAt: issue.created_at,
         items: [],
@@ -184,6 +185,12 @@ export function OrderIssues({ }: { isAdmin?: boolean }) {
                         </Link>
                       ) : group.orderTitle}
                     </h4>
+                    {group.orderStatus === 'On-Hold' && (
+                      <span className="inline-flex items-center gap-1 mt-1 text-[11px] font-bold uppercase tracking-wide text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded">
+                        <PauseCircle className="w-3 h-3" />
+                        On Hold
+                      </span>
+                    )}
                     {group.customerName && (
                       <p className="text-xs text-slate-600 font-medium">
                         {group.customerId ? (

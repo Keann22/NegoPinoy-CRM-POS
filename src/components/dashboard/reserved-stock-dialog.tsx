@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Activity } from 'lucide-react';
+import { Loader2, Activity, PauseCircle } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { OrderTrailDialog } from '@/components/dashboard/order-trail-dialog';
@@ -234,9 +234,16 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose, s
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={order.status === 'Pending Payment' ? 'destructive' : 'secondary'}>
-                        {order.status}
-                      </Badge>
+                      {order.status === 'On-Hold' ? (
+                        <Badge className="gap-1 bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-100">
+                          <PauseCircle className="h-3 w-3" />
+                          On Hold
+                        </Badge>
+                      ) : (
+                        <Badge variant={order.status === 'Pending Payment' ? 'destructive' : 'secondary'}>
+                          {order.status}
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell className="text-right font-bold text-lg">{order.quantity}</TableCell>
                     <TableCell className="text-right">
