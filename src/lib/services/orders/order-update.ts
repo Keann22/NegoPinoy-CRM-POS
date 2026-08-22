@@ -219,9 +219,30 @@ export async function editOrder(
           if (item) {
             const newExpectedQty = item.expected_qty - deduction.deductQty;
             if (newExpectedQty <= 0) {
+              // Deleting the draft line cascades its procurement_request_sources away.
               await supabase.from('purchase_order_items').delete().eq('id', item.id);
             } else {
               await supabase.from('purchase_order_items').update({ expected_qty: newExpectedQty }).eq('id', item.id);
+
+              // Keep this order's source row in step with the lowered demand, so
+              // the Staff Req. count and its detail dialog stay reconciled (and
+              // autoCleanupStaffDrafts doesn't later over-deduct against a stale
+              // source quantity).
+              const { data: src } = await supabase
+                .from('procurement_request_sources')
+                .select('id, quantity')
+                .eq('purchase_order_item_id', item.id)
+                .eq('order_id', context.orderId)
+                .maybeSingle();
+
+              if (src) {
+                const newSrcQty = src.quantity - deduction.deductQty;
+                if (newSrcQty <= 0) {
+                  await supabase.from('procurement_request_sources').delete().eq('id', src.id);
+                } else {
+                  await supabase.from('procurement_request_sources').update({ quantity: newSrcQty }).eq('id', src.id);
+                }
+              }
             }
           }
         }
