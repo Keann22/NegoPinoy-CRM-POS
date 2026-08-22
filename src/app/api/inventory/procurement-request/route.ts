@@ -173,7 +173,7 @@ export async function POST(req: Request) {
     // Fetch existing items for this PO
     const { data: existingItems, error: itemsErrFetch } = await supabase
       .from('purchase_order_items')
-      .select('id, product_id, expected_qty, received_qty')
+      .select('id, product_id, expected_qty, received_qty, manual_qty')
       .eq('po_id', poId);
 
     if (itemsErrFetch) throw itemsErrFetch;
@@ -263,30 +263,40 @@ export async function POST(req: Request) {
       insertedItems?.forEach(i => purchaseOrderItemIdByProduct.set(i.product_id, i.id));
     }
 
-    // Process each request safely to avoid duplicate accumulation
+    // Process each request safely to avoid duplicate accumulation.
+    //
+    // A product's requested qty splits into two kinds of demand that are
+    // tracked differently:
+    //   - order-linked: mirrored row-for-row in procurement_request_sources
+    //     and deduped per order so re-reporting the same shortage doesn't
+    //     double-count. This is the traceable part shown in the detail dialog.
+    //   - manual (order-less): the "Add Missing Item" flow adds demand with no
+    //     order to point to, so it can't become a source. It's recorded in
+    //     manual_qty so reconciliation later knows it's legitimate, not phantom.
+    // expected_qty is the sum of both.
     for (const p of finalRequests) {
       const purchaseOrderItemId = purchaseOrderItemIdByProduct.get(p.productId);
       if (!purchaseOrderItemId) continue;
-      
+
       const contributions = productOrderContributions.get(p.productId);
-      let totalQtyToAdd = p.requestedQty;
-      
+
+      let orderDelta = 0;        // amount added to expected_qty from orders this submission
+      let orderRequestedTotal = 0; // total order-linked qty requested this submission
+
       if (contributions && contributions.size > 0) {
-        // This is tied to specific orders, we must avoid duplicates
-        totalQtyToAdd = 0;
         for (const [orderId, qty] of Array.from(contributions.entries())) {
+          orderRequestedTotal += qty;
           const { data: existingSrc } = await supabase
             .from('procurement_request_sources')
             .select('id, quantity')
             .eq('purchase_order_item_id', purchaseOrderItemId)
             .eq('order_id', orderId)
             .maybeSingle();
-            
+
           if (existingSrc) {
             // Already reported. Update to the new quantity if it's higher.
             if (qty > existingSrc.quantity) {
-              const delta = qty - existingSrc.quantity;
-              totalQtyToAdd += delta;
+              orderDelta += qty - existingSrc.quantity;
               await supabase
                 .from('procurement_request_sources')
                 .update({ quantity: qty })
@@ -294,7 +304,7 @@ export async function POST(req: Request) {
             }
           } else {
             // New order source
-            totalQtyToAdd += qty;
+            orderDelta += qty;
             await supabase
               .from('procurement_request_sources')
               .insert({ purchase_order_item_id: purchaseOrderItemId, order_id: orderId, quantity: qty });
@@ -302,12 +312,20 @@ export async function POST(req: Request) {
         }
       }
 
-      if (totalQtyToAdd > 0 || !existingMap.has(p.productId)) {
-        const currentQty = existingMap.has(p.productId) ? existingMap.get(p.productId)!.expected_qty : 0;
+      // Whatever wasn't attributed to an order is order-less manual demand.
+      // (No per-order dedup applies, so each manual submission accumulates.)
+      const manualDelta = Math.max(0, p.requestedQty - orderRequestedTotal);
+      const totalDelta = orderDelta + manualDelta;
+
+      if (totalDelta > 0 || !existingMap.has(p.productId)) {
+        const existing = existingMap.get(p.productId);
+        const currentQty = existing ? existing.expected_qty : 0;
+        const currentManual = existing ? (existing.manual_qty || 0) : 0;
         await supabase
           .from('purchase_order_items')
           .update({
-            expected_qty: currentQty + totalQtyToAdd,
+            expected_qty: currentQty + totalDelta,
+            manual_qty: currentManual + manualDelta,
             status: 'pending_receipt',
             ...(requestedByName ? { requested_by_name: requestedByName } : {})
           })

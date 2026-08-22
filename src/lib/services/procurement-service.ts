@@ -67,7 +67,7 @@ export async function getAffectedSalesRepOrders(supabase: SupabaseClient, produc
 export async function migrateLeakedBundleDrafts(supabase: SupabaseClient) {
   const { data: staffDraftItems } = await supabase
     .from('purchase_order_items')
-    .select('id, po_id, product_id, expected_qty, requested_by_name, purchase_orders!inner(notes)')
+    .select('id, po_id, product_id, expected_qty, manual_qty, requested_by_name, purchase_orders!inner(notes)')
     .eq('purchase_orders.notes', 'STAFF_DRAFT')
     .eq('status', 'pending_receipt');
 
@@ -108,10 +108,13 @@ export async function migrateLeakedBundleDrafts(supabase: SupabaseClient) {
       if (!componentId) continue;
       const multiplier = comp.quantity || 1;
       const addQty = leak.expected_qty * multiplier;
+      // Carry the bundle line's order-less portion onto the component too, so
+      // manual demand survives the migration and later reconciliation.
+      const addManualQty = (leak.manual_qty || 0) * multiplier;
 
       const { data: existingComponentDraft } = await supabase
         .from('purchase_order_items')
-        .select('id, expected_qty')
+        .select('id, expected_qty, manual_qty')
         .eq('po_id', leak.po_id)
         .eq('product_id', componentId)
         .maybeSingle();
@@ -124,6 +127,7 @@ export async function migrateLeakedBundleDrafts(supabase: SupabaseClient) {
           .from('purchase_order_items')
           .update({
             expected_qty: existingComponentDraft.expected_qty + addQty,
+            manual_qty: (existingComponentDraft.manual_qty || 0) + addManualQty,
             status: 'pending_receipt',
             ...(leak.requested_by_name ? { requested_by_name: leak.requested_by_name } : {})
           })
@@ -135,6 +139,7 @@ export async function migrateLeakedBundleDrafts(supabase: SupabaseClient) {
             po_id: leak.po_id,
             product_id: componentId,
             expected_qty: addQty,
+            manual_qty: addManualQty,
             unit_cost: 0,
             status: 'pending_receipt',
             requested_by_name: leak.requested_by_name || null
@@ -182,7 +187,7 @@ export async function migrateLeakedBundleDrafts(supabase: SupabaseClient) {
 export async function autoCleanupStaffDrafts(supabase: SupabaseClient) {
   const { data: drafts } = await supabase
     .from('purchase_order_items')
-    .select('id, product_id, expected_qty, purchase_orders!inner(notes)')
+    .select('id, product_id, expected_qty, manual_qty, purchase_orders!inner(notes)')
     .eq('purchase_orders.notes', 'STAFF_DRAFT')
     .eq('status', 'pending_receipt');
 
@@ -312,27 +317,28 @@ export async function autoCleanupStaffDrafts(supabase: SupabaseClient) {
     }
   }
 
-  // Heal historical drift where expected_qty floated ABOVE the demand its
-  // surviving order sources can account for. This happened whenever source
-  // rows were destroyed without the matching expected_qty being lowered — most
-  // notably the old bundle-leak migration, which copied a bundle line's
-  // expected_qty onto its components and then deleted the bundle line, letting
-  // the ON DELETE CASCADE wipe its sources. The symptom is a Staff Req. count
-  // (e.g. 125) far larger than the orders shown in its detail dialog (e.g. 5).
+  // Heal historical drift where expected_qty floated ABOVE the demand it can
+  // account for. This happened whenever source rows were destroyed without the
+  // matching expected_qty being lowered — most notably the old bundle-leak
+  // migration, which copied a bundle line's expected_qty onto its components and
+  // then deleted the bundle line, letting the ON DELETE CASCADE wipe its
+  // sources. The symptom is a Staff Req. count (e.g. 125) far larger than the
+  // orders shown in its detail dialog (e.g. 5).
   //
-  // For any line still backed by at least one source, the source sum is the
-  // authoritative traceable demand, so clamp expected_qty down to it. Lines
-  // with zero sources are genuine order-less requests (the ad-hoc "add missing
-  // item" flow) and are left untouched.
+  // The legitimate demand for a line is its traceable order sources plus its
+  // order-less manual_qty ("Add Missing Item"). Clamp expected_qty down to that
+  // total whenever it exceeds it — this removes only the phantom excess while
+  // preserving every manual add. A line with neither sources nor manual_qty is
+  // left untouched (nothing to reconcile against).
   for (const draft of drafts) {
     // Skip lines this pass already deleted or re-based via the deduction above.
     if (draftUpdates.has(draft.id)) continue;
-    const survivingSum = totalSourceSumByDraft.get(draft.id);
-    if (!survivingSum || survivingSum <= 0) continue;
-    if ((draft.expected_qty || 0) > survivingSum) {
+    const legitimateDemand = (totalSourceSumByDraft.get(draft.id) || 0) + (draft.manual_qty || 0);
+    if (legitimateDemand <= 0) continue;
+    if ((draft.expected_qty || 0) > legitimateDemand) {
       await supabase
         .from('purchase_order_items')
-        .update({ expected_qty: survivingSum })
+        .update({ expected_qty: legitimateDemand })
         .eq('id', draft.id);
     }
   }
