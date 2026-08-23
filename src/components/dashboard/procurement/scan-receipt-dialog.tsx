@@ -46,6 +46,41 @@ const fileToDataUri = (file: File): Promise<string> =>
     reader.readAsDataURL(file);
   });
 
+// Phone photos are multi-megabyte; sent raw as base64 they blow past Vercel's
+// ~4.5MB request-body limit and make the vision read slow enough to time out.
+// Downscale to a sane max dimension and re-encode as JPEG before uploading —
+// a few hundred KB, still sharp enough to read a receipt. Falls back to the
+// original file if the browser canvas path fails.
+const MAX_DIM = 1600;
+const JPEG_QUALITY = 0.7;
+
+const downscaleImage = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, MAX_DIM / Math.max(img.width, img.height));
+      const w = Math.max(1, Math.round(img.width * scale));
+      const h = Math.max(1, Math.round(img.height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("no canvas context"));
+        return;
+      }
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", JPEG_QUALITY));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("image load failed"));
+    };
+    img.src = url;
+  });
+
 /** Local product search + "add new" picker (no react-hook-form dependency). */
 function ProductPicker({
   label,
@@ -235,7 +270,12 @@ export function ScanReceiptDialog({
     const file = e.target.files?.[0];
     if (!file) return;
     setPreviewUrl(URL.createObjectURL(file));
-    const dataUri = await fileToDataUri(file);
+    let dataUri: string;
+    try {
+      dataUri = await downscaleImage(file);
+    } catch {
+      dataUri = await fileToDataUri(file); // fallback: send original
+    }
     // allow re-selecting the same file
     e.target.value = "";
     await runScan(dataUri);
