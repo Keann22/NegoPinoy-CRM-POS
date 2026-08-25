@@ -474,7 +474,7 @@ Each row then shows three numbers that look similar but answer different questio
 |---|---|---|
 | **Current Stock** | Running ledger: total ever purchased minus total committed to every open order — including already-picked/packed ones, since stock is deducted the moment an order is *placed*, not when it's picked. Can drift stale if manually mis-synced. | `products.stock_level` |
 | **Staff Req. (note)** | A manually-typed number from whoever submitted the request. Informational only — never auto-grows when new orders arrive, only auto-shrinks when an order is edited down. **Never used to decide how much to buy.** | `purchase_order_items.expected_qty` on the STAFF_DRAFT row |
-| **Need to Buy (buy qty)** | Live count of orders still needing this item that have **not yet been picked** (`Pending Payment`, `Processing`, `Picked (with issue)`, `On-Hold`, `Waiting for Stock`). Drives the "Buy" quantity default. Orders already `Picked`/`Photo`/`Packed`/`For Shipping`/`For Pick-up` are excluded — a real unit was already pulled for those. | Live `order_items` query in the GET route |
+| **Need to Buy (buy qty)** | Live count of orders still needing this item that have **not yet been picked** (`Pending Payment`, `Processing`, `Picked (with issue)`, `On-Hold`, `Waiting for Stock`). Drives the "Buy" quantity default. Orders already `Picked`/`Photo`/`Packed`/`For Shipping`/`For Pick-up` are excluded — a real unit was already pulled for those. Lay-away orders are excluded (they consume stock but aren't auto-bought). For `Picked (with issue)` orders, a line only counts if it has an **open `order_issue`**, keyed on the actual short product — the **component** for a bundle line, not the bundle SKU (see "Bundle-component shortages dropped from Need to Buy"). | Live `order_items` query in the GET route |
 
 A fourth, internal-only **Total Open Demand** (every open order regardless of pick status — the true counterpart to `stock_level`'s ledger math) exists only to detect when Current Stock has drifted from reality (the orange "Current Stock doesn't match total open orders" warning + "Sync Stock" button — which syncs Current Stock to Total Open Demand, not to Staff Req.).
 
@@ -496,7 +496,22 @@ Opening a procurement issue (Dashboard → Procurement Issues widget, `src/compo
 **The fix** brings the panel into parity with the sheet:
 - Filters by the shared **`UNFULFILLED_STATUSES`** constant (`procurement-service.ts`) — the same "not yet picked, still needs buying" set the sheet's **Need to Buy** uses — instead of a private status list. Do not re-inline status strings here; import the constant so the two can't drift.
 - **Expands bundle demand**: an order for a bundle whose `assembly_recipe` consumes this product never references the product's own `product_id`, so the route also matches bundle-parent ids and scales by `qty-per-bundle`, tagging those rows "via bundle" in the UI (same pattern as the sheet — see Bundle Products below).
-- **Mirrors the sheet's two guards** so it doesn't over-count: skips `order_items.is_packed` lines (unit already secured), and for `Picked (with issue)` only counts a line when an **open `order_issue`** exists for that `order_id` + ordered `product_id` (a sibling line's issue must not drag an already-picked item onto the panel).
+- **Mirrors the sheet's two guards** so it doesn't over-count: skips `order_items.is_packed` lines (unit already secured), and for `Picked (with issue)` only counts a line when an **open `order_issue`** exists for it (a sibling line's issue must not drag an already-picked item onto the panel). That issue is keyed on the **component** being requested — for a bundle line, the shortage is logged against the component's `product_id`, **not** the ordered bundle SKU — so the check matches on the component id (falling back to the ordered `product_id`). See "Bundle-component shortages dropped from Need to Buy" below.
+
+### Bundle-component shortages dropped from Need to Buy (fixed 2026-08-25)
+
+**Symptom**: a product frequently showed **Need to Buy = None** on the sheet even though its **Staff Req.** number was non-zero and its Staff Request Details listed real, still-open COD orders. Confirmed against prod on `Big Size Stainless Steel WOK ONLY 43CM`: Staff Req. = 2 (two COD orders), Need to Buy = None.
+
+**Root cause**: the affected product was a **bundle component** (the WOK is part of "…WOK WITH TAKIP -43CM"), so its demand only arrives via the bundle's `assembly_recipe`, and the two orders were `Picked (with issue)`. For `Picked (with issue)` orders, a line only counts toward Need to Buy when an **open `order_issue`** exists — but the shortage is logged against the **component's** `product_id` (what the picker actually flagged short), while the demand loop looked the issue up by `row.product_id`, which for a bundle line is the **bundle SKU**. The key never matched, so the genuine shortage was silently dropped. Lay-away and already-picked (`Photo`/etc.) siblings were correctly excluded, which is why the column looked plausibly "empty" rather than obviously broken.
+
+The **Staff Req.** count didn't have this bug — `autoCleanupStaffDrafts` already checks the issue against both the component *and* the bundle parent (see "Orphaned Staff Requests") — which is exactly why the two numbers disagreed.
+
+**The fix** keys the `Picked (with issue)` issue lookup on the product the demand is attributed to (the component), falling back to the ordered `product_id`, everywhere the guard is applied:
+- `procurement-dashboard-service.ts` — the Need to Buy / Total Open Demand count (`isUnfulfilledFor(row, targetProductId)` helper).
+- `reserved-stock-dialog.tsx` — the "Orders Needing This Item" popup (checks `item.product_id` **or** any product-family id).
+- `GET /api/inventory/procurement-issues/orders` — the "Affected Active Orders" panel (checks the requested component id **or** the ordered `product_id`).
+
+Do not re-narrow any of these back to the ordered `product_id` alone — that reintroduces the drop for every bundle-component product with a `Picked (with issue)` order.
 
 ### Stock Reconciliation report (added 2026-07-16)
 
