@@ -21,7 +21,10 @@ const SheetOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SheetPrimitive.Overlay
     className={cn(
-      "fixed inset-0 z-50 bg-black/80  data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      // No close-state exit animation on the overlay: waiting on its
+      // `animationend` to unmount can strand the full-screen backdrop over the
+      // page and swallow all clicks. It now unmounts synchronously on close.
+      "fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=open]:fade-in-0",
       className
     )}
     {...props}

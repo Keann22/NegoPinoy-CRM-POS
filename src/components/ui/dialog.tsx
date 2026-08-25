@@ -21,7 +21,13 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      // NOTE: no close-state exit animation on purpose. Radix keeps the overlay
+      // mounted until the exit animation's `animationend` fires; when the dialog
+      // re-renders during close (e.g. a parent nulls its data in onOpenChange),
+      // that event is missed and the full-screen backdrop strands over the page,
+      // swallowing every click ("close button doesn't work"). Without an exit
+      // animation the overlay unmounts synchronously on close.
+      "fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=open]:fade-in-0",
       className
     )}
     {...props}
