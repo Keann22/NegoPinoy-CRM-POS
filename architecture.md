@@ -280,9 +280,13 @@ Located in `/src/ai/`:
 
 | File | Purpose |
 |---|---|
-| `genkit.ts` | Genkit initialization with Gemini model |
-| `flows/parse-receipt-flow.ts` | Parses purchase receipt images/PDFs via OCR |
+| `genkit.ts` | Genkit stub (no-op); real Genkit only runs under `genkit:dev` |
 | `flows/generate-marketing-recommendations.ts` | Generates product marketing copy |
+
+> Receipt scanning is **not** a Genkit flow (though it does call Gemini directly over REST,
+> bypassing the broken Genkit bundling). It lives in the Procurement Sheet — see
+> **"Scan Receipt"** under the Procurement Sheet section below. Entry: `POST /api/inventory/scan-receipt`,
+> readers in `src/lib/receipt-ocr.ts`.
 
 AI flows are called from `/src/app/api/` route handlers, not directly from components.
 
@@ -522,6 +526,62 @@ This is the deliberate complement of the procurement sheet: every `stock_level <
 - **"No connected order — likely a data error"**: nothing in order history explains the deficit at all (should be rare — the initial cleanup pass on 2026-07-16 reset 13 such products to `stock_level = 0`, each logged as an `inventory_movements` adjustment). Has a one-click **"Reset to 0"** button per row, which just calls the existing `POST /api/inventory/procurement/sync` with `targetQty: 0`.
 - **"Explained by an already-fulfilled order — accounting debt"**: a real order consumed the stock but already shipped/completed with no purchase ever recorded to true up its cost (see COGS section above — `cost_price_at_sale` stays `0` until a purchase backfills it). No reset button here on purpose: zeroing this would erase the only signal that a real cost still needs recording, and would silently remove the mechanism that would otherwise catch shrinkage/theft or an unpaid supplier. Left negative until someone actually restocks it.
 
+### Scan Receipt (added 2026-08-19)
+
+Reads a **supplier's receipt photo**, matches each line to a product, learns the supplier's own
+product codes for next time, and hands the confirmed items to the existing bulk **Record Selected**
+flow. Scoped to **one supplier at a time** — the button sits in each supplier group header, inline
+with "Copy Order" (`src/components/dashboard/procurement/supplier-group-card.tsx`), wired from the
+sheet (`page.tsx`) into `ScanReceiptDialog` (`src/components/dashboard/procurement/scan-receipt-dialog.tsx`).
+
+This **replaced** an older, dead "Upload Receipt" page that ran through a Genkit/Gemini flow
+(`parse-receipt-flow.ts`) whose `ai` client is a no-op stub — it always returned `null` and every
+scan errored. The old page is retained for now but unlinked from the new flow.
+
+**Reading the image** — `POST /api/inventory/scan-receipt` ([route.ts](src/app/api/inventory/scan-receipt/route.ts)),
+helpers in [`src/lib/receipt-ocr.ts`](src/lib/receipt-ocr.ts). Strategy is **Gemini-primary, OCR fallback**:
+1. **Gemini vision** (`runGeminiReceipt`) is the default reader — a direct call to the Generative
+   Language REST API (`gemini-3.6-flash`, override via `GEMINI_MODEL`) with a JSON `responseSchema`,
+   returning structured `{ code, name, quantity, unitCost }` per line. It handles handwritten / thermal
+   / angled receipts that flat OCR cannot, which is the common real-world case here. Returns `null` on
+   any failure (missing key, quota, bad response) so the caller falls back rather than erroring.
+2. **Tesseract** (`runTesseractBase64`) + **Google Vision** (`runGoogleVisionBase64`) run only if Gemini
+   returns nothing. These are a receipt-only **copy** of the payment-proof OCR
+   (`api/payments/extract-ocr`), adapted to take base64 image content instead of a stored URL, feeding
+   a best-effort line parser (`parseReceiptLines`). There is no UI toggle — the engine is chosen
+   automatically and reported back as `engine` (`gemini` / `tesseract` / `vision`).
+
+**Env**: `GEMINI_API_KEY` (the committed `.env` value is dead — set it in Vercel, and locally in
+`.env.local`), `GOOGLE_CLOUD_VISION_API_KEY` (shared with payments OCR). `next.config.ts` traces the
+Tesseract WASM into this route the same way it does for `extract-ocr`, or the fallback breaks in
+serverless.
+
+**Matching cascade** — per parsed line, against a **supplier-scoped** candidate set (the sheet's
+current items for this supplier + all products whose `supplier_pricing` names this supplier):
+1. **Exact supplier code** — `line.code` equals a product's saved `supplier_pricing[].supplierCode`
+   for this supplier. This is the payoff of code-learning: a receipt code like `CYL4` auto-resolves.
+2. **Fuzzy name** — token-overlap (`tokenScore`) against the supplier's product names.
+3. **Unsure** (below threshold) — the line is returned unmatched with a **shortlist** of candidates
+   (top fuzzy hits, widened by a broad `ilike` on the longest description token). The dialog shows
+   these as one-tap chips plus a free product search / "add new product", so the user resolves it.
+
+**Supplier-code learning** — when a line is matched and its receipt code is new (or differs from
+what's stored), the dialog offers a pre-checked (but editable) "save code" toggle. On confirm it
+calls `PATCH /api/inventory/procurement` with `{ productId, newSupplierId, supplierCode }`, which
+routes to **`setSupplierProductCode`** (`procurement-purchase-service.ts`) — a code-only upsert into
+`products.supplier_pricing[].supplierCode` that deliberately does **not** reassign `products.supplier_id`.
+The toggle prevents silently storing OCR/AI garbage.
+
+**Recording** — confirmed rows (`{ productId, qty, cost, supplierId }`) are handed up to the sheet's
+existing `BulkBuyDialog` → `POST /api/inventory/procurement` → `processProcurementPurchases`, the same
+path the "Record Selected" button uses (creates the PO + `purchase_order_items`, updates supplier
+pricing/cost). Items without a `draftItemId` are inserted as new lines, so a scanned receipt records
+cleanly even for products not currently on the sheet.
+
+**Auth caveat**: like `extract-ocr`, this route has **no auth gate** — anyone who knows the URL can
+POST images (triggering Gemini/OCR cost) and read back product name/SKU matches. Worth a
+management-only check later.
+
 ---
 
 ## Bundle Products & Assembly Recipes
@@ -658,7 +718,7 @@ A third `issue_type` value, `'staff_message'`, extends the same pattern to manua
 
 `notifications.source` (added by `scripts/migrations/add_source_to_notifications.sql`, run manually — no migration runner in this repo) is set to `'staff_message'` on these fan-out rows, distinguishing them from system notifications (order packed, issue reported) that leave `source` null — not currently read by any UI, but there for future filtering if needed.
 
-**`StaffMessageFab` history.** It first shipped with its own unread badge (counting `notifications` where `source = 'staff_message'`), which was removed as redundant with the Bell, making the FAB compose-only (opening `MessageStaffDialog` directly). As of 2026-07-21 it changed roles again: it now navigates to the Messaging Center (`/dashboard/messages` — see that section below) and carries a badge showing the *thread-level* unread total from `GET /api/messages/unread` — a different number than the Bell's (unread messages in threads you participate in, not unread notification rows), so the earlier duplication objection no longer applies. It hides itself on the messages page, and `MessageStaffDialog` is now opened from the messages page's "new topic" button instead.
+**`StaffMessageFab` history.** It first shipped with its own unread badge (counting `notifications` where `source = 'staff_message'`), which was removed as redundant with the Bell, making the FAB compose-only (opening `MessageStaffDialog` directly). As of 2026-07-21 it changed roles again: it now navigates to the Messaging Center (`/dashboard/messages` — see that section below) and carries a badge showing the *thread-level* unread total from `GET /api/messages/unread` — a different number than the Bell's (unread messages in threads you participate in, not unread notification rows), so the earlier duplication objection no longer applies. It hides itself on the messages page, and `MessageStaffDialog` is now opened from the messages page's "new topic" button instead. **(Superseded 2026-08-14 — see "Header Messages drawer vs. Notification Bell" below: the FAB is now a compose-only New-DM popup with no badge and no navigation; the header `MessagesDrawer` owns the inbox and unread badge.)**
 
 **Staff picker source.** `StaffSearch` (`src/components/dashboard/staff-search.tsx`) calls `supabase.rpc('get_all_users')` — previously only known to be called from the Owner/Admin-gated User Management page (`src/app/dashboard/users/page.tsx`). It's unconfirmed whether the RPC itself restricts by role server-side or whether that page's `canManageUsers` check was the only gate; if the RPC turns out to reject non-Owner/Admin callers, `StaffSearch` will silently show an empty staff list for regular Sales/Inventory accounts.
 
@@ -699,13 +759,22 @@ A Slack-style two-pane messaging page (`src/app/dashboard/messages/page.tsx`: th
 
 **Direct messages are `order_issues` rows with `issue_type: 'direct'`** (null `order_id`/`product_id`; 1:1 only, find-or-create via `POST /api/messages/direct` which matches on the exact member pair). Reusing the table means DMs get the message pipeline, realtime channel, and read tracking for free — but it also means **any query that lists `order_issues` broadly must exclude `issue_type = 'direct'` or private DMs leak to all staff**. Two such leaks were fixed in `inbox-drawer.tsx` at build time: its list query (added `.neq('issue_type', 'direct')`) and its realtime toast handler (looks up the parent issue's type and bails on `direct` — otherwise every online staff member got a toast with the DM's content). `GET /api/inventory/issues` was already safe (filters `issue_type = 'order'` or scopes by id). Any future `order_issues` query needs the same treatment.
 
-**API** (`src/app/api/messages/`): `GET threads` (all order/issue threads for everyone — same visibility model as the Inbox Drawer — plus only the caller's DMs, each with per-thread unread; resolved threads capped at 30 most recent for the collapsed "Resolved" archive section), `POST send` (insert message, auto-join sender + mentions, Bell fan-out — to mentions on issue threads, to the other member on DMs; mentions are ignored on DMs so a 1:1 stays 1:1), `POST read` (bump `last_read_at`), `POST direct`, `GET unread` (FAB badge total). All server-side via service role; shared logic in `src/lib/services/thread-service.ts`.
+**API** (`src/app/api/messages/`): `GET threads` (all order/issue threads for everyone — same visibility model as the Messages drawer — plus only the caller's DMs, each with per-thread unread; resolved threads capped at 30 most recent for the collapsed "Resolved" archive section), `POST send` (insert message, auto-join sender + mentions; **creates NO notification-bell rows at all** — a DM or an @mention sent from the messaging center reaches recipients through the Messages drawer because they're joined as thread members, see the split note below; mentions are ignored on DMs so a 1:1 stays 1:1), `POST read` (bump `last_read_at`), `POST direct`, `GET unread` (drawer badge total). All server-side via service role; shared logic in `src/lib/services/thread-service.ts`.
+
+### Header Messages drawer vs. Notification Bell — the split (2026-08-14)
+
+The header had two icons that both read as "notifications", and DMs surfaced in the wrong one: the chat-bubble button was the **Issue Inbox** (`inbox-drawer.tsx`, an all-open-`order_issues` view that explicitly excluded DMs), while a sent DM wrote a `notifications` row via `fanOutStaffNotifications`, so it landed in the **Bell**. Staff couldn't find their DMs. Fixed by making the two surfaces exclusive:
+
+- **💬 `MessagesDrawer`** (`src/components/dashboard/messages-drawer.tsx`, replaces the deleted `inbox-drawer.tsx`) is now conversations only. It reads `GET /api/messages/threads` (the same source as the Messages page — DMs the caller belongs to + open order/issue threads), shows a **true unread badge** (`totalUnread`, not the old "count of open issues" placeholder), and its realtime handler only toasts for messages in threads the viewer is a `thread_participants` member of (never the whole team). Clicking opens `/dashboard/messages`.
+- **🔔 `NotificationBell`** keeps the `notifications` table: system/order alerts and `@mention` fan-outs. Order issues still reach the affected staff here (they already fan out notifications), which is where the removed team-wide Issue Inbox browsing folded to.
+- **`POST /api/messages/send` no longer writes `notifications` rows at all** (both branches). DMs and @mentions typed in the messaging center reach recipients via thread membership → the Messages drawer (badge + realtime toast), never the Bell. The order-issue reply route (`/api/inventory/issues/messages`) and the Message Staff dialog (`createStaffMessage`) still fan out to the Bell — only the messaging-center composer was moved, per the "Messages page composer only" scope decision.
+- **`StaffMessageFab` is a compose-only DM popup again** (2026-08-14). It no longer navigates to the inbox or carries an unread badge (the header `MessagesDrawer` owns the inbox + badge now); clicking it opens a "New direct message" dialog — pick a colleague, type, send (found-or-create the 1:1 via `POST /api/messages/direct` then `POST /api/messages/send`), all in place. Still hidden on `/dashboard/messages` (that page has its own composer).
 
 **UI decisions**: DM section is rendered *above* the order-thread section because dozens of open issues would otherwise bury it off-screen; messages never change `order_issues.status` (resolution stays owned by the packer/issue flows — resolved threads are readable and still accept messages from the archive); composer reuses `MentionInput` on issue threads and a plain input on DMs; timestamps render via `toLocaleString('en-PH')`.
 
 ### Realtime Channel Subscriptions (recurring bug source)
 
-`InboxDrawer` and `NotificationBell` both live in the dashboard layout (global, on every page) and each open a Supabase Realtime channel in a `useEffect`. Two rules keep this from crashing the entire dashboard shell on load:
+`MessagesDrawer` (formerly `InboxDrawer`) and `NotificationBell` both live in the dashboard layout (global, on every page) and each open a Supabase Realtime channel in a `useEffect`. Two rules keep this from crashing the entire dashboard shell on load:
 
 - **Depend on primitives, not the `userProfile` object.** `useUserProfile()`'s `userProfile` is a new object reference on nearly every render — it's rebuilt via `useMemo` off `useUser()`'s `user` state, and `user` itself gets a fresh object literal from `fetchUser()` and again from every `onAuthStateChange` event (`INITIAL_SESSION`, `SIGNED_IN`, etc.) firing in quick succession after mount. An effect with the raw `userProfile` object in its dependency array re-fires several times right after mount as a result. Depend on `userProfile?.id` / `?.firstName` / `?.lastName` instead.
 - **Guard against re-subscribing to a channel that's already subscribed.** Calling `.channel(topic).on(...)` on a topic that's already past `.subscribe()` throws (`cannot add \`postgres_changes\` callbacks... after \`subscribe()\``), and since these two components sit in the layout, the throw takes down every dashboard page, not just one component. The repeated effect fires above are exactly the condition that triggers this. Before creating the channel, remove any existing one on the same topic: `supabase.getChannels().filter(c => c.topic === 'realtime:<name>').forEach(c => supabase.removeChannel(c))`. This also covers React Strict Mode's dev-only double-invoke of effects, which can trigger the same race even with a stable dependency array.

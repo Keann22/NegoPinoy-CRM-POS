@@ -25,6 +25,32 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'userId is required' }, { status: 400 });
     }
 
+    // Two id sets, unioned, so an old-but-active thread is never dropped by the
+    // recent-issues cap: (1) every thread the caller participates in — their DMs
+    // especially, which are long-lived and reused, so their issue `created_at`
+    // is old while activity is fresh; (2) the 200 most-recently-created issues
+    // for the team-wide order/issue view. Ordering by `created_at` alone with a
+    // flat limit used to hide any DM thread created more than 200 issues ago.
+    const { data: myParts, error: partsErr } = await supabase
+      .from('thread_participants')
+      .select('issue_id')
+      .eq('user_id', userId);
+    if (partsErr) throw partsErr;
+    const myIssueIds = (myParts || []).map((r) => r.issue_id);
+
+    const { data: recent, error: recentErr } = await supabase
+      .from('order_issues')
+      .select('id')
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (recentErr) throw recentErr;
+    const recentIds = (recent || []).map((r) => r.id);
+
+    const allIds = [...new Set([...myIssueIds, ...recentIds])];
+    if (allIds.length === 0) {
+      return NextResponse.json({ threads: [], totalUnread: 0 });
+    }
+
     const { data, error } = await supabase
       .from('order_issues')
       .select(`
@@ -35,8 +61,7 @@ export async function GET(req: Request) {
         order_issue_messages(id, sender_role, sender_name, message, created_at, requires_attention, mentions),
         thread_participants(user_id, display_name, is_member, last_read_at)
       `)
-      .order('created_at', { ascending: false })
-      .limit(200);
+      .in('id', allIds);
 
     if (error) throw error;
 

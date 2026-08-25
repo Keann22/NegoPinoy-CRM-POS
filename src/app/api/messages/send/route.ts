@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { fanOutStaffNotifications, resolveRecipientNames } from '@/lib/services/staff-message-service';
 import { getStaffByName, joinThreadMembers, type StaffIdentity } from '@/lib/services/thread-service';
 
 export const dynamic = 'force-dynamic';
@@ -55,29 +54,13 @@ export async function POST(req: Request) {
     }
     await joinThreadMembers(supabase, issueId, members, senderId);
 
-    if (isDirect) {
-      const others = (issue.thread_participants || [])
-        .filter((p: any) => p.is_member && p.user_id !== senderId)
-        .map((p: any) => p.display_name);
-      if (others.length > 0) {
-        await fanOutStaffNotifications(supabase, others, {
-          senderName,
-          message: message.trim(),
-          title: `New message from ${senderName}`,
-          link: '/dashboard/messages',
-        });
-      }
-    } else {
-      const recipientNames = resolveRecipientNames(effectiveMentions, senderName);
-      if (recipientNames.length > 0) {
-        await fanOutStaffNotifications(supabase, recipientNames, {
-          senderName,
-          message: message.trim(),
-          title: `${senderName} tagged you in a thread`,
-          link: issue.order_id ? `/dashboard/orders/${issue.order_id}` : '/dashboard/messages',
-        });
-      }
-    }
+    // Messages-center sends deliberately create NO notification-bell rows.
+    // The Bell is reserved for system/order events; anything typed here (a DM,
+    // or an @mention in a thread) reaches its recipients through the Messages
+    // drawer instead: they're auto-joined as thread members just above, so the
+    // thread shows up unread in their drawer (badge + realtime toast). Only
+    // system-generated paths (stockouts, PO shortages, order-packed, etc.) and
+    // the order-issue reply / Message Staff dialog composers still ping the Bell.
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

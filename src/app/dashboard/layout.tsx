@@ -18,7 +18,6 @@ import {
   Package,
   PackageCheck,
   Repeat,
-  Upload,
   Bot,
   ShoppingCart,
   Truck,
@@ -53,7 +52,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Logo } from '@/components/logo';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { NotificationBell } from '@/components/dashboard/notification-bell';
-import { InboxDrawer } from '@/components/dashboard/inbox-drawer';
+import { MessagesDrawer } from '@/components/dashboard/messages-drawer';
 import { StaffMessageFab } from '@/components/dashboard/staff-message-fab';
 
 export default function DashboardLayout({
@@ -117,7 +116,6 @@ export default function DashboardLayout({
 
       if (isManagement) {
         inventorySubItems.unshift({ href: '/dashboard/reports/procurement', label: 'Procurement Sheet', icon: ListChecks });
-        inventorySubItems.unshift({ href: '/dashboard/inventory/scan-receipt', label: 'Upload Receipt', icon: Upload });
         inventorySubItems.push({ href: '/dashboard/inventory/pending-costs', label: 'Encode Costs', icon: PhilippinePeso });
       }
 
@@ -276,7 +274,7 @@ export default function DashboardLayout({
                 <span className="font-headline">NegosyantengPinoy.Ph</span>
               </Link>
               <div className="ml-auto flex items-center">
-                <InboxDrawer />
+                <MessagesDrawer />
                 <NotificationBell />
               </div>
           </div>
@@ -318,7 +316,7 @@ export default function DashboardLayout({
           <div className="w-full flex-1">
           </div>
           <div className="flex items-center gap-2 md:hidden mr-2">
-            <InboxDrawer />
+            <MessagesDrawer />
             <NotificationBell />
           </div>
           <DropdownMenu>
