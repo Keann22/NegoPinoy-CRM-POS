@@ -136,7 +136,12 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose, s
             if (item.is_packed) return false;
 
             if (item.orders.status === 'Picked (with issue)') {
-              return openIssueKeys.has(`${item.orders.id}-${item.product_id}`);
+              // The shortage is logged against the specific short product. For a
+              // bundle line that's the COMPONENT (one of targetProductIds), not
+              // the ordered bundle SKU (item.product_id) — so check both, or
+              // genuine component shortages get filtered out here.
+              return openIssueKeys.has(`${item.orders.id}-${item.product_id}`)
+                || targetProductIds.some(tid => openIssueKeys.has(`${item.orders.id}-${tid}`));
             }
             return true;
           })

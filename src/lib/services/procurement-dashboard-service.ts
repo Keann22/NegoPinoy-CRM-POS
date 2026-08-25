@@ -160,24 +160,32 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
       needToBuyMap.set(productId, (needToBuyMap.get(productId) || 0) + quantity);
     }
   };
-  demandRows?.forEach((row: any) => {
-    let isUnfulfilled = false;
-
-    if (row.orders.payment_method === 'Lay-away') {
-      isUnfulfilled = false; // Don't auto-buy for layaways, but they still consume stock
-    } else if (row.is_packed) {
-      isUnfulfilled = false;
-    } else if (row.orders.status === 'Picked (with issue)') {
-      isUnfulfilled = openIssueKeys.has(`${row.orders.id}-${row.product_id}`);
-    } else {
-      isUnfulfilled = UNFULFILLED_STATUSES.includes(row.orders.status);
+  // Whether THIS order line's demand for `targetProductId` is still unfulfilled
+  // (i.e. no unit has been secured yet, so it needs buying). For a bundle line
+  // the demand is attributed to each COMPONENT, and — crucially — an open
+  // out-of-stock issue on a "Picked (with issue)" order is recorded against the
+  // specific short product, which for a bundle is the COMPONENT, not the bundle
+  // SKU. So the issue lookup must be keyed on the product we're attributing to
+  // (falling back to the bundle SKU in case the issue was logged there). Keying
+  // it only on row.product_id (the bundle) silently dropped genuine COD
+  // shortages from Need to Buy while the Staff Req. count — which checks both
+  // component and bundle — kept showing them.
+  const isUnfulfilledFor = (row: any, targetProductId: string): boolean => {
+    if (row.orders.payment_method === 'Lay-away') return false; // consume stock, but don't auto-buy
+    if (row.is_packed) return false;
+    if (row.orders.status === 'Picked (with issue)') {
+      return openIssueKeys.has(`${row.orders.id}-${targetProductId}`)
+        || openIssueKeys.has(`${row.orders.id}-${row.product_id}`);
     }
+    return UNFULFILLED_STATUSES.includes(row.orders.status);
+  };
 
+  demandRows?.forEach((row: any) => {
     if (candidateIds.has(row.product_id)) {
-      addDemand(row.product_id, row.quantity, isUnfulfilled);
+      addDemand(row.product_id, row.quantity, isUnfulfilledFor(row, row.product_id));
     }
     const components = bundleToComponents.get(row.product_id);
-    components?.forEach(c => addDemand(c.componentId, row.quantity * c.qtyPerBundle, isUnfulfilled));
+    components?.forEach(c => addDemand(c.componentId, row.quantity * c.qtyPerBundle, isUnfulfilledFor(row, c.componentId)));
   });
 
   const pendingReceiptMap = new Map<string, number>();

@@ -62,8 +62,10 @@ export async function GET(req: Request) {
     // For "Picked (with issue)" orders, only the specific line(s) with an open
     // order_issue are actually still waiting — the rest were picked fine. Mirror
     // the procurement sheet's guard so a sibling line's issue doesn't drag an
-    // already-secured item onto this panel. Keyed by order_id + the ordered
-    // product_id (the bundle SKU for bundle orders, matching order_issues).
+    // already-secured item onto this panel. For a bundle order the shortage is
+    // logged against the COMPONENT (this productId), not the bundle SKU, so both
+    // keys must be considered below — checking only the ordered product_id (the
+    // bundle) hid genuine component shortages from this panel.
     const orderIds = Array.from(new Set((items || []).map((i: any) => i.orders.id)));
     const openIssueKeys = new Set<string>();
     if (orderIds.length > 0) {
@@ -80,9 +82,12 @@ export async function GET(req: Request) {
     const affectedOrders = (items || [])
       // An already-packed line has its unit secured — not blocked by this shortage.
       .filter((i: any) => !i.is_packed)
-      // "Picked (with issue)" lines only count when this exact item is the one flagged.
+      // "Picked (with issue)" lines only count when this exact item is the one
+      // flagged — checked against the component (productId) for bundle lines, or
+      // the ordered product_id, whichever carries the open issue.
       .filter((i: any) =>
         i.orders.status !== 'Picked (with issue)' ||
+        openIssueKeys.has(`${i.orders.id}-${productId}`) ||
         openIssueKeys.has(`${i.orders.id}-${i.product_id}`)
       )
       .map((i: any) => {
