@@ -60,7 +60,7 @@ export function useProductSubmit({
     setOpen(false);
     toast({ title: isEdit ? 'Updating Product...' : 'Adding Product...', description: `"${values.name}" is being ${isEdit ? 'updated' : 'added'}.` });
 
-    const { images: imageFiles, quantityOnHand, supplierPricing, hasVariations: _hv, variations, installmentPrice, assemblyRecipe, ...core } = values;
+    const { images: imageFiles, quantityOnHand, supplierPricing, hasVariations: _hv, variations, installmentPrice, isOnSale, salePrice, assemblyRecipe, ...core } = values;
 
     try {
       if (isEdit && displayProduct) {
@@ -75,6 +75,7 @@ export function useProductSubmit({
           name: core.name, sku: finalSku, shelf_location: core.shelfLocation || null,
           description: core.description, category: core.categoryId,
           selling_price: core.sellingPrice, installment_price: installmentPrice ?? null,
+          is_on_sale: isOnSale ?? false, sale_price: salePrice ?? null,
           images: uploadedImageUrls, supplier_pricing: supplierPricing || [],
           assembly_recipe: assemblyRecipe || [],
           ...(displayProduct.parent_id && core.name !== displayProduct.name ? { variant_name: core.name } : {}),
@@ -153,6 +154,8 @@ export function useProductSubmit({
             name: p.name, variant_name: p.variant_name, parent_id: parentProductId, sku: p.sku,
             shelf_location: core.shelfLocation || null, description: core.description, category: core.categoryId,
             selling_price: p.sellingPrice, installment_price: installmentPrice ?? null,
+            is_on_sale: parentProductId ? false : (isOnSale ?? false),
+            sale_price: parentProductId ? null : (salePrice ?? null),
             initial_unit_cost: p.unitCost ?? supplierPricing?.[0]?.unitCost ?? 0,
             supplier_pricing: supplierPricing || [], stock_level: p.quantityOnHand, images: varImages,
           }).select().single();

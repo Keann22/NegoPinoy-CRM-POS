@@ -230,55 +230,64 @@ export function ScanReceiptDialog({
     };
   };
 
-  const runScan = async (dataUri: string) => {
-    setIsScanning(true);
-    setRows([]);
-    try {
-      const res = await fetch("/api/inventory/scan-receipt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageBase64: dataUri,
-          supplierId,
-          tableItems: (tableItems || []).map((i) => ({ productId: i.productId, productName: i.productName })),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Scan failed");
+  // Scans one image and returns its parsed rows (does not touch state), so the
+  // caller can APPEND across several receipts for the same supplier.
+  const scanOne = async (dataUri: string): Promise<Row[]> => {
+    const res = await fetch("/api/inventory/scan-receipt", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        imageBase64: dataUri,
+        supplierId,
+        tableItems: (tableItems || []).map((i) => ({ productId: i.productId, productName: i.productName })),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Scan failed");
+    setEngine(data.engine || null);
+    const scanned: ScannedLine[] = data.lines || [];
+    return scanned.map(lineToRow);
+  };
 
-      setEngine(data.engine || null);
-      const scanned: ScannedLine[] = data.lines || [];
-      if (scanned.length === 0) {
+  // Accepts one OR many photos (a supplier can hand over several receipts).
+  // Every scanned line is appended to the review list rather than replacing it.
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    e.target.value = ""; // allow re-selecting the same file(s)
+    setPreviewUrl(URL.createObjectURL(files[files.length - 1]));
+    setIsScanning(true);
+    try {
+      let added = 0;
+      for (const file of files) {
+        let dataUri: string;
+        try {
+          dataUri = await downscaleImage(file);
+        } catch {
+          dataUri = await fileToDataUri(file); // fallback: send original
+        }
+        const newRows = await scanOne(dataUri);
+        if (newRows.length > 0) setRows((prev) => [...prev, ...newRows]);
+        added += newRows.length;
+      }
+      if (added === 0) {
         toast({
           variant: "destructive",
           title: "No items found",
           description: "Couldn't read line items from that photo. Try a clearer, flatter shot.",
         });
       } else {
-        toast({ title: "Receipt scanned", description: `Found ${scanned.length} line(s). Review below.` });
+        toast({
+          title: files.length > 1 ? `Scanned ${files.length} receipts` : "Receipt scanned",
+          description: `Added ${added} line(s). Review below.`,
+        });
       }
-      setRows(scanned.map(lineToRow));
     } catch (err: any) {
       console.error("Scan receipt error:", err);
       toast({ variant: "destructive", title: "Scan error", description: err.message || "Failed to scan the receipt." });
     } finally {
       setIsScanning(false);
     }
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setPreviewUrl(URL.createObjectURL(file));
-    let dataUri: string;
-    try {
-      dataUri = await downscaleImage(file);
-    } catch {
-      dataUri = await fileToDataUri(file); // fallback: send original
-    }
-    // allow re-selecting the same file
-    e.target.value = "";
-    await runScan(dataUri);
   };
 
   const updateRow = useCallback((idx: number, patch: Partial<Row>) => {
@@ -363,8 +372,8 @@ export function ScanReceiptDialog({
           <DialogHeader>
             <DialogTitle>Scan Receipt — {supplierName}</DialogTitle>
             <DialogDescription>
-              Upload a photo of this supplier&apos;s receipt. Items are matched to your products; unknown supplier codes are
-              learned for next time. Review below, then record as purchases.
+              Upload one or more photos of this supplier&apos;s receipts. Items are matched to your products; unknown supplier
+              codes are learned for next time. Review below, then record as purchases.
             </DialogDescription>
           </DialogHeader>
 
@@ -372,8 +381,8 @@ export function ScanReceiptDialog({
             <div className="flex items-center gap-4">
               <label className="flex items-center gap-2 px-4 py-2 border-2 border-dashed rounded-md cursor-pointer hover:border-slate-400 text-sm text-slate-600">
                 <Upload className="w-4 h-4" />
-                {previewUrl ? "Choose a different photo" : "Upload receipt photo"}
-                <input type="file" accept="image/*" className="hidden" onChange={handleFileChange} disabled={isScanning} />
+                {rows.length > 0 ? "Add another receipt" : "Upload receipt photo(s)"}
+                <input type="file" accept="image/*" multiple className="hidden" onChange={handleFileChange} disabled={isScanning} />
               </label>
               {isScanning && (
                 <span className="flex items-center gap-2 text-sm text-slate-500">

@@ -141,6 +141,8 @@ export function useProductDialog(props: ProductDialogProps) {
           description: displayProduct.description ?? '',
           categoryId: displayProduct.categoryId ?? undefined,
           sellingPrice: displayProduct.sellingPrice ?? 0,
+          isOnSale: (displayProduct as any).is_on_sale ?? false,
+          salePrice: (displayProduct as any).sale_price ?? undefined,
           installmentPrice: displayProduct.installment_price ?? undefined,
           supplierPricing: displayProduct.supplierPricing || [],
           variations: [],

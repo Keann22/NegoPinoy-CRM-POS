@@ -71,9 +71,9 @@ BEGIN
 
   IF v_excess > 0 AND v_order.customer_id IS NOT NULL THEN
     UPDATE customers SET store_credit = COALESCE(store_credit, 0) + v_excess WHERE id = v_order.customer_id;
-    INSERT INTO accounting_expenses (date, category, amount, description, recorded_by)
+    INSERT INTO expenses (expense_date, category, amount, description)
     VALUES (now(), 'Customer Store Credit Liability', v_excess,
-      'Overpayment from early settlement of order ' || v_order_id || ' converted to store credit', v_recorded_by);
+      'Overpayment from early settlement of order ' || v_order_id || ' converted to store credit');
   END IF;
 
   RETURN jsonb_build_object(

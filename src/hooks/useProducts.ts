@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSupabase, useUser } from '@/lib/supabase/hooks';
 import type { FormattedProduct } from '@/types';
 import { getStockStatus } from '@/types';
+import { isOnSale, hasSaleDiscount, getEffectivePrice } from '@/lib/pricing';
 
 interface UseProductsParams {
   searchTerm: string;
@@ -21,13 +22,19 @@ function formatProduct(
   if (sp.length === 0 && p.initial_unit_cost) {
     sp = [{ supplierName: 'Initial Stock', unitCost: p.initial_unit_cost }];
   }
+  const regularPrice = Number(p.selling_price ?? p.sellingPrice) || 0;
+  const onSale = isOnSale(p.is_on_sale);
+  const discounted = onSale && hasSaleDiscount(regularPrice, p.sale_price);
+  const effectivePrice = getEffectivePrice(regularPrice, p.sale_price, p.is_on_sale);
   return {
     ...p,
     variantName: p.variant_name,
     quantityOnHand: p.quantityOnHand ?? p.stock_level ?? 0,
     status: getStockStatus(p.stock_level ?? p.quantityOnHand),
-    price: `₱${(Number(p.selling_price ?? p.sellingPrice) || 0).toFixed(2)}`,
-    sellingPrice: p.selling_price ?? p.sellingPrice ?? 0,
+    price: `₱${effectivePrice.toFixed(2)}`,
+    onSale,
+    regularPriceLabel: discounted ? `₱${regularPrice.toFixed(2)}` : undefined,
+    sellingPrice: regularPrice,
     image: p.images?.[0] || 'https://placehold.co/64x64',
     shelfLocation: p.shelf_location || '',
     supplierPricing: sp,

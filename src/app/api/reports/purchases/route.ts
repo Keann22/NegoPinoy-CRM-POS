@@ -162,60 +162,76 @@ export async function GET(req: Request) {
       });
     }
 
-    const unrecorded = unrecordedRows.map((r: any) => {
-      const prod = r.products;
-      let productName = prod?.name || 'Unknown Product';
-      if (prod?.variant_name && !productName.includes(prod.variant_name)) {
-        productName = `${productName} [${prod.variant_name}]`;
+    const groupedUnrecorded = new Map<string, any>();
+
+    unrecordedRows.forEach((r: any) => {
+      const source = r.purchase_orders?.notes === 'STAFF_DRAFT' ? 'Staff to-order sheet' : (r.purchase_orders?.notes || 'Buy flow');
+      const key = `${r.product_id}_${source}`;
+
+      if (!groupedUnrecorded.has(key)) {
+        const prod = r.products;
+        let productName = prod?.name || 'Unknown Product';
+        if (prod?.variant_name && !productName.includes(prod.variant_name)) {
+          productName = `${productName} [${prod.variant_name}]`;
+        }
+        
+        const pricing: any[] = prod?.supplier_pricing || [];
+        const bookEntry = pricing.length > 0 ? pricing[pricing.length - 1] : null;
+        const lastPurchase = lastPurchaseByProduct.get(r.product_id) || null;
+
+        let suggestedUnitCost: number | null = null;
+        let costSource: string | null = null;
+        if (Number(r.unit_cost) > 0) {
+          suggestedUnitCost = Number(r.unit_cost);
+          costSource = 'already on this purchase';
+        } else if (lastPurchase?.unitCost) {
+          suggestedUnitCost = lastPurchase.unitCost;
+          costSource = `last bought${lastPurchase.supplierName ? ` from ${lastPurchase.supplierName}` : ''}`;
+        } else if (Number(prod?.initial_unit_cost) > 0) {
+          suggestedUnitCost = Number(prod.initial_unit_cost);
+          costSource = 'product default cost';
+        } else if (Number(bookEntry?.unitCost) > 0) {
+          suggestedUnitCost = Number(bookEntry.unitCost);
+          costSource = 'supplier price book';
+        }
+
+        const bookCost = Number(bookEntry?.unitCost) || 0;
+        const costConflict = !!(lastPurchase?.unitCost && bookCost > 0 && bookCost !== lastPurchase.unitCost)
+          ? { bookCost, lastPurchaseCost: lastPurchase.unitCost }
+          : null;
+
+        groupedUnrecorded.set(key, {
+          id: [r.id],
+          productName,
+          expectedQty: Number(r.expected_qty) || 0,
+          receivedQty: Number(r.received_qty) || 0,
+          unitCost: Number(r.unit_cost) || 0,
+          missingSupplier: !r.supplier_id,
+          missingCost: !(Number(r.unit_cost) > 0),
+          requestedByName: r.requested_by_name ? new Set([r.requested_by_name]) : new Set(),
+          source,
+          suggestedSupplierId: lastPurchase?.supplierId || bookEntry?.supplierId || null,
+          suggestedUnitCost,
+          costSource,
+          costSourceDate: lastPurchase?.purchasedAt || null,
+          costConflict,
+          receivedAt: receiptDateByProduct.get(r.product_id) || null,
+        });
+      } else {
+        const g = groupedUnrecorded.get(key);
+        g.id.push(r.id);
+        g.expectedQty += Number(r.expected_qty) || 0;
+        g.receivedQty += Number(r.received_qty) || 0;
+        if (r.requested_by_name) g.requestedByName.add(r.requested_by_name);
+        g.missingSupplier = g.missingSupplier || !r.supplier_id;
+        g.missingCost = g.missingCost || !(Number(r.unit_cost) > 0);
       }
-      // Pre-fill so clearing the backlog is a confirm rather than a lookup, but
-      // always say where the number came from - a price book entry can disagree
-      // with what was actually paid (pack price recorded against a unit, say),
-      // and silently accepting the wrong one bakes a bad cost into COGS.
-      const pricing: any[] = prod?.supplier_pricing || [];
-      const bookEntry = pricing.length > 0 ? pricing[pricing.length - 1] : null;
-      const lastPurchase = lastPurchaseByProduct.get(r.product_id) || null;
+    });
 
-      let suggestedUnitCost: number | null = null;
-      let costSource: string | null = null;
-      if (Number(r.unit_cost) > 0) {
-        suggestedUnitCost = Number(r.unit_cost);
-        costSource = 'already on this purchase';
-      } else if (lastPurchase?.unitCost) {
-        suggestedUnitCost = lastPurchase.unitCost;
-        costSource = `last bought${lastPurchase.supplierName ? ` from ${lastPurchase.supplierName}` : ''}`;
-      } else if (Number(prod?.initial_unit_cost) > 0) {
-        suggestedUnitCost = Number(prod.initial_unit_cost);
-        costSource = 'product default cost';
-      } else if (Number(bookEntry?.unitCost) > 0) {
-        suggestedUnitCost = Number(bookEntry.unitCost);
-        costSource = 'supplier price book';
-      }
-
-      // Flag when the price book and the last real purchase disagree, so the
-      // number on screen gets a second look instead of a reflex Save.
-      const bookCost = Number(bookEntry?.unitCost) || 0;
-      const costConflict = !!(lastPurchase?.unitCost && bookCost > 0 && bookCost !== lastPurchase.unitCost)
-        ? { bookCost, lastPurchaseCost: lastPurchase.unitCost }
-        : null;
-
-      return {
-        id: r.id,
-        productName,
-        expectedQty: Number(r.expected_qty) || 0,
-        receivedQty: Number(r.received_qty) || 0,
-        unitCost: Number(r.unit_cost) || 0,
-        missingSupplier: !r.supplier_id,
-        missingCost: !(Number(r.unit_cost) > 0),
-        requestedByName: r.requested_by_name || null,
-        source: r.purchase_orders?.notes === 'STAFF_DRAFT' ? 'Staff to-order sheet' : (r.purchase_orders?.notes || 'Buy flow'),
-        suggestedSupplierId: lastPurchase?.supplierId || bookEntry?.supplierId || null,
-        suggestedUnitCost,
-        costSource,
-        costSourceDate: lastPurchase?.purchasedAt || null,
-        costConflict,
-        receivedAt: receiptDateByProduct.get(r.product_id) || null,
-      };
+    const unrecorded = Array.from(groupedUnrecorded.values()).map(g => {
+      g.id = g.id.join(',');
+      g.requestedByName = Array.from(g.requestedByName).join(', ') || null;
+      return g;
     }).sort((a, b) => b.receivedQty - a.receivedQty);
 
     const { data: supplierRows } = await supabase

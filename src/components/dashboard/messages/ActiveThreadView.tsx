@@ -49,6 +49,65 @@ export function ActiveThreadView({
     );
   }
 
+  const memberByName = new Map(
+    selectedThread.members.map((m) => [m.displayName.trim().toLowerCase(), m])
+  );
+  const lastMessageId = selectedThread.messages[selectedThread.messages.length - 1]?.id;
+
+  // Read/reply receipts under my own messages, so a tagger can see whether the
+  // people they pinged have seen or replied. On order/issue threads it's shown
+  // per @mentioned recipient; on DMs it's a single Seen marker under my latest.
+  const receiptChip = (status: 'Replied' | 'Seen' | 'Sent', who?: string) => {
+    const cls =
+      status === 'Replied'
+        ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+        : status === 'Seen'
+        ? 'text-sky-700 bg-sky-50 border-sky-200'
+        : 'text-amber-700 bg-amber-50 border-amber-200';
+    return (
+      <span className={cn('text-[10px] px-1.5 py-0.5 rounded border whitespace-nowrap', cls)}>
+        {who ? `${who}: ` : ''}
+        {status}
+      </span>
+    );
+  };
+
+  const renderReceipts = (msg: Thread['messages'][number], isMine: boolean) => {
+    if (!isMine) return null;
+    const msgTime = new Date(msg.created_at).getTime();
+    const hasReplied = (nameLower: string) =>
+      selectedThread.messages.some(
+        (x) =>
+          (x.sender_name || '').trim().toLowerCase() === nameLower &&
+          new Date(x.created_at).getTime() > msgTime
+      );
+    const hasSeen = (lastReadAt?: string | null) =>
+      !!lastReadAt && new Date(lastReadAt).getTime() >= msgTime;
+
+    if (selectedThread.issueType === 'direct') {
+      // Only annotate my most recent message, and only about the other person.
+      if (msg.id !== lastMessageId) return null;
+      const other = selectedThread.members.find(
+        (m) => m.displayName.trim().toLowerCase() !== myName.trim().toLowerCase()
+      );
+      const status = other && hasSeen(other.lastReadAt) ? 'Seen' : 'Sent';
+      return <div className="mt-0.5 flex">{receiptChip(status)}</div>;
+    }
+
+    const mentions = msg.mentions || [];
+    if (mentions.length === 0) return null;
+    return (
+      <div className="mt-0.5 flex flex-wrap gap-1 justify-end">
+        {mentions.map((name) => {
+          const nameLower = name.trim().toLowerCase();
+          const member = memberByName.get(nameLower);
+          const status = hasReplied(nameLower) ? 'Replied' : hasSeen(member?.lastReadAt) ? 'Seen' : 'Sent';
+          return <span key={name}>{receiptChip(status, name.split(' ')[0])}</span>;
+        })}
+      </div>
+    );
+  };
+
   return (
     <div className="flex-1 min-w-0 flex flex-col">
       <div className="px-4 py-3 border-b flex items-center gap-3">
@@ -129,6 +188,7 @@ export function ActiveThreadView({
                 >
                   {msg.message}
                 </div>
+                {renderReceipts(msg, isMine)}
               </div>
             );
           })

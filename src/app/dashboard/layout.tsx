@@ -54,6 +54,7 @@ import { useUserProfile } from '@/hooks/useUserProfile';
 import { NotificationBell } from '@/components/dashboard/notification-bell';
 import { MessagesDrawer } from '@/components/dashboard/messages-drawer';
 import { StaffMessageFab } from '@/components/dashboard/staff-message-fab';
+import { EscalationModal } from '@/components/dashboard/escalation-modal';
 
 export default function DashboardLayout({
   children,
@@ -265,6 +266,7 @@ export default function DashboardLayout({
     <>
       <DueDateAlert />
       <StaffMessageFab />
+      <EscalationModal />
       <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr] print:block">
         <div className="hidden border-r bg-sidebar md:block print:hidden">
           <div className="flex h-full max-h-screen flex-col gap-2">

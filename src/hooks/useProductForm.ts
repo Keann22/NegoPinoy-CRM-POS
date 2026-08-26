@@ -13,6 +13,8 @@ export const productSchema = z.object({
   categoryId: z.string().optional(),
   images: z.custom<File[]>().optional(),
   sellingPrice: z.coerce.number().min(0, "Selling price must be positive").optional().default(0),
+  isOnSale: z.boolean().default(false),
+  salePrice: z.coerce.number().min(0, "Sale price must be positive").optional(),
   installmentPrice: z.coerce.number().min(0).optional(),
   quantityOnHand: z.coerce.number().int().min(0).optional().default(0),
   supplierPricing: z.array(z.object({
@@ -64,8 +66,8 @@ export function useProductFormSetup() {
     resolver: zodResolver(productSchema),
     defaultValues: { 
       name: '', sku: '', shelfLocation: '', description: '', categoryId: '', 
-      images: [], sellingPrice: 0, quantityOnHand: 0, supplierPricing: [], 
-      hasVariations: false, variations: [], assemblyRecipe: [] 
+      images: [], sellingPrice: 0, isOnSale: false, salePrice: undefined, quantityOnHand: 0, supplierPricing: [],
+      hasVariations: false, variations: [], assemblyRecipe: []
     },
   });
 

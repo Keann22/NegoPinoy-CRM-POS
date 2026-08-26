@@ -67,14 +67,21 @@ export function useProcessedOrders() {
         let all: any[] = [];
         let page = 0;
         while (true) {
-          const { data, error } = await supabase
+          let query = supabase
             .from('orders')
-            .select('id, customer_id, created_at, status, payment_method, total_amount, notes, sales_person_name, is_printed')
-            .gte('created_at', fromIso)
-            .lte('created_at', toIso)
-            .eq('is_printed', activeTab === 'printed')
-            .order('created_at', { ascending: false })
+            .select('id, customer_id, created_at, order_date, status, payment_method, total_amount, notes, sales_person_name, is_printed')
+            .gte('order_date', fromIso)
+            .lte('order_date', toIso)
+            .order('order_date', { ascending: false })
             .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
+
+          if (activeTab === 'printed') {
+            query = query.eq('is_printed', true);
+          } else {
+            query = query.or('is_printed.is.null,is_printed.eq.false');
+          }
+
+          const { data, error } = await query;
 
           if (error) throw error;
           all = all.concat(data || []);
@@ -85,7 +92,7 @@ export function useProcessedOrders() {
         const mapped = all.map((o: any) => ({
           id: o.id,
           customerId: o.customer_id,
-          orderDate: o.created_at,
+          orderDate: o.order_date || o.created_at,
           orderStatus: o.status,
           paymentType: o.payment_method,
           totalAmount: Number(o.total_amount),

@@ -92,7 +92,11 @@ export async function GET(req: Request) {
           reportedByName: issue.reported_by_name,
           createdAt: issue.created_at,
           messages,
-          members: members.map((p: any) => ({ userId: p.user_id, displayName: p.display_name })),
+          members: members.map((p: any) => ({
+            userId: p.user_id,
+            displayName: p.display_name,
+            lastReadAt: p.last_read_at,
+          })),
           lastActivityAt: lastMessage?.created_at || issue.created_at,
           unreadCount: countUnread(messages, myRow?.last_read_at, userName),
         };

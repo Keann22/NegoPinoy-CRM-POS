@@ -62,7 +62,17 @@ export function ViewProductDetailsDialog({ product, open, onOpenChange }: ViewPr
               </div>
               <div>
                   <h4 className="text-sm font-medium text-muted-foreground">Selling Price</h4>
-                  <p className="text-sm mt-1">{product.price}</p>
+                  {product.onSale ? (
+                    <p className="text-sm mt-1 flex items-center gap-2">
+                      {product.regularPriceLabel && (
+                        <span className="text-muted-foreground line-through">{product.regularPriceLabel}</span>
+                      )}
+                      <span className="text-green-600 dark:text-green-500 font-medium">{product.price}</span>
+                      <Badge variant="outline" className="border-green-600/40 text-green-600 dark:text-green-500">On Sale</Badge>
+                    </p>
+                  ) : (
+                    <p className="text-sm mt-1">{product.price}</p>
+                  )}
               </div>
               <div>
                   <h4 className="text-sm font-medium text-muted-foreground">Stock Level</h4>

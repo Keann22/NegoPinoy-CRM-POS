@@ -17,6 +17,23 @@ import { ChevronDown, ChevronRight, MoreHorizontal } from 'lucide-react';
 import { getStockStatus } from '@/types';
 import type { FormattedProduct } from '@/types';
 
+/** Price cell: shows sale price with the regular price struck through when on sale. */
+function PriceLabel({ product }: { product: FormattedProduct }) {
+  if (product.onSale) {
+    return (
+      <span className="flex flex-col leading-tight">
+        {product.regularPriceLabel && (
+          <span className="text-muted-foreground text-xs line-through">{product.regularPriceLabel}</span>
+        )}
+        <span className="text-green-600 dark:text-green-500 font-medium">
+          {product.price} <Badge variant="outline" className="ml-1 border-green-600/40 text-green-600 dark:text-green-500">Sale</Badge>
+        </span>
+      </span>
+    );
+  }
+  return <>{product.price}</>;
+}
+
 interface ProductsTableProps {
   products: FormattedProduct[];
   isLoading: boolean;
@@ -233,7 +250,7 @@ export function ProductsTable({
               <TableCell>
                 {product.children && product.children.length > 0
                   ? <span className="text-muted-foreground">-</span>
-                  : product.price}
+                  : <PriceLabel product={product} />}
               </TableCell>
               <TableCell className="hidden md:table-cell">{product.shelfLocation || '-'}</TableCell>
               <TableCell className="hidden md:table-cell">
@@ -262,7 +279,7 @@ export function ProductsTable({
                 </TableCell>
                 <TableCell className="font-medium pl-10">└ {child.variantName || child.name}</TableCell>
                 <TableCell><Badge variant={child.status.variant}>{child.status.text}</Badge></TableCell>
-                <TableCell>{child.price}</TableCell>
+                <TableCell><PriceLabel product={child} /></TableCell>
                 <TableCell className="hidden md:table-cell">{child.shelfLocation || '-'}</TableCell>
                 <TableCell className="hidden md:table-cell">
                   <StockCell product={child} onViewReserved={onViewReserved} onViewPacked={onViewPacked} onViewAllocated={onViewAllocated} />

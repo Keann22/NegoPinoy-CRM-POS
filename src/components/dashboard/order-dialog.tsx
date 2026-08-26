@@ -132,7 +132,7 @@ export function OrderDialog(props: OrderDialogProps) {
                 onProductSelect={async (p) => {
                   const { data: variants } = await supabase
                     .from('products')
-                    .select('id, name, variant_name, stock_level, selling_price, initial_unit_cost, stock_batches(*)')
+                    .select('id, name, variant_name, stock_level, selling_price, sale_price, is_on_sale, initial_unit_cost, stock_batches(*)')
                     .eq('parent_id', p.id);
 
                   if (variants && variants.length > 0) {

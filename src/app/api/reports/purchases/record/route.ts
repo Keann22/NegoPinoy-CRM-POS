@@ -21,6 +21,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'itemId is required' }, { status: 400 });
     }
 
+    const itemIds = itemId.split(',');
+
     // A quantity correction is reason enough to save on its own - a mis-keyed
     // receipt needs fixing whether or not anyone knows the price yet.
     const qty = receivedQty === null || receivedQty === undefined || receivedQty === ''
@@ -45,16 +47,53 @@ export async function POST(req: Request) {
       receiptIso = parsed.toISOString();
     }
 
-    const result = await repairFromPurchaseItem(
-      supabase,
-      itemId,
-      supplierId || null,
-      Number(unitCost) || null,
-      qty,
-      receiptIso,
-    );
+    let totalCurrentQty = 0;
+    const items = [];
+    for (const id of itemIds) {
+      const { data, error } = await supabase.from('purchase_order_items').select('received_qty').eq('id', id).single();
+      if (error) throw error;
+      const q = Number(data.received_qty) || 0;
+      totalCurrentQty += q;
+      items.push({ id, currentQty: q });
+    }
 
-    return NextResponse.json({ success: true, ...result });
+    const delta = qty !== null ? qty - totalCurrentQty : 0;
+    
+    let combinedResult = {
+      linesUpdated: 0,
+      cogsAdded: 0,
+      movementUpdated: false,
+      supplierName: null as string | null,
+      qtyDelta: delta,
+      expectedWas: null as number | null,
+      expectedNow: null as number | null,
+    };
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      // Apply the entire delta to the first item, others just keep their current qty
+      const targetQty = i === 0 ? item.currentQty + delta : item.currentQty;
+      
+      const result = await repairFromPurchaseItem(
+        supabase,
+        item.id,
+        supplierId || null,
+        Number(unitCost) || null,
+        targetQty,
+        receiptIso,
+      );
+      
+      combinedResult.linesUpdated += result.linesUpdated;
+      combinedResult.cogsAdded += result.cogsAdded;
+      combinedResult.movementUpdated = combinedResult.movementUpdated || result.movementUpdated;
+      combinedResult.supplierName = result.supplierName;
+      if (i === 0) {
+        combinedResult.expectedWas = result.expectedWas;
+        combinedResult.expectedNow = result.expectedNow;
+      }
+    }
+
+    return NextResponse.json({ success: true, ...combinedResult });
   } catch (error: any) {
     console.error('Error recording purchase detail:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });

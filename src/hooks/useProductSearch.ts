@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSupabase, useUser } from '@/lib/supabase/hooks';
 import { useToast } from '@/hooks/use-toast';
 import type { Product } from '@/lib/schemas/order';
+import { getEffectivePrice } from '@/lib/pricing';
 
 /**
  * useProductSearch
@@ -29,7 +30,7 @@ export function useProductSearch(query: string) {
       try {
         let q = supabase
           .from('products')
-          .select('id, name, stock_level, selling_price, installment_price, parent_id, supplier_pricing')
+          .select('id, name, stock_level, selling_price, sale_price, is_on_sale, installment_price, parent_id, supplier_pricing')
           .not('name', 'ilike', '[DELETED]%');
         const words = query.split(' ').filter(w => w.trim() !== '');
         words.forEach(w => { q = q.or(`name.ilike.%${w}%,variant_name.ilike.%${w}%`); });
@@ -40,7 +41,7 @@ export function useProductSearch(query: string) {
           id: doc.id,
           name: doc.name,
           quantityOnHand: doc.stock_level,
-          sellingPrice: doc.selling_price,
+          sellingPrice: getEffectivePrice(doc.selling_price, doc.sale_price, doc.is_on_sale),
           installment_price: doc.installment_price,
           supplier_pricing: doc.supplier_pricing,
           stockBatches: [],

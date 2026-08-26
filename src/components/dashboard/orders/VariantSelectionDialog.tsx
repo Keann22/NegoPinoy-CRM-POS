@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import type { Product } from '@/lib/schemas/order';
+import { getEffectivePrice, isOnSale, hasSaleDiscount } from '@/lib/pricing';
 
 interface VariantOption {
   id: string;
@@ -11,6 +12,8 @@ interface VariantOption {
   variant_name?: string;
   stock_level: number;
   selling_price: number;
+  sale_price?: number | null;
+  is_on_sale?: boolean | null;
   initial_unit_cost?: number;
   stock_batches?: { unitCost: number }[];
 }
@@ -60,7 +63,7 @@ export function VariantSelectionDialog({
                     productName: v.name,
                     quantity: 1,
                     costPriceAtSale,
-                    sellingPriceAtSale: v.selling_price,
+                    sellingPriceAtSale: getEffectivePrice(v.selling_price, v.sale_price, v.is_on_sale),
                     discount: 0,
                   });
                 }
@@ -68,9 +71,18 @@ export function VariantSelectionDialog({
               }}
             >
               <span>{v.variant_name || v.name}</span>
-              <div className="flex gap-4">
+              <div className="flex gap-4 items-center">
                 <span className="text-muted-foreground text-sm font-normal">Stock: {v.stock_level}</span>
-                <span>₱{(v.selling_price || 0).toFixed(2)}</span>
+                {isOnSale(v.is_on_sale) ? (
+                  <span className="flex items-center gap-1.5">
+                    {hasSaleDiscount(v.selling_price, v.sale_price) && (
+                      <span className="text-muted-foreground text-sm line-through">₱{(v.selling_price || 0).toFixed(2)}</span>
+                    )}
+                    <span className="text-green-600 dark:text-green-500 font-medium">₱{getEffectivePrice(v.selling_price, v.sale_price, v.is_on_sale).toFixed(2)}</span>
+                  </span>
+                ) : (
+                  <span>₱{(v.selling_price || 0).toFixed(2)}</span>
+                )}
               </div>
             </Button>
           ))}

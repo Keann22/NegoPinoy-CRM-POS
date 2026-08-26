@@ -14,6 +14,10 @@ export type Product = {
   categoryId?: string;
   categoryName?: string;
   sellingPrice: number;
+  /** Master on-sale flag. When true the product shows a SALE badge (badge does not require a discount). */
+  is_on_sale?: boolean | null;
+  /** Optional sale price. When on sale AND below sellingPrice, this is charged as the cash price. */
+  sale_price?: number | null;
   quantityOnHand: number;
   hasVariations?: boolean;
   images?: string[];
@@ -113,6 +117,10 @@ export type FormattedProduct = Product & {
   packedStock?: number;
   installment_price?: number;
   assembly_recipe?: any[] | null;
+  /** True when the product is flagged on sale (shows the SALE badge). */
+  onSale?: boolean;
+  /** Formatted regular price (e.g. "₱49.99"), set only when there's a real discount, shown struck-through. */
+  regularPriceLabel?: string;
 };
 
 /**

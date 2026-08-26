@@ -20,7 +20,7 @@ export type Thread = {
   reportedByName: string | null;
   createdAt: string;
   messages: ThreadMessage[];
-  members: { userId: string; displayName: string }[];
+  members: { userId: string; displayName: string; lastReadAt?: string | null }[];
   lastActivityAt: string;
   unreadCount: number;
 };
