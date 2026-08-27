@@ -37,6 +37,7 @@ export function usePicker() {
   const {
     scanner,
     scanning,
+    cameraError,
     startScanner,
     stopScanner
   } = usePickerScanner(handleScanSuccess);
@@ -44,6 +45,7 @@ export function usePicker() {
   return {
     scanner,
     scanning,
+    cameraError,
     scannedOrderId,
     setScannedOrderId,
     orderDetails,
