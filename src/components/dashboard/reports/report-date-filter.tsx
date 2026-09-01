@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { DateRange } from 'react-day-picker';
-import { format, subMonths } from 'date-fns';
+import { format, subMonths, startOfToday, endOfToday, startOfYesterday, endOfYesterday } from 'date-fns';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -32,7 +32,11 @@ export function ReportDateFilter({ date, setDate, className }: ReportDateFilterP
 
     const handlePresetChange = (value: string) => {
         const now = new Date();
-        if (value === 'this-month') {
+        if (value === 'today') {
+            setDate({ from: startOfToday(), to: endOfToday() });
+        } else if (value === 'yesterday') {
+            setDate({ from: startOfYesterday(), to: endOfYesterday() });
+        } else if (value === 'this-month') {
             setDate({ from: new Date(now.getFullYear(), now.getMonth(), 1), to: new Date(now.getFullYear(), now.getMonth() + 1, 0) });
         } else if (value === 'last-month') {
             const lastMonth = subMonths(now, 1);
@@ -58,6 +62,8 @@ export function ReportDateFilter({ date, setDate, className }: ReportDateFilterP
             <SelectValue placeholder="Select a preset" />
         </SelectTrigger>
         <SelectContent>
+            <SelectItem value="today">Today</SelectItem>
+            <SelectItem value="yesterday">Yesterday</SelectItem>
             <SelectItem value="this-month">This Month</SelectItem>
             <SelectItem value="last-month">Last Month</SelectItem>
             <SelectItem value="last-3-months">Last 3 Months</SelectItem>

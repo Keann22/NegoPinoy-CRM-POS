@@ -35,3 +35,21 @@ export type UnrecordedRow = {
 };
 
 export type SupplierOption = { id: string; name: string };
+
+export type ProductSaleStat = {
+  productId: string;
+  name: string;
+  qty: number;
+  revenue: number;
+  ordersCount: number;
+  avgPrice: number;
+  percentageOfTotalRevenue: number;
+};
+
+export type ProductSalesSummary = {
+  totalUnits: number;
+  totalRevenue: number;
+  distinctProducts: number;
+  topProduct: string | null;
+};
+

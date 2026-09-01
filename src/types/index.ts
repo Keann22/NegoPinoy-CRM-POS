@@ -18,3 +18,4 @@ export * from './accounting.types';
 export * from './agent.types';
 export * from './report.types';
 export * from './message.types';
+export * from './chat.types';
