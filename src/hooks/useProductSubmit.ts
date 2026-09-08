@@ -71,6 +71,9 @@ export function useProductSubmit({
         }
         const removedImageUrls = (displayProduct.images || []).filter(url => !existingImages.includes(url));
 
+        const hasNoChildren = !displayProduct.children || displayProduct.children.length === 0;
+        const stockChanged = hasNoChildren && typeof quantityOnHand === 'number' && quantityOnHand !== displayProduct.quantityOnHand;
+
         const { error } = await supabase.from('products').update({
           name: core.name, sku: finalSku, shelf_location: core.shelfLocation || null,
           description: core.description, category: core.categoryId,
@@ -78,9 +81,22 @@ export function useProductSubmit({
           is_on_sale: isOnSale ?? false, sale_price: salePrice ?? null,
           images: uploadedImageUrls, supplier_pricing: supplierPricing || [],
           assembly_recipe: assemblyRecipe || [],
+          ...(stockChanged ? { stock_level: quantityOnHand } : {}),
           ...(displayProduct.parent_id && core.name !== displayProduct.name ? { variant_name: core.name } : {}),
         }).eq('id', displayProduct.id);
         if (error) throw error;
+
+        if (stockChanged) {
+          const delta = (quantityOnHand || 0) - (displayProduct.quantityOnHand || 0);
+          await supabase.from('inventory_movements').insert({
+            product_id: displayProduct.id,
+            quantity_change: delta,
+            movement_type: 'adjustment',
+            timestamp: new Date().toISOString(),
+            reason: `Manual Physical Stock Update in Product Dialog: ${(displayProduct.quantityOnHand ?? 0)} -> ${quantityOnHand}`,
+            unit_cost: displayProduct.initial_unit_cost || 0
+          });
+        }
 
         if (removedImageUrls.length > 0) await deleteImages(supabase, removedImageUrls);
 

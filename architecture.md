@@ -20,7 +20,7 @@ It combines the following business domains into one application:
 | **Accounting** | ✅ Production | Payments, expenses, recurring costs, SPX remittances |
 | **Reports** | ✅ Production | Sales, P&L, AR, commissions, procurement sheets |
 | **Shipping** | ✅ Production | SPX courier integration, packing, pick-up management |
-| **AI Layer** | 🔧 Partial | Receipt OCR parsing, marketing recommendations |
+| **AI Layer** | ✅ Production | Receipt OCR parsing, marketing copy, Inventory Guardian watchdog & anomaly resolution |
 | **Chatbot** | ⏳ Planned | Not yet implemented |
 | **E-commerce Website** | ⏳ Partial | Separate Vite app in `/website` |
 
@@ -525,6 +525,34 @@ This is the deliberate complement of the procurement sheet: every `stock_level <
 
 - **"No connected order — likely a data error"**: nothing in order history explains the deficit at all (should be rare — the initial cleanup pass on 2026-07-16 reset 13 such products to `stock_level = 0`, each logged as an `inventory_movements` adjustment). Has a one-click **"Reset to 0"** button per row, which just calls the existing `POST /api/inventory/procurement/sync` with `targetQty: 0`.
 - **"Explained by an already-fulfilled order — accounting debt"**: a real order consumed the stock but already shipped/completed with no purchase ever recorded to true up its cost (see COGS section above — `cost_price_at_sale` stays `0` until a purchase backfills it). No reset button here on purpose: zeroing this would erase the only signal that a real cost still needs recording, and would silently remove the mechanism that would otherwise catch shrinkage/theft or an unpaid supplier. Left negative until someone actually restocks it.
+
+### Agentic AI Physical Inventory Guardian & Monitoring System (added 2026-09-08)
+
+**Files**:
+- Service: [`src/lib/services/inventory/inventory-guardian-service.ts`](src/lib/services/inventory/inventory-guardian-service.ts)
+- API: [`src/app/api/inventory/guardian/anomalies/route.ts`](src/app/api/inventory/guardian/anomalies/route.ts)
+- Pop-up Modal: [`src/components/dashboard/inventory/InventoryGuardianAlertModal.tsx`](src/components/dashboard/inventory/InventoryGuardianAlertModal.tsx)
+- Header Trigger: [`src/components/dashboard/inventory/InventoryGuardianTrigger.tsx`](src/components/dashboard/inventory/InventoryGuardianTrigger.tsx)
+- Hook / Context Provider: [`src/hooks/useInventoryGuardian.tsx`](src/hooks/useInventoryGuardian.tsx)
+- Types: [`src/types/inventory-guardian.types.ts`](src/types/inventory-guardian.types.ts)
+
+**The Problem Solved**:
+In fast-moving JIT operations, management frequently purchases goods that arrive physically at the warehouse, but staff or purchasers forget to encode a purchase order before the items are picked and packed. Because sales orders immediately deduct from `products.stock_level` at order creation, `stock_level` constantly plunges into negative numbers (`-1`, `-4`, `-8`) even though physical boxes are sitting on warehouse shelves. 
+
+Furthermore, `products.stock_level` does **not** represent physical shelf count — it represents **Available (Unreserved) Stock** (`Physical Count − Active Unfulfilled Orders`). When staff previously tried editing products to fix negative stock, two bugs broke the attempt:
+1. **Option C Overwrite Bug (fixed 2026-09-08)**: `src/app/api/inventory/procurement-request/route.ts` previously had code that forcibly calculated `targetStockLevel = -newTotalExpected` whenever a picker reported an issue, overwriting manual stock adjustments back to negative numbers. This was deleted.
+2. **Product Edit Dialog Stock Saving (fixed 2026-09-08)**: `useProductSubmit.ts` accepted `quantityOnHand` in the form, but omitted `stock_level` in its Supabase `.update()` statement for existing products, silently discarding manual stock edits. Fixed to update `stock_level` and log an audited `inventory_movements` adjustment.
+
+**How the Guardian Works**:
+1. **Autonomous Watchdog**: `detectInventoryAnomalies()` runs on Supabase queries (zero external AI API / Gemini cost). It cross-checks negative stocks against live unfulfilled orders (`Processing`, `Picked`, `Packed`, etc.) and open picker shortage tickets (`order_issues`). It classifies anomalies into:
+   - `unrecorded_purchase`: Stock is negative while unfulfilled order demand is 0 (all orders shipped; goods arrived and were sold without an encoded purchase).
+   - `picker_shortage`: Picker flagged missing items on the floor for an active order.
+   - `borrowed_debt`: Items borrowed to fulfill an order that still need replenishment.
+2. **Interactive Alert Modal (`InventoryGuardianAlertModal`)**: Mounted globally in `src/app/dashboard/layout.tsx` for Owner, Admin, and Inventory roles. When discrepancies are detected, a non-blocking modal provides three 1-click resolution actions:
+   - **Set Shelf Count**: Staff inputs what they physically see on the shelf (e.g. `2`). The system automatically calculates active unpicked reservations and sets `stock_level = physicalShelfCount − activeReservations`, logging an audited `inventory_movements` adjustment. Eliminates all mental math on negative numbers.
+   - **Backfill Purchase**: Staff inputs quantity, unit cost, and supplier. Increments `stock_level`, logs a `RESTOCK` movement, and sets `initial_unit_cost`.
+   - **Borrowed Stock**: Marks stock as borrowed for an order, allowing packing to complete while preserving replenishment demand on the Procurement Sheet.
+3. **Header Trigger (`InventoryGuardianTrigger`)**: A 🛡️ icon in the dashboard header displays a badge with the count of active stock anomalies (e.g. `🛡️ 3`) and opens the modal on click.
 
 ### Scan Receipt (added 2026-08-19)
 

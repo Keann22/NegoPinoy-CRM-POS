@@ -55,6 +55,9 @@ import { NotificationBell } from '@/components/dashboard/notification-bell';
 import { MessagesDrawer } from '@/components/dashboard/messages-drawer';
 import { StaffMessageFab } from '@/components/dashboard/staff-message-fab';
 import { EscalationModal } from '@/components/dashboard/escalation-modal';
+import { InventoryGuardianAlertModal } from '@/components/dashboard/inventory/InventoryGuardianAlertModal';
+import { InventoryGuardianTrigger } from '@/components/dashboard/inventory/InventoryGuardianTrigger';
+import { InventoryGuardianProvider } from '@/hooks/useInventoryGuardian';
 
 export default function DashboardLayout({
   children,
@@ -263,10 +266,11 @@ export default function DashboardLayout({
   }
 
   return (
-    <>
+    <InventoryGuardianProvider>
       <DueDateAlert />
       <StaffMessageFab />
       <EscalationModal />
+      <InventoryGuardianAlertModal />
       <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr] print:block">
         <div className="hidden border-r bg-sidebar md:block print:hidden">
           <div className="flex h-full max-h-screen flex-col gap-2">
@@ -275,7 +279,8 @@ export default function DashboardLayout({
                 <Logo className="h-6 w-6" />
                 <span className="font-headline">NegosyantengPinoy.Ph</span>
               </Link>
-              <div className="ml-auto flex items-center">
+              <div className="ml-auto flex items-center gap-1">
+                <InventoryGuardianTrigger />
                 <MessagesDrawer />
                 <NotificationBell />
               </div>
@@ -317,7 +322,8 @@ export default function DashboardLayout({
           </Sheet>
           <div className="w-full flex-1">
           </div>
-          <div className="flex items-center gap-2 md:hidden mr-2">
+          <div className="flex items-center gap-1 md:hidden mr-2">
+            <InventoryGuardianTrigger />
             <MessagesDrawer />
             <NotificationBell />
           </div>
@@ -355,6 +361,6 @@ export default function DashboardLayout({
         </main>
       </div>
     </div>
-    </>
+    </InventoryGuardianProvider>
   );
 }

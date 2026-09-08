@@ -342,51 +342,8 @@ export async function POST(req: Request) {
       }
     }
 
-    // --- Option C: Auto-adjust Negative Inventory ---
-    // Fetch current stock levels for the requested products
-    const productIds = finalRequests.map((r: any) => r.productId);
-    const { data: productsToAdjust, error: prodErr } = await supabase
-      .from('products')
-      .select('id, stock_level')
-      .in('id', productIds)
-      .lt('stock_level', 0); // Only auto-adjust if stock is negative
-
-    if (!prodErr && productsToAdjust && productsToAdjust.length > 0) {
-      for (const p of productsToAdjust) {
-        // Find the total expected qty for this product across existing + new requests
-        const reqItem = finalRequests.find((r: any) => r.productId === p.id);
-        if (!reqItem) continue;
-        
-        let newTotalExpected = reqItem.requestedQty;
-        if (existingMap.has(p.id)) {
-           newTotalExpected += existingMap.get(p.id)!.expected_qty;
-        }
-
-        const targetStockLevel = -newTotalExpected;
-        const currentStockLevel = p.stock_level;
-        const discrepancy = targetStockLevel - currentStockLevel;
-
-        if (discrepancy !== 0) {
-          // Adjust product stock
-          await supabase
-            .from('products')
-            .update({ stock_level: targetStockLevel })
-            .eq('id', p.id);
-
-          // Log discrepancy to inventory_movements for Audit (Option C)
-          await supabase
-            .from('inventory_movements')
-            .insert({
-              product_id: p.id,
-              quantity_change: discrepancy,
-              movement_type: 'adjustment',
-              reason: `Procurement Auto-Adjustment (Audit): ${currentStockLevel} -> ${targetStockLevel}`,
-              supplier_name: 'System Adjustment'
-            });
-        }
-      }
-    }
-    // ------------------------------------------------
+    // Note: Removed destructive "Option C" that previously forced stock_level = -newTotalExpected.
+    // Stock levels are now monitored and reconciled via the Inventory Guardian without clobbering physical counts.
 
     return NextResponse.json({ success: true, poId: poId });
   } catch (error: any) {
