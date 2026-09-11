@@ -858,12 +858,15 @@ To prevent unauthorized adjustments or premature dismissals:
 - **Strictly Blocked**:
   - Sales staff, Rey Magbitang, Cedric Timpug, Danna Ornos, and non-inventory operational accounts cannot see the Guardian popup or trigger badge.
 
-#### 6. Floor App Suppression
-To safeguard warehouse throughput, the Guardian modal automatically suppresses itself on operational scanning pages:
+#### 6. Floor App Non-Intrusive Guidance & Modal Suppression
+To safeguard warehouse throughput, the Guardian modal popup automatically suppresses itself on operational scanning pages:
 - `/dashboard/pick`
 - `/dashboard/pack`
 - `/dashboard/verify`
-Warehouse staff are never interrupted by popups while actively scanning barcodes. The alert badge remains accessible in the main management dashboard header (`InventoryGuardianTrigger.tsx`).
+Warehouse staff are never interrupted by popups or blocked camera scanners while actively scanning barcodes. The management alert badge remains accessible in the main dashboard header (`InventoryGuardianTrigger.tsx`).
+
+**Inline Picker Memory Warnings**: On `/dashboard/pick`, when a picker toggles an item as "Out of Stock", `usePickerData` / `pickerMemoryHelper.ts` inspects recent `inventory_guardian_memory` records and current ledger stock. If staff recently verified physical stock (e.g. *"Tess verified 12 pcs on shelf 2 days ago"*) or the ledger shows positive units, an inline amber warning banner expands immediately below that row urging them to check back shelves, adjacent bins, or Room B before submitting a shortage. The picker is not blocked from submitting if the item is truly missing, but accidental shortage reports caused by misplaced items are dramatically reduced.
+
 
 #### 7. 100% Free Telegram Bot Push Notifications
 Integrated via `src/lib/services/inventory/inventory-guardian-telegram-service.ts` using the official Telegram Bot API:

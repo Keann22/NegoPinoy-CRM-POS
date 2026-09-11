@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { resolveOpenOrderIssues } from '@/lib/services/order-issues-service';
-import type { OrderItem, PickGroup, PickRow } from './types';
+import type { OrderItem, PickGroup, PickRow, ProductMemoryHint } from './types';
+import { fetchProductMemoriesForPicker } from './pickerMemoryHelper';
 
 export function usePickerData(
   supabase: SupabaseClient | null,
@@ -15,6 +16,7 @@ export function usePickerData(
   const [pickGroups, setPickGroups] = useState<PickGroup[]>([]);
   const [outOfStockQty, setOutOfStockQty] = useState<Map<string, number>>(new Map());
   const [qtyDrafts, setQtyDrafts] = useState<Map<string, string>>(new Map());
+  const [productMemories, setProductMemories] = useState<Map<string, ProductMemoryHint>>(new Map());
   const [loading, setLoading] = useState(false);
   const [viewingPhotoItem, setViewingPhotoItem] = useState<OrderItem | null>(null);
 
@@ -24,6 +26,7 @@ export function usePickerData(
     setPickGroups([]);
     setOutOfStockQty(new Map());
     setQtyDrafts(new Map());
+    setProductMemories(new Map());
     setViewingPhotoItem(null);
   };
 
@@ -36,7 +39,7 @@ export function usePickerData(
     try {
       const { data, error } = await supabase
         .from('orders')
-        .select('id, status, customer_id, sales_person_name, customers(full_name), order_items(id, product_id, product_name, quantity, products(images, assembly_recipe))')
+        .select('id, status, customer_id, sales_person_name, customers(full_name), order_items(id, product_id, product_name, quantity, products(images, assembly_recipe, stock_level))')
         .eq('id', orderId)
         .single();
 
@@ -59,22 +62,24 @@ export function usePickerData(
       }));
       setOrderItems(items);
 
-      const missingNameIds = new Set<string>();
+      const allComponentIds = new Set<string>();
       for (const item of rawItems) {
         const recipe = Array.isArray(item.products?.assembly_recipe) ? item.products.assembly_recipe : [];
         for (const comp of recipe) {
           const compId = comp.productId || comp.component_id;
-          if (compId && !comp.productName) missingNameIds.add(compId);
+          if (compId) allComponentIds.add(compId);
         }
       }
 
       const nameMap = new Map<string, string>();
-      if (missingNameIds.size > 0) {
+      let compProductsList: any[] = [];
+      if (allComponentIds.size > 0) {
         const { data: compProducts } = await supabase
           .from('products')
-          .select('id, name, variant_name')
-          .in('id', Array.from(missingNameIds));
-        for (const p of (compProducts || []) as any[]) {
+          .select('id, name, variant_name, stock_level')
+          .in('id', Array.from(allComponentIds));
+        compProductsList = compProducts || [];
+        for (const p of compProductsList) {
           const display = p.variant_name && !p.name?.includes(p.variant_name)
             ? `${p.name} [${p.variant_name}]`
             : p.name;
@@ -124,6 +129,27 @@ export function usePickerData(
         };
       });
       setPickGroups(groups);
+
+      // Collect all product IDs to query verified memory and stock
+      const allProductIds = Array.from(new Set([
+        ...rawItems.map((i: any) => i.product_id).filter(Boolean),
+        ...Array.from(allComponentIds)
+      ]));
+
+      const stockMap = new Map<string, number>();
+      for (const item of rawItems) {
+        if (item.product_id && item.products?.stock_level !== undefined) {
+          stockMap.set(item.product_id, item.products.stock_level);
+        }
+      }
+      for (const comp of compProductsList) {
+        if (comp.id && comp.stock_level !== undefined) {
+          stockMap.set(comp.id, comp.stock_level);
+        }
+      }
+
+      const memoryMap = await fetchProductMemoriesForPicker(supabase, allProductIds, stockMap);
+      setProductMemories(memoryMap);
 
       // Pre-populate any existing out-of-stock issues so the picker doesn't
       // accidentally resolve them by forgetting to re-flag them.
@@ -337,6 +363,7 @@ export function usePickerData(
     pickGroups,
     outOfStockQty,
     qtyDrafts,
+    productMemories,
     loading,
     viewingPhotoItem,
     setViewingPhotoItem,

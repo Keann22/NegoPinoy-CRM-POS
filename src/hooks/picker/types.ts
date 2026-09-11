@@ -30,3 +30,12 @@ export type PickGroup = {
   isSet: boolean;
   rows: PickRow[];
 };
+
+export type ProductMemoryHint = {
+  actorName: string;
+  verifiedCount: number;
+  auditedAt: string;
+  notes?: string;
+  systemStock?: number;
+};
+

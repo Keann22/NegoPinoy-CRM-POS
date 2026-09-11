@@ -5,10 +5,24 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ClipboardList, ScanLine, X, Check, AlertCircle, CameraOff } from 'lucide-react';
+import { Loader2, ClipboardList, ScanLine, X, Check, AlertCircle, AlertTriangle, CameraOff } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { usePicker } from '@/hooks/usePicker';
 import { ProductPhotoDialog } from '@/components/dashboard/product-photo-dialog';
+
+function formatMemoryAge(dateStr?: string): string {
+  if (!dateStr) return '';
+  const diffMs = Date.now() - new Date(dateStr).getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  if (diffDays === 0) {
+    if (diffHours <= 1) return 'earlier today';
+    return `${diffHours} hours ago`;
+  }
+  if (diffDays === 1) return 'yesterday';
+  if (diffDays < 7) return `${diffDays} days ago`;
+  return new Date(dateStr).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+}
 
 export default function PickerApp() {
   const {
@@ -20,6 +34,7 @@ export default function PickerApp() {
     pickGroups,
     outOfStockQty,
     qtyDrafts,
+    productMemories,
     loading,
     viewingPhotoItem,
     setViewingPhotoItem,
@@ -135,37 +150,70 @@ export default function PickerApp() {
                       {pickGroups.map(group => {
                         const renderRow = (
                           key: string,
+                          productId: string,
                           name: React.ReactNode,
                           qty: number,
                           indent: boolean
                         ) => {
                           const isFlagged = outOfStockQty.has(key);
+                          const memoryHint = productMemories.get(productId);
+                          const hasVerifiedMemory = !!(memoryHint && memoryHint.verifiedCount > 0 && memoryHint.actorName);
+                          const hasSystemStock = !!(memoryHint && (memoryHint.systemStock ?? 0) > 0);
+                          const showHint = isFlagged && (hasVerifiedMemory || hasSystemStock);
+
                           return (
-                            <tr key={key} className={`border-b last:border-0 ${isFlagged ? 'bg-red-50' : ''}`}>
-                              <td className={`p-3 ${indent ? 'pl-8' : ''}`}>{name}</td>
-                              <td className="p-3 text-center">
-                                <span className="font-bold">{qty}</span>
-                              </td>
-                              <td className="p-3 text-center">
-                                <Checkbox
-                                  checked={isFlagged}
-                                  onCheckedChange={() => toggleOutOfStock(key, qty)}
-                                />
-                              </td>
-                              <td className="p-3 text-center">
-                                {isFlagged && (
-                                  <input
-                                    type="number"
-                                    min={1}
-                                    max={qty}
-                                    value={qtyDrafts.get(key) ?? ''}
-                                    onChange={(e) => handleQtyDraftChange(key, e.target.value)}
-                                    onBlur={() => commitOutOfStockQty(key, qty)}
-                                    className="w-16 text-center border rounded-md px-1 py-1 text-sm"
+                            <React.Fragment key={key}>
+                              <tr className={`border-b ${showHint ? '' : 'last:border-0'} ${isFlagged ? 'bg-red-50' : ''}`}>
+                                <td className={`p-3 ${indent ? 'pl-8' : ''}`}>{name}</td>
+                                <td className="p-3 text-center">
+                                  <span className="font-bold">{qty}</span>
+                                </td>
+                                <td className="p-3 text-center">
+                                  <Checkbox
+                                    checked={isFlagged}
+                                    onCheckedChange={() => toggleOutOfStock(key, qty)}
                                   />
-                                )}
-                              </td>
-                            </tr>
+                                </td>
+                                <td className="p-3 text-center">
+                                  {isFlagged && (
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={qty}
+                                      value={qtyDrafts.get(key) ?? ''}
+                                      onChange={(e) => handleQtyDraftChange(key, e.target.value)}
+                                      onBlur={() => commitOutOfStockQty(key, qty)}
+                                      className="w-16 text-center border rounded-md px-1 py-1 text-sm"
+                                    />
+                                  )}
+                                </td>
+                              </tr>
+                              {showHint && (
+                                <tr className="bg-amber-50/95 border-b border-amber-200/80">
+                                  <td colSpan={4} className={`p-2.5 ${indent ? 'pl-8' : 'pl-4'}`}>
+                                    <div className="flex items-start gap-2 text-xs text-amber-950">
+                                      <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                                      <div className="space-y-0.5">
+                                        <p className="font-semibold text-amber-900">
+                                          ⚠️ Wait, double check before submitting:
+                                        </p>
+                                        <p className="text-amber-800 leading-relaxed">
+                                          {hasVerifiedMemory ? (
+                                            <>
+                                              <strong>{memoryHint.actorName}</strong> physically verified <strong>{memoryHint.verifiedCount} pcs</strong> on shelf ({formatMemoryAge(memoryHint.auditedAt)}). Please check back shelves, adjacent bins, or Room B!
+                                            </>
+                                          ) : (
+                                            <>
+                                              System ledger shows <strong>{memoryHint?.systemStock} pcs</strong> in stock. Please verify if it was placed in an alternate bin or received recently.
+                                            </>
+                                          )}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
                           );
                         };
 
@@ -181,7 +229,7 @@ export default function PickerApp() {
 
                         if (!group.isSet) {
                           const row = group.rows[0];
-                          return renderRow(row.key, setNameButton, row.quantity, false);
+                          return renderRow(row.key, row.productId, setNameButton, row.quantity, false);
                         }
 
                         // Set: a display-only header, then a flaggable row per part.
@@ -200,7 +248,7 @@ export default function PickerApp() {
                               </td>
                               <td className="p-3" colSpan={2}></td>
                             </tr>
-                            {group.rows.map(row => renderRow(row.key, <span className="text-slate-700">{row.productName}</span>, row.quantity, true))}
+                            {group.rows.map(row => renderRow(row.key, row.productId, <span className="text-slate-700">{row.productName}</span>, row.quantity, true))}
                           </React.Fragment>
                         );
                       })}
