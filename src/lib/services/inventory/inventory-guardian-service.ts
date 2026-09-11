@@ -3,8 +3,17 @@ import type {
   InventoryAnomaly,
   PhysicalCountCorrectionPayload,
   BackfillPurchasePayload,
-  BorrowStockPayload
+  BorrowStockPayload,
+  GuardianDailyProgress,
+  CompletedDailyAuditItem
 } from '@/types';
+import {
+  recordGuardianMemory,
+  getRecentMemoriesForProducts,
+  getProductGuardianMemory
+} from './inventory-guardian-memory-service';
+
+export { getProductGuardianMemory };
 
 // Orders in these statuses still hold/claim physical inventory that has not shipped yet.
 const UNFULFILLED_STATUSES = [
@@ -53,6 +62,14 @@ export async function detectInventoryAnomalies(supabase: SupabaseClient): Promis
     console.error('Error fetching open order issues:', issueErr);
   }
 
+  // 3. Fetch recent memory entries for candidate products
+  const candidateIds = Array.from(new Set([
+    ...(negativeProducts?.map(p => p.id) || []),
+    ...(openIssues?.map((i: any) => i.product_id).filter(Boolean) || [])
+  ]));
+
+  const memoryByProduct = await getRecentMemoriesForProducts(supabase, candidateIds);
+
   // Check negative stock products
   if (negativeProducts && negativeProducts.length > 0) {
     const productIds = negativeProducts.map(p => p.id);
@@ -80,6 +97,15 @@ export async function detectInventoryAnomalies(supabase: SupabaseClient): Promis
         ? `${prod.name} [${prod.variant_name}]`
         : prod.name;
 
+      const pMemories = memoryByProduct.get(prod.id) || [];
+      const lastAudit = pMemories.find(m => m.actionType === 'physical_count_audit');
+      const memoryContext = {
+        lastVerifiedCount: lastAudit?.physicalCount,
+        lastVerifiedAt: lastAudit?.createdAt,
+        lastVerifiedBy: lastAudit?.actorName,
+        repeatDiscrepancyCount: pMemories.length
+      };
+
       // Anomaly: Orders completed, but stock is negative (unrecorded purchase)
       if (demand.count === 0) {
         anomalies.push({
@@ -98,7 +124,8 @@ export async function detectInventoryAnomalies(supabase: SupabaseClient): Promis
           detectedAt: new Date().toISOString(),
           details: {
             shippedWithoutPurchaseQty: Math.abs(stock)
-          }
+          },
+          memoryContext
         });
       } else if (Math.abs(stock) > demand.qty) {
         // Partial unrecorded purchase
@@ -118,7 +145,8 @@ export async function detectInventoryAnomalies(supabase: SupabaseClient): Promis
           detectedAt: new Date().toISOString(),
           details: {
             shippedWithoutPurchaseQty: Math.abs(stock) - demand.qty
-          }
+          },
+          memoryContext
         });
       }
     }
@@ -136,6 +164,21 @@ export async function detectInventoryAnomalies(supabase: SupabaseClient): Promis
         continue;
       }
 
+      const pMemories = memoryByProduct.get(issue.product_id) || [];
+      const lastAudit = pMemories.find(m => m.actionType === 'physical_count_audit');
+      let title = `Floor Shortage Reported: ${pName}`;
+      let description = `Picker ${issue.reported_by_name || 'Staff'} reported ${issue.out_of_stock_qty || 1} unit(s) missing for Order #${(issue.order_id || '').slice(0, 8).toUpperCase()}. System ledger currently shows ${stock}.`;
+      let recommendation = `Verify if the shelf is truly empty, if it was misplaced, or if stock was borrowed from another room.`;
+      let hasConflict = false;
+
+      if (lastAudit && typeof lastAudit.physicalCount === 'number' && lastAudit.physicalCount > 0) {
+        const auditDate = new Date(lastAudit.createdAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+        title = `⚠️ Conflict with Verified Memory: ${pName}`;
+        description = `Picker reported 0 on shelf, BUT on ${auditDate}, ${lastAudit.actorName || 'Staff'} physically verified ${lastAudit.physicalCount} units on the shelf. Please re-check shelf location before reordering.`;
+        recommendation = `Physically verify shelf before purchasing. ${lastAudit.physicalCount} unit(s) were physically verified on ${auditDate}.`;
+        hasConflict = true;
+      }
+
       anomalies.push({
         id: `picker-issue-${issue.id}`,
         productId: issue.product_id,
@@ -146,14 +189,21 @@ export async function detectInventoryAnomalies(supabase: SupabaseClient): Promis
         unfulfilledQty: issue.out_of_stock_qty || 1,
         type: 'picker_shortage',
         severity: 'high',
-        title: `Floor Shortage Reported: ${pName}`,
-        description: `Picker ${issue.reported_by_name || 'Staff'} reported ${issue.out_of_stock_qty || 1} unit(s) missing for Order #${(issue.order_id || '').slice(0, 8).toUpperCase()}. System ledger currently shows ${stock}.`,
-        recommendation: `Verify if the shelf is truly empty, if it was misplaced, or if stock was borrowed from another room.`,
+        title,
+        description,
+        recommendation,
         detectedAt: issue.created_at || new Date().toISOString(),
         details: {
           pickerReportedQty: issue.out_of_stock_qty,
           reportedByName: issue.reported_by_name,
           orderId: issue.order_id
+        },
+        memoryContext: {
+          lastVerifiedCount: lastAudit?.physicalCount,
+          lastVerifiedAt: lastAudit?.createdAt,
+          lastVerifiedBy: lastAudit?.actorName,
+          repeatDiscrepancyCount: pMemories.length,
+          hasMemoryConflict: hasConflict
         }
       });
     }
@@ -163,162 +213,81 @@ export async function detectInventoryAnomalies(supabase: SupabaseClient): Promis
 }
 
 /**
- * Corrects physical shelf stock using an audited physical count.
- * Handles the calculation between physical count, active reservations, and target stock_level.
+ * Computes today's progress towards the 5-product verification goal.
  */
-export async function applyPhysicalShelfCount(
+export async function getGuardianDailyProgress(
   supabase: SupabaseClient,
-  payload: PhysicalCountCorrectionPayload
-): Promise<{ success: boolean; newStockLevel: number; discrepancy: number; activeOrdersCount: number }> {
-  const { productId, physicalShelfCount, notes, actorName = 'Inventory Guardian' } = payload;
+  totalBacklogCount: number
+): Promise<GuardianDailyProgress> {
+  const target = 5;
+  try {
+    // Start of today in Philippine Time (UTC+8)
+    const now = new Date();
+    const phNow = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+    const phDateStr = phNow.toISOString().slice(0, 10);
+    const todayMidnightUtc = new Date(`${phDateStr}T00:00:00+08:00`).toISOString();
 
-  // 1. Fetch current product
-  const { data: product, error: pErr } = await supabase
-    .from('products')
-    .select('id, name, stock_level, initial_unit_cost')
-    .eq('id', productId)
-    .single();
+    const { data: todayMemories, error } = await supabase
+      .from('inventory_guardian_memory')
+      .select('id, product_id, action_type, physical_count, actor_name, created_at, products(name)')
+      .in('action_type', ['physical_count_audit', 'purchase_backfill'])
+      .gte('created_at', todayMidnightUtc)
+      .order('created_at', { ascending: false });
 
-  if (pErr || !product) {
-    throw new Error('Product not found for physical count correction');
-  }
-
-  // 2. Fetch active unfulfilled orders claiming this product
-  const { data: activeItems, error: aErr } = await supabase
-    .from('order_items')
-    .select('quantity, orders!inner(id, status)')
-    .eq('product_id', productId)
-    .in('orders.status', UNFULFILLED_STATUSES);
-
-  if (aErr) {
-    console.error('Error fetching active orders during physical count:', aErr);
-  }
-
-  const activeReservations = (activeItems || []).reduce((sum, item: any) => sum + (Number(item.quantity) || 1), 0);
-  const activeOrdersCount = activeItems?.length || 0;
-
-  // 3. In NegoPinoy, stock_level represents: Available (Unreserved) Stock = Physical Count - Active Reservations
-  const targetStockLevel = physicalShelfCount - activeReservations;
-  const currentStockLevel = product.stock_level ?? 0;
-  const discrepancy = targetStockLevel - currentStockLevel;
-
-  // 4. Update product stock_level
-  const { error: updErr } = await supabase
-    .from('products')
-    .update({ stock_level: targetStockLevel })
-    .eq('id', productId);
-
-  if (updErr) throw updErr;
-
-  // 5. Log movement
-  const auditReason = `Inventory Guardian Audit: Physical shelf count set to ${physicalShelfCount} (Active unfulfilled orders: ${activeReservations}, target stock: ${targetStockLevel}). ${notes || 'Audited by ' + actorName}`;
-
-  await supabase.from('inventory_movements').insert({
-    product_id: productId,
-    quantity_change: discrepancy,
-    movement_type: 'adjustment',
-    timestamp: new Date().toISOString(),
-    reason: auditReason,
-    supplier_name: 'Physical Shelf Audit',
-    unit_cost: product.initial_unit_cost || 0
-  });
-
-  // 6. If physical stock is now confirmed > 0 and covers open picker issues, auto-resolve them
-  if (physicalShelfCount > 0) {
-    const { data: openIssues } = await supabase
-      .from('order_issues')
-      .select('id, order_id')
-      .eq('product_id', productId)
-      .eq('status', 'open');
-
-    if (openIssues && openIssues.length > 0) {
-      await supabase
-        .from('order_issues')
-        .update({ status: 'resolved' })
-        .eq('product_id', productId)
-        .eq('status', 'open');
+    if (error || !todayMemories) {
+      return {
+        target,
+        completedToday: 0,
+        remainingToday: target,
+        isGoalMet: false,
+        completedItems: [],
+        totalBacklogCount
+      };
     }
-  }
 
-  return {
-    success: true,
-    newStockLevel: targetStockLevel,
-    discrepancy,
-    activeOrdersCount
-  };
+    // Deduplicate by product_id so if a product was edited twice today it counts once
+    const seenProductIds = new Set<string>();
+    const completedItems: CompletedDailyAuditItem[] = [];
+
+    for (const m of todayMemories as any[]) {
+      if (!m.product_id || seenProductIds.has(m.product_id)) continue;
+      seenProductIds.add(m.product_id);
+      completedItems.push({
+        id: m.id,
+        productId: m.product_id,
+        productName: m.products?.name || 'Unknown Product',
+        actorName: m.actor_name || 'Staff',
+        actionType: m.action_type,
+        physicalCount: m.physical_count,
+        timestamp: m.created_at
+      });
+    }
+
+    const completedToday = completedItems.length;
+    const remainingToday = Math.max(0, target - completedToday);
+
+    return {
+      target,
+      completedToday,
+      remainingToday,
+      isGoalMet: completedToday >= target,
+      completedItems,
+      totalBacklogCount
+    };
+  } catch (err) {
+    console.error('Error fetching guardian daily progress:', err);
+    return {
+      target,
+      completedToday: 0,
+      remainingToday: target,
+      isGoalMet: false,
+      completedItems: [],
+      totalBacklogCount
+    };
+  }
 }
 
-/**
- * Backfills an unrecorded purchase directly into inventory and movements.
- */
-export async function backfillUnrecordedPurchase(
-  supabase: SupabaseClient,
-  payload: BackfillPurchasePayload
-): Promise<{ success: boolean; newStockLevel: number }> {
-  const { productId, quantity, unitCost, supplierName = 'Unrecorded Delivery', purchaseDate, actorName = 'Inventory Guardian' } = payload;
+export * from './inventory-guardian-action-service';
+export * from './inventory-guardian-memory-service';
 
-  if (quantity <= 0) {
-    throw new Error('Quantity must be greater than 0');
-  }
 
-  // 1. Fetch current product
-  const { data: product, error: pErr } = await supabase
-    .from('products')
-    .select('id, name, stock_level')
-    .eq('id', productId)
-    .single();
-
-  if (pErr || !product) {
-    throw new Error('Product not found for purchase backfill');
-  }
-
-  const currentStock = product.stock_level ?? 0;
-  const newStockLevel = currentStock + quantity;
-
-  // 2. Update stock and initial_unit_cost
-  const { error: updErr } = await supabase
-    .from('products')
-    .update({
-      stock_level: newStockLevel,
-      ...(unitCost > 0 ? { initial_unit_cost: unitCost } : {})
-    })
-    .eq('id', productId);
-
-  if (updErr) throw updErr;
-
-  // 3. Log movement
-  const dateToUse = purchaseDate || new Date().toISOString();
-  await supabase.from('inventory_movements').insert({
-    product_id: productId,
-    quantity_change: quantity,
-    movement_type: 'RESTOCK',
-    timestamp: dateToUse,
-    reason: `Backfilled Unrecorded Purchase: ${quantity} units @ ₱${unitCost} (${actorName})`,
-    supplier_name: supplierName,
-    unit_cost: unitCost
-  });
-
-  return { success: true, newStockLevel };
-}
-
-/**
- * Marks an item as borrowed to fulfill an order, keeping the procurement draft active.
- */
-export async function markStockAsBorrowed(
-  supabase: SupabaseClient,
-  payload: BorrowStockPayload
-): Promise<{ success: boolean }> {
-  const { productId, quantity, orderId, notes, actorName = 'Staff' } = payload;
-
-  // Log movement explaining the borrow
-  await supabase.from('inventory_movements').insert({
-    product_id: productId,
-    quantity_change: 0, // Zero net stock change; borrowed from outside/staging
-    movement_type: 'adjustment',
-    timestamp: new Date().toISOString(),
-    reason: `Borrowed Stock for Order ${orderId ? '#' + orderId.slice(0, 8) : ''}: ${quantity} units borrowed (${notes || 'Requires replenishment'}). Tagged by ${actorName}`,
-    supplier_name: 'Borrowed Stock'
-  });
-
-  return { success: true };
-}

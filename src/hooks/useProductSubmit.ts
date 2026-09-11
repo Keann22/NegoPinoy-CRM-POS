@@ -1,5 +1,7 @@
 import { useToast } from '@/hooks/use-toast';
 import { useSupabase } from '@/lib/supabase/hooks';
+import { useUserProfile } from '@/hooks/useUserProfile';
+import { recordGuardianMemory } from '@/lib/services/inventory/inventory-guardian-memory-service';
 import type { FormattedProduct } from '@/types';
 import type { ProductFormValues, CreateProps, EditProps } from './useProductForm';
 
@@ -43,6 +45,8 @@ export function useProductSubmit({
 }) {
   const supabase = useSupabase();
   const { toast } = useToast();
+  const { userProfile } = useUserProfile();
+  const actorName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : 'Staff';
 
   async function onSubmit(values: ProductFormValues) {
     if (!supabase) return;
@@ -93,8 +97,19 @@ export function useProductSubmit({
             quantity_change: delta,
             movement_type: 'adjustment',
             timestamp: new Date().toISOString(),
-            reason: `Manual Physical Stock Update in Product Dialog: ${(displayProduct.quantityOnHand ?? 0)} -> ${quantityOnHand}`,
+            reason: `Manual Physical Stock Update: ${(displayProduct.quantityOnHand ?? 0)} -> ${quantityOnHand} by ${actorName}`,
             unit_cost: displayProduct.initial_unit_cost || 0
+          });
+
+          await recordGuardianMemory(supabase, {
+            productId: displayProduct.id,
+            actionType: 'physical_count_audit',
+            physicalCount: quantityOnHand,
+            systemStockBefore: displayProduct.quantityOnHand ?? 0,
+            systemStockAfter: quantityOnHand,
+            discrepancy: delta,
+            actorName: actorName,
+            notes: `Verified via Product Edit screen (${actorName})`
           });
         }
 

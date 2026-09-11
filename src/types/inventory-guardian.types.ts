@@ -32,6 +32,29 @@ export interface InventoryAnomaly {
     reportedByName?: string | null;
     orderId?: string | null;
   };
+  memoryContext?: {
+    lastVerifiedCount?: number | null;
+    lastVerifiedAt?: string | null;
+    lastVerifiedBy?: string | null;
+    expectedShelfCount?: number | null;
+    repeatDiscrepancyCount?: number;
+    hasMemoryConflict?: boolean;
+  };
+}
+
+export interface InventoryGuardianMemoryEntry {
+  id: string;
+  productId: string;
+  actionType: 'physical_count_audit' | 'purchase_backfill' | 'borrow_tagged' | 'anomaly_dismissed' | 'anomaly_notified';
+  physicalCount?: number | null;
+  systemStockBefore?: number | null;
+  systemStockAfter?: number | null;
+  discrepancy?: number | null;
+  activeOrdersCount?: number | null;
+  actorName?: string | null;
+  notes?: string | null;
+  metadata?: Record<string, any>;
+  createdAt: string;
 }
 
 export interface PhysicalCountCorrectionPayload {
@@ -57,3 +80,23 @@ export interface BorrowStockPayload {
   notes?: string;
   actorName?: string;
 }
+
+export interface CompletedDailyAuditItem {
+  id: string;
+  productId: string;
+  productName: string;
+  actorName: string;
+  actionType: string;
+  physicalCount?: number | null;
+  timestamp: string;
+}
+
+export interface GuardianDailyProgress {
+  target: number;
+  completedToday: number;
+  remainingToday: number;
+  isGoalMet: boolean;
+  completedItems: CompletedDailyAuditItem[];
+  totalBacklogCount: number;
+}
+

@@ -1,16 +1,23 @@
 'use client';
 
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Download, AlertTriangle, ChevronDown } from 'lucide-react';
+import { Loader2, Download, AlertTriangle, ChevronDown, Receipt } from 'lucide-react';
 import { ReportDateFilter } from '@/components/dashboard/reports/report-date-filter';
 import { format } from 'date-fns';
 import { usePurchasesReport } from '@/hooks/usePurchasesReport';
+import { useReceiptDrafts } from '@/hooks/useReceiptDrafts';
+import { SavedReceiptsDialog } from '@/components/dashboard/procurement/saved-receipts-dialog';
 
 export function PurchasesReport() {
+  const router = useRouter();
+  const { drafts: receiptDrafts, loading: receiptDraftsLoading, deleteDraft: deleteReceiptDraft } = useReceiptDrafts();
+  const [savedReceiptsOpen, setSavedReceiptsOpen] = useState(false);
   const {
     canSeeCosts,
     canSeeSuppliers,
@@ -52,6 +59,32 @@ export function PurchasesReport() {
         <ReportDateFilter date={date} setDate={setDate} className="mt-2 mb-0" />
       </CardHeader>
       <CardContent className="space-y-6">
+        {!loading && receiptDrafts.length > 0 && (
+          <div className="rounded-md border border-indigo-200 bg-indigo-50/70 p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <Receipt className="h-5 w-5 shrink-0 text-indigo-600 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-indigo-950">
+                    {receiptDrafts.length} saved receipt scan {receiptDrafts.length === 1 ? 'draft' : 'drafts'} waiting for review
+                  </p>
+                  <p className="text-sm text-indigo-800 mt-0.5">
+                    Receipt photos saved during procurement. You can review items and record them into purchases.
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-white border-indigo-300 text-indigo-700 hover:bg-indigo-100 font-semibold self-start sm:self-auto shrink-0"
+                onClick={() => setSavedReceiptsOpen(true)}
+              >
+                Review Saved Receipts ({receiptDrafts.length})
+              </Button>
+            </div>
+          </div>
+        )}
+
         {!loading && unrecorded.length > 0 && (
           <div className="rounded-md border border-amber-300 bg-amber-50 p-4">
             <div className="flex items-start gap-3">
@@ -341,6 +374,18 @@ export function PurchasesReport() {
           </Tabs>
         )}
       </CardContent>
+
+      <SavedReceiptsDialog
+        open={savedReceiptsOpen}
+        onOpenChange={setSavedReceiptsOpen}
+        drafts={receiptDrafts}
+        loading={receiptDraftsLoading}
+        onResume={() => {
+          setSavedReceiptsOpen(false);
+          router.push('/dashboard/reports/procurement');
+        }}
+        onDelete={deleteReceiptDraft}
+      />
     </Card>
   );
 }

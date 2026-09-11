@@ -4,8 +4,6 @@ import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { ViewProductDetailsDialog } from "@/components/dashboard/view-product-details-dialog";
-import { PlusCircle, RefreshCw } from "lucide-react";
-
 import { SingleBuyDialog } from "@/components/dashboard/procurement/single-buy-dialog";
 import { BulkBuyDialog } from "@/components/dashboard/procurement/bulk-buy-dialog";
 import { AddMissingItemDialog } from "@/components/dashboard/procurement/add-missing-item-dialog";
@@ -14,6 +12,11 @@ import { ReservedStockDialog } from "@/components/dashboard/reserved-stock-dialo
 import { PurchasedItemsTable } from "@/components/dashboard/procurement/purchased-items-table";
 import { SupplierGroupCard } from "@/components/dashboard/procurement/supplier-group-card";
 import { ScanReceiptDialog } from "@/components/dashboard/procurement/scan-receipt-dialog";
+import { SavedReceiptsDialog } from "@/components/dashboard/procurement/saved-receipts-dialog";
+import { useReceiptDrafts } from "@/hooks/useReceiptDrafts";
+import type { ReceiptScanDraft } from "@/types";
+import { PlusCircle, RefreshCw, Receipt } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -60,8 +63,11 @@ export default function ProcurementSheet() {
 
   const [viewingAllocatedItem, setViewingAllocatedItem] = useState<{ id: string; name: string; context?: 'total' | 'needToBuy' } | null>(null);
 
+  const { drafts, loading: draftsLoading, saveDraft, completeDraft, deleteDraft } = useReceiptDrafts();
+  const [savedScansOpen, setSavedScansOpen] = useState(false);
+  const [activeDraft, setActiveDraft] = useState<ReceiptScanDraft | null>(null);
   const [scanDialogOpen, setScanDialogOpen] = useState(false);
-  const [scanGroup, setScanGroup] = useState<{ id: string; name: string; items: any[] } | null>(null);
+  const [scanGroup, setScanGroup] = useState<{ id: string | null; name: string; items: any[] } | null>(null);
 
   // isManual keeps the current numbers on screen while re-fetching (only the
   // Refresh button spins), instead of blanking the whole sheet behind the
@@ -230,7 +236,19 @@ export default function ProcurementSheet() {
   };
 
   const handleScanReceipt = (supplierId: string, supplierName: string, groupItems: any[]) => {
+    setActiveDraft(null);
     setScanGroup({ id: supplierId, name: supplierName, items: groupItems });
+    setScanDialogOpen(true);
+  };
+
+  const handleResumeDraft = (draft: ReceiptScanDraft) => {
+    setActiveDraft(draft);
+    const group = groupedItems.find((g) => g.id === draft.supplierId);
+    setScanGroup({
+      id: draft.supplierId,
+      name: draft.supplierName,
+      items: group?.items || [],
+    });
     setScanDialogOpen(true);
   };
 
@@ -274,6 +292,19 @@ export default function ProcurementSheet() {
           <p className="text-slate-600 text-sm md:text-base">Your on-the-go shopping list. Click &apos;Buy&apos; to record items as you shop.</p>
         </div>
         <div className="flex flex-col md:flex-row gap-2">
+            <Button
+              onClick={() => setSavedScansOpen(true)}
+              variant="outline"
+              className="font-bold px-4 py-2 flex items-center justify-center gap-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+            >
+              <Receipt className="w-4 h-4 text-indigo-600" />
+              Saved Scans
+              {drafts.length > 0 && (
+                <Badge className="bg-indigo-600 text-white hover:bg-indigo-600 text-xs px-1.5 py-0 min-w-[20px] h-5 flex items-center justify-center rounded-full">
+                  {drafts.length}
+                </Badge>
+              )}
+            </Button>
             <Button
               onClick={() => fetchData(true)}
               disabled={refreshing}
@@ -387,14 +418,29 @@ export default function ProcurementSheet() {
       {scanGroup && (
         <ScanReceiptDialog
           open={scanDialogOpen}
-          onOpenChange={setScanDialogOpen}
+          onOpenChange={(isOpen) => {
+            setScanDialogOpen(isOpen);
+            if (!isOpen) setActiveDraft(null);
+          }}
           supplierId={scanGroup.id}
           supplierName={scanGroup.name}
           tableItems={scanGroup.items}
           isManagement={isManagement}
           onConfirm={handleScanConfirm}
+          initialDraft={activeDraft}
+          onSaveDraft={saveDraft}
+          onCompleteDraft={completeDraft}
         />
       )}
+
+      <SavedReceiptsDialog
+        open={savedScansOpen}
+        onOpenChange={setSavedScansOpen}
+        drafts={drafts}
+        loading={draftsLoading}
+        onResume={handleResumeDraft}
+        onDelete={deleteDraft}
+      />
 
       <ReservedStockDialog
         productId={viewingAllocatedItem?.id || ''}

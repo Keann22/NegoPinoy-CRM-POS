@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { ShieldAlert, Package, ShoppingBag, ArrowRight, CheckCircle2, ChevronRight, ChevronLeft, AlertTriangle } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -8,12 +9,17 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useInventoryGuardian } from '@/hooks/useInventoryGuardian';
-import { useRoleCheck } from '@/hooks/useRoleCheck';
+import { InventoryGuardianMemoryTimeline } from './InventoryGuardianMemoryTimeline';
+import { InventoryGuardianDailyGoalCard, GoalCompletedModalView } from './InventoryGuardianDailyGoalCard';
 
 export function InventoryGuardianAlertModal() {
-  const { isManagement, isInventory } = useRoleCheck();
   const {
+    canAccess,
     anomalies,
+    allAnomalies,
+    dailyProgress,
+    showAllBacklog,
+    setShowAllBacklog,
     dismissAnomaly,
     resolvePhysicalCount,
     resolveBackfillPurchase,
@@ -41,12 +47,12 @@ export function InventoryGuardianAlertModal() {
     }
   }, [anomalies.length, currentIndex]);
 
-  // If every anomaly has been cleared while the modal is open, close it.
+  // If every anomaly has been cleared while the modal is open (and goal not met), close it.
   useEffect(() => {
-    if (open && anomalies.length === 0) {
+    if (open && anomalies.length === 0 && !dailyProgress?.isGoalMet) {
       closeModal();
     }
-  }, [open, anomalies.length, closeModal]);
+  }, [open, anomalies.length, dailyProgress?.isGoalMet, closeModal]);
 
   // Sync inputs when current anomaly changes
   useEffect(() => {
@@ -59,7 +65,31 @@ export function InventoryGuardianAlertModal() {
     }
   }, [currentAnomaly]);
 
-  if (!isManagement && !isInventory) return null;
+  const pathname = usePathname();
+  const isFloorApp = Boolean(
+    pathname?.startsWith('/dashboard/pick') ||
+    pathname?.startsWith('/dashboard/pack') ||
+    pathname?.startsWith('/dashboard/verify')
+  );
+
+  if (!canAccess) return null;
+  if (isFloorApp) return null;
+
+  // If daily goal is reached and no items left in today's queue
+  if (open && anomalies.length === 0 && dailyProgress?.isGoalMet && !showAllBacklog) {
+    return (
+      <Dialog open={open} onOpenChange={(o) => { if (!o) closeModal(); }}>
+        <DialogContent className="max-w-xl">
+          <GoalCompletedModalView
+            dailyProgress={dailyProgress}
+            onViewAllBacklog={() => setShowAllBacklog(true)}
+            onClose={closeModal}
+          />
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   if (!currentAnomaly) return null;
 
   const handleSnooze = () => {
@@ -136,13 +166,23 @@ export function InventoryGuardianAlertModal() {
               <DialogTitle className="text-xl font-bold">Inventory Guardian Alert</DialogTitle>
             </div>
             <Badge variant="outline" className="text-xs">
-              Item {currentIndex + 1} of {anomalies.length}
+              {showAllBacklog ? `Backlog ${currentIndex + 1} of ${anomalies.length}` : `Today's Item ${currentIndex + 1} of ${anomalies.length}`}
             </Badge>
           </div>
           <DialogDescription className="text-sm pt-1">
             The Agentic Watchdog detected a discrepancy in physical stocks. Choose a 1-click option to fix it.
           </DialogDescription>
         </DialogHeader>
+
+        {/* Daily 5-Product Goal & Progress Banner */}
+        {dailyProgress && (
+          <InventoryGuardianDailyGoalCard
+            dailyProgress={dailyProgress}
+            showAllBacklog={showAllBacklog}
+            onToggleShowAllBacklog={setShowAllBacklog}
+            onClose={closeModal}
+          />
+        )}
 
         {/* Product Anomaly Card */}
         <div className="p-4 rounded-lg border bg-muted/30 space-y-3">
@@ -183,7 +223,34 @@ export function InventoryGuardianAlertModal() {
             </p>
             <p className="text-xs text-muted-foreground leading-relaxed">{currentAnomaly.description}</p>
           </div>
+
+          {/* Memory Context Banner */}
+          {currentAnomaly.memoryContext?.hasMemoryConflict ? (
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/50 rounded border border-amber-300 dark:border-amber-800 text-xs text-amber-900 dark:text-amber-200 space-y-1">
+              <div className="flex items-center gap-1.5 font-semibold text-amber-800 dark:text-amber-300">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+                <span>Conflict with Verified Memory</span>
+              </div>
+              <p className="text-[11px] leading-relaxed">
+                Staff previously verified <strong>{currentAnomaly.memoryContext.lastVerifiedCount}</strong> units physically on shelf
+                {currentAnomaly.memoryContext.lastVerifiedAt && ` on ${new Date(currentAnomaly.memoryContext.lastVerifiedAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}`}
+                {currentAnomaly.memoryContext.lastVerifiedBy && ` by ${currentAnomaly.memoryContext.lastVerifiedBy}`}. Check if the item was misplaced or in reserve before ordering more.
+              </p>
+            </div>
+          ) : currentAnomaly.memoryContext?.lastVerifiedCount !== undefined && currentAnomaly.memoryContext?.lastVerifiedCount !== null ? (
+            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground bg-muted/40 px-2.5 py-1.5 rounded border">
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+              <span>
+                Last physically verified: <strong>{currentAnomaly.memoryContext.lastVerifiedCount}</strong> units
+                {currentAnomaly.memoryContext.lastVerifiedAt && ` (${new Date(currentAnomaly.memoryContext.lastVerifiedAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })})`}
+                {currentAnomaly.memoryContext.lastVerifiedBy && ` by ${currentAnomaly.memoryContext.lastVerifiedBy}`}
+              </span>
+            </div>
+          ) : null}
         </div>
+
+        {/* Audit & Memory History Timeline */}
+        <InventoryGuardianMemoryTimeline productId={currentAnomaly.productId} />
 
         {/* 1-Click Fix Options */}
         <Tabs defaultValue="shelf_count" className="w-full">
@@ -292,33 +359,16 @@ export function InventoryGuardianAlertModal() {
         {/* Footer Navigation */}
         <div className="flex items-center justify-between pt-2 border-t mt-2">
           <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handlePrev}
-              disabled={currentIndex === 0}
-              className="h-8 w-8 p-0"
-            >
+            <Button variant="outline" size="sm" onClick={handlePrev} disabled={currentIndex === 0} className="h-8 w-8 p-0">
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleNext}
-              disabled={currentIndex >= anomalies.length - 1}
-              className="h-8 w-8 p-0"
-            >
+            <Button variant="outline" size="sm" onClick={handleNext} disabled={currentIndex >= anomalies.length - 1} className="h-8 w-8 p-0">
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => dismissAnomaly(currentAnomaly.id)}
-              className="text-xs text-muted-foreground"
-            >
+            <Button variant="ghost" size="sm" onClick={() => dismissAnomaly(currentAnomaly.id)} className="text-xs text-muted-foreground">
               Skip this Item
             </Button>
             <Button variant="outline" size="sm" onClick={handleSnooze} className="text-xs">

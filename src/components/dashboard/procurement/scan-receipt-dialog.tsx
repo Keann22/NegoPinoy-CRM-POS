@@ -4,38 +4,19 @@ import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
-import { Loader2, Trash2, Upload } from "lucide-react";
+import { Loader2, Upload, BookmarkCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AddProductDialog } from "@/components/dashboard/product-dialog";
-
-type Candidate = { productId: string; productName: string; sku: string | null; existingCode: string | null };
+import { ScanReceiptTable } from "./scan-receipt-table";
+import type { ReceiptScanRow, ReceiptScanCandidate, ReceiptScanDraft } from "@/types";
 
 type ScannedLine = {
   rawText: string;
   qty: number;
   unitCost: number;
   code: string | null;
-  match: (Candidate & { matchedBy: string; confidence: number }) | null;
-  candidates: Candidate[];
-};
-
-type Row = {
-  rawText: string;
-  qty: number;
-  unitCost: number;
-  code: string | null;
-  productId: string | null;
-  productName: string;
-  existingCode: string | null;
-  matchedBy: string | null;
-  confidence: number;
-  candidates: Candidate[];
-  saveCode: boolean;
+  match: (ReceiptScanCandidate & { matchedBy: string; confidence: number }) | null;
+  candidates: ReceiptScanCandidate[];
 };
 
 const fileToDataUri = (file: File): Promise<string> =>
@@ -46,11 +27,6 @@ const fileToDataUri = (file: File): Promise<string> =>
     reader.readAsDataURL(file);
   });
 
-// Phone photos are multi-megabyte; sent raw as base64 they blow past Vercel's
-// ~4.5MB request-body limit and make the vision read slow enough to time out.
-// Downscale to a sane max dimension and re-encode as JPEG before uploading —
-// a few hundred KB, still sharp enough to read a receipt. Falls back to the
-// original file if the browser canvas path fails.
 const MAX_DIM = 1600;
 const JPEG_QUALITY = 0.7;
 
@@ -81,96 +57,38 @@ const downscaleImage = (file: File): Promise<string> =>
     img.src = url;
   });
 
-/** Local product search + "add new" picker (no react-hook-form dependency). */
-function ProductPicker({
-  label,
-  onSelect,
-  onAddNew,
-}: {
-  label: string;
-  onSelect: (p: { id: string; name: string }) => void;
-  onAddNew: (term: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const [results, setResults] = useState<{ id: string; name: string; sku?: string }[]>([]);
-  const [loading, setLoading] = useState(false);
+const uploadImageToStorage = async (file: File): Promise<string | null> => {
+  try {
+    const supabase = createClient();
+    const ext = file.name.split(".").pop() || "jpg";
+    const fileName = `receipts/${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${ext}`;
+    const { data, error } = await supabase.storage.from("proof_of_payment").upload(fileName, file, { upsert: false });
+    if (error) return null;
+    const { data: { publicUrl } } = supabase.storage.from("proof_of_payment").getPublicUrl(data.path);
+    return publicUrl;
+  } catch {
+    return null;
+  }
+};
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = setTimeout(async () => {
-      if (search.trim().length < 2) {
-        setResults([]);
-        return;
-      }
-      setLoading(true);
-      try {
-        const supabase = createClient();
-        let query = supabase.from("products").select("id, name, sku").not("name", "ilike", "[DELETED]%");
-        search
-          .split(" ")
-          .filter((w) => w.trim() !== "")
-          .forEach((w) => {
-            query = query.or(`name.ilike.%${w}%,variant_name.ilike.%${w}%`);
-          });
-        const { data } = await query.limit(10);
-        setResults(data || []);
-      } finally {
-        setLoading(false);
-      }
-    }, 300);
-    return () => clearTimeout(handler);
-  }, [search, open]);
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="w-full justify-start font-normal text-left truncate">
-          {label || "Search product..."}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[300px] p-0" align="start">
-        <Command shouldFilter={false}>
-          <CommandInput placeholder="Search products..." value={search} onValueChange={setSearch} />
-          <CommandList>
-            {loading && <CommandItem disabled>Searching...</CommandItem>}
-            {!loading && results.length > 0 && (
-              <CommandGroup>
-                {results.map((p) => (
-                  <CommandItem
-                    key={p.id}
-                    value={p.id}
-                    onSelect={() => {
-                      onSelect({ id: p.id, name: p.name });
-                      setOpen(false);
-                    }}
-                  >
-                    {p.name}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-            {!loading && search.trim().length > 1 && (
-              <>
-                {results.length > 0 && <CommandSeparator />}
-                <CommandItem
-                  value={`${search}-add-new`}
-                  className="text-primary cursor-pointer"
-                  onSelect={() => {
-                    onAddNew(search.trim());
-                    setOpen(false);
-                  }}
-                >
-                  + Add &quot;{search.trim()}&quot; as new product
-                </CommandItem>
-              </>
-            )}
-            <CommandEmpty>{search.trim().length < 2 ? "Type to search products." : "No products found."}</CommandEmpty>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
+export interface ScanReceiptDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  supplierId: string | null;
+  supplierName: string;
+  tableItems: any[];
+  isManagement: boolean;
+  onConfirm: (purchases: { productId: string; productName: string; qty: number; cost: number; supplierId: string | null }[]) => void;
+  initialDraft?: ReceiptScanDraft | null;
+  onSaveDraft?: (params: {
+    id?: string | null;
+    supplierId: string | null;
+    supplierName: string;
+    imageUrl?: string | null;
+    rows: ReceiptScanRow[];
+    engine?: string | null;
+  }) => Promise<string | null>;
+  onCompleteDraft?: (draftId: string) => Promise<void>;
 }
 
 export function ScanReceiptDialog({
@@ -181,37 +99,41 @@ export function ScanReceiptDialog({
   tableItems,
   isManagement,
   onConfirm,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  supplierId: string | null;
-  supplierName: string;
-  tableItems: any[];
-  isManagement: boolean;
-  onConfirm: (purchases: { productId: string; productName: string; qty: number; cost: number; supplierId: string | null }[]) => void;
-}) {
+  initialDraft,
+  onSaveDraft,
+  onCompleteDraft,
+}: ScanReceiptDialogProps) {
   const { toast } = useToast();
   const [isScanning, setIsScanning] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDraftSaving, setIsDraftSaving] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [engine, setEngine] = useState<string | null>(null);
-  const [rows, setRows] = useState<Row[]>([]);
+  const [rows, setRows] = useState<ReceiptScanRow[]>([]);
+  const [draftId, setDraftId] = useState<string | null>(null);
 
   const [addProductOpen, setAddProductOpen] = useState(false);
   const [addProductInitial, setAddProductInitial] = useState<any>();
   const [addProductRowIdx, setAddProductRowIdx] = useState<number | null>(null);
 
-  // Reset when the dialog closes so the next open starts clean.
   useEffect(() => {
-    if (!open) {
+    if (open) {
+      if (initialDraft) {
+        setDraftId(initialDraft.id);
+        setRows(initialDraft.rawLines || []);
+        setPreviewUrl(initialDraft.imageUrl);
+        setEngine(initialDraft.engine);
+      }
+    } else {
       setRows([]);
       setPreviewUrl(null);
       setEngine(null);
+      setDraftId(null);
       setIsScanning(false);
     }
-  }, [open]);
+  }, [open, initialDraft]);
 
-  const lineToRow = (line: ScannedLine): Row => {
+  const lineToRow = (line: ScannedLine): ReceiptScanRow => {
     const code = line.code;
     const existingCode = line.match?.existingCode ?? null;
     const codeIsNew = !!code && (!existingCode || existingCode.toUpperCase() !== code.toUpperCase());
@@ -230,9 +152,7 @@ export function ScanReceiptDialog({
     };
   };
 
-  // Scans one image and returns its parsed rows (does not touch state), so the
-  // caller can APPEND across several receipts for the same supplier.
-  const scanOne = async (dataUri: string): Promise<Row[]> => {
+  const scanOne = async (dataUri: string): Promise<ReceiptScanRow[]> => {
     const res = await fetch("/api/inventory/scan-receipt", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -249,48 +169,46 @@ export function ScanReceiptDialog({
     return scanned.map(lineToRow);
   };
 
-  // Accepts one OR many photos (a supplier can hand over several receipts).
-  // Every scanned line is appended to the review list rather than replacing it.
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
-    e.target.value = ""; // allow re-selecting the same file(s)
+    e.target.value = "";
     setPreviewUrl(URL.createObjectURL(files[files.length - 1]));
     setIsScanning(true);
+
     try {
+      uploadImageToStorage(files[files.length - 1]).then((url) => {
+        if (url) setPreviewUrl(url);
+      });
+
       let added = 0;
       for (const file of files) {
         let dataUri: string;
         try {
           dataUri = await downscaleImage(file);
         } catch {
-          dataUri = await fileToDataUri(file); // fallback: send original
+          dataUri = await fileToDataUri(file);
         }
         const newRows = await scanOne(dataUri);
         if (newRows.length > 0) setRows((prev) => [...prev, ...newRows]);
         added += newRows.length;
       }
       if (added === 0) {
-        toast({
-          variant: "destructive",
-          title: "No items found",
-          description: "Couldn't read line items from that photo. Try a clearer, flatter shot.",
-        });
+        toast({ variant: "destructive", title: "No items found", description: "Couldn't read line items. Try a clearer shot." });
       } else {
         toast({
           title: files.length > 1 ? `Scanned ${files.length} receipts` : "Receipt scanned",
-          description: `Added ${added} line(s). Review below.`,
+          description: `Added ${added} line(s). Review below or save as draft.`,
         });
       }
     } catch (err: any) {
-      console.error("Scan receipt error:", err);
-      toast({ variant: "destructive", title: "Scan error", description: err.message || "Failed to scan the receipt." });
+      toast({ variant: "destructive", title: "Scan error", description: err.message || "Failed to scan receipt." });
     } finally {
       setIsScanning(false);
     }
   };
 
-  const updateRow = useCallback((idx: number, patch: Partial<Row>) => {
+  const updateRow = useCallback((idx: number, patch: Partial<ReceiptScanRow>) => {
     setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
   }, []);
 
@@ -322,8 +240,34 @@ export function ScanReceiptDialog({
   };
 
   const removeRow = (idx: number) => setRows((prev) => prev.filter((_, i) => i !== idx));
-
   const matchedCount = rows.filter((r) => r.productId).length;
+
+  const handleSaveDraft = async () => {
+    if (rows.length === 0) {
+      toast({ variant: "destructive", title: "Empty receipt", description: "Scan a receipt before saving a draft." });
+      return;
+    }
+    setIsDraftSaving(true);
+    try {
+      if (onSaveDraft) {
+        const savedId = await onSaveDraft({
+          id: draftId,
+          supplierId,
+          supplierName,
+          imageUrl: previewUrl,
+          rows,
+          engine,
+        });
+        if (savedId) setDraftId(savedId);
+      }
+      toast({ title: "Draft saved!", description: "You can come back and review this receipt anytime." });
+      onOpenChange(false);
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Save failed", description: err.message || "Failed to save draft." });
+    } finally {
+      setIsDraftSaving(false);
+    }
+  };
 
   const handleConfirm = async () => {
     const ready = rows.filter((r) => r.productId && Number(r.qty) > 0);
@@ -333,7 +277,6 @@ export function ScanReceiptDialog({
     }
     setIsSaving(true);
     try {
-      // 1. Learn supplier codes the user chose to keep.
       const codeSaves = rows.filter((r) => r.productId && r.saveCode && r.code && supplierId);
       await Promise.all(
         codeSaves.map((r) =>
@@ -344,11 +287,11 @@ export function ScanReceiptDialog({
           })
         )
       );
-      if (codeSaves.length > 0) {
-        toast({ title: "Supplier codes saved", description: `${codeSaves.length} code(s) will auto-match next time.` });
+
+      if (draftId && onCompleteDraft) {
+        await onCompleteDraft(draftId);
       }
 
-      // 2. Hand the matched items to the existing Record Purchases flow.
       const purchases = ready.map((r) => ({
         productId: r.productId as string,
         productName: r.productName,
@@ -358,7 +301,6 @@ export function ScanReceiptDialog({
       }));
       onConfirm(purchases);
     } catch (err: any) {
-      console.error("Confirm scan error:", err);
       toast({ variant: "destructive", title: "Couldn't save", description: err.message || "Failed to save." });
     } finally {
       setIsSaving(false);
@@ -370,10 +312,12 @@ export function ScanReceiptDialog({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Scan Receipt — {supplierName}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              Scan Receipt — {supplierName}
+              {draftId && <span className="text-xs font-normal text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">Resumed Draft</span>}
+            </DialogTitle>
             <DialogDescription>
-              Upload one or more photos of this supplier&apos;s receipts. Items are matched to your products; unknown supplier
-              codes are learned for next time. Review below, then record as purchases.
+              Upload receipt photo(s) to match products. You can save as draft to finish later, or record purchases now.
             </DialogDescription>
           </DialogHeader>
 
@@ -401,115 +345,38 @@ export function ScanReceiptDialog({
             </div>
 
             {rows.length > 0 && (
-              <div className="border rounded-lg overflow-x-auto">
-                <table className="w-full text-left text-sm min-w-[720px]">
-                  <thead>
-                    <tr className="bg-slate-50 text-slate-500 border-b">
-                      <th className="p-2 w-[38%]">Product (match)</th>
-                      <th className="p-2 text-center w-16">Qty</th>
-                      {isManagement && <th className="p-2 text-center w-24">Unit Cost</th>}
-                      <th className="p-2 w-40">Supplier code</th>
-                      <th className="p-2 w-8"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {rows.map((row, idx) => (
-                      <tr key={idx} className="align-top">
-                        <td className="p-2 space-y-1">
-                          <ProductPicker
-                            label={row.productName}
-                            onSelect={(p) => selectProduct(idx, p, null)}
-                            onAddNew={(term) => openAddProduct(idx, term)}
-                          />
-                          {row.productId && row.matchedBy && row.matchedBy !== "manual" && (
-                            <span className="text-[10px] text-slate-400">
-                              matched by {row.matchedBy}
-                              {row.matchedBy === "name" ? ` (${Math.round(row.confidence * 100)}%)` : ""}
-                            </span>
-                          )}
-                          {!row.productId && row.candidates.length > 0 && (
-                            <div className="flex flex-wrap gap-1 pt-1">
-                              <span className="text-[10px] text-slate-400 w-full">Did you buy:</span>
-                              {row.candidates.map((c) => (
-                                <button
-                                  key={c.productId}
-                                  type="button"
-                                  onClick={() => selectProduct(idx, { id: c.productId, name: c.productName }, c.existingCode)}
-                                  className="text-[11px] px-2 py-0.5 rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
-                                >
-                                  {c.productName}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                          <div className="text-[10px] text-slate-400 truncate" title={row.rawText}>
-                            {row.rawText}
-                          </div>
-                        </td>
-                        <td className="p-2 text-center">
-                          <Input
-                            type="number"
-                            value={row.qty}
-                            onChange={(e) => updateRow(idx, { qty: Number(e.target.value) })}
-                            className="h-8 text-center"
-                          />
-                        </td>
-                        {isManagement && (
-                          <td className="p-2 text-center">
-                            <Input
-                              type="number"
-                              step="0.01"
-                              value={row.unitCost}
-                              onChange={(e) => updateRow(idx, { unitCost: Number(e.target.value) })}
-                              className="h-8 text-right"
-                            />
-                          </td>
-                        )}
-                        <td className="p-2">
-                          {row.code ? (
-                            <div className="space-y-1">
-                              <Badge variant="outline" className="font-mono text-xs">
-                                {row.code}
-                              </Badge>
-                              <label className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                                <Checkbox
-                                  checked={row.saveCode}
-                                  disabled={!row.productId}
-                                  onCheckedChange={(v) => updateRow(idx, { saveCode: !!v })}
-                                />
-                                {row.existingCode && row.existingCode.toUpperCase() === row.code.toUpperCase()
-                                  ? "already saved"
-                                  : "save code for next time"}
-                              </label>
-                            </div>
-                          ) : (
-                            <span className="text-[11px] text-slate-300">—</span>
-                          )}
-                        </td>
-                        <td className="p-2 text-center">
-                          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeRow(idx)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <ScanReceiptTable
+                rows={rows}
+                isManagement={isManagement}
+                onSelectProduct={selectProduct}
+                onAddNewProduct={openAddProduct}
+                onUpdateRow={updateRow}
+                onRemoveRow={removeRow}
+              />
             )}
 
             {rows.length > 0 && (
-              <div className="flex items-center justify-between pt-2">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
                 <span className="text-sm text-slate-500">
                   {matchedCount} of {rows.length} lines matched
                 </span>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Button variant="outline" onClick={() => onOpenChange(false)}>
                     Cancel
                   </Button>
                   <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleSaveDraft}
+                    disabled={isDraftSaving || isSaving}
+                    className="flex items-center gap-1.5 border"
+                  >
+                    {isDraftSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <BookmarkCheck className="w-4 h-4 text-amber-600" />}
+                    Save as Draft
+                  </Button>
+                  <Button
                     onClick={handleConfirm}
-                    disabled={isSaving || matchedCount === 0}
+                    disabled={isSaving || isDraftSaving || matchedCount === 0}
                     className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold"
                   >
                     {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
@@ -528,7 +395,6 @@ export function ScanReceiptDialog({
         initialValues={addProductInitial}
         onProductAdded={(newProduct: { id: string; name: string }) => {
           if (addProductRowIdx !== null) {
-            // A newly created product already carries the code via supplierPricing.
             updateRow(addProductRowIdx, {
               productId: newProduct.id,
               productName: newProduct.name,

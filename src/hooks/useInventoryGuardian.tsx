@@ -1,7 +1,8 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import type { InventoryAnomaly } from '@/types';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
+import type { InventoryAnomaly, InventoryGuardianMemoryEntry, GuardianDailyProgress } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useRoleCheck } from '@/hooks/useRoleCheck';
@@ -9,15 +10,36 @@ import { useRoleCheck } from '@/hooks/useRoleCheck';
 const SNOOZE_KEY = 'guardian_modal_snoozed_at';
 const SNOOZE_MS = 15 * 60 * 1000; // 15 minutes
 
+const EXCLUDED_GUARDIAN_EMAILS = new Set([
+  'cedric@gmail.com',
+  'cedrictimpug@gmail.com',
+  'rey.magbitangjr@gmail.com',
+  'duornos@gmail.com'
+]);
+
+export function isUserAllowedGuardian(email?: string, roles?: string[]): boolean {
+  if (!email) return false;
+  const normalized = email.toLowerCase().trim();
+  if (EXCLUDED_GUARDIAN_EMAILS.has(normalized)) return false;
+  return Boolean(roles?.some(r => ['Admin', 'Owner', 'Inventory'].includes(r)));
+}
+
 interface GuardianContextValue {
+  canAccess: boolean;
   anomalies: InventoryAnomaly[];
+  allAnomalies: InventoryAnomaly[];
+  dailyProgress: GuardianDailyProgress | null;
+  showAllBacklog: boolean;
+  setShowAllBacklog: (show: boolean) => void;
   totalAnomaliesCount: number;
+  totalBacklogCount: number;
   isLoading: boolean;
   fetchAnomalies: () => Promise<void>;
   dismissAnomaly: (id: string) => void;
   resolvePhysicalCount: (productId: string, physicalShelfCount: number, notes?: string) => Promise<any>;
   resolveBackfillPurchase: (productId: string, quantity: number, unitCost: number, supplierName?: string) => Promise<any>;
   resolveBorrowStock: (productId: string, quantity: number, orderId?: string, notes?: string) => Promise<any>;
+  fetchProductMemory: (productId: string) => Promise<InventoryGuardianMemoryEntry[]>;
   // Modal control (shared so the trigger badge and the modal stay in sync)
   isModalOpen: boolean;
   openModal: () => void;
@@ -33,44 +55,70 @@ const GuardianContext = createContext<GuardianContextValue | null>(null);
  */
 export function InventoryGuardianProvider({ children }: { children: ReactNode }) {
   const [anomalies, setAnomalies] = useState<InventoryAnomaly[]>([]);
+  const [allAnomalies, setAllAnomalies] = useState<InventoryAnomaly[]>([]);
+  const [dailyProgress, setDailyProgress] = useState<GuardianDailyProgress | null>(null);
+  const [showAllBacklog, setShowAllBacklog] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [hasAutoOpened, setHasAutoOpened] = useState(false);
   const { toast } = useToast();
   const { userProfile } = useUserProfile();
-  const { isManagement, isInventory } = useRoleCheck();
+  const pathname = usePathname();
+
+  const isFloorApp = Boolean(
+    pathname?.startsWith('/dashboard/pick') ||
+    pathname?.startsWith('/dashboard/pack') ||
+    pathname?.startsWith('/dashboard/verify')
+  );
+
+  const canAccess = useMemo(() => {
+    return isUserAllowedGuardian(userProfile?.email, userProfile?.roles);
+  }, [userProfile]);
 
   const userName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : 'Staff';
 
   const fetchAnomalies = useCallback(async () => {
+    if (!canAccess) {
+      setAnomalies([]);
+      setAllAnomalies([]);
+      setDailyProgress(null);
+      return;
+    }
     setIsLoading(true);
     try {
       const res = await fetch('/api/inventory/guardian/anomalies');
       if (!res.ok) throw new Error('Failed to fetch inventory anomalies');
       const data = await res.json();
-      if (data.success && Array.isArray(data.anomalies)) {
-        setAnomalies(data.anomalies);
+      if (data.success) {
+        if (Array.isArray(data.anomalies)) setAnomalies(data.anomalies);
+        if (Array.isArray(data.allAnomalies)) setAllAnomalies(data.allAnomalies);
+        if (data.dailyProgress) setDailyProgress(data.dailyProgress);
       }
     } catch (err: any) {
       console.error('Error fetching inventory anomalies:', err);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [canAccess]);
 
   useEffect(() => {
-    fetchAnomalies();
-  }, [fetchAnomalies]);
+    if (canAccess) {
+      fetchAnomalies();
+    }
+  }, [canAccess, fetchAnomalies]);
 
-  const activeAnomalies = anomalies.filter(a => !dismissedIds.has(a.id));
+  const currentList = showAllBacklog ? allAnomalies : anomalies;
+  const activeAnomalies = currentList.filter(a => !dismissedIds.has(a.id));
   const totalAnomaliesCount = activeAnomalies.length;
+  const totalBacklogCount = allAnomalies.filter(a => !dismissedIds.has(a.id)).length;
 
   const openModal = useCallback(() => {
+    if (!canAccess) return;
     // An explicit open (clicking the shield) clears any snooze so the modal shows.
     try { sessionStorage.removeItem(SNOOZE_KEY); } catch {}
     setIsModalOpen(true);
-  }, []);
+  }, [canAccess]);
 
   const closeModal = useCallback(() => {
     // Treat any close (X / Escape / outside click / snooze button) as a 15-min snooze.
@@ -79,11 +127,13 @@ export function InventoryGuardianProvider({ children }: { children: ReactNode })
     setIsModalOpen(false);
   }, []);
 
-  // Auto-open ONCE when anomalies first appear for management/inventory, unless snoozed.
+  // Auto-open ONCE when anomalies first appear for allowed staff, unless snoozed, on floor apps, or daily goal already met.
   // Guarded by hasAutoOpened + the snooze timestamp so closing the modal never traps the user.
   useEffect(() => {
     if (hasAutoOpened) return;
-    if (!(isManagement || isInventory)) return;
+    if (!canAccess) return;
+    if (isFloorApp) return; // Do not interrupt warehouse staff while actively picking or packing
+    if (dailyProgress?.isGoalMet) return; // Daily 5-product goal already achieved today!
     if (totalAnomaliesCount === 0) return;
 
     let isSnoozed = false;
@@ -96,7 +146,7 @@ export function InventoryGuardianProvider({ children }: { children: ReactNode })
       setIsModalOpen(true);
     }
     setHasAutoOpened(true);
-  }, [totalAnomaliesCount, isManagement, isInventory, hasAutoOpened]);
+  }, [totalAnomaliesCount, canAccess, hasAutoOpened]);
 
   const dismissAnomaly = (id: string) => {
     setDismissedIds(prev => new Set(prev).add(id));
@@ -183,15 +233,34 @@ export function InventoryGuardianProvider({ children }: { children: ReactNode })
     }
   };
 
+  const fetchProductMemory = useCallback(async (productId: string): Promise<InventoryGuardianMemoryEntry[]> => {
+    try {
+      const res = await fetch(`/api/inventory/guardian/memory?productId=${encodeURIComponent(productId)}`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.success && Array.isArray(data.memory) ? data.memory : [];
+    } catch (err) {
+      console.error('Error fetching product guardian memory:', err);
+      return [];
+    }
+  }, []);
+
   const value: GuardianContextValue = {
+    canAccess,
     anomalies: activeAnomalies,
+    allAnomalies,
+    dailyProgress,
+    showAllBacklog,
+    setShowAllBacklog,
     totalAnomaliesCount,
+    totalBacklogCount,
     isLoading,
     fetchAnomalies,
     dismissAnomaly,
     resolvePhysicalCount,
     resolveBackfillPurchase,
     resolveBorrowStock,
+    fetchProductMemory,
     isModalOpen,
     openModal,
     closeModal
@@ -209,14 +278,21 @@ export function useInventoryGuardian(): GuardianContextValue {
   const ctx = useContext(GuardianContext);
   if (!ctx) {
     return {
+      canAccess: false,
       anomalies: [],
+      allAnomalies: [],
+      dailyProgress: null,
+      showAllBacklog: false,
+      setShowAllBacklog: () => {},
       totalAnomaliesCount: 0,
+      totalBacklogCount: 0,
       isLoading: false,
       fetchAnomalies: async () => {},
       dismissAnomaly: () => {},
       resolvePhysicalCount: async () => {},
       resolveBackfillPurchase: async () => {},
       resolveBorrowStock: async () => {},
+      fetchProductMemory: async () => [],
       isModalOpen: false,
       openModal: () => {},
       closeModal: () => {}

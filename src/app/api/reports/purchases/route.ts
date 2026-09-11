@@ -122,6 +122,7 @@ export async function GET(req: Request) {
     // history is the last purchase_order_items line that carried a cost.
     const uncostedProductIds = Array.from(new Set(unrecordedRows.map((r: any) => r.product_id).filter(Boolean)));
     const lastPurchaseByProduct = new Map<string, { unitCost: number; supplierId: string | null; supplierName: string | null; purchasedAt: string | null }>();
+    const lastMovementByProduct = new Map<string, { unitCost: number; supplierName: string | null }>();
     // When the goods actually landed - this is the day the buy will be filed under.
     const receiptDateByProduct = new Map<string, string>();
 
@@ -135,7 +136,7 @@ export async function GET(req: Request) {
 
       const { data: receiptRows } = await supabase
         .from('inventory_movements')
-        .select('product_id, timestamp')
+        .select('product_id, timestamp, unit_cost, supplier_name')
         .in('product_id', chunk)
         .ilike('movement_type', 'restock')
         .order('timestamp', { ascending: false });
@@ -144,6 +145,12 @@ export async function GET(req: Request) {
         // Ordered newest-first, so the first hit per product is the latest receipt.
         if (!receiptDateByProduct.has(row.product_id)) {
           receiptDateByProduct.set(row.product_id, row.timestamp);
+        }
+        if (Number(row.unit_cost) > 0 && !lastMovementByProduct.has(row.product_id)) {
+          lastMovementByProduct.set(row.product_id, {
+            unitCost: Number(row.unit_cost),
+            supplierName: row.supplier_name || null,
+          });
         }
       });
 
@@ -162,6 +169,50 @@ export async function GET(req: Request) {
       });
     }
 
+    // Helper for finding clean base prefix of variant/family products
+    const getBasePrefix = (name: string): string => {
+      const n = name.trim();
+      const parts = n.split(' - ');
+      if (parts.length > 2) {
+        return `${parts[0].trim()} - ${parts[1].trim()}`.toLowerCase();
+      }
+      if (parts.length === 2) {
+        return parts[0].trim().toLowerCase();
+      }
+      return n.split('(')[0].trim().toLowerCase();
+    };
+
+    // Load catalog products with positive prices to match variants/siblings (e.g. colors, sister sizes)
+    const pricedProductsList: Array<{ id: string; name: string; cost: number; supplierId: string | null; prefix: string }> = [];
+    for (let from = 0; ; from += 1000) {
+      const { data: page, error: pErr } = await supabase
+        .from('products')
+        .select('id, name, initial_unit_cost, supplier_id, supplier_pricing')
+        .range(from, from + 999);
+      if (pErr) break;
+      if (!page || page.length === 0) break;
+      for (const p of page) {
+        let cost = Number(p.initial_unit_cost) || 0;
+        let supplierId = p.supplier_id || null;
+        const pricing = Array.isArray(p.supplier_pricing) ? p.supplier_pricing : [];
+        const validEntry = pricing.find((item: any) => Number(item.unitCost) > 0);
+        if (!cost && validEntry) {
+          cost = Number(validEntry.unitCost);
+          supplierId = supplierId || validEntry.supplierId || null;
+        }
+        if (cost > 0) {
+          pricedProductsList.push({
+            id: p.id,
+            name: p.name,
+            cost,
+            supplierId,
+            prefix: getBasePrefix(p.name),
+          });
+        }
+      }
+      if (page.length < 1000) break;
+    }
+
     const groupedUnrecorded = new Map<string, any>();
 
     unrecordedRows.forEach((r: any) => {
@@ -176,8 +227,15 @@ export async function GET(req: Request) {
         }
         
         const pricing: any[] = prod?.supplier_pricing || [];
-        const bookEntry = pricing.length > 0 ? pricing[pricing.length - 1] : null;
+        const bookEntry = pricing.find((item: any) => Number(item.unitCost) > 0) || (pricing.length > 0 ? pricing[pricing.length - 1] : null);
         const lastPurchase = lastPurchaseByProduct.get(r.product_id) || null;
+        const lastMovement = lastMovementByProduct.get(r.product_id) || null;
+
+        // Check sibling / variant match by prefix
+        const pPrefix = getBasePrefix(productName);
+        const sisterMatch = pricedProductsList.find(
+          item => item.id !== r.product_id && (item.prefix === pPrefix || item.name.toLowerCase().startsWith(pPrefix))
+        ) || null;
 
         let suggestedUnitCost: number | null = null;
         let costSource: string | null = null;
@@ -187,12 +245,18 @@ export async function GET(req: Request) {
         } else if (lastPurchase?.unitCost) {
           suggestedUnitCost = lastPurchase.unitCost;
           costSource = `last bought${lastPurchase.supplierName ? ` from ${lastPurchase.supplierName}` : ''}`;
+        } else if (lastMovement?.unitCost) {
+          suggestedUnitCost = lastMovement.unitCost;
+          costSource = `from restock log${lastMovement.supplierName ? ` (${lastMovement.supplierName})` : ''}`;
         } else if (Number(prod?.initial_unit_cost) > 0) {
           suggestedUnitCost = Number(prod.initial_unit_cost);
           costSource = 'product default cost';
         } else if (Number(bookEntry?.unitCost) > 0) {
           suggestedUnitCost = Number(bookEntry.unitCost);
           costSource = 'supplier price book';
+        } else if (sisterMatch?.cost) {
+          suggestedUnitCost = sisterMatch.cost;
+          costSource = `matched from ${sisterMatch.name}`;
         }
 
         const bookCost = Number(bookEntry?.unitCost) || 0;
@@ -210,7 +274,7 @@ export async function GET(req: Request) {
           missingCost: !(Number(r.unit_cost) > 0),
           requestedByName: r.requested_by_name ? new Set([r.requested_by_name]) : new Set(),
           source,
-          suggestedSupplierId: lastPurchase?.supplierId || bookEntry?.supplierId || null,
+          suggestedSupplierId: lastPurchase?.supplierId || bookEntry?.supplierId || sisterMatch?.supplierId || null,
           suggestedUnitCost,
           costSource,
           costSourceDate: lastPurchase?.purchasedAt || null,

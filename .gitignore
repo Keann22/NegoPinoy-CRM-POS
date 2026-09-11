@@ -45,3 +45,8 @@ firebase-debug.log
 firestore-debug.log
 .vercel
 .env*
+
+# scratch & local receipts
+/receipt/
+/scripts/scratch/
+test-query.js

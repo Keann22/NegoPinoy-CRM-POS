@@ -48,3 +48,37 @@ export type ProcurementBatchItem = {
   receivedQty?: number;
   unitCost: number;
 };
+
+export type ReceiptScanCandidate = {
+  productId: string;
+  productName: string;
+  sku: string | null;
+  existingCode: string | null;
+};
+
+export type ReceiptScanRow = {
+  rawText: string;
+  qty: number;
+  unitCost: number;
+  code: string | null;
+  productId: string | null;
+  productName: string;
+  existingCode: string | null;
+  matchedBy: string | null;
+  confidence: number;
+  candidates: ReceiptScanCandidate[];
+  saveCode: boolean;
+};
+
+export type ReceiptScanDraft = {
+  id: string;
+  supplierId: string | null;
+  supplierName: string;
+  status: 'draft' | 'completed' | 'discarded';
+  imageUrl: string | null;
+  rawLines: ReceiptScanRow[];
+  engine: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+

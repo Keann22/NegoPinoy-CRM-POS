@@ -163,6 +163,7 @@ Key tables (not exhaustive):
 | `suppliers` | Supplier records |
 | `supplier_pricing` | Per-supplier unit costs |
 | `procurement_requests` | Stock reorder requests |
+| `procurement_receipt_scans` | Saved receipt photo scans and line-item drafts |
 | `expenses` | One-time expense records |
 | `recurring_expenses` | Recurring expense templates |
 | `categories` | Product categories |
@@ -554,7 +555,7 @@ Furthermore, `products.stock_level` does **not** represent physical shelf count 
    - **Borrowed Stock**: Marks stock as borrowed for an order, allowing packing to complete while preserving replenishment demand on the Procurement Sheet.
 3. **Header Trigger (`InventoryGuardianTrigger`)**: A 🛡️ icon in the dashboard header displays a badge with the count of active stock anomalies (e.g. `🛡️ 3`) and opens the modal on click.
 
-### Scan Receipt (added 2026-08-19)
+### Scan Receipt (added 2026-08-19, updated 2026-09-08)
 
 Reads a **supplier's receipt photo**, matches each line to a product, learns the supplier's own
 product codes for next time, and hands the confirmed items to the existing bulk **Record Selected**
@@ -600,10 +601,17 @@ routes to **`setSupplierProductCode`** (`procurement-purchase-service.ts`) — a
 `products.supplier_pricing[].supplierCode` that deliberately does **not** reassign `products.supplier_id`.
 The toggle prevents silently storing OCR/AI garbage.
 
+**Drafting & "Save for Later" Workflow (added 2026-09-08)**:
+In physical procurement, purchasers often capture photos of paper receipts while in the market or at a supplier counter, but lack the time to immediately match dozens of line items on mobile.
+- **Save as Draft**: Inside `ScanReceiptDialog`, clicking **"Save as Draft"** uploads the receipt photo to Supabase Storage (`proof_of_payment/receipts/`) and stores the scanned lines, quantities, unit costs, codes, and matching state in the `procurement_receipt_scans` table (`status: 'draft'`).
+- **Resuming in Procurement**: The Procurement Master Sheet header provides a **"Saved Scans"** button with a live badge count. Clicking it opens `SavedReceiptsDialog` (`src/components/dashboard/procurement/saved-receipts-dialog.tsx`), displaying all saved drafts with thumbnails and match counts. Clicking **"Resume Review"** re-opens `ScanReceiptDialog` with the full draft state and image restored.
+- **Purchases Report Awareness**: In `src/components/dashboard/reports/purchases-report.tsx`, an alert banner surfaces when unrecorded receipt drafts are waiting, allowing staff/management to review them and jump directly into Procurement to record them.
+- **Modular Component Split**: To comply with the repository's 400-line limit rule, `ScanReceiptDialog` was modularized into `src/components/dashboard/procurement/product-picker.tsx` (product search command popover) and `src/components/dashboard/procurement/scan-receipt-table.tsx` (editable line items table), with operations encapsulated in `src/hooks/useReceiptDrafts.ts` and types in `src/types/supplier.types.ts`.
+
 **Recording** — confirmed rows (`{ productId, qty, cost, supplierId }`) are handed up to the sheet's
 existing `BulkBuyDialog` → `POST /api/inventory/procurement` → `processProcurementPurchases`, the same
 path the "Record Selected" button uses (creates the PO + `purchase_order_items`, updates supplier
-pricing/cost). Items without a `draftItemId` are inserted as new lines, so a scanned receipt records
+pricing/cost). If resuming a draft, the draft in `procurement_receipt_scans` is automatically updated to `status: 'completed'`. Items without a `draftItemId` are inserted as new lines, so a scanned receipt records
 cleanly even for products not currently on the sheet.
 
 **Auth caveat**: like `extract-ocr`, this route has **no auth gate** — anyone who knows the URL can
@@ -807,6 +815,63 @@ The header had two icons that both read as "notifications", and DMs surfaced in 
 - **Depend on primitives, not the `userProfile` object.** `useUserProfile()`'s `userProfile` is a new object reference on nearly every render — it's rebuilt via `useMemo` off `useUser()`'s `user` state, and `user` itself gets a fresh object literal from `fetchUser()` and again from every `onAuthStateChange` event (`INITIAL_SESSION`, `SIGNED_IN`, etc.) firing in quick succession after mount. An effect with the raw `userProfile` object in its dependency array re-fires several times right after mount as a result. Depend on `userProfile?.id` / `?.firstName` / `?.lastName` instead.
 - **Guard against re-subscribing to a channel that's already subscribed.** Calling `.channel(topic).on(...)` on a topic that's already past `.subscribe()` throws (`cannot add \`postgres_changes\` callbacks... after \`subscribe()\``), and since these two components sit in the layout, the throw takes down every dashboard page, not just one component. The repeated effect fires above are exactly the condition that triggers this. Before creating the channel, remove any existing one on the same topic: `supabase.getChannels().filter(c => c.topic === 'realtime:<name>').forEach(c => supabase.removeChannel(c))`. This also covers React Strict Mode's dev-only double-invoke of effects, which can trigger the same race even with a stable dependency array.
 
+### Inventory Guardian — Agentic AI Physical Stock Watchdog & Telegram Alerts (added 2026-09-11)
+
+The **Inventory Guardian** is an automated watchdog and physical inventory reconciliation assistant that protects stock accuracy and catches silent inventory leaks in real-time. Instead of demanding massive full-warehouse stocktaking, it continuously scans ledger anomalies, matches them with warehouse reality, and guides staff through a manageable **5-product-per-day progressive physical audit**.
+
+#### 1. Core Anomaly Detection Engine
+Implemented in `src/lib/services/inventory/inventory-guardian-service.ts`, the Guardian periodically evaluates product variations against open orders and warehouse states:
+- **Unrecorded Supplier Deliveries (`unrecorded_delivery`)**: Caught when physical stock in the database is `<= 0` (or negative), but orders containing this item are actively being packed, verified, or picked on the floor. This proves physical goods exist on warehouse shelves that were never encoded through procurement/receipts.
+- **Negative Physical Stock (`negative_stock`)**: Identifies items where booked sales exceeded recorded stock on hand without offsetting batch receipts.
+- **Floor Shortages (`floor_shortage`)**: Surfaces order issues reported directly by pickers/packers where items could not be physically found.
+
+#### 2. Long-Term Audit Memory & Conflict Detection
+Stored in the PostgreSQL table `public.inventory_guardian_memory` (managed via `src/lib/services/inventory/inventory-guardian-memory-service.ts`), every physical stock count, recount, and resolution is permanently recorded with:
+- `product_id`, `variation_id`, `audited_by` (user ID), `actor_name` (display name).
+- `previous_stock`, `verified_physical_stock`, `discrepancy_delta`.
+- `source_anomaly_type`, `resolution_action`, and audit `notes`.
+
+**Memory Conflict Detection (`⚠️ Conflict with Verified Memory`)**:
+When an anomaly triggers for a product that was already physically audited and verified by staff recently, the Guardian flags a prominent conflict warning (e.g., *"Audited by Tess 2 days ago as 15 pcs. Ledger now says -2 pcs."*). This instantly alerts management to a physical inventory leak, unrecorded withdrawal, or theft rather than a simple data-entry omission.
+
+#### 3. Daily 5-Product Progressive Goal
+To eliminate operational fatigue, the Guardian does not force staff to audit hundreds of anomalies at once:
+- **Active Queue Capped to 5**: The primary modal queue presents the top 5 high-priority items (`Item 1 of 5`).
+- **Real-Time Progress Tracking**: Uses `getGuardianDailyProgress()` to query audits completed today across all authorized staff.
+- **Goal Completion View**: Once 5 items are audited for the day, the modal displays `InventoryGuardianDailyGoalCard` celebrating the achievement, listing the staff contributors, and giving an option to take a break or manually expand the remaining backlog.
+
+#### 4. Staff Attribution Across All Edits
+Physical audits and manual inventory changes are strictly attributed:
+- **Guardian Modal Resolutions**: Handled via `src/lib/services/inventory/inventory-guardian-action-service.ts` with 1-click actions:
+  - `set_physical_count`: Adjusts stock immediately and logs the audit to memory.
+  - `backfill_purchase`: Creates a backfilled supplier receipt at cost to reconcile unrecorded stock.
+  - `borrow_stock`: Transfers stock from an overstocked variation or sister product.
+- **Manual Product Edits**: `src/hooks/useProductSubmit.ts` captures `userProfile.firstName` / `lastName` to record the exact editor in both `inventory_movements` (`created_by_name`) and `inventory_guardian_memory`.
+
+#### 5. Role-Based Access Control (RBAC)
+To prevent unauthorized adjustments or premature dismissals:
+- **Authorized (`isUserAllowedGuardian`)**:
+  - Keneth Ornos (`ornoskeneth@gmail.com`)
+  - Tess (`tess@example.com`)
+  - Jasmin (`jas@gmail.com`)
+  - Al (`alpinakacute@gmail.com`)
+- **Strictly Blocked**:
+  - Sales staff, Rey Magbitang, Cedric Timpug, Danna Ornos, and non-inventory operational accounts cannot see the Guardian popup or trigger badge.
+
+#### 6. Floor App Suppression
+To safeguard warehouse throughput, the Guardian modal automatically suppresses itself on operational scanning pages:
+- `/dashboard/pick`
+- `/dashboard/pack`
+- `/dashboard/verify`
+Warehouse staff are never interrupted by popups while actively scanning barcodes. The alert badge remains accessible in the main management dashboard header (`InventoryGuardianTrigger.tsx`).
+
+#### 7. 100% Free Telegram Bot Push Notifications
+Integrated via `src/lib/services/inventory/inventory-guardian-telegram-service.ts` using the official Telegram Bot API:
+- **Bot**: `@NegoPinoy_monitor_bot`
+- **Recipient**: Keneth Ornos (`chat_id: 6530498446`)
+- **Anti-Spam Throttling**: 12-hour in-memory deduplication window per product/anomaly.
+- **Settings & Testing**: Includes a dedicated configuration panel in `/dashboard/settings` (`TelegramGuardianSettings.tsx`) allowing live connectivity test pings.
+
 ---
 
 ## Key Files to Know
@@ -847,6 +912,16 @@ The header had two icons that both read as "notifications", and DMs surfaced in 
 | `src/components/dashboard/staff-message-fab.tsx`, `message-staff-dialog.tsx`, `staff-message-thread-dialog.tsx`, `staff-search.tsx`, `order-search.tsx` | "Message Staff" floating compose button, its dialog, thread view, and pickers — see "Message Staff (manual tagging) → Inbox Drawer" |
 | `src/app/api/staff-messages/route.ts` | Creates a `staff_message`-type `order_issues` thread + fans out `notifications` to tagged staff |
 | `src/components/dashboard/mention-input.tsx`, `src/hooks/useStaffDirectory.ts` | `@Name` autocomplete input + shared staff-directory hook — see "@Mention Tagging" |
+| `src/lib/services/inventory/inventory-guardian-service.ts` | Guardian anomaly scanner, memory conflict checks, and daily goal progress — see "Inventory Guardian" |
+| `src/lib/services/inventory/inventory-guardian-action-service.ts` | 1-click resolution actions (`set_physical_count`, `backfill_purchase`, `borrow_stock`) |
+| `src/lib/services/inventory/inventory-guardian-memory-service.ts` | Long-term physical audit memory persistence in `inventory_guardian_memory` |
+| `src/lib/services/inventory/inventory-guardian-telegram-service.ts` | Free Telegram push notifications via `@NegoPinoy_monitor_bot` with 12h anti-spam throttling |
+| `src/hooks/useInventoryGuardian.tsx` | Global Guardian provider, RBAC permissions, floor app suppression, and queue management |
+| `src/components/dashboard/inventory/InventoryGuardianAlertModal.tsx` | Guardian popup modal with 5-item daily quota, memory timeline, and resolution actions |
+| `src/components/dashboard/inventory/InventoryGuardianDailyGoalCard.tsx` | Progress bar, contributor stats, and daily goal completion celebration card |
+| `src/components/dashboard/inventory/InventoryGuardianMemoryTimeline.tsx` | Product audit history timeline with actor attribution and discrepancy deltas |
+| `src/components/dashboard/inventory/InventoryGuardianTrigger.tsx` | Dashboard header shield icon and active anomaly counter badge |
+| `src/components/dashboard/settings/TelegramGuardianSettings.tsx` | Settings configuration card and live Telegram bot ping test button |
 
 ---
 

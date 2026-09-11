@@ -10,6 +10,7 @@ import { useUserProfile } from '@/hooks/useUserProfile';
 import { useToast } from '@/hooks/use-toast';
 import { User, Mail, ShieldCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { TelegramGuardianSettings } from '@/components/dashboard/settings/TelegramGuardianSettings';
 
 export default function SettingsPage() {
     const supabase = useSupabase();
@@ -106,6 +107,8 @@ export default function SettingsPage() {
                             </Button>
                         </CardFooter>
                     </Card>
+
+                    <TelegramGuardianSettings />
                 </div>
 
                 <div className="space-y-6">

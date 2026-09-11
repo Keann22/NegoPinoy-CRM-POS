@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import {
   detectInventoryAnomalies,
+  getGuardianDailyProgress,
   applyPhysicalShelfCount,
   backfillUnrecordedPurchase,
   markStockAsBorrowed
@@ -15,8 +16,42 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function GET() {
   try {
-    const anomalies = await detectInventoryAnomalies(supabase);
-    return NextResponse.json({ success: true, anomalies });
+    const allAnomalies = await detectInventoryAnomalies(supabase);
+    const dailyProgress = await getGuardianDailyProgress(supabase, allAnomalies.length);
+
+    // Filter out products already audited today
+    const auditedProductIds = new Set(dailyProgress.completedItems.map(i => i.productId));
+    const pendingAnomalies = allAnomalies.filter(a => !auditedProductIds.has(a.productId));
+
+    // Today's 5-item queue
+    const queueLimit = dailyProgress.isGoalMet ? 0 : dailyProgress.remainingToday;
+    const todayQueue = pendingAnomalies.slice(0, Math.max(queueLimit, 0));
+
+    // Asynchronously dispatch any pending Telegram alerts in background without blocking
+    (async () => {
+      try {
+        const { notifyInventoryAnomaly, getTelegramConfig } = await import(
+          '@/lib/services/inventory/inventory-guardian-telegram-service'
+        );
+        const config = getTelegramConfig();
+        if (config.botToken && config.chatId) {
+          for (const a of todayQueue) {
+            if (a.severity === 'high') {
+              await notifyInventoryAnomaly(supabase, a);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Background Telegram alert error:', err);
+      }
+    })();
+
+    return NextResponse.json({
+      success: true,
+      anomalies: todayQueue,
+      allAnomalies: pendingAnomalies,
+      dailyProgress
+    });
   } catch (error: any) {
     console.error('Error fetching inventory anomalies:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

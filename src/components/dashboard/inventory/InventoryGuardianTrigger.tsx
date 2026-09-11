@@ -4,13 +4,11 @@ import { ShieldCheck, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useInventoryGuardian } from '@/hooks/useInventoryGuardian';
-import { useRoleCheck } from '@/hooks/useRoleCheck';
 
 export function InventoryGuardianTrigger() {
-  const { isManagement, isInventory } = useRoleCheck();
-  const { totalAnomaliesCount, openModal } = useInventoryGuardian();
+  const { canAccess, totalAnomaliesCount, openModal } = useInventoryGuardian();
 
-  if (!isManagement && !isInventory) return null;
+  if (!canAccess) return null;
 
   const hasAnomalies = totalAnomaliesCount > 0;
 
