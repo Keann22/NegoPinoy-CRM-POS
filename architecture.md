@@ -875,6 +875,20 @@ Integrated via `src/lib/services/inventory/inventory-guardian-telegram-service.t
 - **Anti-Spam Throttling**: 12-hour in-memory deduplication window per product/anomaly.
 - **Settings & Testing**: Includes a dedicated configuration panel in `/dashboard/settings` (`TelegramGuardianSettings.tsx`) allowing live connectivity test pings.
 
+#### 8. Inventory Matching & Resolution Lifecycle
+What happens across the system when inventory matches:
+- **During Staff Physical Audits**:
+  - When authorized inventory staff (e.g. Tess, Jasmin, Al) verify shelf count in the Guardian modal and submit a count (matching or correcting the target):
+    1. **Auto-Resolves Open Issues**: Any open `order_issues` linked to this product are automatically set to `status: 'resolved'` in `inventory-guardian-action-service.ts`.
+    2. **Durable Memory Recorded**: Inserts a row into `inventory_guardian_memory` logging verified physical count, system stock before/after, discrepancy delta, actor display name, and timestamp.
+    3. **Daily Goal Progress Updates**: Anomaly disappears from the active queue and counts toward the daily 5-item quota (`getGuardianDailyProgress`), advancing the goal bar toward the 5/5 celebration card.
+    4. **Future Floor Protection**: The count becomes the durable truth. If a picker later reports 0 on the shelf for this item, Guardian defends it with `⚠️ Conflict with Verified Memory`.
+- **During Order Picking on the Floor**:
+  - If all physical items match what the order requires, the picker leaves all "Out of Stock" checkboxes untoggled and submits picking.
+  - The order transitions directly to `Picked` (or `Photo`) with zero `order_issues` created.
+  - The order moves downstream immediately to the Packer queue (`/dashboard/pack`) with zero delays or disruptions.
+  - The Guardian detects zero discrepancies and remains completely silent in the background.
+
 ---
 
 ## Key Files to Know
