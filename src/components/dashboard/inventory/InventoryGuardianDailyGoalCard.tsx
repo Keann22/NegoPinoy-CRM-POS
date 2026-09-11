@@ -18,18 +18,36 @@ export function InventoryGuardianDailyGoalCard({
   onToggleShowAllBacklog,
   onClose
 }: InventoryGuardianDailyGoalCardProps) {
-  const percent = Math.min(100, Math.round((dailyProgress.completedToday / dailyProgress.target) * 100));
+  const target = Math.max(1, dailyProgress.target);
+  const percent = dailyProgress.isRestDay
+    ? 100
+    : Math.min(100, Math.round((dailyProgress.completedToday / target) * 100));
 
   return (
     <div className="p-3 rounded-lg border bg-primary/5 space-y-2 text-xs">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5 font-semibold text-foreground">
+        <div className="flex items-center gap-1.5 font-semibold text-foreground flex-wrap">
           <Target className="h-4 w-4 text-primary" />
-          <span>
-            Today's Goal: {dailyProgress.completedToday} of {dailyProgress.target} products verified
-          </span>
+          {dailyProgress.isRestDay ? (
+            <span className="text-emerald-700 dark:text-emerald-400">
+              Sunday Rest Day: No audits scheduled today
+            </span>
+          ) : (
+            <span>
+              Today's Goal: {dailyProgress.completedToday} of {dailyProgress.target} products verified
+            </span>
+          )}
+          {!dailyProgress.isRestDay && dailyProgress.carryOver > 0 && (
+            <span className="text-[10px] font-normal text-amber-700 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-300 px-1.5 py-0.5 rounded border border-amber-200/80">
+              +{dailyProgress.carryOver} carried over from previous day
+            </span>
+          )}
         </div>
-        {dailyProgress.isGoalMet ? (
+        {dailyProgress.isRestDay ? (
+          <Badge className="bg-emerald-600/10 text-emerald-700 border-emerald-300 text-[10px]">
+            Rest Day
+          </Badge>
+        ) : dailyProgress.isGoalMet ? (
           <Badge className="bg-emerald-600 hover:bg-emerald-700 text-[10px] gap-1">
             <CheckCircle2 className="h-3 w-3" /> Goal Complete
           </Badge>
@@ -71,7 +89,11 @@ export function InventoryGuardianDailyGoalCard({
       {/* Mode Switcher: Today's Queue vs Full Backlog */}
       <div className="flex items-center justify-between pt-1 text-[11px] text-muted-foreground border-t border-primary/10">
         <span>
-          {showAllBacklog ? 'Viewing full backlog mode' : `Focusing on today's 5-product queue`}
+          {showAllBacklog
+            ? 'Viewing full backlog mode'
+            : dailyProgress.isRestDay
+            ? 'No queue active today (Sunday)'
+            : `Focusing on today's ${dailyProgress.target}-product queue`}
         </span>
         <Button
           type="button"
@@ -113,11 +135,22 @@ export function GoalCompletedModalView({
       </div>
 
       <div className="space-y-1">
-        <h3 className="text-lg font-bold text-foreground">Today's Verification Goal Complete! 🎉</h3>
-        <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-          Staff has successfully verified <strong>{dailyProgress.completedToday} products</strong> today.
-          The remaining backlog ({dailyProgress.totalBacklogCount} items) is safely queued for upcoming days.
-        </p>
+        {dailyProgress.isRestDay ? (
+          <>
+            <h3 className="text-lg font-bold text-foreground">Sunday Rest Day 🌿</h3>
+            <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+              No inventory audit quota is scheduled for today. Regular 5-product daily audits will resume tomorrow (Monday).
+            </p>
+          </>
+        ) : (
+          <>
+            <h3 className="text-lg font-bold text-foreground">Today's Verification Goal Complete! 🎉</h3>
+            <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+              Staff has successfully verified <strong>{dailyProgress.completedToday} of {dailyProgress.target} products</strong> today.
+              The remaining backlog ({dailyProgress.totalBacklogCount} items) is safely queued for upcoming days.
+            </p>
+          </>
+        )}
       </div>
 
       {dailyProgress.completedItems.length > 0 && (

@@ -834,11 +834,12 @@ Stored in the PostgreSQL table `public.inventory_guardian_memory` (managed via `
 **Memory Conflict Detection (`⚠️ Conflict with Verified Memory`)**:
 When an anomaly triggers for a product that was already physically audited and verified by staff recently, the Guardian flags a prominent conflict warning (e.g., *"Audited by Tess 2 days ago as 15 pcs. Ledger now says -2 pcs."*). This instantly alerts management to a physical inventory leak, unrecorded withdrawal, or theft rather than a simple data-entry omission.
 
-#### 3. Daily 5-Product Progressive Goal
-To eliminate operational fatigue, the Guardian does not force staff to audit hundreds of anomalies at once:
-- **Active Queue Capped to 5**: The primary modal queue presents the top 5 high-priority items (`Item 1 of 5`).
-- **Real-Time Progress Tracking**: Uses `getGuardianDailyProgress()` to query audits completed today across all authorized staff.
-- **Goal Completion View**: Once 5 items are audited for the day, the modal displays `InventoryGuardianDailyGoalCard` celebrating the achievement, listing the staff contributors, and giving an option to take a break or manually expand the remaining backlog.
+#### 3. Daily Progressive Goal & Carry-Over Engine
+To eliminate operational fatigue while keeping warehouse accountability high, the Guardian uses a dynamic progressive quota engine (`inventory-guardian-carryover-service.ts`):
+- **Base Target**: 5 priority products per working day.
+- **Carry-Over of Unfinished Audits**: If authorized staff (Tess, Jasmin, Al) do not finish the day's quota, any unfinished shortfall automatically carries over to the next working day. For example, if 3 of 5 items are completed on Friday, the remaining 2 items roll into Saturday, making Saturday's target **7 items** (`5 base + 2 carry-over`).
+- **Sunday Rest Day**: The business does not operate on Sundays. On Sundays, the target is 0 (`isRestDay = true`), modal auto-popups are completely suppressed, and no daily audit queue is required. Any unfinished quota from Saturday safely carries over to **Monday**.
+- **Real-Time Progress & Celebration**: `getGuardianDailyProgress()` tracks unique audited products, displays real-time progress bars with carry-over badges, and shows `GoalCompletedModalView` when the daily target is reached.
 
 #### 4. Staff Attribution Across All Edits
 Physical audits and manual inventory changes are strictly attributed:
@@ -930,6 +931,7 @@ What happens across the system when inventory matches:
 | `src/app/api/staff-messages/route.ts` | Creates a `staff_message`-type `order_issues` thread + fans out `notifications` to tagged staff |
 | `src/components/dashboard/mention-input.tsx`, `src/hooks/useStaffDirectory.ts` | `@Name` autocomplete input + shared staff-directory hook — see "@Mention Tagging" |
 | `src/lib/services/inventory/inventory-guardian-service.ts` | Guardian anomaly scanner, memory conflict checks, and daily goal progress — see "Inventory Guardian" |
+| `src/lib/services/inventory/inventory-guardian-carryover-service.ts` | Calculates historical unfinished carry-over, Sunday rest day suppression, and progressive target quotas |
 | `src/lib/services/inventory/inventory-guardian-action-service.ts` | 1-click resolution actions (`set_physical_count`, `backfill_purchase`, `borrow_stock`) |
 | `src/lib/services/inventory/inventory-guardian-memory-service.ts` | Long-term physical audit memory persistence in `inventory_guardian_memory` |
 | `src/lib/services/inventory/inventory-guardian-telegram-service.ts` | Free Telegram push notifications via `@NegoPinoy_monitor_bot` with 12h anti-spam throttling |

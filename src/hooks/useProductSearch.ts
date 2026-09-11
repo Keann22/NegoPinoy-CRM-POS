@@ -30,22 +30,29 @@ export function useProductSearch(query: string) {
       try {
         let q = supabase
           .from('products')
-          .select('id, name, stock_level, selling_price, sale_price, is_on_sale, installment_price, parent_id, supplier_pricing')
+          .select('id, name, variant_name, sku, stock_level, selling_price, sale_price, is_on_sale, installment_price, parent_id, supplier_pricing')
           .not('name', 'ilike', '[DELETED]%');
         const words = query.split(' ').filter(w => w.trim() !== '');
-        words.forEach(w => { q = q.or(`name.ilike.%${w}%,variant_name.ilike.%${w}%`); });
-        const { data, error } = await q.gt('selling_price', 0).limit(15);
+        words.forEach(w => { q = q.or(`name.ilike.%${w}%,variant_name.ilike.%${w}%,sku.ilike.%${w}%`); });
+        const { data, error } = await q.limit(20);
         if (error) throw error;
 
-        setResults((data || []).map(doc => ({
-          id: doc.id,
-          name: doc.name,
-          quantityOnHand: doc.stock_level,
-          sellingPrice: getEffectivePrice(doc.selling_price, doc.sale_price, doc.is_on_sale),
-          installment_price: doc.installment_price,
-          supplier_pricing: doc.supplier_pricing,
-          stockBatches: [],
-        } as Product)));
+        setResults((data || []).map(doc => {
+          let displayName = doc.name;
+          if (doc.variant_name && !doc.name.toLowerCase().includes(doc.variant_name.toLowerCase())) {
+            displayName = `${doc.name} (${doc.variant_name})`;
+          }
+          return {
+            id: doc.id,
+            name: displayName,
+            sku: doc.sku,
+            quantityOnHand: doc.stock_level ?? 0,
+            sellingPrice: getEffectivePrice(doc.selling_price, doc.sale_price, doc.is_on_sale) ?? 0,
+            installment_price: doc.installment_price,
+            supplier_pricing: doc.supplier_pricing,
+            stockBatches: [],
+          } as Product;
+        }));
       } catch (err) {
         console.error('Product search failed:', err);
         toast({ variant: 'destructive', title: 'Product search failed' });

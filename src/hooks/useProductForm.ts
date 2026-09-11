@@ -3,7 +3,18 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import type { FormattedProduct } from '@/types';
 
-export type SimilarProductWarning = { id: string; name: string; matchType: 'exact' | 'similar' };
+export type DuplicateMatch = {
+  id: string;
+  name: string;
+  sku?: string | null;
+  stockLevel?: number | null;
+  sellingPrice?: number | null;
+  imageUrl?: string | null;
+  matchType: 'exact' | 'similar';
+  similarityScore?: number;
+};
+
+export type SimilarProductWarning = DuplicateMatch;
 
 export const productSchema = z.object({
   name: z.string().trim().min(1, "Product name is required"),
@@ -48,6 +59,7 @@ export type CreateProps = {
   onOpenChange?: (open: boolean) => void;
   initialValues?: Partial<ProductFormValues>;
   onProductAdded?: (product: { id: string; name: string }) => void;
+  onSelectExisting?: (product: { id: string; name: string }) => void;
   triggerButton?: React.ReactNode;
 };
 

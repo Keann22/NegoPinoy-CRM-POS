@@ -61,6 +61,24 @@ export function useProductSubmit({
       }
     }
 
+    if (!isEdit) {
+      const trimmedName = values.name.trim();
+      const { data: existingExact } = await supabase
+        .from('products')
+        .select('id, name')
+        .ilike('name', trimmedName)
+        .not('name', 'ilike', '[DELETED]%')
+        .limit(1);
+      if (existingExact && existingExact.length > 0) {
+        toast({
+          variant: 'destructive',
+          title: 'Duplicate Product Name',
+          description: `A product with name "${existingExact[0].name}" already exists. Creating exact duplicates is not allowed.`,
+        });
+        return;
+      }
+    }
+
     setOpen(false);
     toast({ title: isEdit ? 'Updating Product...' : 'Adding Product...', description: `"${values.name}" is being ${isEdit ? 'updated' : 'added'}.` });
 

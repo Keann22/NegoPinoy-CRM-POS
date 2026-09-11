@@ -133,7 +133,7 @@ export function InventoryGuardianProvider({ children }: { children: ReactNode })
     if (hasAutoOpened) return;
     if (!canAccess) return;
     if (isFloorApp) return; // Do not interrupt warehouse staff while actively picking or packing
-    if (dailyProgress?.isGoalMet) return; // Daily 5-product goal already achieved today!
+    if (dailyProgress?.isGoalMet || dailyProgress?.isRestDay) return; // Daily goal achieved or Sunday rest day!
     if (totalAnomaliesCount === 0) return;
 
     let isSnoozed = false;

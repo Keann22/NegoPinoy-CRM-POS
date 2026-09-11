@@ -66,6 +66,7 @@ export function OrderDialog(props: OrderDialogProps) {
     setAddCustomerOpen,
     addProductOpen,
     setAddProductOpen,
+    canAddProduct,
     onSubmit
   } = useOrderDialog(props);
 
@@ -172,6 +173,7 @@ export function OrderDialog(props: OrderDialogProps) {
                   setProductSearch('');
                 }}
                 onAddProductClick={() => setAddProductOpen(true)}
+                canAddProduct={canAddProduct}
               />
             </div>
             <DialogFooter className="pt-8">
@@ -196,6 +198,10 @@ export function OrderDialog(props: OrderDialogProps) {
         onOpenChange={setAddProductOpen}
         initialValues={{ name: productSearch }}
         onProductAdded={(p: { id: string; name: string }) => {
+          setProductSearch(p.name);
+        }}
+        onSelectExisting={(p: { id: string; name: string }) => {
+          setAddProductOpen(false);
           setProductSearch(p.name);
         }}
       />

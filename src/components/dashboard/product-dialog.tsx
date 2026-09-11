@@ -5,15 +5,15 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
-import { Trash2, AlertTriangle } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileUpload } from "@/components/ui/file-upload";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import type { FormattedProduct } from '@/types';
 import { ProductSupplierSection } from './products/ProductSupplierSection';
 import { ProductVariationsSection } from './products/ProductVariationsSection';
+import { DuplicateProductAlert } from './products/DuplicateProductAlert';
 import { useProductDialog, type ProductDialogProps, type CreateProps, type EditProps } from '@/hooks/useProductDialog';
 import { hasSaleDiscount } from '@/lib/pricing';
 
@@ -32,7 +32,10 @@ export function ProductDialog(props: ProductDialogProps) {
     variantNewImages,
     removeVariantExistingImage,
     updateVariantNewImages,
-    similarProductWarning,
+    duplicateMatch,
+    overrideSimilarDuplicate,
+    setOverrideSimilarDuplicate,
+    isDuplicateBlocked,
     supplierSearch,
     setSupplierSearch,
     supplierResults,
@@ -55,6 +58,12 @@ export function ProductDialog(props: ProductDialogProps) {
     hasVariations,
     onSubmit
   } = useProductDialog(props);
+
+  const handleUseExisting = (product: { id: string; name: string }) => {
+    if (!isEdit && (props as CreateProps).onSelectExisting) {
+      (props as CreateProps).onSelectExisting!(product);
+    }
+  };
 
   if (isEdit && !displayProduct) return null;
 
@@ -98,16 +107,13 @@ export function ProductDialog(props: ProductDialogProps) {
                 <FormItem><FormLabel>Product Name</FormLabel><FormControl><Input placeholder="e.g., AeroGrip Silicon Utensil Set" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
 
-              {similarProductWarning && (
-                <Alert className="border-amber-400 bg-amber-50 text-amber-900">
-                  <AlertTriangle className="h-4 w-4 !text-amber-600" />
-                  <AlertTitle>
-                    {similarProductWarning.matchType === 'exact' ? 'A product with this exact name already exists' : 'This looks similar to an existing product'}
-                  </AlertTitle>
-                  <AlertDescription className="text-amber-800">
-                    &ldquo;{similarProductWarning.name}&rdquo; — double check you&apos;re not creating a duplicate before saving.
-                  </AlertDescription>
-                </Alert>
+              {duplicateMatch && (
+                <DuplicateProductAlert
+                  duplicateMatch={duplicateMatch}
+                  overrideSimilarDuplicate={overrideSimilarDuplicate}
+                  onOverrideChange={setOverrideSimilarDuplicate}
+                  onUseExisting={!isEdit && (props as CreateProps).onSelectExisting ? handleUseExisting : undefined}
+                />
               )}
 
               <FormField control={form.control} name="sku" render={({ field }) => (
@@ -315,7 +321,12 @@ export function ProductDialog(props: ProductDialogProps) {
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-              <Button type="submit">{isEdit ? 'Save Changes' : 'Save Product'}</Button>
+              <Button
+                type="submit"
+                disabled={form.formState.isSubmitting || (!isEdit && isDuplicateBlocked)}
+              >
+                {isEdit ? 'Save Changes' : 'Save Product'}
+              </Button>
             </DialogFooter>
           </form>
         </Form>

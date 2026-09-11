@@ -212,80 +212,10 @@ export async function detectInventoryAnomalies(supabase: SupabaseClient): Promis
   return anomalies;
 }
 
-/**
- * Computes today's progress towards the 5-product verification goal.
- */
-export async function getGuardianDailyProgress(
-  supabase: SupabaseClient,
-  totalBacklogCount: number
-): Promise<GuardianDailyProgress> {
-  const target = 5;
-  try {
-    // Start of today in Philippine Time (UTC+8)
-    const now = new Date();
-    const phNow = new Date(now.getTime() + 8 * 60 * 60 * 1000);
-    const phDateStr = phNow.toISOString().slice(0, 10);
-    const todayMidnightUtc = new Date(`${phDateStr}T00:00:00+08:00`).toISOString();
-
-    const { data: todayMemories, error } = await supabase
-      .from('inventory_guardian_memory')
-      .select('id, product_id, action_type, physical_count, actor_name, created_at, products(name)')
-      .in('action_type', ['physical_count_audit', 'purchase_backfill'])
-      .gte('created_at', todayMidnightUtc)
-      .order('created_at', { ascending: false });
-
-    if (error || !todayMemories) {
-      return {
-        target,
-        completedToday: 0,
-        remainingToday: target,
-        isGoalMet: false,
-        completedItems: [],
-        totalBacklogCount
-      };
-    }
-
-    // Deduplicate by product_id so if a product was edited twice today it counts once
-    const seenProductIds = new Set<string>();
-    const completedItems: CompletedDailyAuditItem[] = [];
-
-    for (const m of todayMemories as any[]) {
-      if (!m.product_id || seenProductIds.has(m.product_id)) continue;
-      seenProductIds.add(m.product_id);
-      completedItems.push({
-        id: m.id,
-        productId: m.product_id,
-        productName: m.products?.name || 'Unknown Product',
-        actorName: m.actor_name || 'Staff',
-        actionType: m.action_type,
-        physicalCount: m.physical_count,
-        timestamp: m.created_at
-      });
-    }
-
-    const completedToday = completedItems.length;
-    const remainingToday = Math.max(0, target - completedToday);
-
-    return {
-      target,
-      completedToday,
-      remainingToday,
-      isGoalMet: completedToday >= target,
-      completedItems,
-      totalBacklogCount
-    };
-  } catch (err) {
-    console.error('Error fetching guardian daily progress:', err);
-    return {
-      target,
-      completedToday: 0,
-      remainingToday: target,
-      isGoalMet: false,
-      completedItems: [],
-      totalBacklogCount
-    };
-  }
-}
+export {
+  computeGuardianDailyTarget,
+  getGuardianDailyProgress
+} from './inventory-guardian-carryover-service';
 
 export * from './inventory-guardian-action-service';
 export * from './inventory-guardian-memory-service';

@@ -92,11 +92,15 @@ export interface CompletedDailyAuditItem {
 }
 
 export interface GuardianDailyProgress {
+  baseTarget: number;
+  carryOver: number;
   target: number;
   completedToday: number;
   remainingToday: number;
   isGoalMet: boolean;
+  isRestDay?: boolean;
   completedItems: CompletedDailyAuditItem[];
   totalBacklogCount: number;
 }
+
 

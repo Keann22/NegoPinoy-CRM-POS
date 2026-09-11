@@ -31,6 +31,7 @@ interface OrderItemsPanelProps {
   isSearchingProducts: boolean;
   onProductSelect: (product: Product) => Promise<void>;
   onAddProductClick: () => void;
+  canAddProduct?: boolean;
 }
 
 export function OrderItemsPanel({
@@ -52,6 +53,7 @@ export function OrderItemsPanel({
   isSearchingProducts,
   onProductSelect,
   onAddProductClick,
+  canAddProduct = true,
 }: OrderItemsPanelProps) {
   const includeInsurance = watch('includeInsurance');
 
@@ -127,7 +129,7 @@ export function OrderItemsPanel({
                 ))}
               </CommandGroup>
             )}
-            {productSearch.length > 0 && !isSearchingProducts && (
+            {productSearch.length > 0 && !isSearchingProducts && canAddProduct && (
               <CommandGroup>
                 <CommandItem
                   value={productSearch + ' add_new'}
@@ -138,7 +140,18 @@ export function OrderItemsPanel({
                 </CommandItem>
               </CommandGroup>
             )}
-            {!isSearchingProducts && productResults.length === 0 && productSearch.length > 1 && <CommandEmpty>No products found.</CommandEmpty>}
+            {!isSearchingProducts && productResults.length === 0 && productSearch.length > 1 && (
+              <CommandEmpty>
+                <div className="py-2 text-center text-xs text-muted-foreground">
+                  <p>No products found for &ldquo;{productSearch}&rdquo;.</p>
+                  {!canAddProduct && (
+                    <p className="mt-1 text-[11px] text-amber-600">
+                      Need a new catalog item? Please request it from an Inventory Manager or Admin.
+                    </p>
+                  )}
+                </div>
+              </CommandEmpty>
+            )}
           </CommandList>
         )}
       </Command>

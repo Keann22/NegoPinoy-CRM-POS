@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSupabase, useUser } from "@/lib/supabase/hooks";
 import { useToast } from "@/hooks/use-toast";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { useRoleCheck } from "@/hooks/useRoleCheck";
 import { useCustomerSearch } from "@/hooks/useCustomerSearch";
 import { useProductSearch } from "@/hooks/useProductSearch";
 import { orderSchema, type OrderFormValues, type Customer, type Product } from "@/lib/schemas/order";
@@ -26,6 +27,8 @@ export function useOrderDialog(props: UseOrderDialogProps) {
     const { user } = useUser();
     const { toast } = useToast();
     const { userProfile } = useUserProfile();
+    const { isManagement, isInventory } = useRoleCheck();
+    const canAddProduct = isManagement || isInventory;
     const router = useRouter();
 
     const [addCustomerOpen, setAddCustomerOpen] = useState(false);
@@ -310,6 +313,7 @@ export function useOrderDialog(props: UseOrderDialogProps) {
         setAddCustomerOpen,
         addProductOpen,
         setAddProductOpen,
+        canAddProduct,
         onSubmit
     };
 }

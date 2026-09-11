@@ -3,7 +3,7 @@ import stringSimilarity from 'string-similarity';
 import { useSupabase, useUser } from '@/lib/supabase/hooks';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import type { FormattedProduct } from '@/types';
-import { useProductFormSetup, type Supplier, type ProductDialogProps, type EditProps, type CreateProps, type SimilarProductWarning } from './useProductForm';
+import { useProductFormSetup, type Supplier, type ProductDialogProps, type EditProps, type CreateProps, type SimilarProductWarning, type DuplicateMatch } from './useProductForm';
 export * from './useProductForm';
 import { useProductSubmit } from './useProductSubmit';
 
@@ -88,44 +88,78 @@ export function useProductDialog(props: ProductDialogProps) {
   }, [supabase, user, componentSearch]);
 
   const { form, supplierFields, appendSupplier, removeSupplier, variationFields, appendVariation, removeVariation, recipeFields, appendRecipe, removeRecipe, hasVariations, nameValue } = useProductFormSetup();
-  const [similarProductWarning, setSimilarProductWarning] = useState<SimilarProductWarning | null>(null);
+  const [duplicateMatch, setDuplicateMatch] = useState<DuplicateMatch | null>(null);
+  const [overrideSimilarDuplicate, setOverrideSimilarDuplicate] = useState(false);
+
   useEffect(() => {
-    if (!supabase || !open) { setSimilarProductWarning(null); return; }
+    setOverrideSimilarDuplicate(false);
+  }, [nameValue]);
+
+  const isDuplicateBlocked = Boolean(
+    duplicateMatch && (duplicateMatch.matchType === 'exact' || !overrideSimilarDuplicate)
+  );
+
+  useEffect(() => {
+    if (!supabase || !open) { setDuplicateMatch(null); return; }
     const trimmed = (nameValue || '').trim();
-    if (trimmed.length < 3) { setSimilarProductWarning(null); return; }
+    if (trimmed.length < 3) { setDuplicateMatch(null); return; }
 
     const handler = setTimeout(async () => {
       const excludeId = isEdit ? displayProduct?.id : undefined;
 
       const { data: exactMatches } = await supabase
         .from('products')
-        .select('id, name')
+        .select('id, name, sku, stock_level, selling_price, images')
         .ilike('name', trimmed)
         .not('name', 'ilike', '[DELETED]%')
         .limit(5);
       const exactMatch = exactMatches?.find(p => p.id !== excludeId);
       if (exactMatch) {
-        setSimilarProductWarning({ id: exactMatch.id, name: exactMatch.name, matchType: 'exact' });
+        setDuplicateMatch({
+          id: exactMatch.id,
+          name: exactMatch.name,
+          sku: exactMatch.sku,
+          stockLevel: exactMatch.stock_level,
+          sellingPrice: exactMatch.selling_price,
+          imageUrl: exactMatch.images?.[0] || null,
+          matchType: 'exact',
+        });
         return;
       }
 
       const keyword = trimmed.split(/\s+/).filter(w => w.length >= 3).sort((a, b) => b.length - a.length)[0];
-      if (!keyword) { setSimilarProductWarning(null); return; }
+      if (!keyword) { setDuplicateMatch(null); return; }
 
       const { data: candidates } = await supabase
         .from('products')
-        .select('id, name')
+        .select('id, name, sku, stock_level, selling_price, images')
         .ilike('name', `%${keyword}%`)
         .not('name', 'ilike', '[DELETED]%')
-        .limit(25);
+        .limit(30);
 
-      let best: { id: string; name: string; score: number } | null = null;
+      let best: { id: string; name: string; sku?: string; stock_level?: number; selling_price?: number; images?: string[]; score: number } | null = null;
       for (const c of candidates || []) {
         if (c.id === excludeId) continue;
         const score = stringSimilarity.compareTwoStrings(trimmed.toLowerCase(), c.name.trim().toLowerCase());
-        if (score >= 0.85 && (!best || score > best.score)) best = { id: c.id, name: c.name, score };
+        if (score >= 0.80 && (!best || score > best.score)) {
+          best = { ...c, score };
+        }
       }
-      setSimilarProductWarning(best ? { id: best.id, name: best.name, matchType: 'similar' } : null);
+
+      if (best) {
+        setDuplicateMatch({
+          id: best.id,
+          name: best.name,
+          sku: best.sku,
+          stockLevel: best.stock_level,
+          sellingPrice: best.selling_price,
+          imageUrl: best.images?.[0] || null,
+          matchType: 'similar',
+          similarityScore: best.score,
+        });
+      } else {
+        setDuplicateMatch(null);
+      }
     }, 400);
 
     return () => clearTimeout(handler);
@@ -197,7 +231,11 @@ export function useProductDialog(props: ProductDialogProps) {
     variantNewImages,
     removeVariantExistingImage,
     updateVariantNewImages,
-    similarProductWarning,
+    similarProductWarning: duplicateMatch,
+    duplicateMatch,
+    overrideSimilarDuplicate,
+    setOverrideSimilarDuplicate,
+    isDuplicateBlocked,
     supplierSearch,
     setSupplierSearch,
     supplierResults,
