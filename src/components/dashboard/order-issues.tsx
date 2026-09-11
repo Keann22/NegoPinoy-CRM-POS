@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, CheckCircle2, MessageSquare, PackageOpen, PauseCircle, Send } from "lucide-react";
@@ -272,6 +273,11 @@ export function OrderIssues({ }: { isAdmin?: boolean }) {
               </div>
               <p className="text-xs text-slate-500 mt-2 pl-8">
                 Reported by: <span className="font-medium text-slate-700">{selectedGroup?.reporter || 'Unknown'}</span>
+                {selectedGroup?.createdAt && (
+                  <span className="ml-2 text-slate-500">
+                    • Reported on: <span className="font-medium text-slate-700">{format(new Date(selectedGroup.createdAt), 'MMM d, yyyy h:mm a')}</span>
+                  </span>
+                )}
               </p>
             </div>
           </DialogHeader>
@@ -287,7 +293,14 @@ export function OrderIssues({ }: { isAdmin?: boolean }) {
                   const isSales = msg.sender_role === 'sales';
                   return (
                     <div key={msg.id} className={`flex flex-col ${isSales ? 'items-end' : 'items-start'}`}>
-                      <span className="text-xs text-slate-500 mb-1">{msg.sender_name || (isSales ? 'Sales' : 'Picker')}</span>
+                      <div className="flex items-center gap-1.5 mb-1 text-xs text-slate-500">
+                        <span className="font-medium text-slate-700">{msg.sender_name || (isSales ? 'Sales' : 'Picker')}</span>
+                        {msg.created_at && (
+                          <span className="text-[11px] text-slate-400">
+                            • {format(new Date(msg.created_at), 'MMM d, yyyy h:mm a')}
+                          </span>
+                        )}
+                      </div>
                       <div className={`p-3 rounded-lg max-w-[85%] text-sm whitespace-pre-wrap shadow-sm ${isSales ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white border rounded-tl-none text-slate-800'}`}>
                         {msg.message}
                       </div>
