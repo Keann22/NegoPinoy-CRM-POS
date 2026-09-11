@@ -6,6 +6,18 @@ import {
   autoCleanupStaffDrafts 
 } from './procurement-service';
 
+async function fetchAllPages<T>(fetcher: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: any }>): Promise<T[]> {
+  const all: T[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await fetcher(from, from + 999);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    all.push(...data);
+    if (data.length < 1000) break;
+  }
+  return all;
+}
+
 export async function getProcurementDashboardData(supabase: SupabaseClient) {
   await migrateLeakedBundleDrafts(supabase);
   await autoCleanupStaffDrafts(supabase);
@@ -57,19 +69,15 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
   });
 
   // 2.6 Candidate out-of-stock products
-  const { data: negativeStockProducts, error: negErr } = await supabase
-    .from('products')
-    .select('id')
-    .lt('stock_level', 0);
-  if (negErr) throw negErr;
+  const negativeStockProducts = await fetchAllPages<any>((from, to) =>
+    supabase.from('products').select('id').lt('stock_level', 0).range(from, to)
+  );
   const negativeStockIds = new Set((negativeStockProducts || []).map((p: any) => p.id));
 
   // 2.7 Products with explicitly open order issues (missing items)
-  const { data: openIssuesInitial, error: openIssuesErr } = await supabase
-    .from('order_issues')
-    .select('product_id')
-    .eq('status', 'open');
-  if (openIssuesErr) throw openIssuesErr;
+  const openIssuesInitial = await fetchAllPages<any>((from, to) =>
+    supabase.from('order_issues').select('product_id').eq('status', 'open').range(from, to)
+  );
   const openIssueProductIds = new Set(
     (openIssuesInitial || [])
       .map((i: any) => i.product_id)
@@ -77,17 +85,9 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
   );
 
   // 3a. Bundle products
-  const bundleProducts: { id: string; assembly_recipe: any }[] = [];
-  for (let from = 0; ; from += 1000) {
-    const { data: page, error: bundleErr } = await supabase
-      .from('products')
-      .select('id, assembly_recipe')
-      .range(from, from + 999);
-    if (bundleErr) throw bundleErr;
-    if (!page || page.length === 0) break;
-    bundleProducts.push(...page);
-    if (page.length < 1000) break;
-  }
+  const bundleProducts = await fetchAllPages<any>((from, to) =>
+    supabase.from('products').select('id, assembly_recipe').range(from, to)
+  );
 
   const allBundleIds = new Set(
     bundleProducts
@@ -133,22 +133,36 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
 
   const bundleProductIds = new Set(bundleToComponents.keys());
 
-  // 3b. Get live order demand
+  // 3b. Get live order demand (paginated and chunked to prevent 1000-row cutoff)
   const allProductIdsForDemand = new Set([...Array.from(candidateIds), ...Array.from(bundleProductIds)]);
-  const { data: demandRows, error: demandErr } = await supabase
-    .from('order_items')
-    .select('product_id, quantity, is_packed, orders!inner(id, status, payment_method)')
-    .in('product_id', Array.from(allProductIdsForDemand))
-    .in('orders.status', ALL_OPEN_STATUSES);
-  if (demandErr) throw demandErr;
+  const allProductIdsList = Array.from(allProductIdsForDemand);
+  const CHUNK_SIZE = 200;
+  const demandRows: any[] = [];
+  const openIssues: any[] = [];
 
-  // 3c. Fetch open issues
-  const { data: openIssues, error: issuesErr } = await supabase
-    .from('order_issues')
-    .select('order_id, product_id')
-    .eq('status', 'open')
-    .in('product_id', Array.from(allProductIdsForDemand));
-  if (issuesErr) throw issuesErr;
+  for (let i = 0; i < allProductIdsList.length; i += CHUNK_SIZE) {
+    const chunk = allProductIdsList.slice(i, i + CHUNK_SIZE);
+    const [chunkDemand, chunkIssues] = await Promise.all([
+      fetchAllPages<any>((from, to) =>
+        supabase
+          .from('order_items')
+          .select('product_id, quantity, is_packed, orders!inner(id, status, payment_method)')
+          .in('product_id', chunk)
+          .in('orders.status', ALL_OPEN_STATUSES)
+          .range(from, to)
+      ),
+      fetchAllPages<any>((from, to) =>
+        supabase
+          .from('order_issues')
+          .select('order_id, product_id')
+          .eq('status', 'open')
+          .in('product_id', chunk)
+          .range(from, to)
+      )
+    ]);
+    demandRows.push(...chunkDemand);
+    openIssues.push(...chunkIssues);
+  }
 
   const openIssueKeys = new Set(openIssues?.map((i: any) => `${i.order_id}-${i.product_id}`));
 

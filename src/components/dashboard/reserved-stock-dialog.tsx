@@ -47,6 +47,7 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose, s
   const [loading, setLoading] = useState(false);
   const [reservedOrders, setReservedOrders] = useState<ReservedOrder[]>([]);
   const [trailOrderId, setTrailOrderId] = useState<string | null>(null);
+  const statusFilterKey = statusFilter.join(',');
 
   useEffect(() => {
     async function fetchReservedOrders() {
@@ -176,7 +177,7 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose, s
     }
 
     fetchReservedOrders();
-  }, [isOpen, productId, supabase, packedOnly]);
+  }, [isOpen, productId, supabase, packedOnly, statusFilterKey, excludeLayaway]);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
