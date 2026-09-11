@@ -27,10 +27,10 @@ export function OrderItemsCard({ orderId, orderStatus, items }: OrderItemsCardPr
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle>Order Items</CardTitle>
           {items.length > 0 && (
-            problemCount > 0 ? (
+            problemCount > 0 || orderStatus === 'Picked (with issue)' ? (
               <Badge variant="destructive" className="flex items-center gap-1.5">
                 <AlertCircle className="h-3.5 w-3.5" />
-                {problemCount} item{problemCount > 1 ? 's' : ''} need{problemCount > 1 ? '' : 's'} attention
+                {problemCount > 0 ? `${problemCount} item${problemCount > 1 ? 's' : ''} need${problemCount > 1 ? '' : 's'} attention` : 'Order has reported issue'}
               </Badge>
             ) : (
               <Badge variant="outline" className="flex items-center gap-1.5 border-emerald-300 text-emerald-700">
@@ -42,11 +42,13 @@ export function OrderItemsCard({ orderId, orderStatus, items }: OrderItemsCardPr
         </div>
       </CardHeader>
       <CardContent>
-        {problemCount > 0 && (
+        {(problemCount > 0 || orderStatus === 'Picked (with issue)') && (
           <div className="mb-4 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
             <p>
-              This order is being held on {problemCount} item{problemCount > 1 ? 's' : ''}.
+              {problemCount > 0
+                ? `This order is being held on ${problemCount} item${problemCount > 1 ? 's' : ''}.`
+                : 'This order was flagged with an issue during picking.'}
               {reportedCount > 0
                 ? ` ${reportedCount} ${reportedCount > 1 ? 'have' : 'has'} a reported inventory issue — click "View issue" to see why it isn't shipping yet.`
                 : ' The flagged item(s) are currently out of stock.'}
@@ -100,7 +102,8 @@ function ItemStatusCell({ item, onViewIssue }: { item: EnrichedOrderItem; onView
     return (
       <div className="flex items-center gap-2">
         <Badge variant="destructive" className="flex items-center gap-1">
-          <PackageX className="h-3 w-3" /> Issue reported
+          <PackageX className="h-3 w-3" />
+          {item.hasComponentIssue ? 'Missing component' : 'Issue reported'}
         </Badge>
         <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={onViewIssue}>
           View issue
@@ -123,10 +126,15 @@ function ItemStatusCell({ item, onViewIssue }: { item: EnrichedOrderItem; onView
 }
 
 function ItemIssueDialog({ item, onClose }: { item: EnrichedOrderItem | null; onClose: () => void }) {
-  const issue = item?.issue ?? null;
+  const issues = item?.issues && item.issues.length > 0
+    ? item.issues
+    : item?.issue
+    ? [item.issue]
+    : [];
+
   return (
     <Dialog open={!!item} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <PackageX className="h-5 w-5 text-red-600" />
@@ -140,56 +148,57 @@ function ItemIssueDialog({ item, onClose }: { item: EnrichedOrderItem | null; on
               <p className="text-xs text-muted-foreground">Ordered quantity: {item.quantity}</p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 rounded-md border bg-muted/30 p-3 text-sm">
-              <div>
-                <p className="text-xs text-muted-foreground">Current stock</p>
-                <p className={`font-semibold ${(item.stockLevel ?? 0) <= 0 ? 'text-red-600' : ''}`}>
-                  {item.stockLevel ?? '—'}
-                </p>
-              </div>
-              {issue?.out_of_stock_qty != null && (
-                <div>
-                  <p className="text-xs text-muted-foreground">Reported short</p>
-                  <p className="font-semibold text-red-600">{issue.out_of_stock_qty}</p>
-                </div>
-              )}
-              {issue && (
-                <>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Reported by</p>
-                    <p className="font-medium">{issue.reported_by_name || 'System'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Reported on</p>
-                    <p className="font-medium">{format(new Date(issue.created_at), 'MMM d, h:mm a')}</p>
-                  </div>
-                </>
-              )}
-            </div>
+            {issues.length > 0 ? (
+              issues.map((issue, idx) => (
+                <div key={issue.id || idx} className="space-y-3 rounded-lg border p-3">
+                  {issue.isComponentIssue && (
+                    <div className="flex items-center gap-2 text-xs font-semibold text-destructive">
+                      <PackageX className="h-3.5 w-3.5" />
+                      <span>Missing Component: {issue.componentName || issue.product_name}</span>
+                    </div>
+                  )}
 
-            {issue ? (
-              issue.messages.length > 0 ? (
-                <div>
-                  <p className="mb-2 text-xs font-semibold text-muted-foreground">Issue discussion</p>
-                  <div className="max-h-60 space-y-3 overflow-y-auto rounded-md border p-3">
-                    {issue.messages.map(msg => {
-                      const isSales = msg.sender_role === 'sales';
-                      return (
-                        <div key={msg.id} className={`flex flex-col ${isSales ? 'items-end' : 'items-start'}`}>
-                          <span className="mb-0.5 text-[10px] text-muted-foreground">
-                            {msg.sender_name || (isSales ? 'Sales' : 'Picker')}
-                          </span>
-                          <div className={`max-w-[90%] whitespace-pre-wrap rounded-lg p-2 text-xs shadow-sm ${isSales ? 'rounded-tr-none bg-indigo-600 text-white' : 'rounded-tl-none border bg-white text-slate-800'}`}>
-                            {msg.message}
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <div className="grid grid-cols-2 gap-3 rounded-md border bg-muted/30 p-2.5 text-xs">
+                    {issue.out_of_stock_qty != null && (
+                      <div>
+                        <p className="text-muted-foreground">Reported short</p>
+                        <p className="font-semibold text-red-600">{issue.out_of_stock_qty} unit{issue.out_of_stock_qty > 1 ? 's' : ''}</p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-muted-foreground">Reported by</p>
+                      <p className="font-medium">{issue.reported_by_name || 'System'}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-muted-foreground">Reported on</p>
+                      <p className="font-medium">{format(new Date(issue.created_at), 'MMM d, h:mm a')}</p>
+                    </div>
                   </div>
+
+                  {issue.messages && issue.messages.length > 0 ? (
+                    <div>
+                      <p className="mb-2 text-xs font-semibold text-muted-foreground">Issue discussion</p>
+                      <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border p-2.5">
+                        {issue.messages.map(msg => {
+                          const isSales = msg.sender_role === 'sales';
+                          return (
+                            <div key={msg.id} className={`flex flex-col ${isSales ? 'items-end' : 'items-start'}`}>
+                              <span className="mb-0.5 text-[10px] text-muted-foreground">
+                                {msg.sender_name || (isSales ? 'Sales' : 'Picker')}
+                              </span>
+                              <div className={`max-w-[90%] whitespace-pre-wrap rounded-lg p-2 text-xs shadow-sm ${isSales ? 'rounded-tr-none bg-indigo-600 text-white' : 'rounded-tl-none border bg-white text-slate-800'}`}>
+                                {msg.message}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No discussion has been added to this issue yet.</p>
+                  )}
                 </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No discussion has been added to this issue yet.</p>
-              )
+              ))
             ) : (
               <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                 <Info className="mt-0.5 h-4 w-4 shrink-0" />

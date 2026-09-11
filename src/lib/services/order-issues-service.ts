@@ -85,9 +85,25 @@ export async function resolveOrderIssuesForRemovedProducts(
     .eq('order_id', orderId)
     .eq('status', 'open');
 
-  if (!issues) return;
+  if (!issues || issues.length === 0) return;
 
-  const issuesToResolve = (issues as any[]).filter(i => i.product_id && !remainingProductIds.includes(i.product_id));
+  // Expand remainingProductIds to include component product IDs for any bundle items
+  const { data: prods } = await supabase
+    .from('products')
+    .select('id, assembly_recipe')
+    .in('id', remainingProductIds);
+
+  const allRemainingIds = new Set<string>(remainingProductIds);
+  (prods || []).forEach((p: any) => {
+    if (Array.isArray(p.assembly_recipe)) {
+      p.assembly_recipe.forEach((comp: any) => {
+        const cId = comp.productId || comp.component_id;
+        if (cId) allRemainingIds.add(cId);
+      });
+    }
+  });
+
+  const issuesToResolve = (issues as any[]).filter(i => i.product_id && !allRemainingIds.has(i.product_id));
 
   for (const issue of issuesToResolve) {
     await supabase.from('order_issues').update({ status: 'resolved' }).eq('id', issue.id);
