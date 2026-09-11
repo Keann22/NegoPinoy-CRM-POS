@@ -169,6 +169,7 @@ export function ProcurementItemRow({
               {item.staffRequestedQty}
             </button>
             <StaffRequestDialog
+              productId={item.productId}
               productName={item.productName}
               isOpen={staffRequestOpen}
               onClose={() => setStaffRequestOpen(false)}
