@@ -20,6 +20,8 @@ const EXCLUDED_GUARDIAN_EMAILS = new Set([
 export function isUserAllowedGuardian(email?: string, roles?: string[]): boolean {
   if (!email) return false;
   const normalized = email.toLowerCase().trim();
+  // Rey has a temporary special assignment for today (30-item shelf check)
+  if (normalized === 'rey.magbitangjr@gmail.com') return true;
   if (EXCLUDED_GUARDIAN_EMAILS.has(normalized)) return false;
   return Boolean(roles?.some(r => ['Admin', 'Owner', 'Inventory'].includes(r)));
 }
@@ -87,7 +89,8 @@ export function InventoryGuardianProvider({ children }: { children: ReactNode })
     }
     setIsLoading(true);
     try {
-      const res = await fetch('/api/inventory/guardian/anomalies');
+      const emailParam = userProfile?.email ? `?userEmail=${encodeURIComponent(userProfile.email)}` : '';
+      const res = await fetch(`/api/inventory/guardian/anomalies${emailParam}`);
       if (!res.ok) throw new Error('Failed to fetch inventory anomalies');
       const data = await res.json();
       if (data.success) {
@@ -100,7 +103,7 @@ export function InventoryGuardianProvider({ children }: { children: ReactNode })
     } finally {
       setIsLoading(false);
     }
-  }, [canAccess]);
+  }, [canAccess, userProfile?.email]);
 
   useEffect(() => {
     if (canAccess) {

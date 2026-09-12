@@ -14,16 +14,28 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const userEmail = searchParams.get('userEmail')?.toLowerCase().trim();
+    const isReySpecialAssignment = userEmail === 'rey.magbitangjr@gmail.com';
+
     const allAnomalies = await detectInventoryAnomalies(supabase);
     const dailyProgress = await getGuardianDailyProgress(supabase, allAnomalies.length);
+
+    // Rey's 30-item temporary shelf check assignment for today
+    if (isReySpecialAssignment) {
+      dailyProgress.target = 30;
+      dailyProgress.baseTarget = 30;
+      dailyProgress.remainingToday = Math.max(0, 30 - dailyProgress.completedToday);
+      dailyProgress.isGoalMet = dailyProgress.completedToday >= 30;
+    }
 
     // Filter out products already audited today
     const auditedProductIds = new Set(dailyProgress.completedItems.map(i => i.productId));
     const pendingAnomalies = allAnomalies.filter(a => !auditedProductIds.has(a.productId));
 
-    // Today's 5-item queue
+    // Today's queue (up to 30 items for Rey, or daily remaining for staff)
     const queueLimit = dailyProgress.isGoalMet ? 0 : dailyProgress.remainingToday;
     const todayQueue = pendingAnomalies.slice(0, Math.max(queueLimit, 0));
 

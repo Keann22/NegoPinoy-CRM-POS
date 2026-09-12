@@ -34,12 +34,17 @@ export function InventoryGuardianDailyGoalCard({
             </span>
           ) : (
             <span>
-              Today's Goal: {dailyProgress.completedToday} of {dailyProgress.target} products verified
+              {dailyProgress.target === 30 ? "Rey's Special Assignment" : "Today's Goal"}: {dailyProgress.completedToday} of {dailyProgress.target} products verified
             </span>
           )}
-          {!dailyProgress.isRestDay && dailyProgress.carryOver > 0 && (
+          {!dailyProgress.isRestDay && dailyProgress.carryOver > 0 && dailyProgress.target !== 30 && (
             <span className="text-[10px] font-normal text-amber-700 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-300 px-1.5 py-0.5 rounded border border-amber-200/80">
               +{dailyProgress.carryOver} carried over from previous day
+            </span>
+          )}
+          {dailyProgress.target === 30 && (
+            <span className="text-[10px] font-normal text-blue-700 bg-blue-50 dark:bg-blue-950/40 dark:text-blue-300 px-1.5 py-0.5 rounded border border-blue-200/80">
+              30 items assigned for today
             </span>
           )}
         </div>
