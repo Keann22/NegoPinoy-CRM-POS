@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
 import { ShieldAlert, Package, ShoppingBag, ArrowRight, CheckCircle2, ChevronRight, ChevronLeft, AlertTriangle } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -65,15 +64,7 @@ export function InventoryGuardianAlertModal() {
     }
   }, [currentAnomaly]);
 
-  const pathname = usePathname();
-  const isFloorApp = Boolean(
-    pathname?.startsWith('/dashboard/pick') ||
-    pathname?.startsWith('/dashboard/pack') ||
-    pathname?.startsWith('/dashboard/verify')
-  );
-
   if (!canAccess) return null;
-  if (isFloorApp) return null;
 
   // If daily goal is reached and no items left in today's queue
   if (open && anomalies.length === 0 && dailyProgress?.isGoalMet && !showAllBacklog) {

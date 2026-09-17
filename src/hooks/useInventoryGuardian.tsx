@@ -1,7 +1,6 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
-import { usePathname } from 'next/navigation';
 import type { InventoryAnomaly, InventoryGuardianMemoryEntry, GuardianDailyProgress } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useUserProfile } from '@/hooks/useUserProfile';
@@ -66,14 +65,6 @@ export function InventoryGuardianProvider({ children }: { children: ReactNode })
   const [hasAutoOpened, setHasAutoOpened] = useState(false);
   const { toast } = useToast();
   const { userProfile } = useUserProfile();
-  const pathname = usePathname();
-
-  const isFloorApp = Boolean(
-    pathname?.startsWith('/dashboard/pick') ||
-    pathname?.startsWith('/dashboard/pack') ||
-    pathname?.startsWith('/dashboard/verify')
-  );
-
   const canAccess = useMemo(() => {
     return isUserAllowedGuardian(userProfile?.email, userProfile?.roles);
   }, [userProfile]);
@@ -130,12 +121,11 @@ export function InventoryGuardianProvider({ children }: { children: ReactNode })
     setIsModalOpen(false);
   }, []);
 
-  // Auto-open ONCE when anomalies first appear for allowed staff, unless snoozed, on floor apps, or daily goal already met.
+  // Auto-open ONCE when anomalies first appear for allowed staff, unless snoozed, or daily goal already met.
   // Guarded by hasAutoOpened + the snooze timestamp so closing the modal never traps the user.
   useEffect(() => {
     if (hasAutoOpened) return;
     if (!canAccess) return;
-    if (isFloorApp) return; // Do not interrupt warehouse staff while actively picking or packing
     if (dailyProgress?.isGoalMet || dailyProgress?.isRestDay) return; // Daily goal achieved or Sunday rest day!
     if (totalAnomaliesCount === 0) return;
 
@@ -149,7 +139,7 @@ export function InventoryGuardianProvider({ children }: { children: ReactNode })
       setIsModalOpen(true);
     }
     setHasAutoOpened(true);
-  }, [totalAnomaliesCount, canAccess, hasAutoOpened]);
+  }, [totalAnomaliesCount, canAccess, hasAutoOpened, dailyProgress]);
 
   const dismissAnomaly = (id: string) => {
     setDismissedIds(prev => new Set(prev).add(id));
