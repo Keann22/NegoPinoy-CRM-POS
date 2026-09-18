@@ -26,6 +26,8 @@ export type Product = {
   stockBatches?: StockBatch[];
   variations?: ProductVariation[];
   supplierPricing?: SupplierPricing[];
+  supplier_id?: string | null;
+  supplierId?: string | null;
   // Supabase column aliases
   variant_name?: string;
   parent_id?: string;

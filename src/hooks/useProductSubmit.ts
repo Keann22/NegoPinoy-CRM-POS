@@ -83,6 +83,7 @@ export function useProductSubmit({
     toast({ title: isEdit ? 'Updating Product...' : 'Adding Product...', description: `"${values.name}" is being ${isEdit ? 'updated' : 'added'}.` });
 
     const { images: imageFiles, quantityOnHand, supplierPricing, hasVariations: _hv, variations, installmentPrice, isOnSale, salePrice, assemblyRecipe, ...core } = values;
+    const effectiveSupplierId = supplierPricing?.find((sp: any) => sp.supplierId)?.supplierId || null;
 
     try {
       if (isEdit && displayProduct) {
@@ -103,10 +104,19 @@ export function useProductSubmit({
           is_on_sale: isOnSale ?? false, sale_price: salePrice ?? null,
           images: uploadedImageUrls, supplier_pricing: supplierPricing || [],
           assembly_recipe: assemblyRecipe || [],
+          ...(effectiveSupplierId ? { supplier_id: effectiveSupplierId } : {}),
           ...(stockChanged ? { stock_level: quantityOnHand } : {}),
           ...(displayProduct.parent_id && core.name !== displayProduct.name ? { variant_name: core.name } : {}),
         }).eq('id', displayProduct.id);
         if (error) throw error;
+
+        // If editing a parent product and supplier is known, propagate to child variants missing a supplier
+        const resolvedParentSupplierId = effectiveSupplierId || displayProduct.supplier_id;
+        if (displayProduct.children && displayProduct.children.length > 0 && resolvedParentSupplierId) {
+          await supabase.from('products').update({ supplier_id: resolvedParentSupplierId })
+            .eq('parent_id', displayProduct.id)
+            .is('supplier_id', null);
+        }
 
         if (stockChanged) {
           const delta = (quantityOnHand || 0) - (displayProduct.quantityOnHand || 0);
@@ -151,6 +161,7 @@ export function useProductSubmit({
         }
 
         if (variations && variations.length > 0) {
+          const variantSupplierId = effectiveSupplierId || displayProduct.supplier_id || null;
           for (let i = 0; i < variations.length; i++) {
             const v = variations[i];
             let varImages = [...uploadedImageUrls];
@@ -161,6 +172,7 @@ export function useProductSubmit({
               sku: vSku, shelf_location: core.shelfLocation || null, description: core.description,
               category: core.categoryId, selling_price: v.sellingPrice,
               initial_unit_cost: v.unitCost ?? supplierPricing?.[0]?.unitCost ?? 0,
+              supplier_id: variantSupplierId,
               supplier_pricing: supplierPricing || [], stock_level: v.quantityOnHand, images: varImages,
             }).select().single();
             if (varErr) throw varErr;
@@ -183,7 +195,9 @@ export function useProductSubmit({
           const { data: parent, error: pErr } = await supabase.from('products').insert({
             name: core.name, sku: finalSku, shelf_location: core.shelfLocation || null,
             description: core.description, category: core.categoryId, images: uploadedImageUrls,
-            selling_price: 0, installment_price: null, stock_level: 0, supplier_pricing: [],
+            selling_price: 0, installment_price: null, stock_level: 0,
+            supplier_id: effectiveSupplierId,
+            supplier_pricing: supplierPricing || [],
           }).select().single();
           if (pErr) throw pErr;
           parentProductId = parent.id;
@@ -206,6 +220,7 @@ export function useProductSubmit({
             is_on_sale: parentProductId ? false : (isOnSale ?? false),
             sale_price: parentProductId ? null : (salePrice ?? null),
             initial_unit_cost: p.unitCost ?? supplierPricing?.[0]?.unitCost ?? 0,
+            supplier_id: effectiveSupplierId,
             supplier_pricing: supplierPricing || [], stock_level: p.quantityOnHand, images: varImages,
           }).select().single();
           if (insErr) throw insErr;

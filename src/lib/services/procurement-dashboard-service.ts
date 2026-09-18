@@ -288,7 +288,7 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
 
   const { data: liveOS, error: lErr } = await supabase
     .from('products')
-    .select('id, name, variant_name, stock_level, supplier_id, initial_unit_cost, supplier_pricing')
+    .select('id, name, variant_name, stock_level, supplier_id, initial_unit_cost, supplier_pricing, parent_id')
     .in('id', Array.from(productIdsToFetch));
   if (lErr) throw lErr;
 
@@ -319,17 +319,54 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
     }
   }
 
+  // Resolve supplier fallback for candidate products missing supplier_id
+  const missingSupplierItems = (liveOS || []).filter((p: any) => !p.supplier_id);
+  const parentIdsToLookup = Array.from(
+    new Set(missingSupplierItems.filter((p: any) => p.parent_id).map((p: any) => p.parent_id))
+  );
+
+  const parentSupplierMap = new Map<string, { supplierId: string; unitCost: number; pricing: any[] }>();
+  if (parentIdsToLookup.length > 0) {
+    const { data: parents } = await supabase
+      .from('products')
+      .select('id, supplier_id, initial_unit_cost, supplier_pricing')
+      .in('id', parentIdsToLookup);
+
+    parents?.forEach((parent: any) => {
+      const supId = parent.supplier_id || parent.supplier_pricing?.find((sp: any) => sp.supplierId)?.supplierId || null;
+      if (supId) {
+        parentSupplierMap.set(parent.id, {
+          supplierId: supId,
+          unitCost: Number(parent.initial_unit_cost) || 0,
+          pricing: parent.supplier_pricing || []
+        });
+      }
+    });
+  }
+
+  const healingUpdates: PromiseLike<any>[] = [];
   const osMap = new Map();
 
   for (const p of liveOS) {
     const draft = draftMap.get(p.id);
     const systemQty = Math.max(0, -p.stock_level);
 
-    let matchedCost = p.initial_unit_cost || 0;
-    if (p.supplier_id && p.supplier_pricing) {
-      const sup = suppliers.find((s: any) => s.id === p.supplier_id);
+    const pricingSupplierId = p.supplier_pricing?.find((sp: any) => sp.supplierId)?.supplierId;
+    const parentInfo = p.parent_id ? parentSupplierMap.get(p.parent_id) : null;
+    const resolvedSupplierId = p.supplier_id || pricingSupplierId || parentInfo?.supplierId || null;
+
+    if (!p.supplier_id && resolvedSupplierId) {
+      healingUpdates.push(
+        supabase.from('products').update({ supplier_id: resolvedSupplierId }).eq('id', p.id)
+      );
+    }
+
+    let matchedCost = p.initial_unit_cost || parentInfo?.unitCost || 0;
+    const effectivePricing = (p.supplier_pricing && p.supplier_pricing.length > 0) ? p.supplier_pricing : (parentInfo?.pricing || []);
+    if (resolvedSupplierId && effectivePricing.length > 0) {
+      const sup = suppliers.find((s: any) => s.id === resolvedSupplierId);
       if (sup) {
-        const pricing = p.supplier_pricing.find((sp: any) => sp.supplierName === sup.name);
+        const pricing = effectivePricing.find((sp: any) => sp.supplierName === sup.name || sp.supplierId === sup.id);
         if (pricing && pricing.unitCost) {
           matchedCost = Number(pricing.unitCost);
         }
@@ -354,9 +391,13 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
       sourceOrders: draft ? (sourceOrdersByDraftId.get(draft.id) || []) : [],
       totalOpenDemandQty: totalOpenDemandMap.get(p.id) || 0,
       needToBuyQty: needToBuyMap.get(p.id) || 0,
-      supplierId: p.supplier_id,
+      supplierId: resolvedSupplierId,
       unitCost: matchedCost
     });
+  }
+
+  if (healingUpdates.length > 0) {
+    await Promise.allSettled(healingUpdates);
   }
 
   const grouped: Record<string, any> = {
@@ -393,7 +434,7 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
       poId: p.po_id,
       poNotes: p.purchase_orders?.notes,
       createdAt: p.created_at,
-      supplierId: p.supplier_id || prod?.supplier_id
+      supplierId: p.supplier_id || prod?.supplier_id || (prod?.parent_id ? parentSupplierMap.get(prod.parent_id)?.supplierId : null) || null
     };
   });
 

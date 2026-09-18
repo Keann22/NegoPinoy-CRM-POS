@@ -248,6 +248,22 @@ When a picker scans an order to re-pick it (e.g., after it was edited to add a n
 
 **The Fix:** During `handleScanSuccess`, `usePickerData.ts` now actively fetches any currently `open` issues for that order and pre-populates `outOfStockQty` in the UI. By automatically checking the "out of stock" boxes for items that were already known to be missing, the system ensures they are safely carried over into the new pick session without requiring the picker to memorize and re-flag them.
 
+### Physical Shelf Count Audits: Preventing Double-Deductions of Picked/Packed Stock (added 2026-09-18)
+
+In NegoPinoy CRM POS, `products.stock_level` represents **Available (Unreserved) Stock**:
+$$\text{Stock Level} = \text{Physical Shelf Count} - \text{Active Unpicked Reservations}$$
+
+**The Bug:**
+Previously, `applyPhysicalShelfCount` in `inventory-guardian-action-service.ts` queried all active orders matching `ALL_OPEN_STATUSES` (including `Picked`, `Photo`, `Packed`, `For Shipping`, `For Pick-up`, and `is_packed = true`) and subtracted their sum from `physicalShelfCount`.
+When warehouse staff conduct a physical shelf audit, they count the items *physically remaining on the shelf*. Units for orders that are already `Picked`, `Photo`, `Packed`, or `For Shipping` have **already been removed from the shelf** and placed into tote bins or packing parcels.
+Subtracting those already-picked orders from an empty shelf count (e.g. `0 - 23 = -23`) caused a **double-deduction**, forcing products into artificial negative stock (e.g. `Serving spoon 6pcs` dropping to `-25` even though active unfulfilled orders were only 14).
+
+**The Rule & Fix:**
+When converting an audited physical shelf count into `stock_level`:
+1. Only count orders that **genuinely still need to be pulled from the shelf**: `Pending Payment`, `Processing`, `Waiting for Stock`, and `On-Hold` (where `is_packed = false`).
+2. For orders in `Picked (with issue)`, only count line items that have an **open** shortage issue in `order_issues` (`status = 'open'`). If an issue was already resolved or belongs to a different item, the unit was already successfully picked.
+3. Completely exclude orders in `Picked`, `Photo`, `Packed`, `For Shipping`, `For Pick-up`, and any item where `is_packed = true` — they are already physically off the shelf and must never be subtracted again.
+
 ---
 
 ## Supabase Client Usage

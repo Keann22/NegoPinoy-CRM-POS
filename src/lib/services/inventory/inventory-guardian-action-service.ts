@@ -6,17 +6,16 @@ import type {
 } from '@/types';
 import { recordGuardianMemory } from './inventory-guardian-memory-service';
 
-const UNFULFILLED_STATUSES = [
+// Statuses that claim physical inventory still waiting to be picked from the warehouse shelf.
+// Statuses where picking has already succeeded ('Picked', 'Photo', 'Packed', 'For Shipping',
+// 'For Pick-up', etc.) or items where is_packed = true have already been physically removed
+// from the shelf and secured into parcels/bins. Subtracting them from a physical shelf count
+// causes a severe double-deduction.
+const UNPICKED_STATUSES = [
   'Pending Payment',
   'Processing',
-  'Picked',
-  'Picked (with issue)',
-  'Photo',
-  'Packed',
-  'For Shipping',
-  'For Pick-up',
-  'On-Hold',
-  'Waiting for Stock'
+  'Waiting for Stock',
+  'On-Hold'
 ];
 
 /**
@@ -40,21 +39,54 @@ export async function applyPhysicalShelfCount(
     throw new Error('Product not found for physical count correction');
   }
 
-  // 2. Fetch active unfulfilled orders claiming this product
+  // 2. Fetch active unpicked orders claiming this product from the shelf
   const { data: activeItems, error: aErr } = await supabase
     .from('order_items')
-    .select('quantity, orders!inner(id, status)')
+    .select('order_id, quantity, is_packed, orders!inner(id, status)')
     .eq('product_id', productId)
-    .in('orders.status', UNFULFILLED_STATUSES);
+    .in('orders.status', [...UNPICKED_STATUSES, 'Picked (with issue)']);
 
   if (aErr) {
     console.error('Error fetching active orders during physical count:', aErr);
   }
 
-  const activeReservations = (activeItems || []).reduce((sum, item: any) => sum + (Number(item.quantity) || 1), 0);
-  const activeOrdersCount = activeItems?.length || 0;
+  // Check open shortage issues for 'Picked (with issue)' orders
+  const { data: openIssues } = await supabase
+    .from('order_issues')
+    .select('order_id, out_of_stock_qty')
+    .eq('product_id', productId)
+    .eq('status', 'open');
 
-  // 3. In NegoPinoy, stock_level represents: Available (Unreserved) Stock = Physical Count - Active Reservations
+  const openIssueMap = new Map<string, number>();
+  (openIssues || []).forEach((i: any) => {
+    openIssueMap.set(i.order_id, Number(i.out_of_stock_qty) || 1);
+  });
+
+  let activeReservations = 0;
+  let activeOrdersCount = 0;
+
+  for (const item of (activeItems || [])) {
+    if (item.is_packed) continue; // Already physically pulled from shelf and packed
+
+    const order = Array.isArray(item.orders) ? item.orders[0] : item.orders;
+    if (!order || typeof order !== 'object') continue;
+    const orderStatus = 'status' in order ? String(order.status) : '';
+    const orderId = 'id' in order ? String(order.id) : '';
+
+    if (orderStatus === 'Picked (with issue)') {
+      // Only count if this specific product has an open out-of-stock issue
+      if (openIssueMap.has(orderId)) {
+        const shortQty = openIssueMap.get(orderId)!;
+        activeReservations += shortQty;
+        activeOrdersCount++;
+      }
+    } else if (UNPICKED_STATUSES.includes(orderStatus)) {
+      activeReservations += (Number(item.quantity) || 1);
+      activeOrdersCount++;
+    }
+  }
+
+  // 3. In NegoPinoy, stock_level represents: Available (Unreserved) Stock = Physical Count - Active Unpicked Reservations
   const targetStockLevel = physicalShelfCount - activeReservations;
   const currentStockLevel = product.stock_level ?? 0;
   const discrepancy = targetStockLevel - currentStockLevel;
