@@ -62,6 +62,7 @@ export interface PhysicalCountCorrectionPayload {
   physicalShelfCount: number;
   notes?: string;
   actorName?: string;
+  actorId?: string;
 }
 
 export interface BackfillPurchasePayload {
@@ -71,6 +72,7 @@ export interface BackfillPurchasePayload {
   supplierName?: string;
   purchaseDate?: string;
   actorName?: string;
+  actorId?: string;
 }
 
 export interface BorrowStockPayload {
@@ -79,6 +81,7 @@ export interface BorrowStockPayload {
   orderId?: string;
   notes?: string;
   actorName?: string;
+  actorId?: string;
 }
 
 export interface CompletedDailyAuditItem {
@@ -101,6 +104,9 @@ export interface GuardianDailyProgress {
   isRestDay?: boolean;
   completedItems: CompletedDailyAuditItem[];
   totalBacklogCount: number;
+  assignedStaffName?: string;
+  teamCompletedToday?: number;
+  allAuditedProductIdsToday?: string[];
 }
 
 

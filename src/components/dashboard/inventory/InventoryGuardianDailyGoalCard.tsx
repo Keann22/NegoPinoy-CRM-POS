@@ -23,6 +23,12 @@ export function InventoryGuardianDailyGoalCard({
     ? 100
     : Math.min(100, Math.round((dailyProgress.completedToday / target) * 100));
 
+  const staffTitle = dailyProgress.target === 30
+    ? "Rey's Special Assignment"
+    : dailyProgress.assignedStaffName
+    ? `${dailyProgress.assignedStaffName}'s Goal`
+    : "Today's Goal";
+
   return (
     <div className="p-3 rounded-lg border bg-primary/5 space-y-2 text-xs">
       <div className="flex items-center justify-between">
@@ -34,7 +40,7 @@ export function InventoryGuardianDailyGoalCard({
             </span>
           ) : (
             <span>
-              {dailyProgress.target === 30 ? "Rey's Special Assignment" : "Today's Goal"}: {dailyProgress.completedToday} of {dailyProgress.target} products verified
+              {staffTitle}: {dailyProgress.completedToday} of {dailyProgress.target} products verified
             </span>
           )}
           {!dailyProgress.isRestDay && dailyProgress.carryOver > 0 && dailyProgress.target !== 30 && (
@@ -149,9 +155,11 @@ export function GoalCompletedModalView({
           </>
         ) : (
           <>
-            <h3 className="text-lg font-bold text-foreground">Today's Verification Goal Complete! 🎉</h3>
+            <h3 className="text-lg font-bold text-foreground">
+              {dailyProgress.assignedStaffName ? `${dailyProgress.assignedStaffName}'s Verification Goal Complete! 🎉` : "Today's Verification Goal Complete! 🎉"}
+            </h3>
             <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-              Staff has successfully verified <strong>{dailyProgress.completedToday} of {dailyProgress.target} products</strong> today.
+              {dailyProgress.assignedStaffName ? `${dailyProgress.assignedStaffName}` : 'Staff'} has successfully verified <strong>{dailyProgress.completedToday} of {dailyProgress.target} products</strong> today.
               The remaining backlog ({dailyProgress.totalBacklogCount} items) is safely queued for upcoming days.
             </p>
           </>

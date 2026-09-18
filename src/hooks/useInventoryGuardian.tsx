@@ -80,8 +80,12 @@ export function InventoryGuardianProvider({ children }: { children: ReactNode })
     }
     setIsLoading(true);
     try {
-      const emailParam = userProfile?.email ? `?userEmail=${encodeURIComponent(userProfile.email)}` : '';
-      const res = await fetch(`/api/inventory/guardian/anomalies${emailParam}`);
+      const params = new URLSearchParams();
+      if (userProfile?.email) params.set('userEmail', userProfile.email);
+      if (userName) params.set('userName', userName);
+      if (userProfile?.id) params.set('userId', userProfile.id);
+      const queryStr = params.toString() ? `?${params.toString()}` : '';
+      const res = await fetch(`/api/inventory/guardian/anomalies${queryStr}`);
       if (!res.ok) throw new Error('Failed to fetch inventory anomalies');
       const data = await res.json();
       if (data.success) {
@@ -94,7 +98,7 @@ export function InventoryGuardianProvider({ children }: { children: ReactNode })
     } finally {
       setIsLoading(false);
     }
-  }, [canAccess, userProfile?.email]);
+  }, [canAccess, userProfile?.email, userName, userProfile?.id]);
 
   useEffect(() => {
     if (canAccess) {
@@ -152,7 +156,7 @@ export function InventoryGuardianProvider({ children }: { children: ReactNode })
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'set_physical_count',
-          payload: { productId, physicalShelfCount, notes, actorName: userName }
+          payload: { productId, physicalShelfCount, notes, actorName: userName, actorId: userProfile?.id }
         })
       });
 
@@ -179,7 +183,7 @@ export function InventoryGuardianProvider({ children }: { children: ReactNode })
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'backfill_purchase',
-          payload: { productId, quantity, unitCost, supplierName, actorName: userName }
+          payload: { productId, quantity, unitCost, supplierName, actorName: userName, actorId: userProfile?.id }
         })
       });
 
@@ -206,7 +210,7 @@ export function InventoryGuardianProvider({ children }: { children: ReactNode })
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'borrow_stock',
-          payload: { productId, quantity, orderId, notes, actorName: userName }
+          payload: { productId, quantity, orderId, notes, actorName: userName, actorId: userProfile?.id }
         })
       });
 

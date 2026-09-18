@@ -18,10 +18,16 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const userEmail = searchParams.get('userEmail')?.toLowerCase().trim();
+    const userName = searchParams.get('userName')?.trim();
+    const userId = searchParams.get('userId')?.trim();
     const isReySpecialAssignment = userEmail === 'rey.magbitangjr@gmail.com';
 
     const allAnomalies = await detectInventoryAnomalies(supabase);
-    const dailyProgress = await getGuardianDailyProgress(supabase, allAnomalies.length);
+    const dailyProgress = await getGuardianDailyProgress(supabase, allAnomalies.length, {
+      email: userEmail,
+      name: userName,
+      userId
+    });
 
     // Rey's 30-item temporary shelf check assignment for today
     if (isReySpecialAssignment) {
@@ -31,11 +37,13 @@ export async function GET(req: Request) {
       dailyProgress.isGoalMet = dailyProgress.completedToday >= 30;
     }
 
-    // Filter out products already audited today
-    const auditedProductIds = new Set(dailyProgress.completedItems.map(i => i.productId));
-    const pendingAnomalies = allAnomalies.filter(a => !auditedProductIds.has(a.productId));
+    // Filter out products already audited today by ANY staff to prevent redundant double checks
+    const allAuditedSet = new Set(
+      dailyProgress.allAuditedProductIdsToday || dailyProgress.completedItems.map(i => i.productId)
+    );
+    const pendingAnomalies = allAnomalies.filter(a => !allAuditedSet.has(a.productId));
 
-    // Today's queue (up to 30 items for Rey, or daily remaining for staff)
+    // Today's queue: if user's goal is met, queue is 0; otherwise provide up to remainingToday items
     const queueLimit = dailyProgress.isGoalMet ? 0 : dailyProgress.remainingToday;
     const todayQueue = pendingAnomalies.slice(0, Math.max(queueLimit, 0));
 
@@ -84,7 +92,8 @@ export async function POST(req: Request) {
         productId: payload.productId,
         physicalShelfCount: Number(payload.physicalShelfCount),
         notes: payload.notes,
-        actorName: payload.actorName
+        actorName: payload.actorName,
+        actorId: payload.actorId
       });
       return NextResponse.json(result);
     }
@@ -96,7 +105,8 @@ export async function POST(req: Request) {
         unitCost: Number(payload.unitCost) || 0,
         supplierName: payload.supplierName,
         purchaseDate: payload.purchaseDate,
-        actorName: payload.actorName
+        actorName: payload.actorName,
+        actorId: payload.actorId
       });
       return NextResponse.json(result);
     }
@@ -107,7 +117,8 @@ export async function POST(req: Request) {
         quantity: Number(payload.quantity),
         orderId: payload.orderId,
         notes: payload.notes,
-        actorName: payload.actorName
+        actorName: payload.actorName,
+        actorId: payload.actorId
       });
       return NextResponse.json(result);
     }

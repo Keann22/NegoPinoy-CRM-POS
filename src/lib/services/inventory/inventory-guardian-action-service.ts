@@ -27,7 +27,7 @@ export async function applyPhysicalShelfCount(
   supabase: SupabaseClient,
   payload: PhysicalCountCorrectionPayload
 ): Promise<{ success: boolean; newStockLevel: number; discrepancy: number; activeOrdersCount: number }> {
-  const { productId, physicalShelfCount, notes, actorName = 'Inventory Guardian' } = payload;
+  const { productId, physicalShelfCount, notes, actorName = 'Inventory Guardian', actorId } = payload;
 
   // 1. Fetch current product
   const { data: product, error: pErr } = await supabase
@@ -107,6 +107,7 @@ export async function applyPhysicalShelfCount(
     discrepancy,
     activeOrdersCount,
     actorName,
+    actorId,
     notes: notes || 'Physical count verified'
   });
 
@@ -125,7 +126,7 @@ export async function backfillUnrecordedPurchase(
   supabase: SupabaseClient,
   payload: BackfillPurchasePayload
 ): Promise<{ success: boolean; newStockLevel: number }> {
-  const { productId, quantity, unitCost, supplierName = 'Unrecorded Delivery', purchaseDate, actorName = 'Inventory Guardian' } = payload;
+  const { productId, quantity, unitCost, supplierName = 'Unrecorded Delivery', purchaseDate, actorName = 'Inventory Guardian', actorId } = payload;
 
   if (quantity <= 0) {
     throw new Error('Quantity must be greater than 0');
@@ -177,6 +178,7 @@ export async function backfillUnrecordedPurchase(
     systemStockAfter: newStockLevel,
     discrepancy: quantity,
     actorName,
+    actorId,
     notes: `Purchased ${quantity} units @ ₱${unitCost} from ${supplierName}`
   });
 
@@ -190,7 +192,7 @@ export async function markStockAsBorrowed(
   supabase: SupabaseClient,
   payload: BorrowStockPayload
 ): Promise<{ success: boolean }> {
-  const { productId, quantity, orderId, notes, actorName = 'Staff' } = payload;
+  const { productId, quantity, orderId, notes, actorName = 'Staff', actorId } = payload;
 
   // Log movement explaining the borrow
   await supabase.from('inventory_movements').insert({
@@ -207,6 +209,7 @@ export async function markStockAsBorrowed(
     productId,
     actionType: 'borrow_tagged',
     actorName,
+    actorId,
     notes: notes || 'Borrowed stock for order',
     metadata: { orderId, quantity }
   });

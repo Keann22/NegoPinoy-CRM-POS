@@ -10,6 +10,7 @@ export interface RecordMemoryParams {
   discrepancy?: number | null;
   activeOrdersCount?: number | null;
   actorName?: string | null;
+  actorId?: string | null;
   notes?: string | null;
   metadata?: Record<string, any>;
 }
@@ -31,6 +32,7 @@ export async function recordGuardianMemory(
       discrepancy: params.discrepancy ?? null,
       active_orders_count: params.activeOrdersCount ?? null,
       actor_name: params.actorName ?? 'System',
+      actor_id: params.actorId ?? null,
       notes: params.notes ?? null,
       metadata: params.metadata ?? {}
     });
