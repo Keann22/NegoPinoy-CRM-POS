@@ -72,7 +72,14 @@ export function SingleBuyDialog({
         </DialogHeader>
         {buyItem && (
           <div className="space-y-4 py-4">
-            <p className="text-sm font-semibold text-slate-800">{buyItem.productName}</p>
+            <div>
+              <p className="text-sm font-semibold text-slate-800">{buyItem.productName}</p>
+              {buyItem.supplierCode && (
+                <p className="text-xs text-slate-500 font-mono mt-0.5" title="Supplier Code">
+                  {buyItem.supplierCode}
+                </p>
+              )}
+            </div>
             
             <div className="space-y-2">
               <label className="text-sm text-slate-600">Supplier</label>

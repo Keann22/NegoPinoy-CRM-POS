@@ -319,13 +319,15 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
     }
   }
 
-  // Resolve supplier fallback for candidate products missing supplier_id
-  const missingSupplierItems = (liveOS || []).filter((p: any) => !p.supplier_id);
+  // Resolve supplier fallback for candidate products missing supplier_id or supplier_pricing
+  const needsParentLookup = (liveOS || []).filter(
+    (p: any) => p.parent_id && (!p.supplier_id || !p.supplier_pricing || p.supplier_pricing.length === 0)
+  );
   const parentIdsToLookup = Array.from(
-    new Set(missingSupplierItems.filter((p: any) => p.parent_id).map((p: any) => p.parent_id))
+    new Set(needsParentLookup.map((p: any) => p.parent_id))
   );
 
-  const parentSupplierMap = new Map<string, { supplierId: string; unitCost: number; pricing: any[] }>();
+  const parentSupplierMap = new Map<string, { supplierId: string | null; unitCost: number; pricing: any[] }>();
   if (parentIdsToLookup.length > 0) {
     const { data: parents } = await supabase
       .from('products')
@@ -334,13 +336,11 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
 
     parents?.forEach((parent: any) => {
       const supId = parent.supplier_id || parent.supplier_pricing?.find((sp: any) => sp.supplierId)?.supplierId || null;
-      if (supId) {
-        parentSupplierMap.set(parent.id, {
-          supplierId: supId,
-          unitCost: Number(parent.initial_unit_cost) || 0,
-          pricing: parent.supplier_pricing || []
-        });
-      }
+      parentSupplierMap.set(parent.id, {
+        supplierId: supId,
+        unitCost: Number(parent.initial_unit_cost) || 0,
+        pricing: parent.supplier_pricing || []
+      });
     });
   }
 
@@ -362,14 +362,22 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
     }
 
     let matchedCost = p.initial_unit_cost || parentInfo?.unitCost || 0;
+    let matchedSupplierCode: string | null = null;
     const effectivePricing = (p.supplier_pricing && p.supplier_pricing.length > 0) ? p.supplier_pricing : (parentInfo?.pricing || []);
     if (resolvedSupplierId && effectivePricing.length > 0) {
       const sup = suppliers.find((s: any) => s.id === resolvedSupplierId);
-      if (sup) {
-        const pricing = effectivePricing.find((sp: any) => sp.supplierName === sup.name || sp.supplierId === sup.id);
-        if (pricing && pricing.unitCost) {
-          matchedCost = Number(pricing.unitCost);
-        }
+      const pricing = effectivePricing.find((sp: any) => sp.supplierId === resolvedSupplierId || (sup && sp.supplierName === sup.name));
+      if (pricing && pricing.unitCost) {
+        matchedCost = Number(pricing.unitCost);
+      }
+      if (pricing?.supplierCode) {
+        matchedSupplierCode = pricing.supplierCode;
+      }
+    }
+    if (!matchedSupplierCode && effectivePricing.length > 0) {
+      const spWithCode = effectivePricing.find((sp: any) => sp.supplierCode);
+      if (spWithCode?.supplierCode) {
+        matchedSupplierCode = spWithCode.supplierCode;
       }
     }
     
@@ -381,6 +389,7 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
     osMap.set(p.id, {
       productId: p.id,
       productName: displayName,
+      supplierCode: matchedSupplierCode || null,
       neededQty: draft ? draft.expected_qty : systemQty,
       systemQty: systemQty,
       currentStock: p.stock_level,
@@ -424,17 +433,30 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
     if (prod?.variant_name && !displayName.includes(prod.variant_name)) {
       displayName = `${displayName} [${prod.variant_name}]`;
     }
+    const parentInfo = prod?.parent_id ? parentSupplierMap.get(prod.parent_id) : null;
+    const effectivePricing = (prod?.supplier_pricing && prod.supplier_pricing.length > 0) ? prod.supplier_pricing : (parentInfo?.pricing || []);
+    const supId = p.supplier_id || prod?.supplier_id || parentInfo?.supplierId || null;
+    let supCode: string | null = null;
+    if (supId && effectivePricing.length > 0) {
+      const sup = suppliers.find((s: any) => s.id === supId);
+      const pricing = effectivePricing.find((sp: any) => sp.supplierId === supId || (sup && sp.supplierName === sup.name));
+      if (pricing?.supplierCode) supCode = pricing.supplierCode;
+    }
+    if (!supCode && effectivePricing.length > 0) {
+      supCode = effectivePricing.find((sp: any) => sp.supplierCode)?.supplierCode || null;
+    }
     return {
       id: p.id,
       productId: p.product_id,
       productName: displayName,
+      supplierCode: supCode,
       expectedQty: p.expected_qty,
       receivedQty: p.received_qty || 0,
       unitCost: p.unit_cost,
       poId: p.po_id,
       poNotes: p.purchase_orders?.notes,
       createdAt: p.created_at,
-      supplierId: p.supplier_id || prod?.supplier_id || (prod?.parent_id ? parentSupplierMap.get(prod.parent_id)?.supplierId : null) || null
+      supplierId: supId
     };
   });
 

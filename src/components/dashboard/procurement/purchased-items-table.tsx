@@ -23,7 +23,14 @@ export function PurchasedItemsTable({ items }: { items: any[] }) {
           <tbody className="divide-y text-slate-700">
             {items.map((item: any) => (
               <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                <td className="p-3 font-medium">{item.productName}</td>
+                <td className="p-3 font-medium">
+                  <div>{item.productName}</div>
+                  {item.supplierCode && (
+                    <div className="text-xs text-slate-400 font-mono mt-0.5" title="Supplier Code">
+                      {item.supplierCode}
+                    </div>
+                  )}
+                </td>
                 <td className="p-3 text-center">
                   <span className="bg-emerald-100 text-emerald-800 px-2 py-1 rounded text-xs font-semibold">
                     {item.poNotes || 'Direct Purchase'}

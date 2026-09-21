@@ -66,10 +66,15 @@ export function ProcurementItemRow({
           type="button" 
           onClick={() => handleProductClick(item.productId)} 
           disabled={isLoadingProduct}
-          className="text-indigo-600 hover:text-indigo-800 hover:underline text-left font-medium disabled:opacity-50"
+          className="text-indigo-600 hover:text-indigo-800 hover:underline text-left font-medium disabled:opacity-50 block"
         >
           {item.productName}
         </button>
+        {item.supplierCode && (
+          <div className="text-xs text-slate-500 font-mono mt-0.5" title="Supplier Code">
+            {item.supplierCode}
+          </div>
+        )}
         {hasDiscrepancy && (
             <div className="text-xs font-bold text-orange-600 mt-1 flex items-center gap-2">
                 <span>⚠️ Current Stock doesn&apos;t match total open orders.</span>
