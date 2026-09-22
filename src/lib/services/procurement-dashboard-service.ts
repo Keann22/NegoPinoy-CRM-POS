@@ -1,22 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { 
-  ALL_OPEN_STATUSES, 
-  UNFULFILLED_STATUSES, 
-  migrateLeakedBundleDrafts, 
-  autoCleanupStaffDrafts 
-} from './procurement-service';
-
-async function fetchAllPages<T>(fetcher: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: any }>): Promise<T[]> {
-  const all: T[] = [];
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await fetcher(from, from + 999);
-    if (error) throw error;
-    if (!data || data.length === 0) break;
-    all.push(...data);
-    if (data.length < 1000) break;
-  }
-  return all;
-}
+import { migrateLeakedBundleDrafts, autoCleanupStaffDrafts } from './procurement-service';
+import { calculateProcurementDemand } from './procurement-demand-service';
+import { getNegativeStockReconciliationItems } from './procurement-reconciliation-service';
 
 export async function getProcurementDashboardData(supabase: SupabaseClient) {
   await migrateLeakedBundleDrafts(supabase);
@@ -38,11 +23,11 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
   if (dErr) throw dErr;
 
   const draftMap = new Map();
-  const productIdsToFetch = new Set<string>();
-  
+  const initialProductIdsToFetch = new Set<string>();
+
   drafts?.forEach((d: any) => {
     draftMap.set(d.product_id, d);
-    productIdsToFetch.add(d.product_id);
+    initialProductIdsToFetch.add(d.product_id);
   });
 
   // 2.5 Get all purchased items (pending receipt, NOT STAFF_DRAFT)
@@ -61,231 +46,35 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
     `)
     .neq('purchase_orders.notes', 'STAFF_DRAFT')
     .eq('status', 'pending_receipt');
-    
+
   if (pErr) throw pErr;
 
   purchased?.forEach((p: any) => {
-    productIdsToFetch.add(p.product_id);
+    initialProductIdsToFetch.add(p.product_id);
   });
 
-  // 2.6 Candidate out-of-stock products
-  const negativeStockProducts = await fetchAllPages<any>((from, to) =>
-    supabase.from('products').select('id').lt('stock_level', 0).range(from, to)
+  // 3. Calculate live order demand, bundle expansion, and candidates
+  const {
+    productIdsToFetch,
+    totalOpenDemandMap,
+    needToBuyMap,
+    bundleToComponents,
+    negativeStockIds,
+  } = await calculateProcurementDemand(supabase, initialProductIdsToFetch, purchased || []);
+
+  // 4. Calculate negative stock reconciliation
+  const reconciliationItems = await getNegativeStockReconciliationItems(
+    supabase,
+    negativeStockIds,
+    productIdsToFetch,
+    bundleToComponents
   );
-  const negativeStockIds = new Set((negativeStockProducts || []).map((p: any) => p.id));
-
-  // 2.7 Products with explicitly open order issues (missing items)
-  const openIssuesInitial = await fetchAllPages<any>((from, to) =>
-    supabase.from('order_issues').select('product_id').eq('status', 'open').range(from, to)
-  );
-  const openIssueProductIds = new Set(
-    (openIssuesInitial || [])
-      .map((i: any) => i.product_id)
-      .filter((id: any) => id != null)
-  );
-
-  // 3a. Bundle products
-  const bundleProducts = await fetchAllPages<any>((from, to) =>
-    supabase.from('products').select('id, assembly_recipe').range(from, to)
-  );
-
-  const allBundleIds = new Set(
-    bundleProducts
-      .filter((bp: any) => (Array.isArray(bp.assembly_recipe) ? bp.assembly_recipe : []).length > 0)
-      .map((bp: any) => bp.id)
-  );
-  allBundleIds.forEach(id => negativeStockIds.delete(id));
-
-  const candidateIds = new Set([
-    ...Array.from(productIdsToFetch), 
-    ...Array.from(negativeStockIds),
-    ...Array.from(openIssueProductIds)
-  ]);
-
-  const bundleToComponents = new Map<string, { componentId: string; qtyPerBundle: number }[]>();
-  
-  // If a bundle itself was somehow directly drafted or had an open issue, 
-  // it will be in candidateIds. We must NEVER buy a bundle directly. 
-  // We must expand it into its components and add those to candidateIds instead,
-  // then remove the bundle from candidateIds.
-  bundleProducts.forEach((bp: any) => {
-    const recipe = Array.isArray(bp.assembly_recipe) ? bp.assembly_recipe : [];
-    if (recipe.length === 0) return;
-    
-    const components = recipe.map((comp: any) => ({ 
-      componentId: comp.productId || comp.component_id, 
-      qtyPerBundle: comp.quantity || 1 
-    }));
-
-    if (candidateIds.has(bp.id)) {
-      // The bundle itself was flagged/drafted. Expand it!
-      components.forEach((c: any) => {
-        if (c.componentId) candidateIds.add(c.componentId);
-      });
-      candidateIds.delete(bp.id);
-      productIdsToFetch.delete(bp.id); // also remove from the fetch set so it doesn't render
-    }
-
-    // Now determine if this bundle is relevant to any component we want to buy
-    const relevant = components.filter((c: any) => c.componentId && candidateIds.has(c.componentId));
-    if (relevant.length > 0) bundleToComponents.set(bp.id, relevant);
-  });
-
-  const bundleProductIds = new Set(bundleToComponents.keys());
-
-  // 3b. Get live order demand (paginated and chunked to prevent 1000-row cutoff)
-  const allProductIdsForDemand = new Set([...Array.from(candidateIds), ...Array.from(bundleProductIds)]);
-  const allProductIdsList = Array.from(allProductIdsForDemand);
-  const CHUNK_SIZE = 200;
-  const demandRows: any[] = [];
-  const openIssues: any[] = [];
-
-  for (let i = 0; i < allProductIdsList.length; i += CHUNK_SIZE) {
-    const chunk = allProductIdsList.slice(i, i + CHUNK_SIZE);
-    const [chunkDemand, chunkIssues] = await Promise.all([
-      fetchAllPages<any>((from, to) =>
-        supabase
-          .from('order_items')
-          .select('product_id, quantity, is_packed, orders!inner(id, status, payment_method)')
-          .in('product_id', chunk)
-          .in('orders.status', ALL_OPEN_STATUSES)
-          .range(from, to)
-      ),
-      fetchAllPages<any>((from, to) =>
-        supabase
-          .from('order_issues')
-          .select('order_id, product_id')
-          .eq('status', 'open')
-          .in('product_id', chunk)
-          .range(from, to)
-      )
-    ]);
-    demandRows.push(...chunkDemand);
-    openIssues.push(...chunkIssues);
-  }
-
-  const openIssueKeys = new Set(openIssues?.map((i: any) => `${i.order_id}-${i.product_id}`));
-
-  const totalOpenDemandMap = new Map<string, number>();
-  const needToBuyMap = new Map<string, number>();
-  const addDemand = (productId: string, quantity: number, isUnfulfilled: boolean) => {
-    totalOpenDemandMap.set(productId, (totalOpenDemandMap.get(productId) || 0) + quantity);
-    if (isUnfulfilled) {
-      needToBuyMap.set(productId, (needToBuyMap.get(productId) || 0) + quantity);
-    }
-  };
-  // Whether THIS order line's demand for `targetProductId` is still unfulfilled
-  // (i.e. no unit has been secured yet, so it needs buying). For a bundle line
-  // the demand is attributed to each COMPONENT, and — crucially — an open
-  // out-of-stock issue on a "Picked (with issue)" order is recorded against the
-  // specific short product, which for a bundle is the COMPONENT, not the bundle
-  // SKU. So the issue lookup must be keyed on the product we're attributing to
-  // (falling back to the bundle SKU in case the issue was logged there). Keying
-  // it only on row.product_id (the bundle) silently dropped genuine COD
-  // shortages from Need to Buy while the Staff Req. count — which checks both
-  // component and bundle — kept showing them.
-  const isUnfulfilledFor = (row: any, targetProductId: string): boolean => {
-    if (row.orders.payment_method === 'Lay-away') return false; // consume stock, but don't auto-buy
-    if (row.is_packed) return false;
-    if (row.orders.status === 'Picked (with issue)') {
-      return openIssueKeys.has(`${row.orders.id}-${targetProductId}`)
-        || openIssueKeys.has(`${row.orders.id}-${row.product_id}`);
-    }
-    return UNFULFILLED_STATUSES.includes(row.orders.status);
-  };
-
-  demandRows?.forEach((row: any) => {
-    if (candidateIds.has(row.product_id)) {
-      addDemand(row.product_id, row.quantity, isUnfulfilledFor(row, row.product_id));
-    }
-    const components = bundleToComponents.get(row.product_id);
-    components?.forEach(c => addDemand(c.componentId, row.quantity * c.qtyPerBundle, isUnfulfilledFor(row, c.componentId)));
-  });
-
-  const pendingReceiptMap = new Map<string, number>();
-  purchased?.forEach((p: any) => {
-    pendingReceiptMap.set(p.product_id, (pendingReceiptMap.get(p.product_id) || 0) + p.expected_qty);
-  });
-
-  for (const [id, qty] of Array.from(needToBuyMap.entries())) {
-    const pendingQty = pendingReceiptMap.get(id) || 0;
-    if (pendingQty > 0) {
-      const remainingNeed = qty - pendingQty;
-      if (remainingNeed > 0) {
-        needToBuyMap.set(id, remainingNeed);
-      } else {
-        needToBuyMap.delete(id);
-      }
-    }
-  }
-
-  negativeStockIds.forEach(id => {
-    if ((needToBuyMap.get(id) || 0) > 0) {
-      productIdsToFetch.add(id);
-    }
-  });
-
-  openIssueProductIds.forEach(id => {
-    if ((needToBuyMap.get(id) || 0) > 0) {
-      productIdsToFetch.add(id);
-    }
-  });
-
-  const VOID_STATUSES = ['Cancelled', 'Returned'];
-  const reconciliationIds = Array.from(negativeStockIds).filter(id => !productIdsToFetch.has(id));
-  let reconciliationItems: any[] = [];
-  if (reconciliationIds.length > 0) {
-    const reconciliationIdSet = new Set(reconciliationIds);
-    const reconciliationBundleParentIds = Array.from(bundleToComponents.entries())
-      .filter(([, comps]) => comps.some(c => reconciliationIdSet.has(c.componentId)))
-      .map(([bundleId]) => bundleId);
-    const idsForHistory = Array.from(new Set([...reconciliationIds, ...reconciliationBundleParentIds]));
-
-    const { data: historyRows, error: historyErr } = await supabase
-      .from('order_items')
-      .select('product_id, orders!inner(id, status, created_at)')
-      .in('product_id', idsForHistory);
-    if (historyErr) throw historyErr;
-
-    const explainingOrderByProduct = new Map<string, { shortOrderId: string; status: string; createdAt: string }>();
-    const considerRecord = (productId: string, record: { shortOrderId: string; status: string; createdAt: string }) => {
-      const existing = explainingOrderByProduct.get(productId);
-      if (!existing || new Date(record.createdAt) > new Date(existing.createdAt)) {
-        explainingOrderByProduct.set(productId, record);
-      }
-    };
-    historyRows?.forEach((row: any) => {
-      if (VOID_STATUSES.includes(row.orders.status)) return;
-      const record = { shortOrderId: row.orders.id.substring(0, 7).toUpperCase(), status: row.orders.status, createdAt: row.orders.created_at };
-      if (reconciliationIdSet.has(row.product_id)) considerRecord(row.product_id, record);
-      bundleToComponents.get(row.product_id)?.forEach(c => {
-        if (reconciliationIdSet.has(c.componentId)) considerRecord(c.componentId, record);
-      });
-    });
-
-    const { data: reconciliationProducts, error: rpErr } = await supabase
-      .from('products')
-      .select('id, name, variant_name, stock_level')
-      .in('id', reconciliationIds);
-    if (rpErr) throw rpErr;
-
-    reconciliationItems = (reconciliationProducts || [])
-      .map((p: any) => {
-        const displayName = p.variant_name && !p.name.includes(p.variant_name) ? `${p.name} [${p.variant_name}]` : p.name;
-        return {
-          productId: p.id,
-          productName: displayName,
-          currentStock: p.stock_level,
-          explainingOrder: explainingOrderByProduct.get(p.id) || null,
-        };
-      })
-      .sort((a, b) => a.currentStock - b.currentStock);
-  }
 
   if (productIdsToFetch.size === 0) {
     return { suppliers, groupedOutofStock: [], purchasedItems: [], reconciliationItems };
   }
 
+  // 5. Fetch live product data for items needing procurement / purchased
   const { data: liveOS, error: lErr } = await supabase
     .from('products')
     .select('id, name, variant_name, stock_level, supplier_id, initial_unit_cost, supplier_pricing, parent_id')
@@ -312,7 +101,7 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
           quantity: row.quantity,
           orderDate: row.orders.order_date,
           status: row.orders.status,
-          paymentType: row.orders.payment_method
+          paymentType: row.orders.payment_method,
         });
         sourceOrdersByDraftId.set(row.purchase_order_item_id, list);
       });
@@ -339,7 +128,7 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
       parentSupplierMap.set(parent.id, {
         supplierId: supId,
         unitCost: Number(parent.initial_unit_cost) || 0,
-        pricing: parent.supplier_pricing || []
+        pricing: parent.supplier_pricing || [],
       });
     });
   }
@@ -380,7 +169,7 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
         matchedSupplierCode = spWithCode.supplierCode;
       }
     }
-    
+
     let displayName = p.name;
     if (p.variant_name && !p.name.includes(p.variant_name)) {
       displayName = `${p.name} [${p.variant_name}]`;
@@ -401,7 +190,7 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
       totalOpenDemandQty: totalOpenDemandMap.get(p.id) || 0,
       needToBuyQty: needToBuyMap.get(p.id) || 0,
       supplierId: resolvedSupplierId,
-      unitCost: matchedCost
+      unitCost: matchedCost,
     });
   }
 
@@ -410,7 +199,7 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
   }
 
   const grouped: Record<string, any> = {
-    unassigned: { id: null, name: 'Unassigned (No Supplier)', items: [] }
+    unassigned: { id: null, name: 'Unassigned (No Supplier)', items: [] },
   };
 
   for (const s of suppliers) {
@@ -425,7 +214,7 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
     }
   }
 
-  const result = Object.values(grouped).filter(g => g.items.length > 0 || g.id === null);
+  const result = Object.values(grouped).filter((g) => g.items.length > 0 || g.id === null);
 
   const purchasedItems = (purchased || []).map((p: any) => {
     const prod = liveOS?.find((l: any) => l.id === p.product_id);
@@ -456,7 +245,7 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
       poId: p.po_id,
       poNotes: p.purchase_orders?.notes,
       createdAt: p.created_at,
-      supplierId: supId
+      supplierId: supId,
     };
   });
 

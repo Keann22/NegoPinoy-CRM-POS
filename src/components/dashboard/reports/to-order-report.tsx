@@ -11,15 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Printer, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-
-type ExplainingOrder = { shortOrderId: string; status: string; createdAt: string };
-
-type ReconciliationItem = {
-    productId: string;
-    productName: string;
-    currentStock: number;
-    explainingOrder: ExplainingOrder | null;
-};
+import type { ExplainingOrder, ReconciliationItem } from '@/types/supplier.types';
 
 type ProductDetails = {
     id: string;

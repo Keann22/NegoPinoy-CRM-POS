@@ -82,3 +82,16 @@ export type ReceiptScanDraft = {
   updatedAt: string;
 };
 
+export type ExplainingOrder = {
+  shortOrderId: string;
+  status: string;
+  createdAt: string;
+};
+
+export type ReconciliationItem = {
+  productId: string;
+  productName: string;
+  currentStock: number;
+  explainingOrder: ExplainingOrder | null;
+};
+
