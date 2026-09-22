@@ -100,20 +100,30 @@ export async function fetchOrderTrail(supabase: SupabaseClient, orderId: string)
   }
 
   (issuesRes || []).forEach((issue: any) => {
+    const isStaffMsg = issue.issue_type === 'staff_message';
     const productName = issue.products?.name;
-    entries.push({
-      id: `issue_${issue.id}`,
-      kind: 'issue_reported',
-      title: productName ? `Stock Issue Reported: ${productName}` : 'Issue Reported',
-      actor: issue.reported_by_name || undefined,
-      createdAt: issue.created_at,
-    });
+
+    if (!isStaffMsg) {
+      entries.push({
+        id: `issue_${issue.id}`,
+        kind: 'issue_reported',
+        title: productName ? `Stock Issue Reported: ${productName}` : 'Issue Reported',
+        actor: issue.reported_by_name || undefined,
+        createdAt: issue.created_at,
+      });
+    }
 
     (issue.order_issue_messages || []).forEach((msg: any) => {
+      // Prevent duplicate if this message was already parsed from orderData.notes
+      const isDuplicate = isStaffMsg && entries.some(
+        (e) => e.kind === 'note' && e.detail?.trim() === msg.message?.trim()
+      );
+      if (isDuplicate) return;
+
       entries.push({
         id: `issue_msg_${msg.id}`,
-        kind: 'issue_message',
-        title: 'Issue Discussion',
+        kind: isStaffMsg ? 'note' : 'issue_message',
+        title: isStaffMsg ? 'Staff Message' : 'Issue Discussion',
         detail: msg.message,
         actor: msg.sender_name || (msg.sender_role === 'sales' ? 'Sales' : 'Picker'),
         createdAt: msg.created_at,

@@ -17,8 +17,16 @@ import {
   Clock,
   User,
   RefreshCw,
-  FileText
+  FileText,
+  AtSign,
+  X
 } from 'lucide-react';
+import { MentionInput } from '@/components/dashboard/mention-input';
+import { useStaffDirectory } from '@/hooks/useStaffDirectory';
+import {
+  createStaffMessage,
+  resolveRecipientNames
+} from '@/lib/services/staff-message-service';
 import {
   fetchOrderTrail,
   addOrderNote,
@@ -72,11 +80,13 @@ const ENTRY_STYLES: Record<OrderTrailEntryKind, {
 export function OrderActivityCard({ orderId }: OrderActivityCardProps) {
   const supabase = useSupabase();
   const { userProfile } = useUserProfile();
+  const { staff } = useStaffDirectory();
 
   const [entries, setEntries] = useState<OrderTrailEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [newNoteText, setNewNoteText] = useState('');
+  const [mentions, setMentions] = useState<string[]>([]);
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
 
   const loadTrail = useCallback(async () => {
@@ -95,8 +105,8 @@ export function OrderActivityCard({ orderId }: OrderActivityCardProps) {
     loadTrail();
   }, [loadTrail]);
 
-  const handlePostNote = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handlePostNote = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!newNoteText.trim() || !supabase || isSubmitting) return;
 
     setIsSubmitting(true);
@@ -105,13 +115,39 @@ export function OrderActivityCard({ orderId }: OrderActivityCardProps) {
       : 'Staff';
 
     try {
+      // Find any manually typed @Names matching known staff
+      const lowerText = newNoteText.toLowerCase();
+      const manuallyTypedNames: string[] = [];
+      staff.forEach((s) => {
+        if (s.fullName && lowerText.includes(`@${s.fullName.toLowerCase()}`)) {
+          manuallyTypedNames.push(s.fullName);
+        }
+      });
+
+      const allTagged = resolveRecipientNames([...mentions, ...manuallyTypedNames], authorName);
+      const orderRef = `Order #${orderId.substring(0, 7).toUpperCase()}`;
+
+      // 1. If staff are tagged, create a staff message thread so it appears in Messages and notifies them
+      if (allTagged.length > 0) {
+        await createStaffMessage(supabase, {
+          issueType: 'order',
+          orderId,
+          message: newNoteText.trim(),
+          senderName: authorName,
+          recipientNames: allTagged,
+          title: `${authorName} tagged you in a note on ${orderRef}`,
+        });
+      }
+
+      // 2. Always persist into orders.notes for complete order history
       const res = await addOrderNote(supabase, orderId, newNoteText.trim(), authorName);
       if (res.success) {
         setNewNoteText('');
+        setMentions([]);
         await loadTrail();
       }
     } catch (err) {
-      console.error('Error posting note:', err);
+      console.error('Error posting note / message:', err);
     } finally {
       setIsSubmitting(false);
     }
@@ -211,12 +247,15 @@ export function OrderActivityCard({ orderId }: OrderActivityCardProps) {
       </CardHeader>
 
       <CardContent className="pt-5 space-y-6">
-        {/* Quick Add Note Box */}
+        {/* Quick Add Note Box with Staff Tagging */}
         <form onSubmit={handlePostNote} className="space-y-3 rounded-lg border bg-slate-50/70 p-3.5">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span className="font-medium text-slate-700 flex items-center gap-1.5">
               <FileText className="w-3.5 h-3.5 text-blue-600" />
               Add Note or Internal Remark
+              <span className="text-[11px] text-muted-foreground font-normal">
+                (type <kbd className="px-1 py-0.5 bg-muted border rounded font-mono text-[10px]">@</kbd> to tag staff)
+              </span>
             </span>
             <span className="flex items-center gap-1">
               <User className="w-3 h-3" />
@@ -224,20 +263,54 @@ export function OrderActivityCard({ orderId }: OrderActivityCardProps) {
             </span>
           </div>
 
-          <Textarea
+          <MentionInput
             value={newNoteText}
-            onChange={(e) => setNewNoteText(e.target.value)}
-            placeholder="Write an internal note about this order (e.g. customer request, payment confirmation, delivery update)..."
+            onChange={setNewNoteText}
+            mentions={mentions}
+            onMentionsChange={setMentions}
+            onSubmit={handlePostNote}
+            placeholder="Write a note... Type @ to tag staff (they will receive a notification and message thread)..."
+            multiline={true}
             rows={2}
-            className="bg-white resize-none text-sm focus-visible:ring-indigo-500"
+            dropdownPosition="top"
+            className="bg-white text-sm focus-visible:ring-indigo-500"
           />
 
-          <div className="flex justify-end">
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+            {mentions.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1 text-indigo-600 font-medium">
+                  <AtSign className="w-3.5 h-3.5" />
+                  Will notify & message:
+                </span>
+                {mentions.map((name) => (
+                  <Badge
+                    key={name}
+                    variant="secondary"
+                    className="gap-1 bg-indigo-50 text-indigo-700 border-indigo-200 text-xs py-0.5 px-2"
+                  >
+                    @{name}
+                    <button
+                      type="button"
+                      onClick={() => setMentions(mentions.filter((m) => m !== name))}
+                      className="hover:text-destructive ml-0.5"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <span className="text-[11px] text-muted-foreground">
+                Tip: Tagging staff notifies them instantly and creates a thread in Messages.
+              </span>
+            )}
+
             <Button
               type="submit"
               size="sm"
               disabled={isSubmitting || !newNoteText.trim()}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs h-8 px-4"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs h-8 px-4 ml-auto"
             >
               {isSubmitting ? (
                 <>

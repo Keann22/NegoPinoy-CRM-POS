@@ -11,6 +11,8 @@ export type StaffMessageInput = {
   recipientNames: string[];
   /** Optional per-recipient notification link (keyed by recipient name), e.g. each rep's affected order. */
   linkByRecipient?: Map<string, string>;
+  /** Optional notification title override. */
+  title?: string;
 };
 
 // Always tagged on staff/inventory escalations, regardless of which staff
@@ -164,7 +166,13 @@ export async function createStaffMessage(supabase: SupabaseClient, input: StaffM
 
   // Order-type staff messages always link to the order itself
   const link = issueType === 'order' && orderId ? `/dashboard/orders/${orderId}` : undefined;
-  await fanOutStaffNotifications(supabase, recipients, { senderName, message, link, linkByRecipient });
+  await fanOutStaffNotifications(supabase, recipients, {
+    senderName,
+    message,
+    title: input.title,
+    link,
+    linkByRecipient,
+  });
 
   return issue.id as string;
 }

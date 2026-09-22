@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { useStaffDirectory } from '@/hooks/useStaffDirectory';
 import { cn } from '@/lib/utils';
 
@@ -12,6 +13,9 @@ interface MentionInputProps {
   placeholder?: string;
   disabled?: boolean;
   className?: string;
+  multiline?: boolean;
+  rows?: number;
+  dropdownPosition?: 'top' | 'bottom';
 }
 
 /** Finds the "@partial" token ending at the caret, if any, so we know whether to show suggestions. */
@@ -32,8 +36,11 @@ export function MentionInput({
   placeholder,
   disabled,
   className,
+  multiline = false,
+  rows = 2,
+  dropdownPosition = 'top',
 }: MentionInputProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
   const { staff } = useStaffDirectory();
 
   const [query, setQuery] = useState<{ start: number; query: string } | null>(null);
@@ -74,53 +81,108 @@ export function MentionInput({
 
   return (
     <div className="relative flex-1">
-      <Input
-        ref={inputRef}
-        value={value}
-        placeholder={placeholder}
-        disabled={disabled}
-        className={className}
-        onChange={(e) => {
-          onChange(e.target.value);
-          updateQueryFromCaret(e.target.value);
-        }}
-        onKeyUp={(e) => {
-          if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) {
-            updateQueryFromCaret(value);
-          }
-        }}
-        onKeyDown={(e) => {
-          if (isOpen) {
-            if (e.key === 'ArrowDown') {
+      {multiline ? (
+        <Textarea
+          ref={inputRef as any}
+          value={value}
+          placeholder={placeholder}
+          disabled={disabled}
+          rows={rows}
+          className={cn('resize-none', className)}
+          onChange={(e) => {
+            onChange(e.target.value);
+            updateQueryFromCaret(e.target.value);
+          }}
+          onKeyUp={(e) => {
+            if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) {
+              updateQueryFromCaret(value);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (isOpen) {
+              if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setHighlighted((h) => (h + 1) % suggestions.length);
+                return;
+              }
+              if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setHighlighted((h) => (h - 1 + suggestions.length) % suggestions.length);
+                return;
+              }
+              if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault();
+                selectSuggestion(suggestions[highlighted].fullName);
+                return;
+              }
+              if (e.key === 'Escape') {
+                setQuery(null);
+                return;
+              }
+            }
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
               e.preventDefault();
-              setHighlighted((h) => (h + 1) % suggestions.length);
-              return;
+              onSubmit?.();
             }
-            if (e.key === 'ArrowUp') {
-              e.preventDefault();
-              setHighlighted((h) => (h - 1 + suggestions.length) % suggestions.length);
-              return;
+          }}
+          onBlur={() => {
+            setTimeout(() => setQuery(null), 150);
+          }}
+        />
+      ) : (
+        <Input
+          ref={inputRef as any}
+          value={value}
+          placeholder={placeholder}
+          disabled={disabled}
+          className={className}
+          onChange={(e) => {
+            onChange(e.target.value);
+            updateQueryFromCaret(e.target.value);
+          }}
+          onKeyUp={(e) => {
+            if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) {
+              updateQueryFromCaret(value);
             }
-            if (e.key === 'Enter' || e.key === 'Tab') {
-              e.preventDefault();
-              selectSuggestion(suggestions[highlighted].fullName);
-              return;
+          }}
+          onKeyDown={(e) => {
+            if (isOpen) {
+              if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setHighlighted((h) => (h + 1) % suggestions.length);
+                return;
+              }
+              if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setHighlighted((h) => (h - 1 + suggestions.length) % suggestions.length);
+                return;
+              }
+              if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault();
+                selectSuggestion(suggestions[highlighted].fullName);
+                return;
+              }
+              if (e.key === 'Escape') {
+                setQuery(null);
+                return;
+              }
             }
-            if (e.key === 'Escape') {
-              setQuery(null);
-              return;
+            if (e.key === 'Enter') {
+              onSubmit?.();
             }
-          }
-          if (e.key === 'Enter') {
-            onSubmit?.();
-          }
-        }}
-        onBlur={() => {
-          setTimeout(() => setQuery(null), 150);
-        }}
-      />
+          }}
+          onBlur={() => {
+            setTimeout(() => setQuery(null), 150);
+          }}
+        />
+      )}
       {isOpen && (
-        <div className="absolute bottom-full left-0 mb-1 w-64 max-h-48 overflow-y-auto rounded-md border bg-popover shadow-md z-50">
+        <div
+          className={cn(
+            'absolute left-0 w-64 max-h-48 overflow-y-auto rounded-md border bg-popover shadow-md z-50',
+            dropdownPosition === 'bottom' ? 'top-full mt-1' : 'bottom-full mb-1'
+          )}
+        >
           {suggestions.map((s, idx) => (
             <button
               type="button"
