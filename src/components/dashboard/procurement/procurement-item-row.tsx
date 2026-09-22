@@ -42,12 +42,6 @@ export function ProcurementItemRow({
   handleDeleteDraftItem: (id: string) => void;
   onViewAllocated: (item: { id: string; name: string; context: 'total' | 'needToBuy' }) => void;
 }) {
-  // Current Stock's deficit should always equal the total of every open order
-  // (including already-picked/packed ones, since stock is deducted at order
-  // creation, not at pick/pack) — that's the actual ledger math. Compare
-  // against the full total here, not needToBuyQty, or this would falsely
-  // flag every product that simply has a packed order in its queue.
-  const hasDiscrepancy = item.systemQty !== (item.totalOpenDemandQty || 0);
   const [showReassign, setShowReassign] = useState(false);
   const [staffRequestOpen, setStaffRequestOpen] = useState(false);
   const [isEditingCode, setIsEditingCode] = useState(false);
@@ -74,7 +68,7 @@ export function ProcurementItemRow({
   };
 
   return (
-    <tr className={hasDiscrepancy ? "bg-orange-50 hover:bg-orange-100" : "hover:bg-slate-50 transition-colors"}>
+    <tr className="hover:bg-slate-50 transition-colors">
       <td className="p-3 text-center">
         <input 
           type="checkbox" 
@@ -154,19 +148,6 @@ export function ProcurementItemRow({
           >
             <Plus className="w-3 h-3" /> Add supplier code
           </button>
-        )}
-        {hasDiscrepancy && (
-            <div className="text-xs font-bold text-orange-600 mt-1 flex items-center gap-2">
-                <span>⚠️ Current Stock doesn&apos;t match total open orders.</span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-6 px-2 text-[10px] border-orange-200 hover:bg-orange-100 hover:text-orange-700"
-                  onClick={() => handleSyncInventory(item.productId, item.totalOpenDemandQty || 0)}
-                >
-                  Sync Stock
-                </Button>
-            </div>
         )}
         {groupId === null ? (
           <div className="mt-2 flex items-center gap-2">
