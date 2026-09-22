@@ -68,6 +68,7 @@ export function useOrderDetail(orderId: string) {
             insurance_fee: data.insurance_fee,
             tracking_number: data.tracking_number,
             spx_sync_data: data.spx_sync_data,
+            notes: data.notes,
           } as Order);
         }
       } catch (err) {

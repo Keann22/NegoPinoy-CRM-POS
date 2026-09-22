@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { parse, isValid } from 'date-fns';
+import { parse, isValid, format } from 'date-fns';
 
 export type OrderTrailEntryKind = 'status' | 'note' | 'issue_reported' | 'issue_message';
 
@@ -124,3 +124,39 @@ export async function fetchOrderTrail(supabase: SupabaseClient, orderId: string)
   entries.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   return entries;
 }
+
+export async function addOrderNote(
+  supabase: SupabaseClient,
+  orderId: string,
+  noteText: string,
+  authorName: string
+): Promise<{ success: boolean; updatedNotes?: string; error?: any }> {
+  if (!noteText.trim()) return { success: false, error: 'Note text cannot be empty' };
+
+  try {
+    const { data: order, error: fetchErr } = await supabase
+      .from('orders')
+      .select('notes')
+      .eq('id', orderId)
+      .single();
+
+    if (fetchErr) throw fetchErr;
+
+    const timestamp = format(new Date(), 'MMM d, yyyy h:mm a');
+    const newNoteEntry = `[${timestamp}] ${authorName.trim() || 'Staff'}:\n${noteText.trim()}`;
+    const updatedNotes = order?.notes ? `${order.notes}\n\n${newNoteEntry}` : newNoteEntry;
+
+    const { error: updateErr } = await supabase
+      .from('orders')
+      .update({ notes: updatedNotes })
+      .eq('id', orderId);
+
+    if (updateErr) throw updateErr;
+
+    return { success: true, updatedNotes };
+  } catch (err) {
+    console.error('Failed to add order note:', err);
+    return { success: false, error: err };
+  }
+}
+

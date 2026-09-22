@@ -19,6 +19,7 @@ import { OrderTrailDialog } from '@/components/dashboard/order-trail-dialog';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useOrderDetail } from '@/hooks/useOrderDetail';
 import { OrderItemsCard } from '@/components/dashboard/orders/order-items-card';
+import { OrderActivityCard } from '@/components/dashboard/orders/order-activity-card';
 import { resolveOpenOrderIssues } from '@/lib/services/order-issues-service';
 import type { OrderStatus } from '@/types';
 
@@ -155,8 +156,19 @@ export default function OrderDetailPage() {
                   <FileText className="mr-2 h-4 w-4" /> View Waybill
                 </Button>
               )}
-              <Button variant="outline" size="sm" onClick={() => setIsTrailOpen(true)}>
-                <Activity className="mr-2 h-4 w-4" /> View Trail
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const el = document.getElementById('order-activity');
+                  if (el) {
+                    el.scrollIntoView({ behavior: 'smooth' });
+                  } else {
+                    setIsTrailOpen(true);
+                  }
+                }}
+              >
+                <Activity className="mr-2 h-4 w-4" /> Activity & Notes
               </Button>
               <Button variant="outline" size="sm" onClick={() => setIsShareReceiptOpen(true)}>
                 <Share2 className="mr-2 h-4 w-4" /> Share Receipt
@@ -305,6 +317,8 @@ export default function OrderDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      <OrderActivityCard orderId={order.id} />
 
       {order && <ShareReceiptDialog open={isShareReceiptOpen} onOpenChange={setIsShareReceiptOpen} order={order} customer={customer ? { fullName: customer.fullName, address: customer.address } : null} orderItems={rawItems} />}
       {order && <MarkShippedDialog open={isMarkShippedOpen} onOpenChange={setIsMarkShippedOpen} orderId={order.id} currentTrackingNumber={order.tracking_number || ''} onSuccess={() => setIsMarkShippedOpen(false)} />}

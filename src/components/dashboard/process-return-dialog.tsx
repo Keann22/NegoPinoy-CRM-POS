@@ -11,13 +11,17 @@ import type { Order } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useSupabase } from '@/lib/supabase/hooks';
 import { useUserProfile } from '@/hooks/useUserProfile';
-import { resolveOpenOrderIssues } from '@/lib/services/order-issues-service';
+import { RotateCcw } from 'lucide-react';
 
-interface OrderItemRow {
-  id: string;
-  product_id: string;
-  product_name: string;
-  quantity: number;
+interface ItemReturnState {
+  orderItemId: string;
+  productId: string;
+  productName: string;
+  orderedQty: number;
+  alreadyReturnedQty: number;
+  remainingQty: number;
+  returnQty: number;
+  dispositionOverride: 'default' | 'restock' | 'exchange' | 'writeoff';
 }
 
 interface ProcessReturnDialogProps {
@@ -34,11 +38,8 @@ export function ProcessReturnDialog({ order, open, onOpenChange, onSuccess }: Pr
   const supabase = useSupabase();
   const { userProfile } = useUserProfile();
 
-  const [items, setItems] = useState<OrderItemRow[]>([]);
-  const [processedItemIds, setProcessedItemIds] = useState<string[]>([]);
-  const [selectedItemId, setSelectedItemId] = useState('');
-  const [quantity, setQuantity] = useState('');
-  const [returnType, setReturnType] = useState<'restock' | 'exchange' | 'writeoff' | ''>('');
+  const [items, setItems] = useState<ItemReturnState[]>([]);
+  const [defaultReturnType, setDefaultReturnType] = useState<'restock' | 'exchange' | 'writeoff' | ''>('restock');
   const [reasonCode, setReasonCode] = useState('');
   const [notes, setNotes] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -47,65 +48,137 @@ export function ProcessReturnDialog({ order, open, onOpenChange, onSuccess }: Pr
   useEffect(() => {
     if (!open || !order || !supabase) return;
     setIsLoading(true);
-    setProcessedItemIds([]);
-    resetForm();
-    supabase
-      .from('order_items')
-      .select('id, product_id, product_name, quantity')
-      .eq('order_id', order.id)
-      .then(({ data, error }) => {
-        if (!error && data) setItems(data);
-        setIsLoading(false);
-      });
-  }, [open, order, supabase]);
-
-  const resetForm = () => {
-    setSelectedItemId('');
-    setQuantity('');
-    setReturnType('');
+    setDefaultReturnType('restock');
     setReasonCode('');
     setNotes('');
+
+    Promise.all([
+      supabase
+        .from('order_items')
+        .select('id, product_id, product_name, quantity')
+        .eq('order_id', order.id),
+      supabase
+        .from('returns')
+        .select('order_item_id, quantity')
+        .eq('order_id', order.id),
+    ]).then(([itemsRes, returnsRes]) => {
+      const orderItems = itemsRes.data || [];
+      const returns = returnsRes.data || [];
+
+      const returnedByItem = new Map<string, number>();
+      returns.forEach(r => {
+        if (r.order_item_id) {
+          returnedByItem.set(r.order_item_id, (returnedByItem.get(r.order_item_id) || 0) + r.quantity);
+        }
+      });
+
+      const rows: ItemReturnState[] = orderItems.map(item => {
+        const alreadyReturned = returnedByItem.get(item.id) || 0;
+        const remaining = Math.max(0, item.quantity - alreadyReturned);
+        return {
+          orderItemId: item.id,
+          productId: item.product_id,
+          productName: item.product_name,
+          orderedQty: item.quantity,
+          alreadyReturnedQty: alreadyReturned,
+          remainingQty: remaining,
+          returnQty: remaining,
+          dispositionOverride: 'default',
+        };
+      });
+
+      setItems(rows);
+      setIsLoading(false);
+    });
+  }, [open, order, supabase]);
+
+  const handleReturnAll = () => {
+    setItems(prev => prev.map(item => ({ ...item, returnQty: item.remainingQty })));
   };
 
-  const selectedItem = items.find(i => i.id === selectedItemId);
+  const handleClearAll = () => {
+    setItems(prev => prev.map(item => ({ ...item, returnQty: 0 })));
+  };
 
-  const handleRecordReturn = async () => {
-    if (!order || !selectedItem || !returnType) {
-      toast({ variant: 'destructive', title: 'Missing info', description: 'Select an item and a return type.' });
+  const updateItemQty = (orderItemId: string, val: number) => {
+    setItems(prev =>
+      prev.map(item => {
+        if (item.orderItemId !== orderItemId) return item;
+        const clamped = Math.max(0, Math.min(item.remainingQty, isNaN(val) ? 0 : val));
+        return { ...item, returnQty: clamped };
+      })
+    );
+  };
+
+  const updateItemDisposition = (orderItemId: string, disposition: 'default' | 'restock' | 'exchange' | 'writeoff') => {
+    setItems(prev =>
+      prev.map(item => (item.orderItemId === orderItemId ? { ...item, dispositionOverride: disposition } : item))
+    );
+  };
+
+  const totalReturnQty = items.reduce((sum, item) => sum + (item.returnQty || 0), 0);
+  const activeItemsCount = items.filter(item => item.returnQty > 0).length;
+
+  const handleSubmit = async () => {
+    if (!order) return;
+
+    if (totalReturnQty === 0) {
+      toast({ variant: 'destructive', title: 'No items selected', description: 'Enter a quantity greater than 0 for at least one item.' });
       return;
     }
-    const qty = Number(quantity);
-    if (!qty || qty <= 0 || qty > selectedItem.quantity) {
-      toast({ variant: 'destructive', title: 'Invalid quantity', description: `Enter a quantity between 1 and ${selectedItem.quantity}.` });
-      return;
-    }
+
     if (!reasonCode) {
       toast({ variant: 'destructive', title: 'Reason required', description: 'Select a reason for this return.' });
       return;
     }
 
+    const unassignedDisposition = items.some(
+      item => item.returnQty > 0 && item.dispositionOverride === 'default' && !defaultReturnType
+    );
+    if (unassignedDisposition) {
+      toast({ variant: 'destructive', title: 'Disposition required', description: 'Select a disposition for the returned items.' });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
+      const itemsToSubmit = items
+        .filter(item => item.returnQty > 0)
+        .map(item => ({
+          orderItemId: item.orderItemId,
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.returnQty,
+          returnType: item.dispositionOverride !== 'default' ? item.dispositionOverride : defaultReturnType,
+        }));
+
       const res = await fetch('/api/inventory/returns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           orderId: order.id,
-          orderItemId: selectedItem.id,
-          productId: selectedItem.product_id,
-          productName: selectedItem.product_name,
-          quantity: qty,
-          returnType,
-          reasonCode,
-          notes,
+          items: itemsToSubmit,
+          defaultReturnType,
+          defaultReasonCode: reasonCode,
+          defaultNotes: notes,
           processedBy: userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : null,
         }),
       });
-      if (!res.ok) throw new Error(await res.text());
 
-      setProcessedItemIds(prev => [...prev, selectedItem.id]);
-      toast({ title: 'Return recorded', description: `${qty} x ${selectedItem.product_name} recorded as ${returnType}.` });
-      resetForm();
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || 'Failed to record return.');
+      }
+
+      const result = await res.json();
+      if (result.allItemsFullyReturned) {
+        toast({ title: 'Order marked Returned', description: `All items on this order have been returned.` });
+      } else {
+        toast({ title: 'Return recorded', description: `Processed ${result.processedCount} item(s) successfully.` });
+      }
+
+      onSuccess();
+      onOpenChange(false);
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Error', description: e.message || 'Failed to record return.' });
     } finally {
@@ -113,136 +186,187 @@ export function ProcessReturnDialog({ order, open, onOpenChange, onSuccess }: Pr
     }
   };
 
-  const handleDone = async () => {
-    if (!order || !supabase) {
-      onOpenChange(false);
-      return;
-    }
-    if (processedItemIds.length === 0) {
-      onOpenChange(false);
-      return;
-    }
-
-    try {
-      const { data: returns } = await supabase
-        .from('returns')
-        .select('order_item_id, quantity')
-        .eq('order_id', order.id);
-
-      const returnedByItem = new Map<string, number>();
-      (returns || []).forEach(r => {
-        if (!r.order_item_id) return;
-        returnedByItem.set(r.order_item_id, (returnedByItem.get(r.order_item_id) || 0) + r.quantity);
-      });
-
-      const allItemsFullyReturned = items.every(item => (returnedByItem.get(item.id) || 0) >= item.quantity);
-
-      if (allItemsFullyReturned) {
-        await supabase.from('orders').update({ status: 'Returned' }).eq('id', order.id);
-        await resolveOpenOrderIssues(supabase, order.id);
-        toast({ title: 'Order marked Returned', description: 'All items on this order have been returned.' });
-      } else {
-        toast({ title: 'Partial return recorded', description: 'Not all items are returned yet — order status unchanged.' });
-      }
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Error', description: e.message || 'Failed to finalize return.' });
-    }
-
-    onSuccess();
-    onOpenChange(false);
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-6">
         <DialogHeader>
-          <DialogTitle>Process Return</DialogTitle>
+          <div className="flex items-center gap-2">
+            <RotateCcw className="h-5 w-5 text-primary" />
+            <DialogTitle>Process Return</DialogTitle>
+          </div>
           <DialogDescription>
-            Record which item is being returned, how much, and what happens to it: restocked (sellable), exchanged (reshipped, no stock change), or written off (damaged, not sellable).
+            Review all items in this order and enter the quantity being returned for each item.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
-          {processedItemIds.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {processedItemIds.map(id => {
-                const item = items.find(i => i.id === id);
-                return item ? <Badge key={id} variant="secondary">✓ {item.product_name}</Badge> : null;
+        {isLoading ? (
+          <div className="py-12 text-center text-muted-foreground text-sm">Loading order items...</div>
+        ) : (
+          <div className="space-y-4 py-2 overflow-y-auto pr-1 flex-1">
+            {/* Batch Controls */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-muted/40 rounded-lg border text-sm">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Default Disposition
+                </label>
+                <Select value={defaultReturnType} onValueChange={(v) => setDefaultReturnType(v as any)}>
+                  <SelectTrigger className="h-9 bg-background">
+                    <SelectValue placeholder="Select disposition" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="restock">Restock — sellable, restore stock</SelectItem>
+                    <SelectItem value="exchange">Exchange — reshipped, no stock change</SelectItem>
+                    <SelectItem value="writeoff">Write-off — damaged / unsellable</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Reason <span className="text-destructive">*</span>
+                </label>
+                <Select value={reasonCode} onValueChange={setReasonCode}>
+                  <SelectTrigger className="h-9 bg-background">
+                    <SelectValue placeholder="Select reason" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {REASON_CODES.map(r => (
+                      <SelectItem key={r} value={r}>{r}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Items Header & Quick Actions */}
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Order Items ({items.length})
+              </span>
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="ghost" size="sm" onClick={handleReturnAll} className="h-7 text-xs">
+                  Return All
+                </Button>
+                <Button type="button" variant="ghost" size="sm" onClick={handleClearAll} className="h-7 text-xs text-muted-foreground">
+                  Clear All
+                </Button>
+              </div>
+            </div>
+
+            {/* Items Side-by-Side List View */}
+            <div className="space-y-2">
+              {items.map(item => {
+                const isFullyReturned = item.remainingQty === 0;
+                return (
+                  <div
+                    key={item.orderItemId}
+                    className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg border gap-3 transition-colors ${
+                      item.returnQty > 0 ? 'bg-primary/5 border-primary/30' : 'bg-background border-border opacity-80'
+                    } ${isFullyReturned ? 'opacity-50 bg-muted/30' : ''}`}
+                  >
+                    {/* Item Details */}
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <div className="font-medium text-sm leading-snug">{item.productName}</div>
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                        <Badge variant="outline" className="text-[11px] px-1.5 py-0">
+                          Ordered: {item.orderedQty}
+                        </Badge>
+                        {item.alreadyReturnedQty > 0 && (
+                          <Badge variant="secondary" className="text-[11px] px-1.5 py-0">
+                            Already returned: {item.alreadyReturnedQty}
+                          </Badge>
+                        )}
+                        {isFullyReturned ? (
+                          <Badge variant="secondary" className="text-[11px] px-1.5 py-0 bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">
+                            Fully Returned
+                          </Badge>
+                        ) : (
+                          <span className="text-[11px]">Max returnable: {item.remainingQty}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Quantity & Per-Item Disposition Controls */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-1.5">
+                        <label className="text-xs font-medium sm:hidden">Qty:</label>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={item.remainingQty}
+                          disabled={isFullyReturned || isSubmitting}
+                          value={item.returnQty === 0 ? '' : item.returnQty}
+                          placeholder="0"
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
+                            updateItemQty(item.orderItemId, val);
+                          }}
+                          className="w-20 h-9 text-center font-semibold"
+                        />
+                        <span className="text-xs text-muted-foreground">/ {item.remainingQty}</span>
+                      </div>
+
+                      {/* Optional disposition override */}
+                      {item.returnQty > 0 && (
+                        <Select
+                          value={item.dispositionOverride}
+                          onValueChange={(val) => updateItemDisposition(item.orderItemId, val as any)}
+                        >
+                          <SelectTrigger className="h-9 w-28 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="default" className="text-xs">
+                              {defaultReturnType ? `Default (${defaultReturnType})` : 'Default'}
+                            </SelectItem>
+                            <SelectItem value="restock" className="text-xs">Restock</SelectItem>
+                            <SelectItem value="exchange" className="text-xs">Exchange</SelectItem>
+                            <SelectItem value="writeoff" className="text-xs">Write-off</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+                  </div>
+                );
               })}
             </div>
-          )}
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Item</label>
-            <Select value={selectedItemId} onValueChange={setSelectedItemId} disabled={isLoading}>
-              <SelectTrigger>
-                <SelectValue placeholder={isLoading ? 'Loading items...' : 'Select an item'} />
-              </SelectTrigger>
-              <SelectContent>
-                {items.map(item => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.product_name} (qty {item.quantity})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Notes */}
+            <div className="space-y-1.5 pt-1">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Notes (optional)
+              </label>
+              <Textarea
+                placeholder="Return tracking number, reason details, customer agreement, etc..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="min-h-[64px] text-sm"
+              />
+            </div>
           </div>
+        )}
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Quantity Returned</label>
-            <Input
-              type="number"
-              min={1}
-              max={selectedItem?.quantity}
-              placeholder="0"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              disabled={!selectedItem}
-            />
+        <DialogFooter className="flex-row items-center justify-between gap-3 pt-3 border-t">
+          <div className="text-xs text-muted-foreground">
+            {totalReturnQty > 0 ? (
+              <span className="font-medium text-foreground">
+                Returning {activeItemsCount} item{activeItemsCount !== 1 ? 's' : ''} ({totalReturnQty} unit{totalReturnQty !== 1 ? 's' : ''})
+              </span>
+            ) : (
+              <span>No items selected</span>
+            )}
           </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Disposition</label>
-            <Select value={returnType} onValueChange={(v) => setReturnType(v as any)}>
-              <SelectTrigger>
-                <SelectValue placeholder="What happens to this item?" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="restock">Restock — sellable, add back to inventory</SelectItem>
-                <SelectItem value="exchange">Exchange — reshipped, no stock change</SelectItem>
-                <SelectItem value="writeoff">Write-off — damaged, not sellable</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={isSubmitting || totalReturnQty === 0 || isLoading}
+            >
+              {isSubmitting ? 'Processing...' : `Process Return (${totalReturnQty})`}
+            </Button>
           </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Reason</label>
-            <Select value={reasonCode} onValueChange={setReasonCode}>
-              <SelectTrigger>
-                <SelectValue placeholder="-- Select Reason --" />
-              </SelectTrigger>
-              <SelectContent>
-                {REASON_CODES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Notes (optional)</label>
-            <Textarea
-              placeholder="Additional details..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="min-h-[80px]"
-            />
-          </div>
-        </div>
-
-        <DialogFooter className="flex-col sm:flex-row gap-2">
-          <Button variant="outline" onClick={handleRecordReturn} disabled={isSubmitting || !selectedItem} className="sm:mr-auto">
-            {isSubmitting ? 'Recording...' : 'Record This Item'}
-          </Button>
-          <Button onClick={handleDone}>Done</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
