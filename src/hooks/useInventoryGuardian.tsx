@@ -16,13 +16,28 @@ const EXCLUDED_GUARDIAN_EMAILS = new Set([
   'duornos@gmail.com'
 ]);
 
-export function isUserAllowedGuardian(email?: string, roles?: string[]): boolean {
-  if (!email) return false;
-  const normalized = email.toLowerCase().trim();
-  // Rey has a temporary special assignment for today (30-item shelf check)
-  if (normalized === 'rey.magbitangjr@gmail.com') return true;
-  if (EXCLUDED_GUARDIAN_EMAILS.has(normalized)) return false;
-  return Boolean(roles?.some(r => ['Admin', 'Owner', 'Inventory'].includes(r)));
+export function isUserAllowedGuardian(email?: string, name?: string): boolean {
+  if (!email && !name) return false;
+  const rawEmail = (email || '').toLowerCase().trim();
+  const rawName = (name || '').toLowerCase().trim();
+
+  // Exclude admin/owner accounts (Keneth Ornos, Cedric, etc.)
+  if (
+    rawEmail.includes('keneth') ||
+    rawEmail.includes('ornos') ||
+    rawName.includes('keneth') ||
+    rawName.includes('ornos') ||
+    rawEmail.includes('cedric')
+  ) {
+    return false;
+  }
+
+  // ONLY assigned inventory audit staff: Jas, Tess, and Al
+  const isJas = rawEmail.includes('jas') || rawName.includes('jas');
+  const isTess = rawEmail.includes('tess') || rawName.includes('tess');
+  const isAl = rawEmail.includes('alpinakacute') || rawName.includes('al') || rawEmail.includes('al_');
+
+  return isJas || isTess || isAl;
 }
 
 interface GuardianContextValue {
@@ -65,11 +80,10 @@ export function InventoryGuardianProvider({ children }: { children: ReactNode })
   const [hasAutoOpened, setHasAutoOpened] = useState(false);
   const { toast } = useToast();
   const { userProfile } = useUserProfile();
-  const canAccess = useMemo(() => {
-    return isUserAllowedGuardian(userProfile?.email, userProfile?.roles);
-  }, [userProfile]);
-
   const userName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : 'Staff';
+  const canAccess = useMemo(() => {
+    return isUserAllowedGuardian(userProfile?.email, userName);
+  }, [userProfile?.email, userName]);
 
   const fetchAnomalies = useCallback(async () => {
     if (!canAccess) {

@@ -15,18 +15,16 @@ import {
 
 export { getProductGuardianMemory };
 
-// Orders in these statuses still hold/claim physical inventory that has not shipped yet.
-const UNFULFILLED_STATUSES = [
+import { fetchAllPages } from '../procurement-demand-service';
+
+// Orders in these statuses claim physical inventory still waiting to be picked from the warehouse shelf.
+// Statuses where picking has already succeeded ('Picked', 'Photo', 'Packed', 'For Shipping',
+// 'For Pick-up') or items where is_packed = true have already been physically pulled from shelf.
+const UNPICKED_STATUSES = [
   'Pending Payment',
   'Processing',
-  'Picked',
-  'Picked (with issue)',
-  'Photo',
-  'Packed',
-  'For Shipping',
-  'For Pick-up',
-  'On-Hold',
-  'Waiting for Stock'
+  'Waiting for Stock',
+  'On-Hold'
 ];
 
 /**
@@ -35,63 +33,140 @@ const UNFULFILLED_STATUSES = [
 export async function detectInventoryAnomalies(supabase: SupabaseClient): Promise<InventoryAnomaly[]> {
   const anomalies: InventoryAnomaly[] = [];
 
-  // 1. Fetch products with negative stock
-  const { data: negativeProducts, error: negErr } = await supabase
-    .from('products')
-    .select('id, name, sku, variant_name, stock_level')
-    .lt('stock_level', 0)
-    .limit(100);
-
-  if (negErr) {
-    console.error('Error fetching negative stock products:', negErr);
-  }
+  // 1. Fetch all products with negative stock (paginated, no 100-item cutoff)
+  const negativeProducts = await fetchAllPages<any>((from, to) =>
+    supabase
+      .from('products')
+      .select('id, name, sku, variant_name, stock_level')
+      .lt('stock_level', 0)
+      .range(from, to)
+  );
 
   // 2. Fetch open order issues (picker shortages).
-  // Scope strictly to issue_type 'order' — the table also holds 'staff_message',
-  // 'purchase_discrepancy', 'direct' (DMs) and 'on_hold' rows that carry a product_id
-  // but are NOT floor shortages, and would otherwise be mislabeled as picker reports.
-  const { data: openIssues, error: issueErr } = await supabase
-    .from('order_issues')
-    .select('id, order_id, product_id, out_of_stock_qty, reported_by_name, created_at, products(name, sku, stock_level)')
-    .eq('status', 'open')
-    .eq('issue_type', 'order')
-    .order('created_at', { ascending: false })
-    .limit(500);
+  // Scope strictly to issue_type 'order' and status 'open'
+  const openIssues = await fetchAllPages<any>((from, to) =>
+    supabase
+      .from('order_issues')
+      .select('id, order_id, product_id, out_of_stock_qty, reported_by_name, created_at, products(name, sku, stock_level)')
+      .eq('status', 'open')
+      .eq('issue_type', 'order')
+      .order('created_at', { ascending: false })
+      .range(from, to)
+  );
 
-  if (issueErr) {
-    console.error('Error fetching open order issues:', issueErr);
-  }
+  const openIssueProductIds = (openIssues || [])
+    .map((i: any) => i.product_id)
+    .filter(Boolean);
 
-  // 3. Fetch recent memory entries for candidate products
+  const openIssueKeySet = new Set(
+    (openIssues || []).map((i: any) => `${i.order_id}-${i.product_id}`)
+  );
+
+  // 3. Fetch bundle products with assembly recipes
+  const bundleProducts = await fetchAllPages<any>((from, to) =>
+    supabase
+      .from('products')
+      .select('id, assembly_recipe')
+      .neq('assembly_recipe', '[]')
+      .range(from, to)
+  );
+
+  const bundleToComponents = new Map<string, { componentId: string; qtyPerBundle: number }[]>();
+  (bundleProducts || []).forEach((bp: any) => {
+    const recipe = Array.isArray(bp.assembly_recipe) ? bp.assembly_recipe : [];
+    if (recipe.length === 0) return;
+    const components = recipe.map((comp: any) => ({
+      componentId: comp.productId || comp.component_id,
+      qtyPerBundle: Number(comp.quantity) || 1,
+    }));
+    bundleToComponents.set(bp.id, components);
+  });
+
+  // 4. Determine candidate IDs and fetch recent memory
   const candidateIds = Array.from(new Set([
     ...(negativeProducts?.map(p => p.id) || []),
-    ...(openIssues?.map((i: any) => i.product_id).filter(Boolean) || [])
+    ...openIssueProductIds
   ]));
 
   const memoryByProduct = await getRecentMemoriesForProducts(supabase, candidateIds);
 
-  // Check negative stock products
+  // 5. Check negative stock products against genuine unpicked demand
   if (negativeProducts && negativeProducts.length > 0) {
-    const productIds = negativeProducts.map(p => p.id);
+    const candidateIdSet = new Set(candidateIds);
 
-    // Fetch active unfulfilled order items for these products
-    const { data: activeItems } = await supabase
-      .from('order_items')
-      .select('product_id, quantity, is_packed, orders!inner(id, status)')
-      .in('product_id', productIds)
-      .in('orders.status', UNFULFILLED_STATUSES);
+    // Also include bundles that consume any candidate component
+    const bundleIdsToQuery: string[] = [];
+    bundleToComponents.forEach((comps, bId) => {
+      if (comps.some(c => candidateIdSet.has(c.componentId))) {
+        bundleIdsToQuery.push(bId);
+      }
+    });
 
-    const activeDemandByProduct = new Map<string, { count: number; qty: number }>();
-    (activeItems || []).forEach((item: any) => {
-      const cur = activeDemandByProduct.get(item.product_id) || { count: 0, qty: 0 };
-      activeDemandByProduct.set(item.product_id, {
+    const allProductIdsToDemand = Array.from(new Set([...candidateIds, ...bundleIdsToQuery]));
+
+    // Fetch active unpicked order items in chunks to avoid URL size limits
+    const CHUNK_SIZE = 150;
+    const activeDemandRows: any[] = [];
+
+    for (let i = 0; i < allProductIdsToDemand.length; i += CHUNK_SIZE) {
+      const chunk = allProductIdsToDemand.slice(i, i + CHUNK_SIZE);
+      const chunkRows = await fetchAllPages<any>((from, to) =>
+        supabase
+          .from('order_items')
+          .select('order_id, product_id, quantity, is_packed, orders!inner(id, status, payment_method)')
+          .in('product_id', chunk)
+          .in('orders.status', [...UNPICKED_STATUSES, 'Picked (with issue)'])
+          .range(from, to)
+      );
+      activeDemandRows.push(...chunkRows);
+    }
+
+    const unfulfilledDemandByProduct = new Map<string, { count: number; qty: number }>();
+
+    const recordDemand = (productId: string, qty: number) => {
+      const cur = unfulfilledDemandByProduct.get(productId) || { count: 0, qty: 0 };
+      unfulfilledDemandByProduct.set(productId, {
         count: cur.count + 1,
-        qty: cur.qty + (Number(item.quantity) || 1)
+        qty: cur.qty + qty
+      });
+    };
+
+    activeDemandRows.forEach((row: any) => {
+      if (row.is_packed) return; // Already physically pulled from shelf and packed
+      if (row.orders?.payment_method === 'Lay-away') return; // Consumes allocation, but not unfulfilled shortage
+
+      const orderStatus = row.orders?.status;
+      const orderId = row.orders?.id;
+
+      // For 'Picked (with issue)', only count if there is an explicit open shortage issue
+      if (orderStatus === 'Picked (with issue)') {
+        const hasOpenDirect = openIssueKeySet.has(`${orderId}-${row.product_id}`);
+        const comps = bundleToComponents.get(row.product_id);
+        const hasOpenComp = comps?.some(c => openIssueKeySet.has(`${orderId}-${c.componentId}`));
+
+        if (!hasOpenDirect && !hasOpenComp) {
+          return; // Shortage already resolved or unrelated to this product
+        }
+      }
+
+      const rowQty = Number(row.quantity) || 1;
+
+      // Direct product demand
+      if (candidateIdSet.has(row.product_id)) {
+        recordDemand(row.product_id, rowQty);
+      }
+
+      // Bundle component demand
+      const components = bundleToComponents.get(row.product_id);
+      components?.forEach((c) => {
+        if (candidateIdSet.has(c.componentId)) {
+          recordDemand(c.componentId, rowQty * c.qtyPerBundle);
+        }
       });
     });
 
     for (const prod of negativeProducts) {
-      const demand = activeDemandByProduct.get(prod.id) || { count: 0, qty: 0 };
+      const demand = unfulfilledDemandByProduct.get(prod.id) || { count: 0, qty: 0 };
       const stock = prod.stock_level ?? 0;
       const displayName = prod.variant_name && !prod.name.includes(prod.variant_name)
         ? `${prod.name} [${prod.variant_name}]`
@@ -106,8 +181,8 @@ export async function detectInventoryAnomalies(supabase: SupabaseClient): Promis
         repeatDiscrepancyCount: pMemories.length
       };
 
-      // Anomaly: Orders completed, but stock is negative (unrecorded purchase)
-      if (demand.count === 0) {
+      // Anomaly 1: Stock is negative, but 0 active unpicked orders need it (Ghost Negative Stock)
+      if (demand.qty === 0) {
         anomalies.push({
           id: `unrecorded-${prod.id}`,
           productId: prod.id,
@@ -118,9 +193,9 @@ export async function detectInventoryAnomalies(supabase: SupabaseClient): Promis
           unfulfilledQty: 0,
           type: 'unrecorded_purchase',
           severity: 'high',
-          title: `Unrecorded Purchase: ${displayName}`,
-          description: `Stock level is currently ${stock}, but you have 0 open unfulfilled orders. Goods were sold and shipped, but the incoming purchase was never recorded in the system.`,
-          recommendation: `Confirm the actual shelf count or backfill the unrecorded purchase so your accounting ledger is accurate.`,
+          title: `Ghost Negative Stock: ${displayName}`,
+          description: `Stock level is currently ${stock}, but you have 0 active unfulfilled orders waiting for this item. All orders have already been packed or completed, but incoming stock was never received in the system.`,
+          recommendation: `Confirm physical shelf count to true up this item to 0 or backfill the unrecorded purchase.`,
           detectedAt: new Date().toISOString(),
           details: {
             shippedWithoutPurchaseQty: Math.abs(stock)
@@ -128,7 +203,8 @@ export async function detectInventoryAnomalies(supabase: SupabaseClient): Promis
           memoryContext
         });
       } else if (Math.abs(stock) > demand.qty) {
-        // Partial unrecorded purchase
+        // Anomaly 2: Stock deficit is significantly larger than actual active unpicked orders
+        const ghostDeficit = Math.abs(stock) - demand.qty;
         anomalies.push({
           id: `partial-unrecorded-${prod.id}`,
           productId: prod.id,
@@ -138,13 +214,13 @@ export async function detectInventoryAnomalies(supabase: SupabaseClient): Promis
           unfulfilledOrdersCount: demand.count,
           unfulfilledQty: demand.qty,
           type: 'unrecorded_purchase',
-          severity: 'medium',
+          severity: ghostDeficit >= 5 ? 'high' : 'medium',
           title: `Stock Deficit Exceeds Orders: ${displayName}`,
-          description: `Stock level is ${stock}, but open orders only account for ${demand.qty} unit(s). The remaining deficit of ${Math.abs(stock) - demand.qty} unit(s) is likely from unrecorded deliveries.`,
-          recommendation: `Check physical warehouse shelf count to true up this item.`,
+          description: `Stock level is ${stock}, but active open orders only account for ${demand.qty} unit(s). The remaining deficit of ${ghostDeficit} unit(s) is ghost negative stock from past unrecorded deliveries.`,
+          recommendation: `Check physical warehouse shelf count to true up this item so stock matches genuine reservations.`,
           detectedAt: new Date().toISOString(),
           details: {
-            shippedWithoutPurchaseQty: Math.abs(stock) - demand.qty
+            shippedWithoutPurchaseQty: ghostDeficit
           },
           memoryContext
         });

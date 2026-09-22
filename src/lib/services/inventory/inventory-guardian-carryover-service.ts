@@ -12,17 +12,48 @@ export interface StaffIdentifier {
   userId?: string;
 }
 
+export function isAssignedAuditor(matcher?: StaffIdentifier): boolean {
+  if (!matcher) return false;
+  const rawName = (matcher.name || '').toLowerCase().trim();
+  const rawEmail = (matcher.email || '').toLowerCase().trim();
+
+  // Exclude admin/owner accounts
+  if (
+    rawEmail.includes('keneth') ||
+    rawEmail.includes('ornos') ||
+    rawName.includes('keneth') ||
+    rawName.includes('ornos') ||
+    rawEmail.includes('cedric')
+  ) {
+    return false;
+  }
+
+  return (
+    rawName.includes('jas') || rawEmail.includes('jas') ||
+    rawName.includes('al') || rawEmail.includes('alpinakacute') ||
+    rawName.includes('tess') || rawEmail.includes('tess')
+  );
+}
+
 export function resolveStaffDisplayName(matcher?: StaffIdentifier): string | undefined {
   if (!matcher) return undefined;
   const rawName = (matcher.name || '').toLowerCase().trim();
   const rawEmail = (matcher.email || '').toLowerCase().trim();
 
+  if (
+    rawEmail.includes('keneth') ||
+    rawEmail.includes('ornos') ||
+    rawName.includes('keneth') ||
+    rawName.includes('ornos')
+  ) {
+    return undefined;
+  }
+
   if (rawName.includes('jas') || rawEmail.includes('jas')) return 'Jasmin';
   if (rawName.includes('al') || rawEmail.includes('alpinakacute')) return 'Al';
   if (rawName.includes('tess') || rawEmail.includes('tess')) return 'Tess';
-  if (rawName.includes('rey') || rawEmail.includes('rey')) return 'Rey';
 
-  return matcher.name || undefined;
+  return undefined;
 }
 
 export function matchesStaff(
@@ -74,9 +105,9 @@ export async function computeGuardianDailyTarget(
   isSunday: boolean,
   staffMatcher?: StaffIdentifier
 ): Promise<{ baseTarget: number; carryOver: number; target: number }> {
-  if (isSunday) {
+  if (isSunday || (staffMatcher && !isAssignedAuditor(staffMatcher))) {
     return {
-      baseTarget: BASE_DAILY_TARGET,
+      baseTarget: staffMatcher && !isAssignedAuditor(staffMatcher) ? 0 : BASE_DAILY_TARGET,
       carryOver: 0,
       target: 0
     };
@@ -163,6 +194,24 @@ export async function getGuardianDailyProgress(
   const phDateStr = phNow.toISOString().slice(0, 10);
   const dayOfWeek = phNow.getUTCDay(); // 0 = Sunday
   const isSunday = dayOfWeek === 0;
+
+  const isAssigned = isAssignedAuditor(userIdentifier);
+  if (userIdentifier && !isAssigned) {
+    return {
+      baseTarget: 0,
+      carryOver: 0,
+      target: 0,
+      completedToday: 0,
+      remainingToday: 0,
+      isGoalMet: true,
+      isRestDay: isSunday,
+      completedItems: [],
+      totalBacklogCount,
+      assignedStaffName: undefined,
+      teamCompletedToday: 0,
+      allAuditedProductIdsToday: []
+    };
+  }
 
   const assignedStaffName = resolveStaffDisplayName(userIdentifier);
 

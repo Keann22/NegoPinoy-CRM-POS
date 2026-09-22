@@ -8,10 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { useInventoryGuardian } from '@/hooks/useInventoryGuardian';
+import { useUserProfile } from '@/hooks/useUserProfile';
 
 export function TelegramGuardianSettings() {
-  const { canAccess } = useInventoryGuardian();
+  const { userProfile } = useUserProfile();
   const { toast } = useToast();
   const [status, setStatus] = useState<{ configured: boolean; hasBotToken: boolean; hasChatId: boolean } | null>(null);
   const [isLoadingStatus, setIsLoadingStatus] = useState(true);
@@ -20,7 +20,8 @@ export function TelegramGuardianSettings() {
   const [isTesting, setIsTesting] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
 
-  if (!canAccess) return null;
+  const canManage = Boolean(userProfile?.roles?.some(r => ['Admin', 'Owner', 'Inventory'].includes(r)));
+  if (!canManage) return null;
 
   const fetchStatus = async () => {
     setIsLoadingStatus(true);
