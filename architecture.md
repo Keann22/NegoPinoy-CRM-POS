@@ -756,6 +756,30 @@ The same `OrderTrailDialog` (`order-trail-dialog.tsx`) that backs the order deta
 
 Note this corrects an earlier claim under "Procurement Sheet: three numbers that must not be confused" that clicking **Staff Req.** opens the same `reserved-stock-dialog.tsx` popup — it actually opens the separate `staff-request-dialog.tsx`. In `staff-request-dialog.tsx`, a manually-added request with no linked order (`order.orderId` null) shows a `-` instead of a button.
 
+#### Consolidated Order Activity & Notes on Order Details (`/dashboard/orders/[id]`) (added 2026-09-22)
+
+Previously, order history was hidden behind the "View Trail" modal button, while freeform notes were only viewable and editable inside `overdue-order-dialog.tsx`.
+
+As of 2026-09-22, the Order Details page directly embeds **`OrderActivityCard`** (`src/components/dashboard/orders/order-activity-card.tsx`), uniting all order notes and the audit trail into a single chronological feed right on the page:
+
+1. **Unified Timeline Feed**: Merges status changes (`order_logs`), staff notes (`orders.notes`), and order stock issues / messages (`order_issues` / `order_issue_messages`) into one seamless vertical timeline with distinct visual styles (blue cards for notes, indigo dots for status changes, red dots for stock issues).
+2. **Instant Filter Tabs**: Allows staff to toggle between:
+   - **All Activity**: Chronological union of all notes and events.
+   - **Notes Only**: Internal staff notes and message discussions.
+   - **System Trail**: Status changes, assignments, and audit transitions.
+3. **Inline Quick-Note Composer with `@` Staff Mentions**:
+   - Staff can write and post notes directly on the Order Details page.
+   - Powered by an enhanced **`MentionInput`** (`src/components/dashboard/mention-input.tsx`) supporting multiline notes (`multiline={true}`) and upward/downward suggestion dropdown positioning (`dropdownPosition="top"`).
+   - Typing `@` opens an instant autocomplete dropdown of staff members from `useStaffDirectory`.
+4. **Dual Notification & Messaging Integration**:
+   - When staff members are tagged (e.g. `@Jasmin Urs`), posting the note calls `createStaffMessage` (`src/lib/services/staff-message-service.ts`), which automatically:
+     - Creates an `order_issues` thread (`issue_type: 'staff_message'`) linked to the order.
+     - Registers the sender and tagged staff as thread members (`joinThreadMembers`), surfacing the conversation in the **Messages** inbox (`/dashboard/messages`) with unread tracking.
+     - Fans out high-priority in-app notifications (`fanOutStaffNotifications`) linking directly to the order (`/dashboard/orders/[id]`).
+   - Simultaneously persists the note to `orders.notes` via `addOrderNote` in `order-trail-service.ts` for full backwards compatibility with reports and overdue views.
+   - `fetchOrderTrail` automatically deduplicates entries between `orders.notes` and `order_issue_messages` so the timeline remains clean and never shows duplicate note cards.
+5. **Direct Page Navigation**: The top action bar's "Activity & Notes" button smoothly scrolls down to `#order-activity` on the page instead of opening a popup.
+
 ### Purchase-Receiving Discrepancies → Inbox Drawer
 
 `order_issues` isn't picker-only. Bulk Receive (`src/app/dashboard/inventory/receive`, `POST /api/inventory/receive/pending-pos`) inserts an `order_issues` row with `issue_type: 'purchase_discrepancy'` (`order_id` left null, `po_id` set instead) whenever received qty is less than expected and staff enters a shortage note — same table as picker-reported issues, discriminated by `issue_type` (`'order'` is the default). This reuses the existing realtime plumbing rather than building a parallel system: the Inbox Drawer (`src/components/dashboard/inbox-drawer.tsx`, global in the dashboard header, not scoped to any one role) subscribes to `INSERT` on `order_issue_messages` and fires an urgent toast + browser notification whenever a message has `requires_attention: true`, regardless of issue type. Clicking a purchase-discrepancy card opens `purchase-issue-dialog.tsx` (reply thread + Resolve) instead of `overdue-order-dialog.tsx`, which handles picker-reported issues.
@@ -942,7 +966,8 @@ What happens across the system when inventory matches:
 | `src/lib/services/order-trail-service.ts` | `fetchOrderTrail()` — merges `order_logs` + `orders.notes` + `order_issues`/messages into one chronological list, see "Order Trail: one merged history instead of four separate silos" |
 | `src/components/dashboard/reserved-stock-dialog.tsx` | "Stock Allocation Details" / "Orders Needing This Item" popup — bundle-aware; per-row "View Trail" button, see "Bundle Products & Assembly Recipes" and "View Trail from the Procurement Sheet pop-ups" |
 | `src/components/dashboard/procurement/staff-request-dialog.tsx` | "Staff Request Details" popup (opened from the Staff Req. number) — per-row "View Trail" button, see "View Trail from the Procurement Sheet pop-ups" |
-| `src/components/dashboard/order-trail-dialog.tsx` | `OrderTrailDialog` — renders `fetchOrderTrail()`; reused by the order detail page and both Procurement Sheet pop-ups |
+| `src/components/dashboard/order-trail-dialog.tsx` | `OrderTrailDialog` — renders `fetchOrderTrail()`; reused by the Procurement Sheet pop-ups |
+| `src/components/dashboard/orders/order-activity-card.tsx` | `OrderActivityCard` — consolidated timeline of notes and audit trail on `/dashboard/orders/[id]` with `@` mention staff tagging and message thread creation |
 | `src/components/dashboard/staff-message-fab.tsx`, `message-staff-dialog.tsx`, `staff-message-thread-dialog.tsx`, `staff-search.tsx`, `order-search.tsx` | "Message Staff" floating compose button, its dialog, thread view, and pickers — see "Message Staff (manual tagging) → Inbox Drawer" |
 | `src/app/api/staff-messages/route.ts` | Creates a `staff_message`-type `order_issues` thread + fans out `notifications` to tagged staff |
 | `src/components/dashboard/mention-input.tsx`, `src/hooks/useStaffDirectory.ts` | `@Name` autocomplete input + shared staff-directory hook — see "@Mention Tagging" |
