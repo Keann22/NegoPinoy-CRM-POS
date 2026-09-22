@@ -33,14 +33,16 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const { productId, newSupplierId, unitCost, supplierCode } = await req.json();
-    if (!productId || !newSupplierId) {
-      return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
+    if (!productId) {
+      return NextResponse.json({ error: 'Missing productId' }, { status: 400 });
     }
-    // Code-only request (from the receipt scanner): just learn the supplier's
-    // product code without reassigning the product's supplier.
-    if (supplierCode !== undefined && unitCost === undefined) {
-      await setSupplierProductCode(supabase, productId, newSupplierId, supplierCode);
-    } else {
+    // Code-only request (with or without supplier specified)
+    if (supplierCode !== undefined && (unitCost === undefined || !newSupplierId)) {
+      await setSupplierProductCode(supabase, productId, newSupplierId || null, supplierCode);
+      if (newSupplierId && unitCost !== undefined) {
+        await updateProductSupplierPricing(supabase, productId, newSupplierId, unitCost);
+      }
+    } else if (newSupplierId) {
       await updateProductSupplierPricing(supabase, productId, newSupplierId, unitCost);
       if (supplierCode !== undefined) {
         await setSupplierProductCode(supabase, productId, newSupplierId, supplierCode);

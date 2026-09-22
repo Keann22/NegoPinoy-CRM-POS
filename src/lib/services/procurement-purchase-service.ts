@@ -130,7 +130,7 @@ export async function processProcurementPurchases(supabase: SupabaseClient, purc
 export async function setSupplierProductCode(
   supabase: SupabaseClient,
   productId: string,
-  supplierId: string,
+  supplierId: string | null | undefined,
   supplierCode: string
 ) {
   const code = (supplierCode || '').trim();
@@ -138,22 +138,38 @@ export async function setSupplierProductCode(
 
   const { data: currentProduct } = await supabase
     .from('products')
-    .select('supplier_pricing')
+    .select('supplier_pricing, supplier_id')
     .eq('id', productId)
     .single();
   const pricing = currentProduct?.supplier_pricing || [];
 
-  const idx = pricing.findIndex((sp: any) => sp.supplierId === supplierId);
-  if (idx >= 0) {
-    pricing[idx].supplierCode = code;
+  const effectiveSupplierId = supplierId || currentProduct?.supplier_id || null;
+
+  if (effectiveSupplierId) {
+    const idx = pricing.findIndex((sp: any) => sp.supplierId === effectiveSupplierId);
+    if (idx >= 0) {
+      pricing[idx].supplierCode = code;
+    } else {
+      const { data: sup } = await supabase.from('suppliers').select('name').eq('id', effectiveSupplierId).single();
+      pricing.push({
+        supplierId: effectiveSupplierId,
+        supplierName: sup?.name || 'Unknown Supplier',
+        unitCost: 0,
+        supplierCode: code,
+      });
+    }
   } else {
-    const { data: sup } = await supabase.from('suppliers').select('name').eq('id', supplierId).single();
-    pricing.push({
-      supplierId,
-      supplierName: sup?.name || 'Unknown Supplier',
-      unitCost: 0,
-      supplierCode: code,
-    });
+    const idx = pricing.findIndex((sp: any) => sp.supplierCode !== undefined);
+    if (idx >= 0) {
+      pricing[idx].supplierCode = code;
+    } else {
+      pricing.push({
+        supplierId: null,
+        supplierName: 'Unassigned',
+        unitCost: 0,
+        supplierCode: code,
+      });
+    }
   }
 
   const { error } = await supabase.from('products').update({ supplier_pricing: pricing }).eq('id', productId);

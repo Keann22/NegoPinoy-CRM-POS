@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Flag, ShoppingCart, Trash2 } from "lucide-react";
+import { Flag, ShoppingCart, Trash2, Pencil, Plus } from "lucide-react";
 import { StaffRequestDialog } from "./staff-request-dialog";
 
 export function ProcurementItemRow({
@@ -34,7 +34,7 @@ export function ProcurementItemRow({
   suppliers: any[];
   pendingSupplier: string;
   setPendingSupplier: (val: string) => void;
-  handleAssignSupplier: (id: string, supplierId: string, cost: string | number) => void;
+  handleAssignSupplier: (id: string, supplierId?: string | null, cost?: string | number, supplierCode?: string) => void;
   editedCost: string;
   setEditedCost: (val: string) => void;
   openBuyDialog: (item: any, groupId: string | null) => void;
@@ -50,6 +50,28 @@ export function ProcurementItemRow({
   const hasDiscrepancy = item.systemQty !== (item.totalOpenDemandQty || 0);
   const [showReassign, setShowReassign] = useState(false);
   const [staffRequestOpen, setStaffRequestOpen] = useState(false);
+  const [isEditingCode, setIsEditingCode] = useState(false);
+  const [codeDraft, setCodeDraft] = useState(item.supplierCode || "");
+  const [isSavingCode, setIsSavingCode] = useState(false);
+
+  const handleSaveCode = async () => {
+    setIsSavingCode(true);
+    try {
+      const targetSupplierId = groupId || item.supplierId || pendingSupplier || null;
+      await handleAssignSupplier(
+        item.productId,
+        targetSupplierId,
+        editedCost !== undefined ? editedCost : item.unitCost,
+        codeDraft.trim()
+      );
+      item.supplierCode = codeDraft.trim() || null;
+      setIsEditingCode(false);
+    } catch (e: any) {
+      alert("Failed to save supplier code: " + e.message);
+    } finally {
+      setIsSavingCode(false);
+    }
+  };
 
   return (
     <tr className={hasDiscrepancy ? "bg-orange-50 hover:bg-orange-100" : "hover:bg-slate-50 transition-colors"}>
@@ -70,10 +92,68 @@ export function ProcurementItemRow({
         >
           {item.productName}
         </button>
-        {item.supplierCode && (
-          <div className="text-xs text-slate-500 font-mono mt-0.5" title="Supplier Code">
-            {item.supplierCode}
+        {isEditingCode ? (
+          <div className="flex items-center gap-1.5 mt-1">
+            <input
+              type="text"
+              value={codeDraft}
+              onChange={(e) => setCodeDraft(e.target.value)}
+              placeholder="Supplier code (e.g. WK-32-SS)..."
+              className="text-xs border border-indigo-300 rounded px-2 py-0.5 w-44 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleSaveCode();
+                } else if (e.key === "Escape") {
+                  setIsEditingCode(false);
+                }
+              }}
+            />
+            <Button
+              size="sm"
+              disabled={isSavingCode}
+              className="h-6 px-2 text-[10px] bg-indigo-600 hover:bg-indigo-700 text-white"
+              onClick={handleSaveCode}
+            >
+              {isSavingCode ? "..." : "Save"}
+            </Button>
+            <button
+              type="button"
+              onClick={() => setIsEditingCode(false)}
+              className="text-[10px] text-slate-400 hover:text-slate-600 px-1"
+            >
+              Cancel
+            </button>
           </div>
+        ) : item.supplierCode ? (
+          <div className="flex items-center gap-1.5 mt-0.5 group/code">
+            <span className="text-xs text-slate-500 font-mono" title="Supplier Code">
+              {item.supplierCode}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setCodeDraft(item.supplierCode || "");
+                setIsEditingCode(true);
+              }}
+              className="text-slate-400 hover:text-indigo-600 p-0.5 rounded opacity-60 hover:opacity-100 transition-opacity"
+              title="Edit supplier code"
+            >
+              <Pencil className="w-3 h-3" />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              setCodeDraft("");
+              setIsEditingCode(true);
+            }}
+            className="text-[11px] text-indigo-500 hover:text-indigo-700 hover:underline flex items-center gap-1 mt-0.5"
+          >
+            <Plus className="w-3 h-3" /> Add supplier code
+          </button>
         )}
         {hasDiscrepancy && (
             <div className="text-xs font-bold text-orange-600 mt-1 flex items-center gap-2">

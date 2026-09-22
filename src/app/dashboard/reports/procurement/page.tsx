@@ -204,19 +204,19 @@ export default function ProcurementSheet() {
     }
   };
 
-  const handleAssignSupplier = async (productId: string, newSupplierId: string, unitCost?: string | number) => {
-    if (!newSupplierId) return;
+  const handleAssignSupplier = async (productId: string, newSupplierId?: string | null, unitCost?: string | number, supplierCode?: string) => {
+    if (!newSupplierId && supplierCode === undefined) return;
     try {
       const res = await fetch("/api/inventory/procurement", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId, newSupplierId, unitCost })
+        body: JSON.stringify({ productId, newSupplierId, unitCost, supplierCode })
       });
       if (!res.ok) throw new Error(await res.text());
       
       fetchData();
     } catch (e: any) {
-      alert("Failed to assign supplier: " + e.message);
+      alert("Failed to update supplier or code: " + e.message);
     }
   };
 
