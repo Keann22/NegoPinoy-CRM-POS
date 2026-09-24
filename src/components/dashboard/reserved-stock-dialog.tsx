@@ -195,7 +195,7 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose, s
             if (item.is_packed) return false;
 
             if (item.orders.status === 'Picked (with issue)') {
-              return false;
+              return statusFilter.includes('Picked (with issue)');
             }
             return true;
           })
