@@ -179,19 +179,23 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose, s
 
         let formattedOrders: ReservedOrder[] = (data || [])
           .filter((item: any) => {
-            // Packed view wants exactly the packed rows; every other view treats
-            // packed stock as already handled and excludes it.
-            if (packedOnly) return item.is_packed === true;
+            const hasOpenIssue = item.orders.status === 'Picked (with issue)' && (
+              openIssueKeys.has(`${item.orders.id}-${item.product_id}`)
+              || targetProductIds.some(tid => openIssueKeys.has(`${item.orders.id}-${tid}`))
+            );
+
+            // Packed view wants exactly the packed rows (excluding short items);
+            // every other view treats packed stock as already handled and excludes it.
+            if (packedOnly) return item.is_packed === true && !hasOpenIssue;
+
+            // An open shortage issue wins over a stale is_packed flag because the
+            // item is physically missing and still waiting to be fulfilled.
+            if (hasOpenIssue) return true;
 
             if (item.is_packed) return false;
 
             if (item.orders.status === 'Picked (with issue)') {
-              // The shortage is logged against the specific short product. For a
-              // bundle line that's the COMPONENT (one of targetProductIds), not
-              // the ordered bundle SKU (item.product_id) — so check both, or
-              // genuine component shortages get filtered out here.
-              return openIssueKeys.has(`${item.orders.id}-${item.product_id}`)
-                || targetProductIds.some(tid => openIssueKeys.has(`${item.orders.id}-${tid}`));
+              return false;
             }
             return true;
           })

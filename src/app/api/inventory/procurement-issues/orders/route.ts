@@ -1,4 +1,4 @@
-﻿import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { UNFULFILLED_STATUSES } from '@/lib/services/procurement-service';
 
@@ -80,16 +80,20 @@ export async function GET(req: Request) {
     }
 
     const affectedOrders = (items || [])
-      // An already-packed line has its unit secured — not blocked by this shortage.
-      .filter((i: any) => !i.is_packed)
       // "Picked (with issue)" lines only count when this exact item is the one
       // flagged — checked against the component (productId) for bundle lines, or
       // the ordered product_id, whichever carries the open issue.
-      .filter((i: any) =>
-        i.orders.status !== 'Picked (with issue)' ||
-        openIssueKeys.has(`${i.orders.id}-${productId}`) ||
-        openIssueKeys.has(`${i.orders.id}-${i.product_id}`)
-      )
+      // An open shortage issue takes precedence over a lingering is_packed flag.
+      .filter((i: any) => {
+        if (i.orders.status === 'Picked (with issue)') {
+          return (
+            openIssueKeys.has(`${i.orders.id}-${productId}`) ||
+            openIssueKeys.has(`${i.orders.id}-${i.product_id}`)
+          );
+        }
+        // Non-issue orders: an already-packed line has its unit secured.
+        return !i.is_packed;
+      })
       .map((i: any) => {
         const viaBundle = i.product_id !== productId;
         const qtyPer = viaBundle ? (qtyPerBundleById.get(i.product_id) || 1) : 1;
