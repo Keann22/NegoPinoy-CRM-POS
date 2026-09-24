@@ -29,6 +29,10 @@ export interface AlertReviewRowItem {
     auditedAt: string;
     notes: string;
   } | null;
+  isResolved?: boolean;
+  resolvedAt?: string | null;
+  resolvedBy?: string | null;
+  resolvedNotes?: string | null;
 }
 
 interface AlertReviewTableRowProps {
@@ -37,6 +41,10 @@ interface AlertReviewTableRowProps {
   onViewOrders: (item: AlertReviewRowItem) => void;
   onViewTrail: (productId: string) => void;
   onOpenAdjust: (item: AlertReviewRowItem) => void;
+  onConfirmStock?: (item: AlertReviewRowItem) => void;
+  isConfirming?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (productId: string) => void;
 }
 
 export function AlertReviewTableRow({
@@ -44,15 +52,30 @@ export function AlertReviewTableRow({
   index,
   onViewOrders,
   onViewTrail,
-  onOpenAdjust
+  onOpenAdjust,
+  onConfirmStock,
+  isConfirming = false,
+  isSelected = false,
+  onToggleSelect
 }: AlertReviewTableRowProps) {
   const isNeg = item.currentStock < 0;
   const isZero = item.currentStock === 0;
 
   return (
-    <tr className="hover:bg-slate-50 transition-colors">
-      <td className="p-3 text-center font-mono text-[11px] text-muted-foreground">
-        {index + 1}
+    <tr className={`transition-colors ${item.isResolved ? 'bg-slate-50/60 opacity-80' : isSelected ? 'bg-indigo-50/50' : 'hover:bg-slate-50'}`}>
+      <td className="p-3 text-center">
+        <div className="flex items-center justify-center gap-1.5 font-mono text-[11px] text-muted-foreground">
+          {onToggleSelect && !item.isResolved && (
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={() => onToggleSelect(item.productId)}
+              className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+              title="Select for bulk confirmation"
+            />
+          )}
+          <span>{index + 1}</span>
+        </div>
       </td>
 
       {/* Product Name & Details */}
@@ -193,6 +216,25 @@ export function AlertReviewTableRow({
             <Edit3 className="h-3 w-3" />
             Set Count
           </Button>
+
+          {item.isResolved ? (
+            <Badge variant="outline" className="h-7 px-2 text-[10px] font-semibold gap-1 bg-emerald-50 text-emerald-700 border-emerald-300 shrink-0">
+              <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+              Confirmed
+            </Badge>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isConfirming}
+              onClick={() => onConfirmStock?.(item)}
+              className="h-7 px-2.5 text-[11px] gap-1 font-semibold text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 border-emerald-300 dark:border-emerald-800/60 dark:text-emerald-400 dark:hover:bg-emerald-950/40 shrink-0"
+              title="Confirm current stock is accurate and remove this item from the pending review list"
+            >
+              <CheckCircle2 className={`h-3 w-3 text-emerald-600 ${isConfirming ? 'animate-spin' : ''}`} />
+              {isConfirming ? 'Saving...' : 'Confirm Stock'}
+            </Button>
+          )}
         </div>
       </td>
     </tr>

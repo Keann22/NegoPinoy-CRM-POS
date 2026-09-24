@@ -1,16 +1,17 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { AlertReviewTrailDialog } from '@/components/dashboard/inventory/alert-review-trail-dialog';
 import { AlertReviewAdjustDialog } from '@/components/dashboard/inventory/alert-review-adjust-dialog';
 import { AlertReviewTableRow, type AlertReviewRowItem } from '@/components/dashboard/inventory/alert-review-table-row';
+import { AlertReviewKpiCards } from '@/components/dashboard/inventory/alert-review-kpi-cards';
+import { AlertReviewFiltersBar } from '@/components/dashboard/inventory/alert-review-filters-bar';
 import { ReservedStockDialog } from '@/components/dashboard/reserved-stock-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { ShieldAlert, Search, RefreshCw } from 'lucide-react';
+import { ShieldAlert, RefreshCw, CheckCircle2 } from 'lucide-react';
 
 const ACTIVE_ORDER_STATUSES = [
   'Pending Payment',
@@ -27,15 +28,17 @@ export default function AlertReviewPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [stockFilter, setStockFilter] = useState<'all' | 'negative' | 'zero' | 'positive'>('all');
   const [rangeFilter, setRangeFilter] = useState<'recent' | 'today' | 'all'>('recent');
+  const [reviewStatus, setReviewStatus] = useState<'pending' | 'resolved' | 'all'>('pending');
 
-  // Trail dialog state
+  // Confirmation & bulk selection state
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkConfirming, setBulkConfirming] = useState(false);
+
+  // Modal dialog states
   const [trailProductId, setTrailProductId] = useState<string | null>(null);
   const [trailOpen, setTrailOpen] = useState(false);
-
-  // Active Orders (including Lay-aways) dialog state
   const [selectedOrdersItem, setSelectedOrdersItem] = useState<{ id: string; name: string } | null>(null);
-
-  // Quick physical count correction modal state
   const [adjustItem, setAdjustItem] = useState<AlertReviewRowItem | null>(null);
   const [adjustOpen, setAdjustOpen] = useState(false);
 
@@ -80,14 +83,19 @@ export default function AlertReviewPage() {
       if (stockFilter === 'negative') return item.currentStock < 0;
       if (stockFilter === 'zero') return item.currentStock === 0;
       if (stockFilter === 'positive') return item.currentStock > 0;
+
+      if (reviewStatus === 'pending') return !item.isResolved;
+      if (reviewStatus === 'resolved') return !!item.isResolved;
+
       return true;
     });
-  }, [items, searchQuery, stockFilter]);
+  }, [items, searchQuery, stockFilter, reviewStatus]);
 
   // Metric counts
   const totalAlertsCount = useMemo(() => items.reduce((acc, i) => acc + i.alertCount, 0), [items]);
   const negativeStockCount = useMemo(() => items.filter(i => i.currentStock < 0).length, [items]);
-  const auditedCount = useMemo(() => items.filter(i => !!i.lastPhysicalAudit).length, [items]);
+  const pendingCount = useMemo(() => items.filter(i => !i.isResolved).length, [items]);
+  const resolvedCount = useMemo(() => items.filter(i => !!i.isResolved).length, [items]);
 
   const handleOpenTrail = (productId: string) => {
     setTrailProductId(productId);
@@ -103,10 +111,114 @@ export default function AlertReviewPage() {
     setAdjustOpen(true);
   };
 
+  const handleConfirmStock = async (item: AlertReviewRowItem) => {
+    setConfirmingId(item.productId);
+    try {
+      const res = await fetch('/api/inventory/guardian/alert-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId: item.productId,
+          actorName: 'Admin Review',
+          notes: `Stock confirmed as accurate (${item.currentStock})`
+        })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to confirm stock');
+
+      setItems(prev => prev.map(i => {
+        if (i.productId === item.productId) {
+          return {
+            ...i,
+            isResolved: true,
+            resolvedAt: new Date().toISOString(),
+            resolvedBy: 'Admin Review'
+          };
+        }
+        return i;
+      }));
+
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        next.delete(item.productId);
+        return next;
+      });
+
+      toast({
+        title: 'Stock Confirmed',
+        description: `Confirmed stock for "${item.name}". Removed from pending review.`
+      });
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Error', description: err.message });
+    } finally {
+      setConfirmingId(null);
+    }
+  };
+
+  const handleBulkConfirm = async () => {
+    if (selectedIds.size === 0) return;
+    setBulkConfirming(true);
+    const ids = Array.from(selectedIds);
+    try {
+      const res = await fetch('/api/inventory/guardian/alert-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productIds: ids,
+          actorName: 'Admin Review'
+        })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to confirm stocks');
+
+      setItems(prev => prev.map(i => {
+        if (selectedIds.has(i.productId)) {
+          return {
+            ...i,
+            isResolved: true,
+            resolvedAt: new Date().toISOString(),
+            resolvedBy: 'Admin Review'
+          };
+        }
+        return i;
+      }));
+
+      const count = ids.length;
+      setSelectedIds(new Set());
+      toast({
+        title: 'Batch Confirmed',
+        description: `Confirmed ${count} products. Removed from pending review.`
+      });
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Error', description: err.message });
+    } finally {
+      setBulkConfirming(false);
+    }
+  };
+
+  const handleToggleSelect = (productId: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(productId)) next.delete(productId);
+      else next.add(productId);
+      return next;
+    });
+  };
+
+  const handleSelectAllVisible = () => {
+    const pendingVisible = filteredItems.filter(i => !i.isResolved).map(i => i.productId);
+    const allSelected = pendingVisible.length > 0 && pendingVisible.every(id => selectedIds.has(id));
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      pendingVisible.forEach(id => (allSelected ? next.delete(id) : next.add(id)));
+      return next;
+    });
+  };
+
   const handleAdjustSuccess = (productId: string, newStockLevel: number, physicalCount: number, notes: string) => {
     toast({
-      title: 'Stock Updated',
-      description: `Physical shelf set to ${physicalCount}. New ledger stock: ${newStockLevel}.`
+      title: 'Stock Updated & Resolved',
+      description: `Physical shelf set to ${physicalCount}. New ledger stock: ${newStockLevel}. Removed from pending review.`
     });
 
     setItems(prev => prev.map(i => {
@@ -114,6 +226,9 @@ export default function AlertReviewPage() {
         return {
           ...i,
           currentStock: newStockLevel,
+          isResolved: true,
+          resolvedAt: new Date().toISOString(),
+          resolvedBy: 'Admin Review',
           lastPhysicalAudit: {
             actorName: 'Admin Review',
             physicalCount,
@@ -125,6 +240,9 @@ export default function AlertReviewPage() {
       return i;
     }));
   };
+
+  const pendingVisibleCount = filteredItems.filter(i => !i.isResolved).length;
+  const isAllVisibleSelected = pendingVisibleCount > 0 && filteredItems.filter(i => !i.isResolved).every(i => selectedIds.has(i.productId));
 
   return (
     <div className="space-y-6 pb-16">
@@ -138,7 +256,7 @@ export default function AlertReviewPage() {
             </h1>
           </div>
           <p className="text-sm text-muted-foreground mt-1">
-            Purchasing-sheet style review of all items alerted via Telegram since yesterday. Click any demand count to see all active orders (including Lay-aways) and their statuses.
+            Purchasing-sheet style review of items alerted via Telegram. Confirm verified stock to dismiss and remove them from your active review list.
           </p>
         </div>
 
@@ -157,111 +275,76 @@ export default function AlertReviewPage() {
       </div>
 
       {/* KPI Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="shadow-sm">
-          <CardHeader className="p-4 pb-1">
-            <CardDescription className="text-xs font-medium">Alerted Products</CardDescription>
-            <CardTitle className="text-2xl font-extrabold text-slate-800">{items.length}</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-1 text-[11px] text-muted-foreground">
-            Unique items notified to Telegram
-          </CardContent>
-        </Card>
+      <AlertReviewKpiCards
+        pendingCount={pendingCount}
+        resolvedCount={resolvedCount}
+        negativeStockCount={negativeStockCount}
+        totalAlertsCount={totalAlertsCount}
+      />
 
-        <Card className="shadow-sm border-rose-200 bg-rose-50/30">
-          <CardHeader className="p-4 pb-1">
-            <CardDescription className="text-xs font-medium text-rose-700">Negative Stock Items</CardDescription>
-            <CardTitle className="text-2xl font-extrabold text-rose-700">{negativeStockCount}</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-1 text-[11px] text-rose-600">
-            Items currently below 0 in ledger
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm">
-          <CardHeader className="p-4 pb-1">
-            <CardDescription className="text-xs font-medium">Total Messages Sent</CardDescription>
-            <CardTitle className="text-2xl font-extrabold text-indigo-600">{totalAlertsCount}</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-1 text-[11px] text-muted-foreground">
-            Telegram push alerts dispatched
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm border-emerald-200 bg-emerald-50/30">
-          <CardHeader className="p-4 pb-1">
-            <CardDescription className="text-xs font-medium text-emerald-700">Physically Audited</CardDescription>
-            <CardTitle className="text-2xl font-extrabold text-emerald-700">{auditedCount}</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-1 text-[11px] text-emerald-600">
-            Count confirmed by staff
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters & Search Toolbar */}
+      {/* Sheet Table Card */}
       <Card className="shadow-sm">
-        <div className="p-4 border-b bg-slate-50 flex flex-col md:flex-row justify-between md:items-center gap-3">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Search product name, SKU, shelf..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="pl-9 h-9 text-xs bg-white"
-            />
-          </div>
+        {/* Filters Toolbar */}
+        <AlertReviewFiltersBar
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          reviewStatus={reviewStatus}
+          onReviewStatusChange={setReviewStatus}
+          rangeFilter={rangeFilter}
+          onRangeFilterChange={setRangeFilter}
+          stockFilter={stockFilter}
+          onStockFilterChange={setStockFilter}
+          pendingCount={pendingCount}
+          resolvedCount={resolvedCount}
+          totalCount={items.length}
+          negativeStockCount={negativeStockCount}
+        />
 
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Range Toggle */}
-            <div className="inline-flex rounded-md border bg-white p-0.5 text-xs">
-              {(['recent', 'today', 'all'] as const).map(r => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => setRangeFilter(r)}
-                  className={`px-3 py-1 rounded font-medium transition-colors ${
-                    rangeFilter === r ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  {r === 'recent' ? 'Since Yesterday' : r === 'today' ? 'Today Only' : 'All Time'}
-                </button>
-              ))}
-            </div>
-
-            {/* Stock Filter */}
-            <div className="inline-flex rounded-md border bg-white p-0.5 text-xs">
-              <button
-                type="button"
-                onClick={() => setStockFilter('all')}
-                className={`px-2.5 py-1 rounded font-medium ${stockFilter === 'all' ? 'bg-slate-200 text-slate-900' : 'text-slate-600'}`}
+        {/* Bulk Action Bar */}
+        {selectedIds.size > 0 && (
+          <div className="flex items-center justify-between p-3 bg-indigo-50 border-b border-indigo-100 text-xs font-medium">
+            <span className="text-indigo-900 font-semibold">
+              {selectedIds.size} product{selectedIds.size > 1 ? 's' : ''} selected
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                onClick={handleBulkConfirm}
+                disabled={bulkConfirming}
+                className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold gap-1.5"
               >
-                All ({items.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setStockFilter('negative')}
-                className={`px-2.5 py-1 rounded font-medium ${stockFilter === 'negative' ? 'bg-rose-100 text-rose-800' : 'text-slate-600'}`}
+                <CheckCircle2 className={`h-3.5 w-3.5 ${bulkConfirming ? 'animate-spin' : ''}`} />
+                {bulkConfirming ? 'Confirming...' : `Confirm Stock for ${selectedIds.size} Items`}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedIds(new Set())}
+                className="h-7 text-xs"
               >
-                Negative ({negativeStockCount})
-              </button>
-              <button
-                type="button"
-                onClick={() => setStockFilter('zero')}
-                className={`px-2.5 py-1 rounded font-medium ${stockFilter === 'zero' ? 'bg-amber-100 text-amber-800' : 'text-slate-600'}`}
-              >
-                Zero
-              </button>
+                Clear Selection
+              </Button>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Sheet Table */}
         <div className="overflow-x-auto">
           <Table className="text-xs">
             <TableHeader className="bg-slate-50 text-slate-600">
               <TableRow>
-                <th className="p-3 w-10 text-center font-bold">#</th>
+                <th className="p-3 w-12 text-center font-bold">
+                  {reviewStatus !== 'resolved' && (
+                    <input
+                      type="checkbox"
+                      checked={isAllVisibleSelected}
+                      onChange={handleSelectAllVisible}
+                      className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                      title="Select all visible pending products"
+                    />
+                  )}
+                  {reviewStatus === 'resolved' && '#'}
+                </th>
                 <th className="p-3 text-left w-2/5">Product & SKU</th>
                 <th className="p-3 text-center">Shelf</th>
                 <th className="p-3 text-center">Current Inventory</th>
@@ -282,7 +365,9 @@ export default function AlertReviewPage() {
               ) : filteredItems.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="text-center py-12 text-muted-foreground">
-                    No alerted products found matching your search.
+                    {reviewStatus === 'pending'
+                      ? 'No pending items to review! All alerted items have been confirmed or verified.'
+                      : 'No products found matching your search.'}
                   </td>
                 </tr>
               ) : (
@@ -294,6 +379,10 @@ export default function AlertReviewPage() {
                     onViewOrders={handleOpenOrders}
                     onViewTrail={handleOpenTrail}
                     onOpenAdjust={handleOpenAdjust}
+                    onConfirmStock={handleConfirmStock}
+                    isConfirming={confirmingId === item.productId}
+                    isSelected={selectedIds.has(item.productId)}
+                    onToggleSelect={handleToggleSelect}
                   />
                 ))
               )}
@@ -309,7 +398,7 @@ export default function AlertReviewPage() {
         onOpenChange={setTrailOpen}
       />
 
-      {/* Active Orders & Lay-aways Dialog (with order statuses and order trails) */}
+      {/* Active Orders & Lay-aways Dialog */}
       {selectedOrdersItem && (
         <ReservedStockDialog
           productId={selectedOrdersItem.id}

@@ -124,18 +124,22 @@ export async function GET(req: Request) {
       });
     }
 
-    // Fetch recent physical count audits for these products
+    // Fetch recent physical count audits and dismissals for these products
     const { data: auditMemories } = await supabase
       .from('inventory_guardian_memory')
-      .select('product_id, actor_name, physical_count, created_at, notes')
+      .select('id, product_id, action_type, actor_name, physical_count, created_at, notes, metadata')
       .in('product_id', productIds)
-      .eq('action_type', 'physical_count_audit')
+      .in('action_type', ['physical_count_audit', 'anomaly_dismissed'])
       .order('created_at', { ascending: false });
 
     const auditMap = new Map<string, any>();
-    for (const aud of (auditMemories || [])) {
-      if (!auditMap.has(aud.product_id)) {
-        auditMap.set(aud.product_id, aud);
+    const resolutionMap = new Map<string, any>();
+    for (const mem of (auditMemories || [])) {
+      if (mem.action_type === 'physical_count_audit' && !auditMap.has(mem.product_id)) {
+        auditMap.set(mem.product_id, mem);
+      }
+      if (!resolutionMap.has(mem.product_id)) {
+        resolutionMap.set(mem.product_id, mem);
       }
     }
 
@@ -145,6 +149,12 @@ export async function GET(req: Request) {
       const latestAlert = pAlerts[0];
       const demand = demandMap.get(p.id) || { count: 0, qty: 0 };
       const lastAudit = auditMap.get(p.id) || null;
+      const latestResolution = resolutionMap.get(p.id) || null;
+
+      // An alert is considered resolved if an audit or confirmation was made after the latest alert was generated
+      const latestAlertTime = latestAlert?.created_at ? new Date(latestAlert.created_at).getTime() : 0;
+      const resolutionTime = latestResolution?.created_at ? new Date(latestResolution.created_at).getTime() : 0;
+      const isResolved = resolutionTime >= latestAlertTime;
 
       const anomalyId = latestAlert?.metadata?.anomalyId || '';
       let anomalyTypeLabel = 'Stock Discrepancy';
@@ -178,7 +188,11 @@ export async function GET(req: Request) {
           physicalCount: lastAudit.physical_count,
           auditedAt: lastAudit.created_at,
           notes: lastAudit.notes
-        } : null
+        } : null,
+        isResolved,
+        resolvedAt: isResolved ? latestResolution?.created_at : null,
+        resolvedBy: isResolved ? latestResolution?.actor_name : null,
+        resolvedNotes: isResolved ? latestResolution?.notes : null
       };
     });
 
@@ -193,6 +207,60 @@ export async function GET(req: Request) {
     });
   } catch (error: any) {
     console.error('Error in alert-review API route:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const { productIds, productId, notes, actorName = 'Admin Review' } = body;
+
+    const ids: string[] = productIds && Array.isArray(productIds)
+      ? productIds
+      : productId ? [productId] : [];
+
+    if (ids.length === 0) {
+      return NextResponse.json({ success: false, error: 'Product ID(s) required' }, { status: 400 });
+    }
+
+    // Fetch current product stocks
+    const { data: products, error: pErr } = await supabase
+      .from('products')
+      .select('id, name, stock_level')
+      .in('id', ids);
+
+    if (pErr) throw pErr;
+
+    const timestamp = new Date().toISOString();
+    const rowsToInsert = (products || []).map(p => ({
+      product_id: p.id,
+      action_type: 'anomaly_dismissed',
+      system_stock_before: p.stock_level ?? 0,
+      system_stock_after: p.stock_level ?? 0,
+      discrepancy: 0,
+      actor_name: actorName,
+      notes: notes || `Confirmed current stock (${p.stock_level ?? 0}) as accurate from Alert Review Sheet`,
+      metadata: {
+        resolved_from: 'alert_review_sheet',
+        confirmed_at: timestamp
+      }
+    }));
+
+    if (rowsToInsert.length > 0) {
+      const { error: insErr } = await supabase
+        .from('inventory_guardian_memory')
+        .insert(rowsToInsert);
+      if (insErr) throw insErr;
+    }
+
+    return NextResponse.json({
+      success: true,
+      confirmedCount: rowsToInsert.length,
+      confirmedProductIds: ids
+    });
+  } catch (error: any) {
+    console.error('Error in POST alert-review:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
