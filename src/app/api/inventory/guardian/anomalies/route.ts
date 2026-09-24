@@ -47,25 +47,6 @@ export async function GET(req: Request) {
     const queueLimit = dailyProgress.isGoalMet ? 0 : dailyProgress.remainingToday;
     const todayQueue = pendingAnomalies.slice(0, Math.max(queueLimit, 0));
 
-    // Dispatch pending high-severity Telegram alerts (throttled to 2 per cycle to ensure fast response & avoid spam)
-    try {
-      const { notifyInventoryAnomaly, getTelegramConfig } = await import(
-        '@/lib/services/inventory/inventory-guardian-telegram-service'
-      );
-      const config = getTelegramConfig();
-      if (config.botToken && config.chatId) {
-        const highSeverityAnomalies = pendingAnomalies.filter(a => a.severity === 'high');
-        let sentCount = 0;
-        for (const a of highSeverityAnomalies) {
-          if (sentCount >= 2) break;
-          const res = await notifyInventoryAnomaly(supabase, a);
-          if (res.sent) sentCount++;
-        }
-      }
-    } catch (err) {
-      console.error('Telegram alert dispatch error:', err);
-    }
-
     return NextResponse.json({
       success: true,
       anomalies: todayQueue,

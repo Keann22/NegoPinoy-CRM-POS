@@ -168,6 +168,10 @@ Key tables (not exhaustive):
 | `recurring_expenses` | Recurring expense templates |
 | `categories` | Product categories |
 | `notifications` | In-app notifications |
+| `warehouses` | Storage locations (`UNIT1` Fulfillment Hub, `UNIT2` Reserve & Inbound) |
+| `product_warehouse_stock` | Stock levels, shelf locations, and reorder thresholds per warehouse |
+| `stock_transfers` | Internal stock transfer documents between warehouses |
+| `stock_transfer_items` | Line items for internal stock transfers |
 
 **Auth**: Uses `supabase.auth` — user metadata stores `first_name`, `last_name`, and `roles[]`.
 
@@ -263,6 +267,23 @@ When converting an audited physical shelf count into `stock_level`:
 1. Only count orders that **genuinely still need to be pulled from the shelf**: `Pending Payment`, `Processing`, `Waiting for Stock`, and `On-Hold` (where `is_packed = false`).
 2. For orders in `Picked (with issue)`, only count line items that have an **open** shortage issue in `order_issues` (`status = 'open'`). If an issue was already resolved or belongs to a different item, the unit was already successfully picked.
 3. Completely exclude orders in `Picked`, `Photo`, `Packed`, `For Shipping`, `For Pick-up`, and any item where `is_packed = true` — they are already physically off the shelf and must never be subtracted again.
+
+### Multi-Warehouse Tracking: Strategy A (added 2026-09-22)
+
+The system supports multi-warehouse inventory tracking with **Strategy A**:
+- **Unit 1 (`UNIT1`) — Fulfillment Hub**: Active pick & pack, courier dispatch (SPX staging), fast-moving items on accessible picking shelves.
+- **Unit 2 (`UNIT2`) — Reserve & Inbound**: Unopened master cartons, bulk reserve, and supplier delivery receiving.
+
+#### Bi-Directional Total Synchronization (Zero Breakage Guarantee)
+To guarantee 100% backward compatibility with POS orders, P&L reports, and the separate `/website` e-commerce app:
+1. `products.stock_level` is always the **Total Catalog Stock** across all warehouses.
+2. PostgreSQL trigger `trg_sync_product_warehouse_totals` on `product_warehouse_stock` automatically computes `SUM(stock_level)` and writes it to `products.stock_level`. It also keeps `products.shelf_location` synchronized with the Fulfillment Hub (Unit 1) shelf location.
+3. PostgreSQL trigger `trg_sync_product_direct_update` on `products` ensures that any manual stock edits or legacy script writes to `products.stock_level` or `products.shelf_location` automatically reflect in Unit 1's `product_warehouse_stock`. Both triggers use `pg_trigger_depth() > 1` to prevent trigger loops.
+
+#### Runner Transfers & Inbound Receiving
+- **Internal Transfers** (`/dashboard/inventory/transfers`): Screen for the daily runner. Features a **Runner Sheet** suggesting items to transfer from Unit 2 Reserve to Unit 1 Active (where Unit 1 stock $\le$ reorder threshold and Unit 2 has stock), plus Quick Transfer and Transfer History. Executed atomically via `execute_stock_transfer` RPC.
+- **Inbound Receiving** (`/dashboard/inventory/receive`): Defaults receiving destination to **Unit 2 (Reserve & Inbound)** with a dropdown to select Unit 1 for urgent direct-to-shelf restocks.
+- **Picker Alert** (`/dashboard/pick`): If an item on Unit 1 shelf is empty, the picker UI displays Unit 2 reserve stock so pickers can request replenishment rather than reporting false out-of-stock issues.
 
 ---
 
@@ -982,6 +1003,9 @@ What happens across the system when inventory matches:
 | `src/components/dashboard/inventory/InventoryGuardianMemoryTimeline.tsx` | Product audit history timeline with actor attribution and discrepancy deltas |
 | `src/components/dashboard/inventory/InventoryGuardianTrigger.tsx` | Dashboard header shield icon and active anomaly counter badge |
 | `src/components/dashboard/settings/TelegramGuardianSettings.tsx` | Settings configuration card and live Telegram bot ping test button |
+| `src/app/dashboard/inventory/alert-review/page.tsx` | Guardian Alert Review Sheet — purchasing-sheet style review of all alerted items with quick count actions |
+| `src/components/dashboard/inventory/alert-review-trail-dialog.tsx` | Deep audit trail dialog showing movements, guardian memories, and active open orders for alerted items |
+| `src/app/api/inventory/guardian/alert-review/route.ts` | API route delivering grouped alerted products and deep product trail data |
 
 ---
 

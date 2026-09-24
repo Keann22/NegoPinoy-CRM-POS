@@ -132,9 +132,6 @@ export async function detectInventoryAnomalies(supabase: SupabaseClient): Promis
     };
 
     activeDemandRows.forEach((row: any) => {
-      if (row.is_packed) return; // Already physically pulled from shelf and packed
-      if (row.orders?.payment_method === 'Lay-away') return; // Consumes allocation, but not unfulfilled shortage
-
       const orderStatus = row.orders?.status;
       const orderId = row.orders?.id;
 
@@ -147,6 +144,8 @@ export async function detectInventoryAnomalies(supabase: SupabaseClient): Promis
         if (!hasOpenDirect && !hasOpenComp) {
           return; // Shortage already resolved or unrelated to this product
         }
+      } else if (row.is_packed) {
+        return; // Already physically pulled from shelf and packed
       }
 
       const rowQty = Number(row.quantity) || 1;
@@ -180,6 +179,16 @@ export async function detectInventoryAnomalies(supabase: SupabaseClient): Promis
         lastVerifiedBy: lastAudit?.actorName,
         repeatDiscrepancyCount: pMemories.length
       };
+
+      // If staff has physically audited this product within the past 24 hours,
+      // its physical count has already been verified on the shelf.
+      // Do not generate ghost negative stock anomalies asking staff to re-check it.
+      const isAuditedRecently = Boolean(
+        lastAudit?.createdAt && (Date.now() - new Date(lastAudit.createdAt).getTime()) < 24 * 60 * 60 * 1000
+      );
+      if (isAuditedRecently) {
+        continue;
+      }
 
       // Anomaly 1: Stock is negative, but 0 active unpicked orders need it (Ghost Negative Stock)
       if (demand.qty === 0) {

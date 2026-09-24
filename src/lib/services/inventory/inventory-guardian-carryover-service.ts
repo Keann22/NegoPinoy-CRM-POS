@@ -196,31 +196,10 @@ export async function getGuardianDailyProgress(
   const isSunday = dayOfWeek === 0;
 
   const isAssigned = isAssignedAuditor(userIdentifier);
-  if (userIdentifier && !isAssigned) {
-    return {
-      baseTarget: 0,
-      carryOver: 0,
-      target: 0,
-      completedToday: 0,
-      remainingToday: 0,
-      isGoalMet: true,
-      isRestDay: isSunday,
-      completedItems: [],
-      totalBacklogCount,
-      assignedStaffName: undefined,
-      teamCompletedToday: 0,
-      allAuditedProductIdsToday: []
-    };
-  }
-
   const assignedStaffName = resolveStaffDisplayName(userIdentifier);
-
-  const { baseTarget, carryOver, target } = await computeGuardianDailyTarget(
-    supabase,
-    phDateStr,
-    isSunday,
-    userIdentifier
-  );
+  let baseTarget = isAssigned ? BASE_DAILY_TARGET : 0;
+  let carryOver = 0;
+  let target = baseTarget;
 
   try {
     const todayMidnightUtc = new Date(`${phDateStr}T00:00:00+08:00`).toISOString();
@@ -231,6 +210,39 @@ export async function getGuardianDailyProgress(
       .in('action_type', ['physical_count_audit', 'purchase_backfill'])
       .gte('created_at', todayMidnightUtc)
       .order('created_at', { ascending: false });
+
+    // All products checked today across the entire team (to prevent redundant assignments)
+    const allAuditedProductIdsToday = Array.from(
+      new Set((todayMemories || []).map((m: any) => m.product_id).filter(Boolean))
+    );
+    const teamCompletedToday = allAuditedProductIdsToday.length;
+
+    if (userIdentifier && !isAssigned) {
+      return {
+        baseTarget: 0,
+        carryOver: 0,
+        target: 0,
+        completedToday: 0,
+        remainingToday: 0,
+        isGoalMet: true,
+        isRestDay: isSunday,
+        completedItems: [],
+        totalBacklogCount,
+        assignedStaffName: undefined,
+        teamCompletedToday,
+        allAuditedProductIdsToday
+      };
+    }
+
+    const targetInfo = await computeGuardianDailyTarget(
+      supabase,
+      phDateStr,
+      isSunday,
+      userIdentifier
+    );
+    baseTarget = targetInfo.baseTarget;
+    carryOver = targetInfo.carryOver;
+    target = targetInfo.target;
 
     if (error || !todayMemories) {
       return {
@@ -248,12 +260,6 @@ export async function getGuardianDailyProgress(
         allAuditedProductIdsToday: []
       };
     }
-
-    // All products checked today across the entire team (to prevent redundant assignments)
-    const allAuditedProductIdsToday = Array.from(
-      new Set(todayMemories.map((m: any) => m.product_id).filter(Boolean))
-    );
-    const teamCompletedToday = allAuditedProductIdsToday.length;
 
     // Filter memories belonging to this specific user (or all if unassigned)
     const userMemories = userIdentifier
