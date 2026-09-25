@@ -137,13 +137,13 @@ export async function calculateProcurementDemand(
 
   const isUnfulfilledFor = (row: any, targetProductId: string): boolean => {
     if (row.orders.payment_method === 'Lay-away') return false; // consume stock, but don't auto-buy
-    if (row.is_packed) return false;
     if (row.orders.status === 'Picked (with issue)') {
       return (
         openIssueKeys.has(`${row.orders.id}-${targetProductId}`) ||
         openIssueKeys.has(`${row.orders.id}-${row.product_id}`)
       );
     }
+    if (row.is_packed) return false;
     return UNFULFILLED_STATUSES.includes(row.orders.status);
   };
 

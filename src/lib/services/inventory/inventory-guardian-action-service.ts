@@ -66,8 +66,6 @@ export async function applyPhysicalShelfCount(
   let activeOrdersCount = 0;
 
   for (const item of (activeItems || [])) {
-    if (item.is_packed) continue; // Already physically pulled from shelf and packed
-
     const order = Array.isArray(item.orders) ? item.orders[0] : item.orders;
     if (!order || typeof order !== 'object') continue;
     const orderStatus = 'status' in order ? String(order.status) : '';
@@ -80,6 +78,8 @@ export async function applyPhysicalShelfCount(
         activeReservations += shortQty;
         activeOrdersCount++;
       }
+    } else if (item.is_packed) {
+      continue; // Already physically pulled from shelf and packed
     } else if (UNPICKED_STATUSES.includes(orderStatus)) {
       activeReservations += (Number(item.quantity) || 1);
       activeOrdersCount++;

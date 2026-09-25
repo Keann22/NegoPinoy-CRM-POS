@@ -195,7 +195,10 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose, s
             if (item.is_packed) return false;
 
             if (item.orders.status === 'Picked (with issue)') {
-              return statusFilter.includes('Picked (with issue)');
+              // If this item was short, hasOpenIssue above already returned true.
+              // If hasOpenIssue is false, the picker already found and secured this item,
+              // so it behaves as 'Picked' and should only show if 'Picked' is in statusFilter.
+              return statusFilter.includes('Picked');
             }
             return true;
           })
