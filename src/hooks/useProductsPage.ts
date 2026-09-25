@@ -44,6 +44,7 @@ export function useProductsPage() {
   });
 
   const isManagement = useMemo(() => userProfile?.roles?.some(r => ['Admin', 'Owner'].includes(r)), [userProfile]);
+  const canManageProducts = useMemo(() => userProfile?.roles?.some(r => ['Admin', 'Owner', 'Inventory'].includes(r)), [userProfile]);
 
   const allVisibleProducts = useMemo(
     () => paginatedProducts.flatMap(p => [p, ...(p.children || [])]),
@@ -218,6 +219,7 @@ export function useProductsPage() {
     isLoading,
     refetch,
     isManagement,
+    canManageProducts,
     totalPages,
     handleDeleteConfirm,
     handleBulkDeleteConfirm,

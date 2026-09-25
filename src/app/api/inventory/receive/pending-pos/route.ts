@@ -85,10 +85,16 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const { receives, unexpectedItems, reportedByName } = await req.json();
+    const { receives, unexpectedItems, reportedByName, targetWarehouseId: reqTargetWarehouseId } = await req.json();
 
     if ((!receives || receives.length === 0) && (!unexpectedItems || unexpectedItems.length === 0)) {
       return NextResponse.json({ error: 'No items provided' }, { status: 400 });
+    }
+
+    let targetWarehouseId = reqTargetWarehouseId;
+    if (!targetWarehouseId) {
+      const { data: u2 } = await supabase.from('warehouses').select('id').eq('code', 'UNIT2').maybeSingle();
+      if (u2) targetWarehouseId = u2.id;
     }
 
     // Fetched lazily (only if at least one item actually has a discrepancy) and
@@ -145,11 +151,18 @@ export async function POST(req: Request) {
         const stockCost = canAutoRecord
           ? null
           : (Number(poItem.unit_cost) > 0 ? Number(poItem.unit_cost) : null);
-        const { error: updateError } = await supabase.rpc('increment_stock', {
-            p_product_id: poItem.product_id,
-            qty: r.receivedQty,
-            new_unit_cost: stockCost
-        });
+        const { error: updateError } = targetWarehouseId
+          ? await supabase.rpc('increment_warehouse_stock', {
+              p_product_id: poItem.product_id,
+              p_warehouse_id: targetWarehouseId,
+              p_qty: r.receivedQty,
+              p_new_unit_cost: stockCost,
+            })
+          : await supabase.rpc('increment_stock', {
+              p_product_id: poItem.product_id,
+              qty: r.receivedQty,
+              new_unit_cost: stockCost,
+            });
 
         if (updateError) throw updateError;
 
@@ -282,11 +295,18 @@ export async function POST(req: Request) {
     if (unexpectedItems && unexpectedItems.length > 0) {
       for (const item of unexpectedItems) {
         // 1. Update Live Stock safely
-        const { error: updateError } = await supabase.rpc('increment_stock', {
-            p_product_id: item.productId,
-            qty: item.receivedQty,
-            new_unit_cost: item.unitCost || 0
-        });
+        const { error: updateError } = targetWarehouseId
+          ? await supabase.rpc('increment_warehouse_stock', {
+              p_product_id: item.productId,
+              p_warehouse_id: targetWarehouseId,
+              p_qty: item.receivedQty,
+              p_new_unit_cost: item.unitCost || 0,
+            })
+          : await supabase.rpc('increment_stock', {
+              p_product_id: item.productId,
+              qty: item.receivedQty,
+              new_unit_cost: item.unitCost || 0,
+            });
         
         if (updateError) throw updateError;
 

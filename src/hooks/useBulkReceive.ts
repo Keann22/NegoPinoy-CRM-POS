@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useSupabase } from '@/lib/supabase/hooks';
 import { useToast } from '@/hooks/use-toast';
+import { useUserProfile } from '@/hooks/useUserProfile';
 
 const shipmentItemSchema = z.object({
   productId: z.string().min(1, "Product must be selected."),
@@ -23,6 +24,8 @@ export type ShipmentFormValues = z.infer<typeof shipmentSchema>;
 export function useBulkReceive() {
   const supabase = useSupabase();
   const { toast } = useToast();
+  const { userProfile } = useUserProfile();
+  const canManageInventory = userProfile?.roles?.some(r => ['Admin', 'Owner', 'Inventory'].includes(r));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittingIndex, setSubmittingIndex] = useState<number | null>(null);
 
@@ -49,6 +52,15 @@ export function useBulkReceive() {
   }, 0);
 
   const handleReceiveSingleItem = async (index: number) => {
+    if (!canManageInventory) {
+      toast({
+        variant: 'destructive',
+        title: 'Permission Denied',
+        description: 'Sales accounts do not have permission to receive stock.',
+      });
+      return;
+    }
+
     const values = form.getValues();
     const item = values.items[index];
     
@@ -124,6 +136,15 @@ export function useBulkReceive() {
   };
 
   const onSubmit = async (values: ShipmentFormValues) => {
+    if (!canManageInventory) {
+      toast({
+        variant: 'destructive',
+        title: 'Permission Denied',
+        description: 'Sales accounts do not have permission to receive stock.',
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     toast({ title: 'Saving Shipment...', description: 'Please wait.' });
 

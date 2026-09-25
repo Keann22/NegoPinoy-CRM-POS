@@ -1,7 +1,9 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import type { FormattedProduct } from '@/app/dashboard/products/page';
+import type { FormattedProduct } from '@/types';
 import { ZoomableImage } from "@/components/ui/zoomable-image";
+import { useSupabase } from "@/lib/supabase/hooks";
+import { useState, useEffect } from "react";
 
 interface ViewProductDetailsDialogProps {
   product: FormattedProduct | null;
@@ -10,6 +12,29 @@ interface ViewProductDetailsDialogProps {
 }
 
 export function ViewProductDetailsDialog({ product, open, onOpenChange }: ViewProductDetailsDialogProps) {
+  const supabase = useSupabase();
+  const [warehouseStock, setWarehouseStock] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!product?.id || !open || !supabase) return;
+    const loadStock = async () => {
+      try {
+        const { data } = await supabase
+          .from('product_warehouse_stock')
+          .select('stock_level, shelf_location, warehouse:warehouses(name, code, is_fulfillment_hub)')
+          .eq('product_id', product.id);
+        if (data) {
+          // Sort fulfillment hub first
+          data.sort((a: any, b: any) => (b.warehouse?.is_fulfillment_hub ? 1 : 0) - (a.warehouse?.is_fulfillment_hub ? 1 : 0));
+          setWarehouseStock(data);
+        }
+      } catch (err) {
+        console.error('Failed to load warehouse stock:', err);
+      }
+    };
+    loadStock();
+  }, [product?.id, open, supabase]);
+
   if (!product) return null;
 
   return (
@@ -75,10 +100,35 @@ export function ViewProductDetailsDialog({ product, open, onOpenChange }: ViewPr
                   )}
               </div>
               <div>
-                  <h4 className="text-sm font-medium text-muted-foreground">Stock Level</h4>
-                  <p className="text-sm mt-1">{product.quantityOnHand}</p>
+                  <h4 className="text-sm font-medium text-muted-foreground">Total Stock</h4>
+                  <p className="text-sm font-semibold mt-1">{product.quantityOnHand} pcs</p>
               </div>
           </div>
+
+          {/* Warehouse Stock Breakdown */}
+          {warehouseStock.length > 0 && (
+            <div>
+              <h4 className="text-sm font-medium text-muted-foreground mb-2">Location & Storage Breakdown</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {warehouseStock.map((ws, i) => (
+                  <div key={i} className="border rounded-lg p-3 bg-muted/20 flex flex-col justify-between">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-xs font-semibold text-foreground">{ws.warehouse?.name}</span>
+                      <Badge variant={ws.warehouse?.is_fulfillment_hub ? 'default' : 'secondary'} className="text-[10px] px-1.5 py-0">
+                        {ws.warehouse?.code}
+                      </Badge>
+                    </div>
+                    <div className="mt-2.5 flex items-baseline justify-between">
+                      <span className="text-xl font-bold">{ws.stock_level} pcs</span>
+                      <span className="text-xs font-mono text-muted-foreground">
+                        {ws.shelf_location ? `Shelf: ${ws.shelf_location}` : 'No shelf'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div>
               <h4 className="text-sm font-medium text-muted-foreground mb-2">Description</h4>

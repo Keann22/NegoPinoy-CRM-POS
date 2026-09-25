@@ -40,6 +40,7 @@ interface ProductsTableProps {
   selectedProductIds: string[];
   expandedParents: Set<string>;
   isManagement: boolean | undefined;
+  canManageProducts?: boolean;
   onSelectAll: (checked: boolean) => void;
   onSelectOne: (id: string, checked: boolean) => void;
   onToggleExpand: (id: string) => void;
@@ -133,9 +134,10 @@ function GroupStockCell({ product, onViewReserved, onViewPacked, onViewAllocated
   );
 }
 
-function ProductActionsMenu({ product, isManagement, onViewDetails, onEdit, onViewHistory, onDelete }: {
+function ProductActionsMenu({ product, isManagement, canManageProducts, onViewDetails, onEdit, onViewHistory, onDelete }: {
   product: FormattedProduct;
   isManagement: boolean | undefined;
+  canManageProducts: boolean | undefined;
   onViewDetails: (p: FormattedProduct) => void;
   onEdit: (p: FormattedProduct) => void;
   onViewHistory: (p: FormattedProduct) => void;
@@ -152,7 +154,9 @@ function ProductActionsMenu({ product, isManagement, onViewDetails, onEdit, onVi
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>Actions</DropdownMenuLabel>
         <DropdownMenuItem onClick={() => onViewDetails(product)}>View Details</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onEdit(product)}>Edit</DropdownMenuItem>
+        {canManageProducts && (
+          <DropdownMenuItem onClick={() => onEdit(product)}>Edit</DropdownMenuItem>
+        )}
         <DropdownMenuItem onClick={() => onViewHistory(product)}>View History</DropdownMenuItem>
         {isManagement && (
           <DropdownMenuItem
@@ -168,11 +172,12 @@ function ProductActionsMenu({ product, isManagement, onViewDetails, onEdit, onVi
 }
 
 export function ProductsTable({
-  products, isLoading, selectedProductIds, expandedParents, isManagement,
+  products, isLoading, selectedProductIds, expandedParents, isManagement, canManageProducts,
   onSelectAll, onSelectOne, onToggleExpand,
   onViewDetails, onEdit, onViewHistory, onDelete,
   onViewReserved, onViewPacked, onViewAllocated,
 }: ProductsTableProps) {
+  const allowProductManage = canManageProducts ?? isManagement;
   const allSelected = products.length > 0 && products.every(p => selectedProductIds.includes(p.id));
 
   return (
@@ -260,7 +265,7 @@ export function ProductsTable({
                 }
               </TableCell>
               <TableCell>
-                <ProductActionsMenu product={product} isManagement={isManagement} onViewDetails={onViewDetails} onEdit={onEdit} onViewHistory={onViewHistory} onDelete={onDelete} />
+                <ProductActionsMenu product={product} isManagement={isManagement} canManageProducts={allowProductManage} onViewDetails={onViewDetails} onEdit={onEdit} onViewHistory={onViewHistory} onDelete={onDelete} />
               </TableCell>
             </TableRow>
 
@@ -285,7 +290,7 @@ export function ProductsTable({
                   <StockCell product={child} onViewReserved={onViewReserved} onViewPacked={onViewPacked} onViewAllocated={onViewAllocated} />
                 </TableCell>
                 <TableCell>
-                  <ProductActionsMenu product={child} isManagement={isManagement} onViewDetails={onViewDetails} onEdit={onEdit} onViewHistory={onViewHistory} onDelete={onDelete} />
+                  <ProductActionsMenu product={child} isManagement={isManagement} canManageProducts={allowProductManage} onViewDetails={onViewDetails} onEdit={onEdit} onViewHistory={onViewHistory} onDelete={onDelete} />
                 </TableCell>
               </TableRow>
             ))}

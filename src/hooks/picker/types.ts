@@ -37,5 +37,6 @@ export type ProductMemoryHint = {
   auditedAt: string;
   notes?: string;
   systemStock?: number;
+  unit2ReserveStock?: number;
 };
 

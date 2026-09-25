@@ -131,10 +131,28 @@ The app has 4 user roles stored in Supabase user metadata:
 |---|---|
 | `Owner` | Full access — inherits all roles |
 | `Admin` | Full access — inherits Sales + Inventory |
-| `Sales` | Orders, Customers, Products, Reports |
-| `Inventory` | Products, Inventory management, Procurement |
+| `Sales` | Orders, Customers, Products (read-only catalog lookup), Reports |
+| `Inventory` | Products (catalog management), Inventory management, Procurement |
 
-Role checks are done via `useUserProfile()` hook and helper functions in `user.types.ts`.
+Role checks are done via `useUserProfile()` hook and helper functions in `user.types.ts` and `useRoleCheck.ts`.
+
+### Product & Inventory Management Restrictions for Sales (updated 2026-09-25)
+
+Sales users need to browse the product catalog to assist customers, look up prices, check stock availability, view product details, and view product history. However, they are **strictly prohibited from creating products, altering products, or modifying stock/inventory**:
+
+1. **Product Creation & Upload**:
+   - The "Add Product" (`AddProductDialog`) and "Bulk Upload" (`BulkUploadProductsDialog`) buttons on `/dashboard/products` are hidden from Sales users.
+   - Guarded by `canManageProducts` (`isManagement || isInventory`).
+   - `useProductSubmit.ts` and `bulk-upload-products-dialog.tsx` reject form submissions from non-management/non-inventory accounts with a "Permission Denied" notification.
+   - In order creation (`useOrderDialog.ts`), `canAddProduct` is also restricted to `isManagement || isInventory`.
+
+2. **Product Editing**:
+   - In `ProductsTable.tsx`, the "Edit" action menu option is hidden for Sales users (leaving only "View Details" and "View History").
+   - `ProductDialog` conditionally returns `null` when a user without product management privileges attempts to render or access the dialog.
+
+3. **Adding Stock & Inventory Management**:
+   - Sales users cannot add stock through direct restock (`/dashboard/inventory/restock`), bulk receiving (`/dashboard/inventory/receive`), or bundle assembly (`/dashboard/inventory/assemble`). Handlers in these pages enforce `canManageInventory` (`isManagement || isInventory`).
+   - **Route Guard**: The entire `/dashboard/inventory/*` subtree is protected by `src/app/dashboard/inventory/layout.tsx`. If a user with only the `Sales` role attempts to navigate directly to any inventory route, they are blocked and redirected back to `/dashboard` with an "Access Restricted" alert.
 
 ### Reports tab access by role
 

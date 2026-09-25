@@ -11,6 +11,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Loader2, PackagePlus, AlertCircle, Box } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useRoleCheck } from '@/hooks/useRoleCheck';
 
 type ProductWithRecipe = {
     id: string;
@@ -31,6 +32,8 @@ export default function AssembleKitPage() {
     const supabase = useSupabase();
     const { user } = useUser();
     const { toast } = useToast();
+    const { isManagement, isInventory } = useRoleCheck();
+    const canManageInventory = isManagement || isInventory;
 
     const [productSearch, setProductSearch] = useState('');
     const [selectedProduct, setSelectedProduct] = useState<ProductWithRecipe | null>(null);
@@ -111,6 +114,14 @@ export default function AssembleKitPage() {
     }, [recipe, qty, componentDetails, hasRecipe]);
 
     const handleAssemble = async () => {
+        if (!canManageInventory) {
+            toast({
+                variant: 'destructive',
+                title: 'Permission Denied',
+                description: 'Sales accounts do not have permission to assemble products or modify stock.',
+            });
+            return;
+        }
         if (!supabase || !selectedProduct || !canAssemble || qty <= 0) return;
         setLoading(true);
 

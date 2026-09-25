@@ -42,7 +42,8 @@ export default function RestockPage() {
   const supabase = useSupabase();
   const { user } = useUser();
   const { toast } = useToast();
-  const { isManagement } = useRoleCheck();
+  const { isManagement, isInventory } = useRoleCheck();
+  const canManageInventory = isManagement || isInventory;
 
   const [productResults, setProductResults] = useState<Product[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
@@ -87,6 +88,15 @@ export default function RestockPage() {
   };
 
   const onSubmit = async (values: RestockFormValues) => {
+    if (!canManageInventory) {
+      toast({
+        variant: 'destructive',
+        title: 'Permission Denied',
+        description: 'Sales accounts do not have permission to restock or add stock.',
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     toast({ title: 'Saving Purchase...', description: 'Please wait.' });
 

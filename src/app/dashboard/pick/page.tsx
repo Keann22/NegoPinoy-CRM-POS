@@ -159,12 +159,22 @@ export default function PickerApp() {
                           const memoryHint = productMemories.get(productId);
                           const hasVerifiedMemory = !!(memoryHint && memoryHint.verifiedCount > 0 && memoryHint.actorName);
                           const hasSystemStock = !!(memoryHint && (memoryHint.systemStock ?? 0) > 0);
-                          const showHint = isFlagged && (hasVerifiedMemory || hasSystemStock);
+                          const hasReserveStock = !!(memoryHint && (memoryHint.unit2ReserveStock ?? 0) > 0);
+                          const showHint = isFlagged && (hasVerifiedMemory || hasSystemStock || hasReserveStock);
 
                           return (
                             <React.Fragment key={key}>
                               <tr className={`border-b ${showHint ? '' : 'last:border-0'} ${isFlagged ? 'bg-red-50' : ''}`}>
-                                <td className={`p-3 ${indent ? 'pl-8' : ''}`}>{name}</td>
+                                <td className={`p-3 ${indent ? 'pl-8' : ''}`}>
+                                  <div className="flex items-center flex-wrap gap-1.5">
+                                    {name}
+                                    {hasReserveStock && (
+                                      <Badge variant="outline" className="text-[10px] text-blue-700 bg-blue-50 border-blue-300 font-semibold">
+                                        Unit 2: {memoryHint.unit2ReserveStock} in reserve
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </td>
                                 <td className="p-3 text-center">
                                   <span className="font-bold">{qty}</span>
                                 </td>
@@ -193,18 +203,26 @@ export default function PickerApp() {
                                   <td colSpan={4} className={`p-2.5 ${indent ? 'pl-8' : 'pl-4'}`}>
                                     <div className="flex items-start gap-2 text-xs text-amber-950">
                                       <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                                      <div className="space-y-0.5">
+                                      <div className="space-y-1 w-full">
                                         <p className="font-semibold text-amber-900">
                                           ⚠️ Wait, double check before submitting:
                                         </p>
+                                        {hasReserveStock && (
+                                          <div className="bg-blue-100/90 text-blue-950 p-2 rounded border border-blue-200 font-medium">
+                                            📦 <strong>Unit 2 Reserve has {memoryHint?.unit2ReserveStock} pcs in stock!</strong>
+                                            <span className="block text-blue-800 text-[11px] font-normal mt-0.5">
+                                              This item is available in Unit 2 bulk storage. Check Unit 2 or request replenishment from the runner instead of reporting an OOS issue.
+                                            </span>
+                                          </div>
+                                        )}
                                         <p className="text-amber-800 leading-relaxed">
                                           {hasVerifiedMemory ? (
                                             <>
-                                              <strong>{memoryHint.actorName}</strong> physically verified <strong>{memoryHint.verifiedCount} pcs</strong> on shelf ({formatMemoryAge(memoryHint.auditedAt)}). Please check back shelves, adjacent bins, or Room B!
+                                              <strong>{memoryHint?.actorName}</strong> physically verified <strong>{memoryHint?.verifiedCount} pcs</strong> on shelf ({formatMemoryAge(memoryHint?.auditedAt || '')}). Please check back shelves, adjacent bins, or Room B!
                                             </>
                                           ) : (
                                             <>
-                                              System ledger shows <strong>{memoryHint?.systemStock} pcs</strong> in stock. Please verify if it was placed in an alternate bin or received recently.
+                                              System ledger shows <strong>{memoryHint?.systemStock} pcs</strong> in total stock. Please verify if it was placed in an alternate bin or received recently.
                                             </>
                                           )}
                                         </p>

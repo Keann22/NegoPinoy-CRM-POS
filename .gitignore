@@ -50,3 +50,4 @@ firestore-debug.log
 /receipt/
 /scripts/scratch/
 test-query.js
+*-backup-*.json

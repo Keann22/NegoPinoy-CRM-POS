@@ -14,6 +14,9 @@ export function PendingPurchases({ onReceiveComplete }: { onReceiveComplete: () 
     setItems,
     unexpectedItems,
     setUnexpectedItems,
+    warehouses,
+    targetWarehouseId,
+    setTargetWarehouseId,
     loading,
     isSubmitting,
     submittingId,
@@ -43,8 +46,28 @@ export function PendingPurchases({ onReceiveComplete }: { onReceiveComplete: () 
   return (
     <Card className="mb-6 border-indigo-200 shadow-md">
       <CardHeader className="bg-indigo-50/50 pb-4 border-b">
-        <CardTitle className="text-xl text-indigo-900">Pending Incoming Items</CardTitle>
-        <CardDescription>Items recently purchased by Management or requested by Staff that are waiting to be received into inventory.</CardDescription>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div>
+            <CardTitle className="text-xl text-indigo-900">Pending Incoming Items</CardTitle>
+            <CardDescription>Items recently purchased by Management or requested by Staff that are waiting to be received into inventory.</CardDescription>
+          </div>
+          {warehouses && warehouses.length > 0 && (
+            <div className="flex items-center gap-2 self-start sm:self-auto bg-white/90 border border-indigo-200 rounded-lg px-2.5 py-1 text-xs shadow-sm">
+              <span className="text-muted-foreground font-medium whitespace-nowrap">Receive Destination:</span>
+              <select
+                value={targetWarehouseId}
+                onChange={(e) => setTargetWarehouseId(e.target.value)}
+                className="bg-transparent font-semibold text-indigo-900 focus:outline-none cursor-pointer"
+              >
+                {warehouses.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="p-0">
         <table className="w-full text-left text-sm">

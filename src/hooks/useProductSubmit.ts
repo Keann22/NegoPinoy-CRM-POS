@@ -51,6 +51,16 @@ export function useProductSubmit({
   async function onSubmit(values: ProductFormValues) {
     if (!supabase) return;
 
+    const canManageProducts = userProfile?.roles?.some(r => ['Admin', 'Owner', 'Inventory'].includes(r));
+    if (!canManageProducts) {
+      toast({
+        variant: 'destructive',
+        title: 'Permission Denied',
+        description: 'Sales accounts do not have permission to create or edit products.',
+      });
+      return;
+    }
+
     const finalSku = values.sku?.trim() || `PRD-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
     const shouldCheckSku = !isEdit || finalSku !== displayProduct?.sku;
     if (shouldCheckSku) {

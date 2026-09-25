@@ -268,6 +268,14 @@ export function usePickerData(
       if (hasIssues) {
         const missingQtyFor = (r: PickRow) => outOfStockQty.get(r.key) ?? r.quantity;
 
+        const flaggedOrderItemIds = Array.from(new Set(flaggedRows.map(r => r.orderItemId).filter(Boolean)));
+        if (flaggedOrderItemIds.length > 0) {
+          await supabase
+            .from('order_items')
+            .update({ is_packed: false })
+            .in('id', flaggedOrderItemIds);
+        }
+
         const issuesToInsert = flaggedRows.map(r => ({
           order_id: scannedOrderId,
           product_id: r.productId,

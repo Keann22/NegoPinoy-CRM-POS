@@ -25,6 +25,7 @@ export function ProductDialog(props: ProductDialogProps) {
     setOpen,
     displayProduct,
     isManagement,
+    canManageProducts,
     form,
     existingImages,
     removeExistingImage,
@@ -65,7 +66,7 @@ export function ProductDialog(props: ProductDialogProps) {
     }
   };
 
-  if (isEdit && !displayProduct) return null;
+  if (!canManageProducts || (isEdit && !displayProduct)) return null;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

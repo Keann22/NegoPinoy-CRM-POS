@@ -19,6 +19,7 @@ export function useProductDialog(props: ProductDialogProps) {
   const { user } = useUser();
   const { userProfile } = useUserProfile();
   const isManagement = useMemo(() => userProfile?.roles?.some((r: string) => ['Admin', 'Owner'].includes(r)), [userProfile]);
+  const canManageProducts = useMemo(() => userProfile?.roles?.some((r: string) => ['Admin', 'Owner', 'Inventory'].includes(r)), [userProfile]);
 
   const [supplierSearch, setSupplierSearch] = useState('');
   const [componentSearch, setComponentSearch] = useState('');
@@ -224,6 +225,7 @@ export function useProductDialog(props: ProductDialogProps) {
     setOpen,
     displayProduct,
     isManagement,
+    canManageProducts,
     form,
     existingImages,
     removeExistingImage,

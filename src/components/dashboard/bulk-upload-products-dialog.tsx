@@ -97,12 +97,21 @@ export function BulkUploadProductsDialog() {
   const { userProfile } = useUserProfile();
 
   const canViewCostPrice = userProfile && (userProfile.roles?.includes('Owner') || userProfile.roles?.includes('Admin'));
+  const canManageProducts = userProfile?.roles?.some(r => ['Admin', 'Owner', 'Inventory'].includes(r));
 
   const form = useForm<z.infer<typeof bulkUploadSchema>>({
     resolver: zodResolver(bulkUploadSchema),
   });
 
   const handleOpenChange = (isOpen: boolean) => {
+    if (isOpen && !canManageProducts) {
+      toast({
+        variant: "destructive",
+        title: "Permission Denied",
+        description: "Sales accounts do not have permission to upload products.",
+      });
+      return;
+    }
     if (!isOpen) {
       form.reset();
     }
@@ -110,6 +119,15 @@ export function BulkUploadProductsDialog() {
   }
 
   const processCsvData = async (csvData: string) => {
+    if (!canManageProducts) {
+      toast({
+        variant: "destructive",
+        title: "Permission Denied",
+        description: "Sales accounts do not have permission to upload products.",
+      });
+      setIsUploading(false);
+      return;
+    }
     const { headers, rows: dataRows } = parseCsvDataRobustly(csvData);
 
     if (dataRows.length === 0) {
@@ -278,6 +296,8 @@ export function BulkUploadProductsDialog() {
     reader.readAsText(file);
   }
   
+  if (!canManageProducts) return null;
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>

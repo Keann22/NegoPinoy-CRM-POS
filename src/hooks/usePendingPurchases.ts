@@ -1,10 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { useSupabase } from '@/lib/supabase/hooks';
+import type { Warehouse } from '@/types';
 
 export function usePendingPurchases(onReceiveComplete: () => void) {
+  const supabase = useSupabase();
   const [items, setItems] = useState<any[]>([]);
   const [unexpectedItems, setUnexpectedItems] = useState<any[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [targetWarehouseId, setTargetWarehouseId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
@@ -26,7 +31,28 @@ export function usePendingPurchases(onReceiveComplete: () => void) {
 
   useEffect(() => {
     fetchPending();
-  }, []);
+
+    const fetchWh = async () => {
+      if (!supabase) return;
+      try {
+        const { data } = await supabase
+          .from('warehouses')
+          .select('*')
+          .eq('is_active', true)
+          .order('is_fulfillment_hub', { ascending: false });
+
+        if (data && data.length > 0) {
+          setWarehouses(data);
+          const u2 = data.find((w) => w.code === 'UNIT2');
+          setTargetWarehouseId(u2 ? u2.id : data[0].id);
+        }
+      } catch (err) {
+        console.error('Failed to load warehouses:', err);
+      }
+    };
+
+    fetchWh();
+  }, [supabase]);
 
   const handleQtyChange = (id: string, qty: string) => {
     setItems(items.map(i => i.id === id ? { ...i, receivedQty: qty } : i));
@@ -68,7 +94,7 @@ export function usePendingPurchases(onReceiveComplete: () => void) {
       const res = await fetch("/api/inventory/receive/pending-pos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ receives: toReceive, unexpectedItems: toReceiveUnexpected, reportedByName })
+        body: JSON.stringify({ receives: toReceive, unexpectedItems: toReceiveUnexpected, reportedByName, targetWarehouseId })
       });
 
       if (!res.ok) throw new Error(await res.text());
@@ -159,7 +185,7 @@ export function usePendingPurchases(onReceiveComplete: () => void) {
       const res = await fetch("/api/inventory/receive/pending-pos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ receives: toReceive, unexpectedItems: toReceiveUnexpected, reportedByName })
+        body: JSON.stringify({ receives: toReceive, unexpectedItems: toReceiveUnexpected, reportedByName, targetWarehouseId })
       });
 
       if (!res.ok) throw new Error(await res.text());
@@ -196,6 +222,9 @@ export function usePendingPurchases(onReceiveComplete: () => void) {
     setItems,
     unexpectedItems,
     setUnexpectedItems,
+    warehouses,
+    targetWarehouseId,
+    setTargetWarehouseId,
     loading,
     isSubmitting,
     submittingId,

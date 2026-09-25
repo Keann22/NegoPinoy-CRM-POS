@@ -13,8 +13,10 @@ export function useRoleCheck() {
     const isInventory = userRoles.some((r: string) => ['Admin', 'Owner', 'Inventory'].includes(r));
     const isInventoryOnly = userRoles.length === 1 && userRoles[0] === 'Inventory';
     const canCreateOrder = isSales || isManagement;
+    const canManageInventory = isManagement || isInventory;
+    const canManageProducts = isManagement || isInventory;
 
-    return { isManagement, isSales, isInventory, isInventoryOnly, canCreateOrder };
+    return { isManagement, isSales, isInventory, isInventoryOnly, canCreateOrder, canManageInventory, canManageProducts };
   }, [userProfile]);
 
   return { ...roles, userProfile, isLoading };

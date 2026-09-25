@@ -55,6 +55,7 @@ export default function ProductsPage() {
     isLoading,
     refetch,
     isManagement,
+    canManageProducts,
     totalPages,
     handleDeleteConfirm,
     handleBulkDeleteConfirm,
@@ -70,10 +71,12 @@ export default function ProductsPage() {
               Manage your products and view their inventory status.
             </CardDescription>
           </div>
-          <div className="flex gap-2">
-            <BulkUploadProductsDialog />
-            <AddProductDialog onProductAdded={refetch} />
-          </div>
+          {canManageProducts && (
+            <div className="flex gap-2">
+              <BulkUploadProductsDialog />
+              <AddProductDialog onProductAdded={refetch} />
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-between mb-4">
@@ -117,6 +120,7 @@ export default function ProductsPage() {
             selectedProductIds={selectedProductIds}
             expandedParents={expandedParents}
             isManagement={isManagement}
+            canManageProducts={canManageProducts}
             onSelectAll={(checked) => {
               if (checked) {
                 setSelectedProductIds(prev => Array.from(new Set([...prev, ...paginatedProducts.map(p => p.id)])));
@@ -145,7 +149,7 @@ export default function ProductsPage() {
               <div className="flex flex-col items-center justify-center text-center border-2 border-dashed rounded-lg p-12 mt-4">
                   <p className="text-lg font-semibold">No products found</p>
                   <p className="text-muted-foreground mt-2">
-                      {searchTerm ? `Your search for "${searchTerm}" did not match any products.` : `Click "Add Product" to get started.`}
+                      {searchTerm ? `Your search for "${searchTerm}" did not match any products.` : (canManageProducts ? 'Click "Add Product" to get started.' : 'No products available.')}
                   </p>
               </div>
           )}
