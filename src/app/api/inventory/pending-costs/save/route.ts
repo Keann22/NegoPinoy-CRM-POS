@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { backfillOrderItemCosts } from '@/lib/services/cost-backfill-service';
 import { resolveSupplierName, applyProductCost, linkPurchaseItem, createBackfillPurchaseOrder } from '@/lib/services/purchase-repair-service';
+import { splitStaffDraftLine } from '@/lib/services/procurement-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -86,7 +87,7 @@ export async function POST(req: Request) {
     let linkedPurchase = false;
     const { data: candidates } = await supabase
       .from('purchase_order_items')
-      .select('id, purchase_orders!inner(notes)')
+      .select('id, received_qty, purchase_orders!inner(notes)')
       .eq('product_id', movement.product_id)
       .gt('received_qty', 0)
       .or('supplier_id.is.null,unit_cost.is.null,unit_cost.eq.0')
@@ -96,7 +97,12 @@ export async function POST(req: Request) {
     if (candidates && candidates.length > 0) {
       const isStaffDraft = (candidates[0] as any).purchase_orders?.notes === 'STAFF_DRAFT';
       const poId = isStaffDraft ? await createBackfillPurchaseOrder(supabase, movement.timestamp) : null;
-      await linkPurchaseItem(supabase, candidates[0].id, supplierId || null, cost, poId);
+      // Only what was received moves to the real PO; an unreceived remainder
+      // of the staff request stays on the draft.
+      const lineId = isStaffDraft
+        ? await splitStaffDraftLine(supabase, candidates[0].id, Number((candidates[0] as any).received_qty) || 0, poId)
+        : candidates[0].id;
+      await linkPurchaseItem(supabase, lineId, supplierId || null, cost, poId);
       linkedPurchase = true;
     }
 

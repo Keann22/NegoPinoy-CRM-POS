@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { backfillOrderItemCosts } from './cost-backfill-service';
+import { splitStaffDraftLine } from './procurement-service';
 
 export async function processProcurementPurchases(supabase: SupabaseClient, purchases: any[]) {
   if (!purchases || purchases.length === 0) {
@@ -18,6 +19,8 @@ export async function processProcurementPurchases(supabase: SupabaseClient, purc
     const parsedCost = Number(p.cost) || 0;
     
     if (p.draftItemId) {
+      // Buying less than staff requested must leave the rest on the draft.
+      const itemId = await splitStaffDraftLine(supabase, p.draftItemId, Number(p.qty) || 0, po.id);
       const { error: updErr } = await supabase
         .from('purchase_order_items')
         .update({
@@ -27,7 +30,7 @@ export async function processProcurementPurchases(supabase: SupabaseClient, purc
           unit_cost: parsedCost,
           status: 'pending_receipt'
         })
-        .eq('id', p.draftItemId);
+        .eq('id', itemId);
       if (updErr) throw updErr;
     } else {
       const { error: insErr } = await supabase

@@ -345,3 +345,101 @@ export async function autoCleanupStaffDrafts(supabase: SupabaseClient) {
 }
 
 
+
+/**
+ * Carve a purchase of `takeQty` units off a STAFF_DRAFT line, leaving whatever
+ * wasn't bought on the draft so it stays in Staff Req.
+ *
+ * Both purchase paths used to move the WHOLE draft line onto the purchase PO and
+ * overwrite its expected_qty with the bought amount. Buying 2 against a request
+ * for 5 therefore silently erased the other 3 - along with the order sources
+ * behind them - so Staff Req. fell out of step with Need to Buy while those
+ * customers were still waiting.
+ *
+ * The bought units are attributed to the oldest requests first: those order
+ * sources move with the purchased line, then any shortfall comes off the
+ * order-less manual_qty. The draft keeps the rest, so its expected_qty stays
+ * equal to what its remaining sources + manual_qty account for.
+ *
+ * Returns the id of the line that now represents the purchase: a new line on
+ * `targetPoId` when the draft was split, otherwise the draft itself (not a
+ * draft, or the buy covers the whole request) for the caller to move as before.
+ */
+export async function splitStaffDraftLine(
+  supabase: SupabaseClient,
+  draftItemId: string,
+  takeQty: number,
+  targetPoId: string | null,
+): Promise<string> {
+  const { data: draft, error } = await supabase
+    .from('purchase_order_items')
+    .select('id, po_id, product_id, expected_qty, received_qty, manual_qty, unit_cost, supplier_id, requested_by_name, purchase_orders!inner(notes)')
+    .eq('id', draftItemId)
+    .single();
+  if (error) throw error;
+
+  const expected = Number(draft.expected_qty) || 0;
+  if ((draft as any).purchase_orders?.notes !== 'STAFF_DRAFT' || takeQty <= 0 || takeQty >= expected) {
+    return draftItemId;
+  }
+
+  const { data: bought, error: insErr } = await supabase
+    .from('purchase_order_items')
+    .insert({
+      po_id: targetPoId || draft.po_id,
+      product_id: draft.product_id,
+      expected_qty: takeQty,
+      received_qty: draft.received_qty || 0,
+      unit_cost: draft.unit_cost || 0,
+      supplier_id: draft.supplier_id || null,
+      status: 'pending_receipt',
+      requested_by_name: draft.requested_by_name || null,
+    })
+    .select('id')
+    .single();
+  if (insErr) throw insErr;
+
+  const { data: sources } = await supabase
+    .from('procurement_request_sources')
+    .select('id, order_id, quantity, created_at')
+    .eq('purchase_order_item_id', draftItemId)
+    .order('created_at', { ascending: true });
+
+  let remaining = takeQty;
+  for (const src of sources || []) {
+    if (remaining <= 0) break;
+    if (src.quantity <= remaining) {
+      await supabase
+        .from('procurement_request_sources')
+        .update({ purchase_order_item_id: bought.id })
+        .eq('id', src.id);
+      remaining -= src.quantity;
+    } else {
+      await supabase
+        .from('procurement_request_sources')
+        .update({ quantity: src.quantity - remaining })
+        .eq('id', src.id);
+      await supabase
+        .from('procurement_request_sources')
+        .insert({
+          purchase_order_item_id: bought.id,
+          order_id: src.order_id,
+          quantity: remaining,
+          created_at: src.created_at,
+        });
+      remaining = 0;
+    }
+  }
+
+  const { error: updErr } = await supabase
+    .from('purchase_order_items')
+    .update({
+      expected_qty: expected - takeQty,
+      received_qty: 0,
+      manual_qty: Math.max(0, (draft.manual_qty || 0) - remaining),
+    })
+    .eq('id', draftItemId);
+  if (updErr) throw updErr;
+
+  return bought.id;
+}

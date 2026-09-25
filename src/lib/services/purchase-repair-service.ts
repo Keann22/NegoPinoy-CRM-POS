@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { backfillOrderItemCosts } from './cost-backfill-service';
+import { splitStaffDraftLine } from './procurement-service';
 
 /**
  * Repairing stock that was received before anyone knew its price.
@@ -327,6 +328,9 @@ export async function repairFromPurchaseItem(
     || item.created_at
     || null;
   const poId = isStaffDraft ? await createBackfillPurchaseOrder(supabase, receiptTimestamp) : null;
+  // A partial delivery against a staff request records only what arrived; the
+  // undelivered remainder stays on the draft instead of vanishing with the move.
+  const lineId = isStaffDraft && newQty > 0 ? await splitStaffDraftLine(supabase, itemId, newQty, poId) : itemId;
 
   let movementUpdated = false;
   if (cost > 0 || qtyDelta !== 0) {
@@ -375,11 +379,11 @@ export async function repairFromPurchaseItem(
     const { error: itemPatchErr } = await supabase
       .from('purchase_order_items')
       .update(patch)
-      .eq('id', itemId);
+      .eq('id', lineId);
     if (itemPatchErr) throw itemPatchErr;
   }
 
-  await linkPurchaseItem(supabase, itemId, supplierId, cost, poId);
+  await linkPurchaseItem(supabase, lineId, supplierId, cost, poId);
 
   const { linesUpdated, cogsAdded } = await backfillOrderItemCosts(supabase, item.product_id, newQty, cost);
 
