@@ -555,6 +555,37 @@ The **Staff Req.** count didn't have this bug — `autoCleanupStaffDrafts` alrea
 
 Do not re-narrow any of these back to the ordered `product_id` alone — that reintroduces the drop for every bundle-component product with a `Picked (with issue)` order.
 
+### Active Orders Popup: Excluding Fulfilled Items on Picked (with issue) Orders (fixed 2026-09-25)
+
+**The Bug:**
+In multi-item orders where only one product was missing, the order status transitions to `Picked (with issue)`. Previously, clicking "Need to Buy" or "Current Stock" opened `ReservedStockDialog.tsx`, which checked:
+```typescript
+if (item.orders.status === 'Picked (with issue)') {
+  return statusFilter.includes('Picked (with issue)');
+}
+```
+Because the check evaluated only the order-level status, items in that order that were already picked and secured by the picker were still displayed in the popup for those products. For example, in an order containing both a Cookware Set and a Wok, if only the Wok was out of stock, clicking Need to Buy on the Cookware Set would still display that order as active demand, confusing staff into thinking more Cookware Sets were needed.
+
+**The Fix:**
+In [`ReservedStockDialog.tsx`](src/components/dashboard/reserved-stock-dialog.tsx), line items under `Picked (with issue)` orders now check if that specific product actually has an open issue in `order_issues`.
+- If `hasOpenIssue` is true, the item is genuinely missing and displayed as active demand.
+- If `hasOpenIssue` is false, the item was already picked and physically set aside; it behaves as `Picked` and is excluded when `statusFilter` only queries unfulfilled purchase demand.
+
+### Partial Purchases: Retaining Unbought Remainder in Staff Request (fixed 2026-09-25)
+
+**The Bug:**
+When purchasing goods from the Procurement Sheet, management often buys fewer units than requested (e.g. supplier only had 3 units available out of 8 requested).
+Previously, `processProcurementPurchases` took the single `STAFF_DRAFT` `purchase_order_items` line, moved it to the newly created purchase order, and overwrote `expected_qty` with the bought quantity (`boughtQty`).
+This caused the remaining unbought units (e.g. 5 units) and their linked order attributions (`procurement_request_sources`) to vanish from the `STAFF_DRAFT` PO entirely. As a result:
+- `Staff Req.` dropped from 8 down to 3, drifting below `Need to Buy` (8).
+- The unbought orders lost their draft line representation until manually re-requested or re-scanned.
+
+**The Fix:**
+Implemented `splitStaffDraftLine` in [`procurement-service.ts`](src/lib/services/procurement-service.ts):
+1. When `boughtQty < existingDraft.expected_qty`, the system carves off only the purchased quantity into a new PO item row assigned to the purchase order.
+2. Linked `procurement_request_sources` are split proportionally (oldest orders first assigned to the purchase row; unfulfilled remainder kept on the draft).
+3. The remaining quantity (`expected_qty - boughtQty`) stays on the existing `STAFF_DRAFT` line so `Staff Req.` remains accurate and matches unfulfilled demand until fully purchased.
+
 ### Stock Reconciliation report (added 2026-07-16)
 
 **Location**: Reports → "Stock Reconciliation" tab (`to-order-report.tsx`, still the `to-order` tab value under the hood — only the label changed). Reads `reconciliationItems` from the same `GET /api/inventory/procurement` response used by the sheet above.
