@@ -1,77 +1,117 @@
 'use client';
 import { createClient } from '@/lib/supabase/client';
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
+import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
 
 const supabase = createClient();
 
-let cachedUser: { uid: string; email?: string; photoURL?: string; userMetadata?: Record<string, any> } | null = null;
-let isInitialFetchDone = false;
+export type UserData = {
+    uid: string;
+    email?: string;
+    photoURL?: string;
+    userMetadata?: Record<string, any>;
+};
+
+type AuthState = {
+    user: UserData | null;
+    isLoading: boolean;
+};
+
+function formatUserData(user: User): UserData {
+    return {
+        uid: user.id,
+        email: user.email,
+        photoURL: user.user_metadata?.avatar_url,
+        userMetadata: { ...user.app_metadata, ...user.user_metadata },
+    };
+}
+
+let state: AuthState = {
+    user: null,
+    isLoading: true,
+};
+
+const serverSnapshot: AuthState = {
+    user: null,
+    isLoading: true,
+};
+
+const listeners = new Set<() => void>();
+
+function emitChange() {
+    for (const listener of listeners) {
+        listener();
+    }
+}
+
+function updateState(newState: Partial<AuthState>) {
+    state = { ...state, ...newState };
+    emitChange();
+}
+
+let isInitialized = false;
+
+function initAuth() {
+    if (isInitialized || typeof window === 'undefined') return;
+    isInitialized = true;
+
+    // Single unified listener for auth state changes
+    supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
+        if (session?.user) {
+            updateState({
+                user: formatUserData(session.user),
+                isLoading: false,
+            });
+        } else if (event === 'SIGNED_OUT') {
+            updateState({ user: null, isLoading: false });
+        }
+    });
+
+    // Resolve initial session / user
+    supabase.auth.getUser().then(({ data }: { data: { user: User | null } }) => {
+        if (data?.user) {
+            updateState({
+                user: formatUserData(data.user),
+                isLoading: false,
+            });
+        } else {
+            updateState({ user: null, isLoading: false });
+        }
+    }).catch((err: unknown) => {
+        console.warn('Warning fetching user:', err);
+        updateState({ user: null, isLoading: false });
+    });
+}
+
+function subscribe(callback: () => void) {
+    listeners.add(callback);
+    initAuth();
+    return () => {
+        listeners.delete(callback);
+    };
+}
+
+function getSnapshot(): AuthState {
+    return state;
+}
+
+function getServerSnapshot(): AuthState {
+    return serverSnapshot;
+}
 
 export function useUser() {
-    const [user, setUser] = useState<{ uid: string; email?: string; photoURL?: string; userMetadata?: Record<string, any> } | null>(cachedUser);
-    const [isLoading, setIsLoading] = useState(!isInitialFetchDone);
-
-    useEffect(() => {
-        const fetchUser = async () => {
-            try {
-                // Just use getUser() instead of forcing a refreshSession on every component mount
-                // which causes race conditions and logs the user out.
-                const { data } = await supabase.auth.getUser();
-                if (data.user) {
-                    const userData = {
-                        uid: data.user.id,
-                        email: data.user.email,
-                        photoURL: data.user.user_metadata?.avatar_url,
-                        userMetadata: { ...data.user.app_metadata, ...data.user.user_metadata },
-                    };
-                    cachedUser = userData;
-                    setUser(userData);
-                } else {
-                    cachedUser = null;
-                    setUser(null);
-                }
-            } catch (err) {
-                console.warn('Warning fetching user:', err);
-                cachedUser = null;
-                setUser(null);
-            } finally {
-                isInitialFetchDone = true;
-                setIsLoading(false);
-            }
-        };
-        fetchUser();
-
-        const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-            if (session?.user) {
-                const userData = {
-                    uid: session.user.id,
-                    email: session.user.email,
-                    photoURL: session.user.user_metadata?.avatar_url,
-                    userMetadata: { ...session.user.app_metadata, ...session.user.user_metadata },
-                };
-                cachedUser = userData;
-                setUser(userData);
-            } else {
-                cachedUser = null;
-                setUser(null);
-            }
-            isInitialFetchDone = true;
-            setIsLoading(false);
-        });
-
-        return () => {
-            authListener.subscription.unsubscribe();
-        };
-    }, []);
-
-    return { user, isLoading, isUserLoading: isLoading };
+    const current = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+    return {
+        user: current.user,
+        isLoading: current.isLoading,
+        isUserLoading: current.isLoading,
+    };
 }
 
 export function useAuth() {
     return {
         signOut: async () => {
-            cachedUser = null;
-            isInitialFetchDone = false;
+            updateState({ user: null, isLoading: false });
             return await supabase.auth.signOut();
         }
     };

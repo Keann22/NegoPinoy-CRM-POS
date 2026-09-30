@@ -190,12 +190,8 @@ export default function DashboardLayout({
 
   useEffect(() => {
     if (!isUserLoading && !user) {
-      // Sign out to clear any stale session in localStorage that getSession might falsely read
-      auth.signOut().finally(() => {
-        router.push('/');
-      });
+      router.replace('/');
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, isUserLoading, router]);
 
   const handleLogout = () => {

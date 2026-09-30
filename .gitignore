@@ -49,5 +49,6 @@ firestore-debug.log
 # scratch & local receipts
 /receipt/
 /scripts/scratch/
+/bug report/
 test-query.js
 *-backup-*.json
