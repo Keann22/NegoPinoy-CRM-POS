@@ -13,16 +13,16 @@ export default function InventoryLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { isManagement, isInventory, isLoading } = useRoleCheck();
+  const { isManagement, isInventory, isLoading, userProfile } = useRoleCheck();
   const canAccessInventory = isManagement || isInventory;
 
   useEffect(() => {
-    if (!isLoading && !canAccessInventory) {
+    if (!isLoading && userProfile && !canAccessInventory) {
       router.replace('/dashboard');
     }
-  }, [isLoading, canAccessInventory, router]);
+  }, [isLoading, userProfile, canAccessInventory, router]);
 
-  if (isLoading) {
+  if (isLoading || !userProfile) {
     return (
       <div className="flex h-64 items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

@@ -4,9 +4,12 @@ import { useEffect, useState } from 'react';
 
 const supabase = createClient();
 
+let cachedUser: { uid: string; email?: string; photoURL?: string; userMetadata?: Record<string, any> } | null = null;
+let isInitialFetchDone = false;
+
 export function useUser() {
-    const [user, setUser] = useState<{ uid: string; email?: string; photoURL?: string; userMetadata?: Record<string, any> } | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const [user, setUser] = useState<{ uid: string; email?: string; photoURL?: string; userMetadata?: Record<string, any> } | null>(cachedUser);
+    const [isLoading, setIsLoading] = useState(!isInitialFetchDone);
 
     useEffect(() => {
         const fetchUser = async () => {
@@ -15,19 +18,24 @@ export function useUser() {
                 // which causes race conditions and logs the user out.
                 const { data } = await supabase.auth.getUser();
                 if (data.user) {
-                    setUser({
+                    const userData = {
                         uid: data.user.id,
                         email: data.user.email,
                         photoURL: data.user.user_metadata?.avatar_url,
-                        userMetadata: data.user.user_metadata,
-                    });
+                        userMetadata: { ...data.user.app_metadata, ...data.user.user_metadata },
+                    };
+                    cachedUser = userData;
+                    setUser(userData);
                 } else {
+                    cachedUser = null;
                     setUser(null);
                 }
             } catch (err) {
                 console.warn('Warning fetching user:', err);
+                cachedUser = null;
                 setUser(null);
             } finally {
+                isInitialFetchDone = true;
                 setIsLoading(false);
             }
         };
@@ -35,15 +43,20 @@ export function useUser() {
 
         const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
             if (session?.user) {
-                setUser({
+                const userData = {
                     uid: session.user.id,
                     email: session.user.email,
                     photoURL: session.user.user_metadata?.avatar_url,
-                    userMetadata: session.user.user_metadata,
-                });
+                    userMetadata: { ...session.user.app_metadata, ...session.user.user_metadata },
+                };
+                cachedUser = userData;
+                setUser(userData);
             } else {
+                cachedUser = null;
                 setUser(null);
             }
+            isInitialFetchDone = true;
+            setIsLoading(false);
         });
 
         return () => {
@@ -56,7 +69,11 @@ export function useUser() {
 
 export function useAuth() {
     return {
-        signOut: async () => await supabase.auth.signOut()
+        signOut: async () => {
+            cachedUser = null;
+            isInitialFetchDone = false;
+            return await supabase.auth.signOut();
+        }
     };
 }
 

@@ -224,6 +224,30 @@ export function ProcurementItemRow({
       </td>
       <td
         className="p-3 text-center"
+        title={
+          item.unscannedLayawayQty > 0
+            ? `Physical shelf stock: ${item.physicalStock}. Ledger current stock is ${item.currentStock} because ${item.unscannedLayawayQty} pcs are in active Lay-away orders not yet scanned/picked.`
+            : `Physical shelf stock: ${item.physicalStock}.`
+        }
+      >
+        <div className="flex flex-col items-center justify-center">
+          <span className={`font-bold text-lg ${
+            item.physicalStock > 0 ? 'text-emerald-700' : 'text-slate-500'
+          }`}>
+            {item.physicalStock}
+          </span>
+          {item.unscannedLayawayQty > 0 && (
+            <span
+              className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 font-medium whitespace-nowrap"
+              title={`${item.unscannedLayawayQty} pcs in active Lay-away orders waiting to be scanned/picked`}
+            >
+              +{item.unscannedLayawayQty} lay-away
+            </span>
+          )}
+        </div>
+      </td>
+      <td
+        className="p-3 text-center"
         title="Manual note from staff — not used to calculate the Buy quantity"
       >
         {item.staffRequestedQty !== null ? (

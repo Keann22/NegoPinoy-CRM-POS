@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useSupabase } from '@/lib/supabase/hooks';
 import { useToast } from '@/hooks/use-toast';
-import { useUserProfile } from '@/hooks/useUserProfile';
+import { useRoleCheck } from '@/hooks/useRoleCheck';
 
 const shipmentItemSchema = z.object({
   productId: z.string().min(1, "Product must be selected."),
@@ -24,8 +24,7 @@ export type ShipmentFormValues = z.infer<typeof shipmentSchema>;
 export function useBulkReceive() {
   const supabase = useSupabase();
   const { toast } = useToast();
-  const { userProfile } = useUserProfile();
-  const canManageInventory = userProfile?.roles?.some(r => ['Admin', 'Owner', 'Inventory'].includes(r));
+  const { canManageInventory } = useRoleCheck();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittingIndex, setSubmittingIndex] = useState<number | null>(null);
 

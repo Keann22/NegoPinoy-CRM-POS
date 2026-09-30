@@ -68,6 +68,7 @@ export function SupplierGroupCard({
             </th>
             <th className="p-3 text-left w-1/3">Product</th>
             <th className="p-3 text-center">Current Stock</th>
+            <th className="p-3 text-center">Physical Stock</th>
             <th className="p-3 text-center">Staff Req. <span className="font-normal normal-case text-[10px] text-slate-400">(note)</span></th>
             <th className="p-3 text-center">Need to Buy <span className="font-normal normal-case text-[10px] text-slate-400">(not yet picked)</span></th>
             <th className="p-3 text-center w-32">Unit Cost</th>

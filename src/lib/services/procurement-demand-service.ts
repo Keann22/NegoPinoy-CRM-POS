@@ -21,6 +21,7 @@ export interface ProcurementDemandResult {
   needToBuyMap: Map<string, number>;
   bundleToComponents: Map<string, { componentId: string; qtyPerBundle: number }[]>;
   negativeStockIds: Set<string>;
+  unscannedLayawayMap: Map<string, number>;
 }
 
 export async function calculateProcurementDemand(
@@ -128,11 +129,15 @@ export async function calculateProcurementDemand(
 
   const totalOpenDemandMap = new Map<string, number>();
   const needToBuyMap = new Map<string, number>();
+  const unscannedLayawayMap = new Map<string, number>();
   const addDemand = (productId: string, quantity: number, isUnfulfilled: boolean) => {
     totalOpenDemandMap.set(productId, (totalOpenDemandMap.get(productId) || 0) + quantity);
     if (isUnfulfilled) {
       needToBuyMap.set(productId, (needToBuyMap.get(productId) || 0) + quantity);
     }
+  };
+  const addLayawayDemand = (productId: string, quantity: number) => {
+    unscannedLayawayMap.set(productId, (unscannedLayawayMap.get(productId) || 0) + quantity);
   };
 
   const isUnfulfilledFor = (row: any, targetProductId: string): boolean => {
@@ -147,14 +152,33 @@ export async function calculateProcurementDemand(
     return UNFULFILLED_STATUSES.includes(row.orders.status);
   };
 
+  const isUnscannedLayaway = (row: any): boolean => {
+    if (row.orders.payment_method !== 'Lay-away') return false;
+    if (row.is_packed) return false;
+    // Orders already picked or packed were physically pulled from shelf
+    if (['Picked', 'Photo', 'Packed', 'For Shipping', 'For Pick-up', 'Picked (with issue)'].includes(row.orders.status)) {
+      return false;
+    }
+    // Processing, Pending Payment, Waiting for Stock, On-Hold: still physically on the shelf!
+    return true;
+  };
+
   demandRows?.forEach((row: any) => {
+    const isLayawayOnShelf = isUnscannedLayaway(row);
     if (candidateIds.has(row.product_id)) {
       addDemand(row.product_id, row.quantity, isUnfulfilledFor(row, row.product_id));
+      if (isLayawayOnShelf) {
+        addLayawayDemand(row.product_id, row.quantity);
+      }
     }
     const components = bundleToComponents.get(row.product_id);
-    components?.forEach((c) =>
-      addDemand(c.componentId, row.quantity * c.qtyPerBundle, isUnfulfilledFor(row, c.componentId))
-    );
+    components?.forEach((c) => {
+      const compQty = row.quantity * c.qtyPerBundle;
+      addDemand(c.componentId, compQty, isUnfulfilledFor(row, c.componentId));
+      if (isLayawayOnShelf) {
+        addLayawayDemand(c.componentId, compQty);
+      }
+    });
   });
 
   const pendingReceiptMap = new Map<string, number>();
@@ -192,5 +216,6 @@ export async function calculateProcurementDemand(
     needToBuyMap,
     bundleToComponents,
     negativeStockIds,
+    unscannedLayawayMap,
   };
 }
