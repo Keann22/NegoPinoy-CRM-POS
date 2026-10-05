@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Flag, ShoppingCart, Trash2, Pencil, Plus } from "lucide-react";
 import { StaffRequestDialog } from "./staff-request-dialog";
 import { ProcurementStockDetailDialog } from "./stock-detail-dialog";
+import { EditUnallocatedStockDialog } from "./edit-unallocated-stock-dialog";
 
 export function ProcurementItemRow({
   item,
@@ -46,6 +47,7 @@ export function ProcurementItemRow({
   const [showReassign, setShowReassign] = useState(false);
   const [staffRequestOpen, setStaffRequestOpen] = useState(false);
   const [stockDetailOpen, setStockDetailOpen] = useState(false);
+  const [editUnallocatedOpen, setEditUnallocatedOpen] = useState(false);
   const [isEditingCode, setIsEditingCode] = useState(false);
   const [codeDraft, setCodeDraft] = useState(item.supplierCode || "");
   const [isSavingCode, setIsSavingCode] = useState(false);
@@ -236,12 +238,22 @@ export function ProcurementItemRow({
         className="p-3 text-center"
         title={`Unallocated stock: ${item.unallocatedStock ?? item.physicalStock} free pieces available on shelf.`}
       >
-        <div className="flex flex-col items-center justify-center">
-          <span className={`font-bold text-lg ${
-            (item.unallocatedStock ?? item.physicalStock) > 0 ? 'text-emerald-700' : 'text-slate-500'
-          }`}>
-            {item.unallocatedStock ?? item.physicalStock}
-          </span>
+        <div className="flex flex-col items-center justify-center group/unallocated">
+          <div className="flex items-center justify-center gap-1">
+            <span className={`font-bold text-lg ${
+              (item.unallocatedStock ?? item.physicalStock) > 0 ? 'text-emerald-700' : 'text-slate-500'
+            }`}>
+              {item.unallocatedStock ?? item.physicalStock}
+            </span>
+            <button
+              type="button"
+              onClick={() => setEditUnallocatedOpen(true)}
+              className="p-1 text-slate-400 hover:text-indigo-600 rounded hover:bg-slate-100 transition-colors"
+              title="Edit unallocated stock directly & alert AI Guardian"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+          </div>
           {item.unscannedLayawayQty > 0 && (
             <span
               className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 font-medium whitespace-nowrap"
@@ -250,6 +262,16 @@ export function ProcurementItemRow({
               +{item.unscannedLayawayQty} lay-away
             </span>
           )}
+          <EditUnallocatedStockDialog
+            item={item}
+            isOpen={editUnallocatedOpen}
+            onClose={() => setEditUnallocatedOpen(false)}
+            onSuccess={() => {
+              if (handleSyncInventory) {
+                handleSyncInventory(item.productId, item.currentStock);
+              }
+            }}
+          />
         </div>
       </td>
       <td
