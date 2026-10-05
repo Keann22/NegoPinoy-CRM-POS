@@ -355,6 +355,7 @@ export default function ProcurementSheet() {
               setIssueDialogOpen={setIssueDialogOpen}
               handleDeleteDraftItem={handleDeleteDraftItem}
               setViewingAllocatedItem={setViewingAllocatedItem}
+              onRefreshData={fetchData}
             />
           ))}
         </div>

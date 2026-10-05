@@ -25,6 +25,7 @@ export function ProcurementItemRow({
   onReportIssue,
   handleDeleteDraftItem,
   onViewAllocated,
+  onRefreshData,
 }: {
   item: any;
   groupId: string | null;
@@ -43,6 +44,7 @@ export function ProcurementItemRow({
   onReportIssue: () => void;
   handleDeleteDraftItem: (id: string) => void;
   onViewAllocated: (item: { id: string; name: string; context: 'total' | 'needToBuy' }) => void;
+  onRefreshData?: () => void;
 }) {
   const [showReassign, setShowReassign] = useState(false);
   const [staffRequestOpen, setStaffRequestOpen] = useState(false);
@@ -267,8 +269,10 @@ export function ProcurementItemRow({
             isOpen={editUnallocatedOpen}
             onClose={() => setEditUnallocatedOpen(false)}
             onSuccess={() => {
-              if (handleSyncInventory) {
-                handleSyncInventory(item.productId, item.currentStock);
+              if (onRefreshData) {
+                onRefreshData();
+              } else {
+                window.location.reload();
               }
             }}
           />

@@ -24,7 +24,8 @@ export function SupplierGroupCard({
   setIssueProduct,
   setIssueDialogOpen,
   handleDeleteDraftItem,
-  setViewingAllocatedItem
+  setViewingAllocatedItem,
+  onRefreshData
 }: any) {
   return (
     <div className="border rounded-lg overflow-hidden shadow-sm">
@@ -100,6 +101,7 @@ export function SupplierGroupCard({
               }}
               handleDeleteDraftItem={handleDeleteDraftItem}
               onViewAllocated={setViewingAllocatedItem}
+              onRefreshData={onRefreshData}
             />
           ))}
         </tbody>
