@@ -112,6 +112,7 @@ export function EditUnallocatedStockDialog({ item, isOpen, onClose, onSuccess }:
               type="number"
               value={newStock}
               onChange={(e) => setNewStock(e.target.value)}
+              onFocus={(e) => e.target.select()}
               placeholder="e.g. 5"
               className="font-bold text-base bg-white"
               required
