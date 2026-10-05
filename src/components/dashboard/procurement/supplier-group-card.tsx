@@ -67,8 +67,8 @@ export function SupplierGroupCard({
               <input type="checkbox" onChange={() => toggleGroupSelection(group.items)} checked={group.items.length > 0 && group.items.every((i: any) => selectedItems[i.productId])} className="w-5 h-5 cursor-pointer accent-indigo-600" />
             </th>
             <th className="p-3 text-left w-1/3">Product</th>
-            <th className="p-3 text-center">Current Stock</th>
-            <th className="p-3 text-center">Physical Stock</th>
+            <th className="p-3 text-center">Current Stock <span className="font-normal normal-case text-[10px] text-indigo-500">(details)</span></th>
+            <th className="p-3 text-center">Unallocated Stock</th>
             <th className="p-3 text-center">Staff Req. <span className="font-normal normal-case text-[10px] text-slate-400">(note)</span></th>
             <th className="p-3 text-center">Need to Buy <span className="font-normal normal-case text-[10px] text-slate-400">(not yet picked)</span></th>
             <th className="p-3 text-center w-32">Unit Cost</th>

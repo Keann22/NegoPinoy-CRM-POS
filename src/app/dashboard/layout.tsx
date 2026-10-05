@@ -33,6 +33,7 @@ import {
   CalendarCheck2,
   Undo2,
   Printer,
+  Mail,
 } from 'lucide-react';
 import { useAuth, useUser } from '@/lib/supabase/hooks';
 import { usePathname, useRouter } from 'next/navigation';
@@ -155,6 +156,7 @@ export default function DashboardLayout({
         ]
       });
       links.push({ href: '/dashboard/customers', label: 'Customers', icon: Users });
+      links.push({ href: '/dashboard/customers/email', label: 'CRM Email Sender', icon: Mail });
       links.push({ href: '/dashboard/suppliers', label: 'Suppliers', icon: Building });
       links.push({ href: '/dashboard/users', label: 'User Management', icon: Users });
       
@@ -164,6 +166,7 @@ export default function DashboardLayout({
       links.push({ href: '/dashboard/chat', label: 'Chat History', icon: MessageCircle });
     } else if (isSales) {
       links.push({ href: '/dashboard/customers', label: 'Customers', icon: Users });
+      links.push({ href: '/dashboard/customers/email', label: 'CRM Email Sender', icon: Mail });
     }
 
     links.push({ href: '/dashboard/reports', label: 'Reports', icon: LineChart });

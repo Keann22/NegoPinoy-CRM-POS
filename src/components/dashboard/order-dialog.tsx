@@ -131,14 +131,28 @@ export function OrderDialog(props: OrderDialogProps) {
                 productResults={productResults}
                 isSearchingProducts={isSearchingProducts}
                 onProductSelect={async (p) => {
-                  const { data: variants } = await supabase
+                  const { data: level1 } = await supabase
                     .from('products')
                     .select('id, name, variant_name, stock_level, selling_price, sale_price, is_on_sale, initial_unit_cost, stock_batches(*)')
-                    .eq('parent_id', p.id);
+                    .eq('parent_id', p.id)
+                    .not('name', 'ilike', '[DELETED]%');
 
-                  if (variants && variants.length > 0) {
+                  if (level1 && level1.length > 0) {
+                    const level1Ids = level1.map((v: any) => v.id);
+                    const { data: level2 } = await supabase
+                      .from('products')
+                      .select('id, name, variant_name, stock_level, selling_price, sale_price, is_on_sale, initial_unit_cost, stock_batches(*)')
+                      .in('parent_id', level1Ids)
+                      .not('name', 'ilike', '[DELETED]%');
+
+                    let leafVariants = level1;
+                    if (level2 && level2.length > 0) {
+                      const nonLeafLevel1Ids = new Set(level2.map((l2: any) => l2.parent_id));
+                      leafVariants = [...level1.filter((l1: any) => !nonLeafLevel1Ids.has(l1.id)), ...level2];
+                    }
+
                     setVariantSelectionProduct(p as any);
-                    setVariantSelectionOptions(variants);
+                    setVariantSelectionOptions(leafVariants);
                     return;
                   }
 

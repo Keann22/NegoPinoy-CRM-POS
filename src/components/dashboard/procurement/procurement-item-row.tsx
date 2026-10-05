@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Flag, ShoppingCart, Trash2, Pencil, Plus } from "lucide-react";
 import { StaffRequestDialog } from "./staff-request-dialog";
+import { ProcurementStockDetailDialog } from "./stock-detail-dialog";
 
 export function ProcurementItemRow({
   item,
@@ -44,6 +45,7 @@ export function ProcurementItemRow({
 }) {
   const [showReassign, setShowReassign] = useState(false);
   const [staffRequestOpen, setStaffRequestOpen] = useState(false);
+  const [stockDetailOpen, setStockDetailOpen] = useState(false);
   const [isEditingCode, setIsEditingCode] = useState(false);
   const [codeDraft, setCodeDraft] = useState(item.supplierCode || "");
   const [isSavingCode, setIsSavingCode] = useState(false);
@@ -215,26 +217,30 @@ export function ProcurementItemRow({
           </div>
         )}
       </td>
-      <td
-        className="p-3 font-bold text-slate-500 text-center text-lg cursor-pointer hover:underline hover:text-indigo-600"
-        title="See which orders/customers this stock is allocated to"
-        onClick={() => onViewAllocated({ id: item.productId, name: item.productName, context: 'total' })}
-      >
-        {item.currentStock}
+      <td className="p-3 text-center">
+        <button
+          type="button"
+          className="font-bold text-slate-700 text-lg cursor-pointer hover:underline hover:text-indigo-600 bg-slate-100 hover:bg-slate-200 px-2.5 py-0.5 rounded border border-slate-200 transition-colors"
+          title="Click to view detailed stock breakdown & lay-away information"
+          onClick={() => setStockDetailOpen(true)}
+        >
+          {item.currentStock}
+        </button>
+        <ProcurementStockDetailDialog
+          item={item}
+          isOpen={stockDetailOpen}
+          onClose={() => setStockDetailOpen(false)}
+        />
       </td>
       <td
         className="p-3 text-center"
-        title={
-          item.unscannedLayawayQty > 0
-            ? `Physical shelf stock: ${item.physicalStock}. Ledger current stock is ${item.currentStock} because ${item.unscannedLayawayQty} pcs are in active Lay-away orders not yet scanned/picked.`
-            : `Physical shelf stock: ${item.physicalStock}.`
-        }
+        title={`Unallocated stock: ${item.unallocatedStock ?? item.physicalStock} free pieces available on shelf.`}
       >
         <div className="flex flex-col items-center justify-center">
           <span className={`font-bold text-lg ${
-            item.physicalStock > 0 ? 'text-emerald-700' : 'text-slate-500'
+            (item.unallocatedStock ?? item.physicalStock) > 0 ? 'text-emerald-700' : 'text-slate-500'
           }`}>
-            {item.physicalStock}
+            {item.unallocatedStock ?? item.physicalStock}
           </span>
           {item.unscannedLayawayQty > 0 && (
             <span

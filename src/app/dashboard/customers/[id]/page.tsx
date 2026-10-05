@@ -11,8 +11,9 @@ import { LogPaymentDialog } from '@/components/dashboard/log-payment-dialog';
 import { format } from 'date-fns';
 import { type Order } from '@/app/dashboard/orders/page';
 import { Badge } from '@/components/ui/badge';
+import Link from 'next/link';
 import { AddCustomerDialog } from '@/components/dashboard/add-customer-dialog';
-import { Pencil } from 'lucide-react';
+import { Pencil, Mail } from 'lucide-react';
 
 type Customer = {
   id: string;
@@ -231,7 +232,12 @@ export default function CustomerDetailPage() {
                 </CardDescription>
               ) : null}
             </div>
-            <div className="self-start">
+            <div className="self-start flex items-center gap-2">
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/dashboard/customers/email?customerId=${customer.id}&email=${encodeURIComponent(customer.email || '')}&name=${encodeURIComponent(customer.fullName || '')}`}>
+                  <Mail className="h-4 w-4 mr-2 text-primary" /> Email Suki
+                </Link>
+              </Button>
               <Button variant="outline" size="sm" onClick={() => setEditingCustomer(customer)}>
                 <Pencil className="h-4 w-4 mr-2" /> Edit
               </Button>

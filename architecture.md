@@ -55,7 +55,7 @@ It combines the following business domains into one application:
       /products           ← Product management
       /inventory          ← Inventory sub-routes
       /accounting         ← Accounting sub-routes
-      /customers          ← Customer management
+      /customers          ← Customer management & CRM Email Sender (/email)
       /suppliers          ← Supplier management
       /reports            ← Report pages
       /pack               ← Packer app (warehouse use)
@@ -68,11 +68,13 @@ It combines the following business domains into one application:
       /users              ← User management
       /settings           ← App settings
     /api                  ← Server-side API routes
+      /crm                ← CRM email sending endpoints
       /inventory          ← Inventory API endpoints
       /payments           ← Payment processing (OCR)
   /components             ← UI components
     /dashboard            ← Dashboard-specific components
       /accounting         ← Accounting dialog components
+      /crm-email          ← CRM Email Sender components (Selector, Composer, Preview, History)
       /inventory          ← Inventory dialog components
       /orders             ← Order panel components
       /reports            ← Report components

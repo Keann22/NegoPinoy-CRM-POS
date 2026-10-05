@@ -102,6 +102,18 @@ export function useProducts({ searchTerm, stockFilter, page, pageSize }: UseProd
             .not('name', 'ilike', '[DELETED]%');
           if (childError) throw childError;
           children = childData || [];
+
+          const level1Ids = children.map(c => c.id);
+          if (level1Ids.length > 0) {
+            const { data: grandChildData, error: grandChildError } = await supabase
+              .from('products')
+              .select('*')
+              .in('parent_id', level1Ids)
+              .not('name', 'ilike', '[DELETED]%');
+            if (!grandChildError && grandChildData && grandChildData.length > 0) {
+              children = [...children, ...grandChildData];
+            }
+          }
         }
 
         // Reserved/packed stock only needs to cover this page's products +
@@ -126,10 +138,22 @@ export function useProducts({ searchTerm, stockFilter, page, pageSize }: UseProd
           });
         }
 
+        const rootParentMap = new Map<string, string>();
+        children.forEach(c => {
+          if (parentIds.includes(c.parent_id)) {
+            rootParentMap.set(c.id, c.parent_id);
+          }
+        });
+        children.forEach(c => {
+          if (rootParentMap.has(c.parent_id)) {
+            rootParentMap.set(c.id, rootParentMap.get(c.parent_id)!);
+          }
+        });
+
         const formattedChildren = children.map(c => formatProduct(c, reserved, packed));
         const formatted = (parents || []).map((p: any) => {
           const productChildren = formattedChildren
-            .filter(c => c.parent_id === p.id)
+            .filter(c => (rootParentMap.get(c.id) === p.id || c.parent_id === p.id) && !children.some(other => other.parent_id === c.id))
             .map(c => ({ ...c, parentName: p.name }));
           return {
             ...formatProduct(p, reserved, packed),

@@ -178,6 +178,10 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
 
     const unscannedLayawayQty = unscannedLayawayMap.get(p.id) || 0;
     const physicalStock = Math.max(0, (p.stock_level ?? 0) + unscannedLayawayQty);
+    const totalOpenDemandQty = totalOpenDemandMap.get(p.id) || 0;
+    const needToBuyQty = needToBuyMap.get(p.id) || 0;
+    const allocatedPickedQty = Math.max(0, totalOpenDemandQty - needToBuyQty);
+    const unallocatedStock = Math.max(0, physicalStock - needToBuyQty);
 
     osMap.set(p.id, {
       productId: p.id,
@@ -187,14 +191,16 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
       systemQty: systemQty,
       currentStock: p.stock_level,
       physicalStock: physicalStock,
+      allocatedPickedQty: allocatedPickedQty,
+      unallocatedStock: unallocatedStock,
       unscannedLayawayQty: unscannedLayawayQty,
       staffRequestedQty: draft ? draft.expected_qty : null,
       requestedByName: draft ? draft.requested_by_name : null,
       requestedAt: draft ? draft.created_at : null,
       draftItemId: draft ? draft.id : null,
       sourceOrders: draft ? (sourceOrdersByDraftId.get(draft.id) || []) : [],
-      totalOpenDemandQty: totalOpenDemandMap.get(p.id) || 0,
-      needToBuyQty: needToBuyMap.get(p.id) || 0,
+      totalOpenDemandQty: totalOpenDemandQty,
+      needToBuyQty: needToBuyQty,
       supplierId: resolvedSupplierId,
       unitCost: matchedCost,
     });

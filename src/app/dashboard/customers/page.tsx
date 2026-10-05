@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { MoreHorizontal, Star, Flame, Users, Search } from 'lucide-react';
+import { MoreHorizontal, Star, Flame, Users, Search, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -121,6 +121,12 @@ export default function CustomersPage() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                 />
             </div>
+            <Button variant="outline" asChild>
+              <Link href="/dashboard/customers/email">
+                <Mail className="w-4 h-4 mr-1.5 text-primary" />
+                Email Sender
+              </Link>
+            </Button>
             <AddCustomerDialog onSuccess={() => setDebouncedQuery(debouncedQuery + ' ')} />
         </div>
       </CardHeader>
