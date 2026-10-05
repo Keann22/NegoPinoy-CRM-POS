@@ -219,3 +219,37 @@ export async function calculateProcurementDemand(
     unscannedLayawayMap,
   };
 }
+
+export async function getSingleProductProcurementDemand(
+  supabase: SupabaseClient,
+  productId: string
+): Promise<{ unscannedLayawayQty: number; needToBuyQty: number }> {
+  const { data: purchased } = await supabase
+    .from('purchase_order_items')
+    .select(`
+      id, 
+      product_id, 
+      expected_qty, 
+      received_qty, 
+      unit_cost, 
+      po_id, 
+      created_at, 
+      supplier_id,
+      purchase_orders!inner(id, notes, status)
+    `)
+    .eq('product_id', productId)
+    .neq('purchase_orders.notes', 'STAFF_DRAFT')
+    .eq('status', 'pending_receipt');
+
+  const result = await calculateProcurementDemand(
+    supabase,
+    new Set([productId]),
+    purchased || []
+  );
+
+  return {
+    unscannedLayawayQty: result.unscannedLayawayMap.get(productId) || 0,
+    needToBuyQty: result.needToBuyMap.get(productId) || 0,
+  };
+}
+

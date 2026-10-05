@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { recordGuardianMemory } from '@/lib/services/inventory/inventory-guardian-memory-service';
+import { getSingleProductProcurementDemand } from '@/lib/services/procurement-demand-service';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -26,11 +27,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 });
     }
 
+    // 2. Fetch layaway and need-to-buy demand for this product
+    const { unscannedLayawayQty, needToBuyQty } = await getSingleProductProcurementDemand(supabase, productId);
+
+    // Formula: unallocatedStock = (stock_level + unscannedLayawayQty) - needToBuyQty
+    // Therefore, targetStockLevel = targetUnallocatedStock - unscannedLayawayQty + needToBuyQty
     const currentStock = product.stock_level ?? 0;
-    const targetStockLevel = Number(newUnallocatedStock);
+    const desiredUnallocated = Number(newUnallocatedStock);
+    const targetStockLevel = Math.round(desiredUnallocated - unscannedLayawayQty + needToBuyQty);
     const discrepancy = targetStockLevel - currentStock;
 
-    // 2. Update product stock_level in DB
+    // 3. Update product stock_level in DB
     const { error: updErr } = await supabase
       .from('products')
       .update({ stock_level: targetStockLevel })
@@ -40,7 +47,7 @@ export async function POST(req: Request) {
 
     const fullReason = `Procurement Edit (${reasonCode}): ${notes || 'No extra notes'}`;
 
-    // 3. Log inventory movement
+    // 4. Log inventory movement
     const { error: movErr } = await supabase
       .from('inventory_movements')
       .insert({
@@ -55,7 +62,7 @@ export async function POST(req: Request) {
       console.error('Failed to log inventory movement:', movErr);
     }
 
-    // 4. Alert AI Inventory Guardian & Record Memory
+    // 5. Alert AI Inventory Guardian & Record Memory
     await recordGuardianMemory(supabase, {
       productId,
       actionType: 'physical_count_audit',
@@ -64,14 +71,14 @@ export async function POST(req: Request) {
       systemStockAfter: targetStockLevel,
       discrepancy,
       actorName,
-      notes: `[Procurement Direct Edit] Reason: ${reasonCode}. Notes: ${notes || 'None'}`
+      notes: `[Procurement Direct Edit] Target Unallocated: ${desiredUnallocated} (Layaway: ${unscannedLayawayQty}, Demand: ${needToBuyQty}). Reason: ${reasonCode}. Notes: ${notes || 'None'}`
     });
 
-    // 5. Create Owner / Guardian Alert
+    // 6. Create Owner / Guardian Alert
     try {
       await supabase.from('owner_alerts').insert({
         title: `🛡️ AI Inventory Guardian: Unallocated Stock Adjusted`,
-        message: `Stock for '${product.name}' was directly updated to ${targetStockLevel} by ${actorName}. Reason: ${reasonCode}. Notes: ${notes || 'No additional notes.'}`,
+        message: `Unallocated stock for '${product.name}' was set to ${desiredUnallocated} (System stock level adjusted from ${currentStock} to ${targetStockLevel}) by ${actorName}. Reason: ${reasonCode}. Notes: ${notes || 'No additional notes.'}`,
         product_id: productId,
         severity: Math.abs(discrepancy) > 5 ? 'high' : 'medium',
         is_read: false,
@@ -83,6 +90,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
+      newUnallocatedStock: desiredUnallocated,
       newStockLevel: targetStockLevel,
       discrepancy,
       productName: product.name
