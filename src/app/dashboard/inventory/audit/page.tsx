@@ -73,7 +73,15 @@ export default function OutOfStockAudit() {
   };
 
   const updateRow = (id: string, field: keyof EntryRow, value: string) => {
-    setRows(rows.map(r => r.id === id ? { ...r, [field]: value, status: 'pending' } : r));
+    setRows(rows.map(r => {
+      if (r.id !== id) return r;
+      const isChangingCoreInput = field === 'productId' || field === 'qty';
+      return {
+        ...r,
+        [field]: value,
+        ...(isChangingCoreInput ? { status: 'pending' as const, discrepancyMessage: undefined } : {})
+      };
+    }));
     if (field === 'productId' && value) fetchOnHoldCustomers(value);
   };
 
@@ -125,12 +133,14 @@ export default function OutOfStockAudit() {
   };
 
   const handleApplyCorrection = async (row: EntryRow) => {
-    if (!row.reasonCode || !row.notes.trim()) {
-      return alert("You must select a reason and provide a written explanation for the discrepancy before confirming.");
+    if (!row.reasonCode) {
+      return alert("Please select a reason for the discrepancy before confirming.");
     }
 
     const product = products.find(p => p.id === row.productId);
     if (!product) return;
+
+    const finalNotes = row.notes.trim() || row.reasonCode;
 
     setIsSubmitting(prev => ({ ...prev, [row.id]: true }));
 
@@ -144,7 +154,7 @@ export default function OutOfStockAudit() {
           physicalCount: Number(row.qty),
           discrepancyToApply: row.discrepancyToApply,
           reasonCode: row.reasonCode,
-          notes: row.notes
+          notes: finalNotes
         })
       });
 
