@@ -9,9 +9,11 @@ import type { InventoryGuardianMemoryEntry } from '@/types';
 
 interface InventoryGuardianMemoryTimelineProps {
   productId: string;
+  /** Show only manual stock adjustments (physical counts that changed the stock number). */
+  adjustmentsOnly?: boolean;
 }
 
-export function InventoryGuardianMemoryTimeline({ productId }: InventoryGuardianMemoryTimelineProps) {
+export function InventoryGuardianMemoryTimeline({ productId, adjustmentsOnly = false }: InventoryGuardianMemoryTimelineProps) {
   const { fetchProductMemory } = useInventoryGuardian();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -33,7 +35,11 @@ export function InventoryGuardianMemoryTimeline({ productId }: InventoryGuardian
       setIsLoading(true);
       try {
         const data = await fetchProductMemory(productId);
-        setMemories(data);
+        setMemories(
+          adjustmentsOnly
+            ? data.filter((m) => m.actionType === 'physical_count_audit' && m.discrepancy !== 0)
+            : data
+        );
         setHasLoaded(true);
       } finally {
         setIsLoading(false);
@@ -101,7 +107,9 @@ export function InventoryGuardianMemoryTimeline({ productId }: InventoryGuardian
 
           {!isLoading && memories.length === 0 && (
             <p className="text-center py-2 text-muted-foreground text-[11px]">
-              No past audit memories found for this product yet.
+              {adjustmentsOnly
+                ? 'No manual stock adjustments recorded for this product yet.'
+                : 'No past audit memories found for this product yet.'}
             </p>
           )}
 

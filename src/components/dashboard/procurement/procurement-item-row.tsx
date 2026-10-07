@@ -267,9 +267,12 @@ export function ProcurementItemRow({
               type="button"
               onClick={() => setEditUnallocatedOpen(true)}
               className="text-[10px] text-slate-500 hover:text-indigo-600 mt-1 flex items-center justify-center gap-0.5 whitespace-nowrap cursor-pointer hover:underline"
-              title={`Last stock edit: ${new Date(item.lastEditedAt).toLocaleString('en-PH')} by ${item.lastEditedBy || 'Staff'}. Click to view full history.`}
+              title={`Manually adjusted ${item.manualAdjustmentCount ?? 1}x. Last: ${new Date(item.lastEditedAt).toLocaleString('en-PH')} by ${item.lastEditedBy || 'Staff'}. Click to view full history.`}
             >
               <Clock className="w-2.5 h-2.5 text-indigo-500 shrink-0" />
+              {(item.manualAdjustmentCount ?? 0) > 1 && (
+                <span className="font-bold text-indigo-600">{item.manualAdjustmentCount}×</span>
+              )}
               {new Date(item.lastEditedAt).toLocaleDateString('en-PH', {
                 month: 'short',
                 day: 'numeric',
@@ -290,7 +293,7 @@ export function ProcurementItemRow({
               className="text-[10px] text-slate-400 hover:text-indigo-600 mt-0.5 italic cursor-pointer hover:underline"
               title="Click to view history or set unallocated stock"
             >
-              Never edited
+              Never adjusted
             </button>
           )}
           <EditUnallocatedStockDialog

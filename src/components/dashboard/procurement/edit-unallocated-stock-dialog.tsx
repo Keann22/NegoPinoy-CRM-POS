@@ -102,14 +102,14 @@ export function EditUnallocatedStockDialog({ item, isOpen, onClose, onSuccess }:
             <div className="flex items-center gap-2 text-xs text-slate-600 bg-slate-100/90 px-3 py-2 rounded-lg border border-slate-200">
               <Clock className="w-4 h-4 text-indigo-600 shrink-0" />
               <span>
-                Last edited: <strong className="text-slate-800 font-semibold">{new Date(item.lastEditedAt).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}</strong>
+                Manually adjusted <strong className="text-slate-800 font-semibold">{item.manualAdjustmentCount ?? 1} {(item.manualAdjustmentCount ?? 1) === 1 ? 'time' : 'times'}</strong> · Last: <strong className="text-slate-800 font-semibold">{new Date(item.lastEditedAt).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}</strong>
                 {item.lastEditedBy ? <> by <strong className="text-slate-800 font-semibold">{item.lastEditedBy}</strong></> : ''}
               </span>
             </div>
           ) : (
             <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200/60">
               <Clock className="w-4 h-4 text-slate-400 shrink-0" />
-              <span>No previous unallocated stock edit recorded for this item.</span>
+              <span>No manual stock adjustment recorded for this item.</span>
             </div>
           )}
 
@@ -171,7 +171,7 @@ export function EditUnallocatedStockDialog({ item, isOpen, onClose, onSuccess }:
           </div>
 
           <div className="pt-2 border-t border-slate-200">
-            <InventoryGuardianMemoryTimeline productId={item.productId} />
+            <InventoryGuardianMemoryTimeline productId={item.productId} adjustmentsOnly />
           </div>
 
           <DialogFooter className="pt-2">

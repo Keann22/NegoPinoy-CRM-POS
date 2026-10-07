@@ -110,49 +110,39 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
   }
 
   // 4.5 Fetch last stock edit metadata (guardian memory & inventory movements)
-  const lastEditMap = new Map<string, { editedAt: string; editedBy: string }>();
+  const lastEditMap = new Map<string, { editedAt: string; editedBy: string; count: number }>();
   if (productIdsToFetch.size > 0) {
     const pIdArray = Array.from(productIdsToFetch);
-    const [memRes, movRes] = await Promise.all([
-      supabase
-        .from('inventory_guardian_memory')
-        .select('product_id, actor_name, created_at')
-        .in('product_id', pIdArray)
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('inventory_movements')
-        .select('product_id, timestamp, reason')
-        .in('product_id', pIdArray)
-        .eq('movement_type', 'adjustment')
-        .order('timestamp', { ascending: false })
-    ]);
+    // Guardian memory is the single source here (same as the audit timeline in the dialog).
+    // inventory_movements 'adjustment' rows are NOT used: the system writes them too
+    // (e.g. "Order Edit Reversal", dashboard sync), which showed a "last edited" stamp
+    // with an empty timeline. Every manual stock-edit path records a memory entry.
+    // 'physical_count_audit' = a person typed a new stock number (Product Edit physical stock,
+    // Adjust Stock, Edit Unallocated Stock, or the Guardian popup's physical count).
+    const memRes = await supabase
+      .from('inventory_guardian_memory')
+      .select('product_id, actor_name, created_at, discrepancy')
+      .in('product_id', pIdArray)
+      .eq('action_type', 'physical_count_audit')
+      .order('created_at', { ascending: false });
 
     if (memRes.data) {
       for (const m of memRes.data) {
-        if (!lastEditMap.has(m.product_id)) {
+        // A count that matched the system (no change) is a verification, not an adjustment.
+        if (m.discrepancy === 0) continue;
+        const existing = lastEditMap.get(m.product_id);
+        if (existing) {
+          existing.count += 1;
+        } else {
           lastEditMap.set(m.product_id, {
             editedAt: m.created_at,
-            editedBy: m.actor_name || 'Staff'
+            editedBy: m.actor_name || 'Staff',
+            count: 1
           });
         }
       }
     }
 
-    if (movRes.data) {
-      for (const mov of movRes.data) {
-        const existing = lastEditMap.get(mov.product_id);
-        if (!existing || new Date(mov.timestamp) > new Date(existing.editedAt)) {
-          let actor = 'Staff';
-          if (mov.reason && mov.reason.includes(' by ')) {
-            actor = mov.reason.split(' by ').pop()?.trim() || 'Staff';
-          }
-          lastEditMap.set(mov.product_id, {
-            editedAt: mov.timestamp,
-            editedBy: actor
-          });
-        }
-      }
-    }
   }
 
   // Resolve supplier fallback for candidate products missing supplier_id or supplier_pricing
@@ -243,6 +233,7 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
       unscannedLayawayQty: unscannedLayawayQty,
       lastEditedAt: lastEdit ? lastEdit.editedAt : null,
       lastEditedBy: lastEdit ? lastEdit.editedBy : null,
+      manualAdjustmentCount: lastEdit ? lastEdit.count : 0,
       staffRequestedQty: draft ? draft.expected_qty : null,
       requestedByName: draft ? draft.requested_by_name : null,
       requestedAt: draft ? draft.created_at : null,
