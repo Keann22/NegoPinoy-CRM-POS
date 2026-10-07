@@ -22,6 +22,8 @@ export interface ProcurementDemandResult {
   bundleToComponents: Map<string, { componentId: string; qtyPerBundle: number }[]>;
   negativeStockIds: Set<string>;
   unscannedLayawayMap: Map<string, number>;
+  /** Unfulfilled order qty before pending-receipt POs are netted off needToBuyMap. */
+  openUnscannedMap: Map<string, number>;
 }
 
 export async function calculateProcurementDemand(
@@ -186,6 +188,8 @@ export async function calculateProcurementDemand(
     pendingReceiptMap.set(p.product_id, (pendingReceiptMap.get(p.product_id) || 0) + p.expected_qty);
   });
 
+  const openUnscannedMap = new Map(needToBuyMap);
+
   for (const [id, qty] of Array.from(needToBuyMap.entries())) {
     const pendingQty = pendingReceiptMap.get(id) || 0;
     if (pendingQty > 0) {
@@ -217,6 +221,7 @@ export async function calculateProcurementDemand(
     bundleToComponents,
     negativeStockIds,
     unscannedLayawayMap,
+    openUnscannedMap,
   };
 }
 

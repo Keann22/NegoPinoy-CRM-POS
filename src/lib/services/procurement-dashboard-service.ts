@@ -61,6 +61,7 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
     bundleToComponents,
     negativeStockIds,
     unscannedLayawayMap,
+    openUnscannedMap,
   } = await calculateProcurementDemand(supabase, initialProductIdsToFetch, purchased || []);
 
   // 4. Calculate negative stock reconciliation
@@ -216,7 +217,8 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
     const physicalStock = Math.max(0, (p.stock_level ?? 0) + unscannedLayawayQty);
     const totalOpenDemandQty = totalOpenDemandMap.get(p.id) || 0;
     const needToBuyQty = needToBuyMap.get(p.id) || 0;
-    const allocatedPickedQty = Math.max(0, totalOpenDemandQty - needToBuyQty);
+    const openUnscannedQty = openUnscannedMap.get(p.id) || 0;
+    const allocatedPickedQty = Math.max(0, totalOpenDemandQty - openUnscannedQty);
     const unallocatedStock = Math.max(0, physicalStock - needToBuyQty);
     const lastEdit = lastEditMap.get(p.id);
 
@@ -241,6 +243,7 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
       sourceOrders: draft ? (sourceOrdersByDraftId.get(draft.id) || []) : [],
       totalOpenDemandQty: totalOpenDemandQty,
       needToBuyQty: needToBuyQty,
+      openUnscannedQty: openUnscannedQty,
       supplierId: resolvedSupplierId,
       unitCost: matchedCost,
     });

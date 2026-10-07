@@ -44,14 +44,17 @@ export function ProcurementStockDetailDialog({ item, isOpen, onClose }: Procurem
 
   const physicalStock = item?.physicalStock ?? 0;
   const layawayQty = item?.unscannedLayawayQty ?? 0;
-  // allocatedPickedQty from the service is (open demand − need-to-buy), which still
+  // needToBuyQty is net of pending-receipt POs; the card and its list count every
+  // unscanned order piece, so use the pre-PO figure and show the PO cover separately.
+  const openUnscanned = item?.openUnscannedQty ?? item?.needToBuyQty ?? 0;
+  const coveredByPo = Math.max(0, openUnscanned - (item?.needToBuyQty ?? 0));
+  // allocatedPickedQty from the service is (open demand − open unscanned), which still
   // contains on-shelf lay-away. Lay-away has its own card, so take it out here.
   const allocatedPicked = Math.max(
     0,
-    (item?.allocatedPickedQty ?? Math.max(0, (item?.totalOpenDemandQty || 0) - (item?.needToBuyQty || 0))) - layawayQty
+    (item?.allocatedPickedQty ?? Math.max(0, (item?.totalOpenDemandQty || 0) - openUnscanned)) - layawayQty
   );
   const unallocated = item?.unallocatedStock ?? Math.max(0, physicalStock - (item?.needToBuyQty || 0));
-  const openUnscanned = item?.needToBuyQty ?? 0;
 
   useEffect(() => {
     let cancelled = false;
@@ -268,6 +271,11 @@ export function ProcurementStockDetailDialog({ item, isOpen, onClose }: Procurem
                 <span className="text-[10px] text-blue-700 flex items-center gap-1">
                   <MousePointerClick className="w-3 h-3" /> Click for unscanned orders
                 </span>
+                {coveredByPo > 0 && (
+                  <span className="text-[10px] text-blue-700 block">
+                    {coveredByPo} covered by incoming PO · {item?.needToBuyQty ?? 0} to buy
+                  </span>
+                )}
               </div>
               <span className="text-2xl font-extrabold text-blue-900">{openUnscanned}</span>
             </button>
