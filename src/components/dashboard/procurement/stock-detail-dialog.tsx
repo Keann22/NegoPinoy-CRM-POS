@@ -6,7 +6,8 @@ import { useSupabase } from '@/lib/supabase/hooks';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ALL_OPEN_STATUSES, UNFULFILLED_STATUSES } from '@/lib/services/procurement-service';
+import { fetchAllPages } from '@/lib/services/procurement-demand-service';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Package, CheckCircle2, Loader2, ExternalLink, ShoppingBag, Info, MousePointerClick } from 'lucide-react';
 import { format } from 'date-fns';
@@ -28,7 +29,12 @@ interface RelatedOrderRow {
   status: string;
   orderDate: string;
   isPacked: boolean;
+  category: Exclude<OrderCategory, 'all'>;
+  viaBundle: boolean;
 }
+
+// Orders at these statuses were already physically pulled from the shelf.
+const PICKED_STATUSES = ['Picked', 'Photo', 'Packed', 'For Shipping', 'For Pick-up', 'Picked (with issue)'];
 
 export function ProcurementStockDetailDialog({ item, isOpen, onClose }: ProcurementStockDetailDialogProps) {
   const supabase = useSupabase();
@@ -37,81 +43,139 @@ export function ProcurementStockDetailDialog({ item, isOpen, onClose }: Procurem
   const [orderRows, setOrderRows] = useState<RelatedOrderRow[]>([]);
 
   const physicalStock = item?.physicalStock ?? 0;
-  const allocatedPicked = item?.allocatedPickedQty ?? Math.max(0, (item?.totalOpenDemandQty || 0) - (item?.needToBuyQty || 0));
+  const layawayQty = item?.unscannedLayawayQty ?? 0;
+  // allocatedPickedQty from the service is (open demand − need-to-buy), which still
+  // contains on-shelf lay-away. Lay-away has its own card, so take it out here.
+  const allocatedPicked = Math.max(
+    0,
+    (item?.allocatedPickedQty ?? Math.max(0, (item?.totalOpenDemandQty || 0) - (item?.needToBuyQty || 0))) - layawayQty
+  );
   const unallocated = item?.unallocatedStock ?? Math.max(0, physicalStock - (item?.needToBuyQty || 0));
   const openUnscanned = item?.needToBuyQty ?? 0;
-  const layawayQty = item?.unscannedLayawayQty ?? 0;
 
   useEffect(() => {
+    let cancelled = false;
+
     async function fetchRelatedOrders() {
       if (!isOpen || !supabase || !item?.productId) return;
       setLoadingOrders(true);
+      setOrderRows([]);
       try {
-        // Fetch product family IDs (product itself + variants)
-        const { data: family } = await supabase
-          .from('products')
-          .select('id')
-          .or(`id.eq.${item.productId},parent_id.eq.${item.productId}`);
+        const productId: string = item.productId;
 
-        const targetProductIds = (family && family.length > 0) ? family.map((f: any) => f.id) : [item.productId];
+        // Bundles hold no stock of their own: a bundle sale consumes this product,
+        // so bundle order lines count here too (qty × qty-per-bundle).
+        const bundles = await fetchAllPages<any>((from, to) =>
+          supabase.from('products').select('id, assembly_recipe').not('assembly_recipe', 'is', null).range(from, to)
+        );
+        const qtyPerBundle = new Map<string, number>();
+        bundles.forEach((bp: any) => {
+          const recipe = Array.isArray(bp.assembly_recipe) ? bp.assembly_recipe : [];
+          const perBundle = recipe
+            .filter((c: any) => (c.productId || c.component_id) === productId)
+            .reduce((sum: number, c: any) => sum + (c.quantity || 1), 0);
+          if (perBundle > 0 && bp.id !== productId) qtyPerBundle.set(bp.id, perBundle);
+        });
 
-        const { data, error } = await supabase
-          .from('order_items')
-          .select(`
-            id,
-            product_id,
-            quantity,
-            is_packed,
-            orders!inner(
-              id,
-              order_date,
-              status,
-              customer_id,
-              payment_method,
-              customers(full_name)
-            )
-          `)
-          .in('product_id', targetProductIds);
+        const targetProductIds = [productId, ...Array.from(qtyPerBundle.keys())];
+        const CHUNK_SIZE = 200;
+        const data: any[] = [];
+        const openIssues: any[] = [];
 
-        if (error) throw error;
+        // Same scope as the procurement demand calculation: open orders only, paginated.
+        for (let i = 0; i < targetProductIds.length; i += CHUNK_SIZE) {
+          const chunk = targetProductIds.slice(i, i + CHUNK_SIZE);
+          const [chunkRows, chunkIssues] = await Promise.all([
+            fetchAllPages<any>((from, to) =>
+              supabase
+                .from('order_items')
+                .select(`
+                  id,
+                  product_id,
+                  quantity,
+                  is_packed,
+                  orders!inner(
+                    id,
+                    order_date,
+                    status,
+                    customer_id,
+                    payment_method,
+                    customers(full_name)
+                  )
+                `)
+                .in('product_id', chunk)
+                .in('orders.status', ALL_OPEN_STATUSES)
+                .order('id')
+                .range(from, to)
+            ),
+            fetchAllPages<any>((from, to) =>
+              supabase
+                .from('order_issues')
+                .select('order_id, product_id')
+                .eq('status', 'open')
+                .in('product_id', chunk)
+                .order('id')
+                .range(from, to)
+            ),
+          ]);
+          data.push(...chunkRows);
+          openIssues.push(...chunkIssues);
+        }
 
-        const formatted: RelatedOrderRow[] = (data || []).map((row: any) => ({
-          id: row.id,
-          orderId: row.orders?.id || '',
-          customerName: row.orders?.customers?.full_name || 'Unknown Customer',
-          quantity: row.quantity || 1,
-          paymentMethod: row.orders?.payment_method || 'Cash',
-          status: row.orders?.status || 'Processing',
-          orderDate: row.orders?.order_date || new Date().toISOString(),
-          isPacked: !!row.is_packed,
-        }));
+        const openIssueKeys = new Set(openIssues.map((i: any) => `${i.order_id}-${i.product_id}`));
 
-        setOrderRows(formatted);
+        // Mirrors isUnscannedLayaway / isUnfulfilledFor in procurement-demand-service.ts
+        // so each list adds up to the number on its card.
+        const categorize = (row: any): Exclude<OrderCategory, 'all'> => {
+          const status = row.orders.status;
+          if (row.orders.payment_method === 'Lay-away') {
+            return !row.is_packed && !PICKED_STATUSES.includes(status) ? 'layaway' : 'allocated';
+          }
+          if (status === 'Picked (with issue)') {
+            const hasOpenIssue =
+              openIssueKeys.has(`${row.orders.id}-${productId}`) ||
+              openIssueKeys.has(`${row.orders.id}-${row.product_id}`);
+            return hasOpenIssue ? 'unscanned' : 'allocated';
+          }
+          if (row.is_packed) return 'allocated';
+          return UNFULFILLED_STATUSES.includes(status) ? 'unscanned' : 'allocated';
+        };
+
+        const formatted: RelatedOrderRow[] = data
+          .map((row: any) => ({
+            id: row.id,
+            orderId: row.orders?.id || '',
+            customerName: row.orders?.customers?.full_name || 'Unknown Customer',
+            quantity: (row.quantity || 0) * (row.product_id === productId ? 1 : qtyPerBundle.get(row.product_id) || 1),
+            paymentMethod: row.orders?.payment_method || 'Cash',
+            status: row.orders?.status || 'Processing',
+            orderDate: row.orders?.order_date || new Date().toISOString(),
+            isPacked: !!row.is_packed,
+            category: categorize(row),
+            viaBundle: row.product_id !== productId,
+          }))
+          .sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
+
+        if (!cancelled) setOrderRows(formatted);
       } catch (err) {
         console.error('Error fetching related orders for stock detail:', err);
       } finally {
-        setLoadingOrders(false);
+        if (!cancelled) setLoadingOrders(false);
       }
     }
 
     fetchRelatedOrders();
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen, supabase, item?.productId]);
 
   if (!item) return null;
 
   // Filter orders based on active category
-  const filteredOrders = orderRows.filter((r) => {
-    if (selectedCategory === 'allocated') {
-      return r.isPacked || ['Picked', 'Photo', 'Packed', 'For Shipping', 'For Pick-up', 'Picked (with issue)', 'Completed'].includes(r.status);
-    }
-    if (selectedCategory === 'unscanned') {
-      return !r.isPacked && r.paymentMethod !== 'Lay-away' && ['Processing', 'Pending Payment', 'Waiting for Stock', 'On-Hold'].includes(r.status);
-    }
-    if (selectedCategory === 'layaway') {
-      return r.paymentMethod === 'Lay-away' && !['Completed', 'Cancelled'].includes(r.status);
-    }
-    return true; // 'all'
-  });
+  const filteredOrders = selectedCategory === 'all' ? orderRows : orderRows.filter((r) => r.category === selectedCategory);
+  const filteredQty = filteredOrders.reduce((sum, r) => sum + r.quantity, 0);
+  const filteredOrderCount = new Set(filteredOrders.map((r) => r.orderId)).size;
 
   const getCategoryTitle = () => {
     switch (selectedCategory) {
@@ -235,7 +299,7 @@ export function ProcurementStockDetailDialog({ item, isOpen, onClose }: Procurem
                 {getCategoryTitle()}
               </span>
               <Badge variant="outline" className="text-[11px] bg-white">
-                {filteredOrders.length} Order{filteredOrders.length !== 1 ? 's' : ''}
+                {filteredOrderCount} Order{filteredOrderCount !== 1 ? 's' : ''} · {filteredQty} pc{filteredQty !== 1 ? 's' : ''}
               </Badge>
             </div>
 
@@ -248,7 +312,7 @@ export function ProcurementStockDetailDialog({ item, isOpen, onClose }: Procurem
                 No related orders found for this category.
               </div>
             ) : (
-              <ScrollArea className="max-h-[220px]">
+              <div className="max-h-[40vh] overflow-y-auto">
                 <Table>
                   <TableHeader className="bg-slate-50 text-[11px]">
                     <TableRow>
@@ -274,7 +338,10 @@ export function ProcurementStockDetailDialog({ item, isOpen, onClose }: Procurem
                           </Link>
                         </TableCell>
                         <TableCell className="font-medium text-slate-800 py-2">{row.customerName}</TableCell>
-                        <TableCell className="text-center font-bold text-slate-900 py-2">{row.quantity}</TableCell>
+                        <TableCell className="text-center font-bold text-slate-900 py-2">
+                          {row.quantity}
+                          {row.viaBundle && <span className="block text-[10px] font-normal text-slate-400">via bundle</span>}
+                        </TableCell>
                         <TableCell className="text-center py-2">
                           <Badge variant="outline" className="text-[10px] font-normal">
                             {row.paymentMethod}
@@ -300,7 +367,7 @@ export function ProcurementStockDetailDialog({ item, isOpen, onClose }: Procurem
                     ))}
                   </TableBody>
                 </Table>
-              </ScrollArea>
+              </div>
             )}
           </div>
         </div>
