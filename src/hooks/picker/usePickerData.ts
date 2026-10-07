@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { resolveOpenOrderIssues } from '@/lib/services/order-issues-service';
+import { handleStockStatusTransition } from '@/lib/services/orders/order-update';
 import type { OrderItem, PickGroup, PickRow, ProductMemoryHint } from './types';
 import { fetchProductMemoriesForPicker } from './pickerMemoryHelper';
 
@@ -247,6 +248,8 @@ export function usePickerData(
         .eq('id', scannedOrderId);
 
       if (orderError) throw orderError;
+
+      await handleStockStatusTransition(supabase, scannedOrderId, orderDetails?.status, newStatus);
 
       const userName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : 'Unknown Staff';
 

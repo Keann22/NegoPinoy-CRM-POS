@@ -42,8 +42,8 @@ export function useWarehouseStock() {
     try {
       // 1. Fetch warehouses
       const { data: whList } = await supabase.from('warehouses').select('id, code');
-      const unit1 = whList?.find((w) => w.code === 'UNIT1');
-      const unit2 = whList?.find((w) => w.code === 'UNIT2');
+      const unit1 = whList?.find((w: any) => w.code === 'UNIT1');
+      const unit2 = whList?.find((w: any) => w.code === 'UNIT2');
 
       if (!unit1 || !unit2) return;
 
@@ -60,7 +60,7 @@ export function useWarehouseStock() {
         return;
       }
 
-      const productIds = u2Stock.map((row) => row.product_id);
+      const productIds = u2Stock.map((row: any) => row.product_id);
 
       // 3. Fetch Unit 1 stock for those products
       const { data: u1Stock, error: u1Err } = await supabase
@@ -71,18 +71,20 @@ export function useWarehouseStock() {
 
       if (u1Err) throw u1Err;
 
-      const u1Map = new Map(u1Stock?.map((row) => [row.product_id, row]));
+      const u1Map = new Map((u1Stock || []).map((row: any) => [row.product_id, row]));
 
       const results: ReplenishmentSuggestion[] = [];
-      for (const row of u2Stock) {
-        const u1 = u1Map.get(row.product_id);
+      for (const row of u2Stock as any[]) {
+        const u1: any = u1Map.get(row.product_id);
         const u1Level = u1?.stock_level ?? 0;
         const threshold = u1?.reorder_threshold ?? 5;
         const u2Level = row.stock_level ?? 0;
 
         // If Unit 1 is low or empty
+        const prod: any = row.products;
+        if (prod?.name?.startsWith('[DELETED]')) continue;
+
         if (u1Level <= threshold && u2Level > 0) {
-          const prod: any = row.products;
           // Suggest transferring up to 10 or whatever is in reserve
           const suggested = Math.min(u2Level, Math.max(5, threshold * 2 - u1Level));
           results.push({

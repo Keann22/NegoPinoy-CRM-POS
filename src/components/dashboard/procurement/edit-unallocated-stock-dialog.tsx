@@ -6,9 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ShieldAlert, Loader2, Package, CheckCircle2 } from 'lucide-react';
+import { ShieldAlert, Loader2, Package, CheckCircle2, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/lib/supabase/hooks';
+import { useUserProfile } from '@/hooks/useUserProfile';
+import { InventoryGuardianMemoryTimeline } from '@/components/dashboard/inventory/InventoryGuardianMemoryTimeline';
 
 interface EditUnallocatedStockDialogProps {
   item: any | null;
@@ -19,6 +21,7 @@ interface EditUnallocatedStockDialogProps {
 
 export function EditUnallocatedStockDialog({ item, isOpen, onClose, onSuccess }: EditUnallocatedStockDialogProps) {
   const { user } = useUser();
+  const { userProfile } = useUserProfile();
   const { toast } = useToast();
   const [newStock, setNewStock] = useState<string>('');
   const [reasonCode, setReasonCode] = useState<string>('Physical Count Correction');
@@ -49,7 +52,8 @@ export function EditUnallocatedStockDialog({ item, isOpen, onClose, onSuccess }:
 
     setSubmitting(true);
     try {
-      const actorName = user?.userMetadata?.full_name || user?.email || 'Staff';
+      const profileName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : '';
+      const actorName = profileName || user?.userMetadata?.full_name || user?.email || 'Staff';
       const res = await fetch('/api/inventory/procurement/edit-unallocated-stock', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -94,6 +98,21 @@ export function EditUnallocatedStockDialog({ item, isOpen, onClose, onSuccess }:
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 py-2">
+          {item.lastEditedAt ? (
+            <div className="flex items-center gap-2 text-xs text-slate-600 bg-slate-100/90 px-3 py-2 rounded-lg border border-slate-200">
+              <Clock className="w-4 h-4 text-indigo-600 shrink-0" />
+              <span>
+                Last edited: <strong className="text-slate-800 font-semibold">{new Date(item.lastEditedAt).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}</strong>
+                {item.lastEditedBy ? <> by <strong className="text-slate-800 font-semibold">{item.lastEditedBy}</strong></> : ''}
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200/60">
+              <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+              <span>No previous unallocated stock edit recorded for this item.</span>
+            </div>
+          )}
+
           <div className="bg-indigo-50/80 border border-indigo-200 rounded-lg p-3 text-xs text-indigo-900 space-y-1">
             <div className="font-semibold flex items-center gap-1.5 text-indigo-800">
               <ShieldAlert className="w-4 h-4 text-indigo-600" />
@@ -149,6 +168,10 @@ export function EditUnallocatedStockDialog({ item, isOpen, onClose, onSuccess }:
               rows={2}
               className="text-xs bg-white"
             />
+          </div>
+
+          <div className="pt-2 border-t border-slate-200">
+            <InventoryGuardianMemoryTimeline productId={item.productId} />
           </div>
 
           <DialogFooter className="pt-2">

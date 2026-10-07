@@ -3,6 +3,7 @@ import { useSupabase } from '@/lib/supabase/hooks';
 import { useToast } from '@/hooks/use-toast';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { resolveOpenOrderIssues } from '@/lib/services/order-issues-service';
+import { handleStockStatusTransition } from '@/lib/services/orders/order-update';
 
 export type OrderItem = {
   id: string;
@@ -330,6 +331,7 @@ export function usePacker() {
         .eq('id', scannedOrderId);
 
       if (error) throw error;
+      await handleStockStatusTransition(supabase, scannedOrderId, orderDetails?.status, 'Packed');
       const { error: orderItemsError } = await supabase
         .from('order_items')
         .update({ is_packed: true })

@@ -12,6 +12,7 @@ export function useProductsPage() {
 
   const [deletingProduct, setDeletingProduct] = useState<FormattedProduct | null>(null);
   const [editingProduct, setEditingProduct] = useState<FormattedProduct | null>(null);
+  const [adjustingStockProduct, setAdjustingStockProduct] = useState<FormattedProduct | null>(null);
   const [viewingDetailsProduct, setViewingDetailsProduct] = useState<FormattedProduct | null>(null);
   const [viewingHistoryProduct, setViewingHistoryProduct] = useState<FormattedProduct | null>(null);
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
@@ -134,9 +135,9 @@ export function useProductsPage() {
             
         if (productsData) {
             const allImagePaths = productsData
-                .flatMap(p => p.images || [])
-                .filter(url => !url.includes('placehold.co'))
-                .map(url => {
+                .flatMap((p: any) => p.images || [])
+                .filter((url: string) => !url.includes('placehold.co'))
+                .map((url: string) => {
                     const urlParts = url.split('/');
                     return urlParts[urlParts.length - 1];
                 });
@@ -190,6 +191,8 @@ export function useProductsPage() {
     setDeletingProduct,
     editingProduct,
     setEditingProduct,
+    adjustingStockProduct,
+    setAdjustingStockProduct,
     viewingDetailsProduct,
     setViewingDetailsProduct,
     viewingHistoryProduct,

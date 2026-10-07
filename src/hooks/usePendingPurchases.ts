@@ -43,7 +43,7 @@ export function usePendingPurchases(onReceiveComplete: () => void) {
 
         if (data && data.length > 0) {
           setWarehouses(data);
-          const u2 = data.find((w) => w.code === 'UNIT2');
+          const u2 = data.find((w: any) => w.code === 'UNIT2');
           setTargetWarehouseId(u2 ? u2.id : data[0].id);
         }
       } catch (err) {

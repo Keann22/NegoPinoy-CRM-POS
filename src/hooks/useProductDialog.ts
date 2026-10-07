@@ -114,7 +114,7 @@ export function useProductDialog(props: ProductDialogProps) {
         .ilike('name', trimmed)
         .not('name', 'ilike', '[DELETED]%')
         .limit(5);
-      const exactMatch = exactMatches?.find(p => p.id !== excludeId);
+      const exactMatch = exactMatches?.find((p: any) => p.id !== excludeId);
       if (exactMatch) {
         setDuplicateMatch({
           id: exactMatch.id,
@@ -179,6 +179,7 @@ export function useProductDialog(props: ProductDialogProps) {
           isOnSale: (displayProduct as any).is_on_sale ?? false,
           salePrice: (displayProduct as any).sale_price ?? undefined,
           installmentPrice: displayProduct.installment_price ?? undefined,
+          quantityOnHand: displayProduct.quantityOnHand ?? 0,
           supplierPricing: displayProduct.supplierPricing || [],
           variations: [],
           assemblyRecipe: displayProduct.assembly_recipe || [],

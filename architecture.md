@@ -305,6 +305,28 @@ To guarantee 100% backward compatibility with POS orders, P&L reports, and the s
 - **Inbound Receiving** (`/dashboard/inventory/receive`): Defaults receiving destination to **Unit 2 (Reserve & Inbound)** with a dropdown to select Unit 1 for urgent direct-to-shelf restocks.
 - **Picker Alert** (`/dashboard/pick`): If an item on Unit 1 shelf is empty, the picker UI displays Unit 2 reserve stock so pickers can request replenishment rather than reporting false out-of-stock issues.
 
+### Physical Stock Allocation & Unallocated Processing Orders (added 2026-10-08)
+
+`products.stock_level` represents the **Physical Stock Count Available on Shelf**.
+
+#### Order Status & Allocation Rule
+Orders created by sales staff enter the `Processing` status. Because inventory staff have not yet physically picked or packed the items off the shelf, **`Processing` orders do NOT reduce Available Stock (`stock_level`)**.
+
+Stock allocation and physical deduction occur **ONLY** when items are physically picked or packed by inventory staff (or when status moves to an allocated status):
+- **`UNALLOCATED_STATUSES`**: `Processing`, `Pending Payment`, `On-Hold`, `Draft`
+- **`ALLOCATED_STATUSES`**: `Picked`, `Picked (with issue)`, `Packed`, `For Shipping`, `For Pick-up`, `Completed`, `Delivered`, `Payment Received (COD)`, `Shipped`
+
+#### Stock Transition Handling
+The `handleStockStatusTransition(supabase, orderId, oldStatus, newStatus)` helper function in `@/lib/services/orders/order-update`:
+1. When transitioning from an **Unallocated** status to an **Allocated** status (e.g., `Processing` → `Picked` or `Packed`), physical stock is decremented (`applyOrderStockDelta(..., -1)`).
+2. When transitioning from an **Allocated** status back to an **Unallocated** status (or `Cancelled`), physical stock is restored (`applyOrderStockDelta(..., +1)`).
+3. Cancelling a `Processing` order does NOT alter stock, because stock was never deducted.
+
+#### Manual Stock Adjustments
+Authorized inventory/management staff can manually adjust physical stock levels directly:
+- **UI**: Products Table (`ProductsTable.tsx` → "Adjust Stock" row action) or Product Edit Dialog (`AdjustStockDialog.tsx`).
+- **Audit**: Direct adjustments prompt for a target physical quantity or relative change (+/-), write an entry to `inventory_movements` with the reason and staff name, and update `products.stock_level` (which syncs across warehouses via database triggers).
+
 ---
 
 ## Supabase Client Usage

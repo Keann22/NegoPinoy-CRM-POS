@@ -15,6 +15,7 @@ import { BulkUploadProductsDialog } from '@/components/dashboard/bulk-upload-pro
 import { ReservedStockDialog } from '@/components/dashboard/reserved-stock-dialog';
 import { ViewProductHistoryDialog } from '@/components/dashboard/view-product-history-dialog';
 import { ViewProductDetailsDialog } from '@/components/dashboard/view-product-details-dialog';
+import { AdjustStockDialog } from '@/components/dashboard/inventory/adjust-stock-dialog';
 import { ProductsTable } from '@/components/dashboard/products/ProductsTable';
 import { useProductsPage } from '@/hooks/useProductsPage';
 
@@ -26,6 +27,8 @@ export default function ProductsPage() {
     setDeletingProduct,
     editingProduct,
     setEditingProduct,
+    adjustingStockProduct,
+    setAdjustingStockProduct,
     viewingDetailsProduct,
     setViewingDetailsProduct,
     viewingHistoryProduct,
@@ -139,6 +142,7 @@ export default function ProductsPage() {
             })}
             onViewDetails={setViewingDetailsProduct}
             onEdit={setEditingProduct}
+            onAdjustStock={setAdjustingStockProduct}
             onViewHistory={setViewingHistoryProduct}
             onDelete={setDeletingProduct}
             onViewReserved={setViewingReservedProduct}
@@ -184,6 +188,13 @@ export default function ProductsPage() {
         product={editingProduct}
         open={!!editingProduct}
         onOpenChange={(isOpen: boolean) => !isOpen && setEditingProduct(null)}
+        onSuccess={() => refetch()}
+      />
+
+      <AdjustStockDialog
+        product={adjustingStockProduct}
+        open={!!adjustingStockProduct}
+        onOpenChange={(isOpen: boolean) => !isOpen && setAdjustingStockProduct(null)}
         onSuccess={() => refetch()}
       />
 

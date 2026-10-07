@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { useOrders } from '@/hooks/useOrders';
 import { useSupabase } from '@/lib/supabase/hooks';
 
 import { AddOrderDialog } from '@/components/dashboard/order-dialog';
@@ -27,8 +28,7 @@ import { ProcessReturnDialog } from '@/components/dashboard/process-return-dialo
 import { OrdersFilterBar } from '@/components/dashboard/orders/OrdersFilterBar';
 import { OrdersTable } from '@/components/dashboard/orders/OrdersTable';
 import { OverdueOrders } from '@/components/dashboard/orders/OverdueOrders';
-import { useOrders } from '@/hooks/useOrders';
-import { restoreStockForCancelledOrder, deductStockForUncancelledOrder } from '@/lib/services/order-service';
+import { handleStockStatusTransition } from '@/lib/services/orders/order-update';
 import { resolveOpenOrderIssues, STATUSES_THAT_CLEAR_ORDER_ISSUES } from '@/lib/services/order-issues-service';
 
 import type { FormattedOrder, Order, OrderStatus } from '@/types';
@@ -133,11 +133,7 @@ export default function OrdersPage() {
   const applyOrderStatusChange = async (orderId: string, currentStatus: OrderStatus | undefined, newStatus: OrderStatus) => {
     if (!supabase || currentStatus === newStatus) return;
 
-    if (newStatus === 'Cancelled' && currentStatus !== 'Cancelled') {
-      await restoreStockForCancelledOrder(supabase, orderId);
-    } else if (currentStatus === 'Cancelled' && newStatus !== 'Cancelled') {
-      await deductStockForUncancelledOrder(supabase, orderId);
-    }
+    await handleStockStatusTransition(supabase, orderId, currentStatus, newStatus);
 
     const updatePayload: any = { status: newStatus };
     if (['Shipped', 'Completed', 'Payment Received (COD)'].includes(newStatus)) {

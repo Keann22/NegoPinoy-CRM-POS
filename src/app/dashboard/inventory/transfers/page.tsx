@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowRightLeft, ListChecks, History } from 'lucide-react';
+import { ArrowRightLeft, ListChecks, History, Warehouse } from 'lucide-react';
 import { useWarehouseStock } from '@/hooks/useWarehouseStock';
+import { WarehouseOverview } from '@/components/dashboard/inventory/transfers/warehouse-overview';
 import { ReplenishmentTable } from '@/components/dashboard/inventory/transfers/replenishment-table';
 import { QuickTransfer } from '@/components/dashboard/inventory/transfers/quick-transfer';
 import { TransferHistory } from '@/components/dashboard/inventory/transfers/transfer-history';
@@ -20,19 +22,25 @@ export default function StockTransfersPage() {
     refreshSuggestions,
   } = useWarehouseStock();
 
+  const [activeTab, setActiveTab] = useState<string>('overview');
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Internal Stock Transfers</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Multi-Warehouse & Stock Transfers</h1>
           <p className="text-muted-foreground text-sm">
-            Manage replenishment between Unit 2 (Reserve & Inbound) and Unit 1 (Fulfillment Hub).
+            Overview of Unit 1 (Fulfillment Hub) vs Unit 2 (Reserve Storage) inventory and replenishment.
           </p>
         </div>
       </div>
 
-      <Tabs defaultValue="replenishment" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 max-w-md">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList className="grid w-full grid-cols-4 max-w-xl">
+          <TabsTrigger value="overview" className="flex items-center gap-2">
+            <Warehouse className="h-4 w-4" />
+            <span>Stock Overview</span>
+          </TabsTrigger>
           <TabsTrigger value="replenishment" className="flex items-center gap-2">
             <ListChecks className="h-4 w-4" />
             <span>Runner Sheet</span>
@@ -51,6 +59,13 @@ export default function StockTransfersPage() {
             <span>History</span>
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="overview" className="space-y-4">
+          <WarehouseOverview
+            warehouses={warehouses}
+            onTransferClick={() => setActiveTab('quick-transfer')}
+          />
+        </TabsContent>
 
         <TabsContent value="replenishment" className="space-y-4">
           <Card>

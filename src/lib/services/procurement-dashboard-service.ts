@@ -109,6 +109,52 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
     }
   }
 
+  // 4.5 Fetch last stock edit metadata (guardian memory & inventory movements)
+  const lastEditMap = new Map<string, { editedAt: string; editedBy: string }>();
+  if (productIdsToFetch.size > 0) {
+    const pIdArray = Array.from(productIdsToFetch);
+    const [memRes, movRes] = await Promise.all([
+      supabase
+        .from('inventory_guardian_memory')
+        .select('product_id, actor_name, created_at')
+        .in('product_id', pIdArray)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('inventory_movements')
+        .select('product_id, timestamp, reason')
+        .in('product_id', pIdArray)
+        .eq('movement_type', 'adjustment')
+        .order('timestamp', { ascending: false })
+    ]);
+
+    if (memRes.data) {
+      for (const m of memRes.data) {
+        if (!lastEditMap.has(m.product_id)) {
+          lastEditMap.set(m.product_id, {
+            editedAt: m.created_at,
+            editedBy: m.actor_name || 'Staff'
+          });
+        }
+      }
+    }
+
+    if (movRes.data) {
+      for (const mov of movRes.data) {
+        const existing = lastEditMap.get(mov.product_id);
+        if (!existing || new Date(mov.timestamp) > new Date(existing.editedAt)) {
+          let actor = 'Staff';
+          if (mov.reason && mov.reason.includes(' by ')) {
+            actor = mov.reason.split(' by ').pop()?.trim() || 'Staff';
+          }
+          lastEditMap.set(mov.product_id, {
+            editedAt: mov.timestamp,
+            editedBy: actor
+          });
+        }
+      }
+    }
+  }
+
   // Resolve supplier fallback for candidate products missing supplier_id or supplier_pricing
   const needsParentLookup = (liveOS || []).filter(
     (p: any) => p.parent_id && (!p.supplier_id || !p.supplier_pricing || p.supplier_pricing.length === 0)
@@ -182,6 +228,7 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
     const needToBuyQty = needToBuyMap.get(p.id) || 0;
     const allocatedPickedQty = Math.max(0, totalOpenDemandQty - needToBuyQty);
     const unallocatedStock = Math.max(0, physicalStock - needToBuyQty);
+    const lastEdit = lastEditMap.get(p.id);
 
     osMap.set(p.id, {
       productId: p.id,
@@ -194,6 +241,8 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
       allocatedPickedQty: allocatedPickedQty,
       unallocatedStock: unallocatedStock,
       unscannedLayawayQty: unscannedLayawayQty,
+      lastEditedAt: lastEdit ? lastEdit.editedAt : null,
+      lastEditedBy: lastEdit ? lastEdit.editedBy : null,
       staffRequestedQty: draft ? draft.expected_qty : null,
       requestedByName: draft ? draft.requested_by_name : null,
       requestedAt: draft ? draft.created_at : null,

@@ -191,6 +191,21 @@ export function ProductDialog(props: ProductDialogProps) {
                 </div>
               )}
 
+              {isEdit && !(displayProduct as FormattedProduct)?.children?.length && (
+                <div className="space-y-4 rounded-lg border p-4">
+                  <p className="text-sm font-semibold">Inventory Stock</p>
+                  <FormField control={form.control} name="quantityOnHand" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Physical Stock Quantity (Available)</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="0" placeholder="0" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+              )}
+
               {isManagement && (!isEdit || !(displayProduct as FormattedProduct)?.children?.length) && (
                 <ProductSupplierSection
                   form={form}

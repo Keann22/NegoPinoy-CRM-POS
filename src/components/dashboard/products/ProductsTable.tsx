@@ -46,6 +46,7 @@ interface ProductsTableProps {
   onToggleExpand: (id: string) => void;
   onViewDetails: (product: FormattedProduct) => void;
   onEdit: (product: FormattedProduct) => void;
+  onAdjustStock?: (product: FormattedProduct) => void;
   onViewHistory: (product: FormattedProduct) => void;
   onDelete: (product: FormattedProduct) => void;
   onViewReserved: (product: { id: string; name: string }) => void;
@@ -134,15 +135,17 @@ function GroupStockCell({ product, onViewReserved, onViewPacked, onViewAllocated
   );
 }
 
-function ProductActionsMenu({ product, isManagement, canManageProducts, onViewDetails, onEdit, onViewHistory, onDelete }: {
+function ProductActionsMenu({ product, isManagement, canManageProducts, onViewDetails, onEdit, onAdjustStock, onViewHistory, onDelete }: {
   product: FormattedProduct;
   isManagement: boolean | undefined;
   canManageProducts: boolean | undefined;
   onViewDetails: (p: FormattedProduct) => void;
   onEdit: (p: FormattedProduct) => void;
+  onAdjustStock?: (p: FormattedProduct) => void;
   onViewHistory: (p: FormattedProduct) => void;
   onDelete: (p: FormattedProduct) => void;
 }) {
+  const isGroupParent = product.children && product.children.length > 0;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -155,7 +158,10 @@ function ProductActionsMenu({ product, isManagement, canManageProducts, onViewDe
         <DropdownMenuLabel>Actions</DropdownMenuLabel>
         <DropdownMenuItem onClick={() => onViewDetails(product)}>View Details</DropdownMenuItem>
         {canManageProducts && (
-          <DropdownMenuItem onClick={() => onEdit(product)}>Edit</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onEdit(product)}>Edit Details</DropdownMenuItem>
+        )}
+        {canManageProducts && onAdjustStock && !isGroupParent && (
+          <DropdownMenuItem onClick={() => onAdjustStock(product)}>Adjust Stock</DropdownMenuItem>
         )}
         <DropdownMenuItem onClick={() => onViewHistory(product)}>View History</DropdownMenuItem>
         {isManagement && (
@@ -174,7 +180,7 @@ function ProductActionsMenu({ product, isManagement, canManageProducts, onViewDe
 export function ProductsTable({
   products, isLoading, selectedProductIds, expandedParents, isManagement, canManageProducts,
   onSelectAll, onSelectOne, onToggleExpand,
-  onViewDetails, onEdit, onViewHistory, onDelete,
+  onViewDetails, onEdit, onAdjustStock, onViewHistory, onDelete,
   onViewReserved, onViewPacked, onViewAllocated,
 }: ProductsTableProps) {
   const allowProductManage = canManageProducts ?? isManagement;
@@ -265,7 +271,7 @@ export function ProductsTable({
                 }
               </TableCell>
               <TableCell>
-                <ProductActionsMenu product={product} isManagement={isManagement} canManageProducts={allowProductManage} onViewDetails={onViewDetails} onEdit={onEdit} onViewHistory={onViewHistory} onDelete={onDelete} />
+                <ProductActionsMenu product={product} isManagement={isManagement} canManageProducts={allowProductManage} onViewDetails={onViewDetails} onEdit={onEdit} onAdjustStock={onAdjustStock} onViewHistory={onViewHistory} onDelete={onDelete} />
               </TableCell>
             </TableRow>
 
@@ -290,7 +296,7 @@ export function ProductsTable({
                   <StockCell product={child} onViewReserved={onViewReserved} onViewPacked={onViewPacked} onViewAllocated={onViewAllocated} />
                 </TableCell>
                 <TableCell>
-                  <ProductActionsMenu product={child} isManagement={isManagement} canManageProducts={allowProductManage} onViewDetails={onViewDetails} onEdit={onEdit} onViewHistory={onViewHistory} onDelete={onDelete} />
+                  <ProductActionsMenu product={{ ...child, parentName: product.name }} isManagement={isManagement} canManageProducts={allowProductManage} onViewDetails={onViewDetails} onEdit={onEdit} onAdjustStock={onAdjustStock} onViewHistory={onViewHistory} onDelete={onDelete} />
                 </TableCell>
               </TableRow>
             ))}
