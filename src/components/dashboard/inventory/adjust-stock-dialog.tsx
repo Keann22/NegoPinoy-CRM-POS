@@ -82,11 +82,15 @@ export function AdjustStockDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!product || !supabase) return;
-
-    const actorName = userProfile
-      ? `${userProfile.firstName} ${userProfile.lastName}`.trim()
-      : 'Staff';
+    const canManageProducts = userProfile?.roles?.some(r => ['Admin', 'Owner', 'Inventory'].includes(r));
+    if (!canManageProducts) {
+      toast({
+        title: 'Permission Denied',
+        description: 'Sales accounts cannot modify inventory or stock levels.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setIsSubmitting(true);
     toast({ title: 'Updating Stock...', description: `Changing stock for "${productName}".` });
@@ -100,6 +104,10 @@ export function AdjustStockDialog({
           .eq('id', product.id);
 
         if (updateError) throw updateError;
+
+        const actorName = userProfile
+          ? `${userProfile.firstName} ${userProfile.lastName}`.trim()
+          : 'Staff';
 
         // 2. Insert inventory movement audit record
         const noteText = reason.trim()

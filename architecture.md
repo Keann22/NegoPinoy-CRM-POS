@@ -327,6 +327,12 @@ Authorized inventory/management staff can manually adjust physical stock levels 
 - **UI**: Products Table (`ProductsTable.tsx` → "Adjust Stock" row action) or Product Edit Dialog (`AdjustStockDialog.tsx`).
 - **Audit**: Direct adjustments prompt for a target physical quantity or relative change (+/-), write an entry to `inventory_movements` with the reason and staff name, and update `products.stock_level` (which syncs across warehouses via database triggers).
 
+#### Unallocated Stock Tracking & Edit Audit History (added 2026-10-08)
+The Procurement Sheet tracks when unallocated stock was last edited and attributes the change to the specific staff member or owner:
+- **Last Edit Metadata**: `getProcurementDashboardData` queries `inventory_guardian_memory` (and `inventory_movements` adjustments) for each procurement item to resolve `lastEditedAt` and `lastEditedBy`.
+- **UI Attribution & Interactivity**: In `procurement-item-row.tsx`, the unallocated stock number, pencil icon, and date timestamp badge are interactive buttons. Clicking any of them opens `EditUnallocatedStockDialog.tsx`.
+- **Embedded Audit Timeline**: `EditUnallocatedStockDialog.tsx` displays the last edit date/time and actor name in the header banner, and embeds `InventoryGuardianMemoryTimeline.tsx` at the bottom of the modal, allowing staff and management to expand and review the complete chronological history of physical count verifications, stock adjustments, and staff notes.
+
 ---
 
 ## Supabase Client Usage
@@ -1079,6 +1085,8 @@ What happens across the system when inventory matches:
 | `src/app/dashboard/inventory/alert-review/page.tsx` | Guardian Alert Review Sheet — purchasing-sheet style review of all alerted items with quick count actions |
 | `src/components/dashboard/inventory/alert-review-trail-dialog.tsx` | Deep audit trail dialog showing movements, guardian memories, and active open orders for alerted items |
 | `src/app/api/inventory/guardian/alert-review/route.ts` | API route delivering grouped alerted products and deep product trail data |
+| `src/components/dashboard/procurement/edit-unallocated-stock-dialog.tsx` | Dialog for editing unallocated stock with embedded `InventoryGuardianMemoryTimeline` audit history |
+| `src/components/dashboard/procurement/procurement-item-row.tsx` | Renders procurement items with interactive unallocated stock cells, last edit date/time timestamps, and staff actor attribution |
 
 ---
 
