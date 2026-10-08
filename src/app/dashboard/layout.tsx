@@ -98,6 +98,7 @@ export default function DashboardLayout({
       links.push({ href: '/dashboard/packed-orders', label: 'Packed Orders', icon: PackageCheck });
       links.push({ href: '/dashboard/for-shipping', label: 'For Shipping', icon: Truck });
       links.push({ href: '/dashboard/for-pick-up', label: 'For Pick-up', icon: PackageCheck });
+      links.push({ href: '/dashboard/photo-review', label: 'Photo Orders Review', icon: ClipboardList });
     }
 
     links.push({ href: '/dashboard/products', label: 'Products', icon: Package });

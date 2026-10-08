@@ -205,6 +205,12 @@ export default function OrderDetailPage() {
               <p className="font-semibold">{order.tracking_number}</p>
             </div>
           )}
+          {order.notes && (
+            <div className="md:col-span-3">
+              <p className="text-sm font-medium text-muted-foreground">Notes</p>
+              <p className="text-sm whitespace-pre-wrap break-words">{order.notes}</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
