@@ -18,6 +18,33 @@ export function computeOrderTotals(
   return { subtotal, totalDiscount, insuranceFee };
 }
 
+/**
+ * Saves which price type each line used. The `process_order_transaction` RPC
+ * only knows the amount, and on edit it deletes and re-inserts every line, so
+ * these columns are written right after it on both create and edit.
+ * Never throws — the order itself is already saved.
+ */
+export async function saveOrderItemPriceTypes(
+  supabase: SupabaseClient,
+  orderId: string,
+  items: OrderFormValues['orderItems']
+): Promise<void> {
+  for (const item of items) {
+    if (!item.priceType) continue;
+    const isCustom = item.priceType === 'custom';
+    const { error } = await supabase
+      .from('order_items')
+      .update({
+        price_type: item.priceType,
+        price_override_reason: isCustom ? item.priceOverrideReason?.trim() || null : null,
+        price_override_by: isCustom ? item.priceOverrideBy || null : null,
+      })
+      .eq('order_id', orderId)
+      .eq('product_id', item.productId);
+    if (error) console.error('Failed to save price type for order item:', error);
+  }
+}
+
 /** Uploads a proof-of-payment file to Supabase Storage and returns the public URL. */
 export async function uploadProofOfPayment(
   supabase: SupabaseClient,

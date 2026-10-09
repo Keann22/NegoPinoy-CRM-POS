@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
@@ -10,6 +10,7 @@ import { useCustomerSearch } from "@/hooks/useCustomerSearch";
 import { useProductSearch } from "@/hooks/useProductSearch";
 import { orderSchema, type OrderFormValues, type Customer, type Product } from "@/lib/schemas/order";
 import { createOrder, editOrder } from "@/lib/services/order-service";
+import { buildPriceList, defaultPriceType, resolvePrice, selectWithPriceColumns, type PriceList } from "@/lib/pricing";
 
 type UseOrderDialogProps = {
     mode: 'create' | 'edit';
@@ -27,8 +28,9 @@ export function useOrderDialog(props: UseOrderDialogProps) {
     const { user } = useUser();
     const { toast } = useToast();
     const { userProfile } = useUserProfile();
-    const { isManagement, isInventory } = useRoleCheck();
+    const { isManagement, isInventory, canManagePrices } = useRoleCheck();
     const canAddProduct = isManagement || isInventory;
+    const currentUserName = userProfile ? (`${userProfile.firstName} ${userProfile.lastName}`.trim() || userProfile.email) : '';
     const router = useRouter();
 
     const [addCustomerOpen, setAddCustomerOpen] = useState(false);
@@ -41,7 +43,8 @@ export function useOrderDialog(props: UseOrderDialogProps) {
 
     const [customerSearch, setCustomerSearch] = useState('');
     const [productSearch, setProductSearch] = useState('');
-    const [productPriceCache, setProductPriceCache] = useState<Record<string, { cashPrice: number; installmentPrice: number | null }>>({});
+    const [productPriceCache, setProductPriceCache] = useState<Record<string, PriceList>>({});
+    const requestedPriceListIds = useRef<Set<string>>(new Set());
 
     const { results: customerResults, isSearching: isSearchingCustomers } = useCustomerSearch(customerSearch);
     const { results: productResults, isSearching: isSearchingProducts } = useProductSearch(productSearch);
@@ -84,6 +87,9 @@ export function useOrderDialog(props: UseOrderDialogProps) {
             }
             setCustomerSearch('');
             setProductSearch('');
+            // Price lists are re-read on the next open so price changes show up.
+            setProductPriceCache({});
+            requestedPriceListIds.current.clear();
         }
 
         if (isEditing && props.onOpenChange) {
@@ -107,7 +113,10 @@ export function useOrderDialog(props: UseOrderDialogProps) {
                     quantity: item.quantity,
                     costPriceAtSale: item.costPriceAtSale || 0,
                     sellingPriceAtSale: item.sellingPriceAtSale || 0,
-                    discount: item.discount || 0
+                    discount: item.discount || 0,
+                    priceType: item.priceType ?? null,
+                    priceOverrideReason: item.priceOverrideReason ?? null,
+                    priceOverrideBy: item.priceOverrideBy ?? null,
                 })),
                 paymentType: order.paymentType as any,
                 installmentMonths: order.installmentMonths || undefined,
@@ -141,21 +150,50 @@ export function useOrderDialog(props: UseOrderDialogProps) {
     const isInstallmentFirstTimer = form.watch('isInstallmentFirstTimer');
     const watchedPaymentType = form.watch('paymentType');
 
+    // Load the price list of every product on the order (including lines that were
+    // already on an order being edited) so each line can offer its price types.
+    const itemIdsKey = form.watch('orderItems').map(item => item.productId).join(',');
     useEffect(() => {
-        const currentItems = form.getValues('orderItems');
-        if (!currentItems || currentItems.length === 0) return;
+        if (!supabase || !dialogOpen) return;
+        const missing = itemIdsKey.split(',').filter(id => id && !requestedPriceListIds.current.has(id));
+        if (missing.length === 0) return;
+        missing.forEach(id => requestedPriceListIds.current.add(id));
+        (async () => {
+            const { data, error } = await selectWithPriceColumns((priceColumns) =>
+                supabase.from('products').select(`id, ${priceColumns}`).in('id', missing));
+            if (error || !data) {
+                console.error('Failed to load price lists:', error);
+                missing.forEach(id => requestedPriceListIds.current.delete(id));
+                return;
+            }
+            setProductPriceCache(prev => ({ ...prev, ...Object.fromEntries(data.map((p: any) => [p.id, buildPriceList(p)])) }));
+        })();
+    }, [itemIdsKey, supabase, dialogOpen]);
+
+    // First-timer installment orders charge the installment price. Lines only move
+    // back to their normal price when installment pricing is switched off in this
+    // session — an order saved at installment prices is never repriced just by opening it.
+    const installmentActive = watchedPaymentType === 'Installment' && !!isInstallmentFirstTimer;
+    const wasInstallmentActive = useRef(false);
+    useEffect(() => {
+        const currentItems = form.getValues('orderItems') || [];
+        const turnedOff = wasInstallmentActive.current && !installmentActive;
         currentItems.forEach((item, index) => {
-            const cached = productPriceCache[item.productId];
-            if (!cached) return;
-            const useInstallment =
-                watchedPaymentType === 'Installment' &&
-                isInstallmentFirstTimer &&
-                cached.installmentPrice &&
-                cached.installmentPrice > 0;
-            const newPrice = useInstallment ? cached.installmentPrice! : cached.cashPrice;
-            form.setValue(`orderItems.${index}.sellingPriceAtSale`, newPrice);
+            const list = productPriceCache[item.productId];
+            if (!list || item.priceType === 'custom') return;
+            if (installmentActive && list.installment != null) {
+                if (item.priceType !== 'installment') {
+                    form.setValue(`orderItems.${index}.priceType`, 'installment');
+                    form.setValue(`orderItems.${index}.sellingPriceAtSale`, list.installment);
+                }
+            } else if (turnedOff && item.priceType === 'installment') {
+                const priceType = defaultPriceType(list);
+                form.setValue(`orderItems.${index}.priceType`, priceType);
+                form.setValue(`orderItems.${index}.sellingPriceAtSale`, resolvePrice(list, priceType));
+            }
         });
-    }, [isInstallmentFirstTimer, watchedPaymentType, form, productPriceCache]);
+        wasInstallmentActive.current = installmentActive;
+    }, [installmentActive, form, productPriceCache]);
 
     const { fields, append, remove } = useFieldArray({
         control: form.control,
@@ -291,7 +329,8 @@ export function useOrderDialog(props: UseOrderDialogProps) {
         productSearch,
         setProductSearch,
         productPriceCache,
-        setProductPriceCache,
+        canManagePrices,
+        currentUserName,
         customerResults,
         isSearchingCustomers,
         productResults,

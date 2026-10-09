@@ -1,6 +1,7 @@
 import { useToast } from '@/hooks/use-toast';
 import { useSupabase } from '@/lib/supabase/hooks';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { canManagePricesFor } from '@/hooks/useRoleCheck';
 import { recordGuardianMemory } from '@/lib/services/inventory/inventory-guardian-memory-service';
 import type { FormattedProduct } from '@/types';
 import type { ProductFormValues, CreateProps, EditProps } from './useProductForm';
@@ -61,6 +62,27 @@ export function useProductSubmit({
       return;
     }
 
+    const canEditPrices = canManagePricesFor(userProfile);
+
+    // A sale is a price on the existing product, not a second SKU — separate
+    // "SALE" products split the stock and orders of one physical item.
+    const newNames = [...(isEdit ? [] : [values.name]), ...(values.variations || []).map(v => v.nameSuffix)];
+    if (!canEditPrices && newNames.some(n => /\bsale\b/i.test(n))) {
+      toast({
+        variant: 'destructive',
+        title: 'Do not create a separate SALE product',
+        description: 'Put the sale price on the existing product instead. Ask an Admin or a price manager to set it.',
+      });
+      return;
+    }
+
+    // Stock may stay negative if it already was, but can't be typed in as negative.
+    const stockUntouched = isEdit && values.quantityOnHand === displayProduct?.quantityOnHand;
+    if ((values.quantityOnHand ?? 0) < 0 && !stockUntouched) {
+      form.setError('quantityOnHand', { type: 'manual', message: 'Stock cannot be set below 0.' });
+      return;
+    }
+
     const finalSku = values.sku?.trim() || `PRD-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
     const shouldCheckSku = !isEdit || finalSku !== displayProduct?.sku;
     if (shouldCheckSku) {
@@ -92,7 +114,7 @@ export function useProductSubmit({
     setOpen(false);
     toast({ title: isEdit ? 'Updating Product...' : 'Adding Product...', description: `"${values.name}" is being ${isEdit ? 'updated' : 'added'}.` });
 
-    const { images: imageFiles, quantityOnHand, supplierPricing, hasVariations: _hv, variations, installmentPrice, isOnSale, salePrice, assemblyRecipe, ...core } = values;
+    const { images: imageFiles, quantityOnHand, supplierPricing, hasVariations: _hv, variations, installmentPrice, isOnSale, salePrice, adsPrice, livePrice, assemblyRecipe, ...core } = values;
     const effectiveSupplierId = supplierPricing?.find((sp: any) => sp.supplierId)?.supplierId || null;
 
     try {
@@ -107,11 +129,27 @@ export function useProductSubmit({
         const hasNoChildren = !displayProduct.children || displayProduct.children.length === 0;
         const stockChanged = hasNoChildren && typeof quantityOnHand === 'number' && quantityOnHand !== displayProduct.quantityOnHand;
 
+        // Prices are only written by price managers, and every change is logged.
+        const newPrices: Record<string, any> = {
+          selling_price: core.sellingPrice, installment_price: installmentPrice ?? null,
+          is_on_sale: isOnSale ?? false, sale_price: salePrice ?? null,
+          ads_price: adsPrice ?? null, live_price: livePrice ?? null,
+        };
+        const oldPrices: Record<string, any> = {
+          selling_price: displayProduct.sellingPrice ?? null, installment_price: displayProduct.installment_price ?? null,
+          is_on_sale: displayProduct.is_on_sale ?? false, sale_price: displayProduct.sale_price ?? null,
+          ads_price: (displayProduct as any).ads_price ?? null, live_price: (displayProduct as any).live_price ?? null,
+        };
+        // Compare as numbers so "250" vs 250 is not logged as a change (booleans compare as 0/1).
+        const asComparable = (v: any) => (v == null ? null : Number(v));
+        const changedPriceKeys = canEditPrices
+          ? Object.keys(newPrices).filter(k => asComparable(newPrices[k]) !== asComparable(oldPrices[k]))
+          : [];
+
         const { error } = await supabase.from('products').update({
           name: core.name, sku: finalSku, shelf_location: core.shelfLocation || null,
           description: core.description, category: core.categoryId,
-          selling_price: core.sellingPrice, installment_price: installmentPrice ?? null,
-          is_on_sale: isOnSale ?? false, sale_price: salePrice ?? null,
+          ...(canEditPrices ? newPrices : {}),
           images: uploadedImageUrls, supplier_pricing: supplierPricing || [],
           assembly_recipe: assemblyRecipe || [],
           ...(effectiveSupplierId ? { supplier_id: effectiveSupplierId } : {}),
@@ -119,6 +157,19 @@ export function useProductSubmit({
           ...(displayProduct.parent_id && core.name !== displayProduct.name ? { variant_name: core.name } : {}),
         }).eq('id', displayProduct.id);
         if (error) throw error;
+
+        if (changedPriceKeys.length > 0) {
+          const { error: auditError } = await supabase.from('audit_logs').insert({
+            table_name: 'products',
+            record_id: displayProduct.id,
+            user_id: userProfile?.id,
+            user_email: userProfile?.email || 'Unknown',
+            action: 'UPDATE',
+            old_values: Object.fromEntries(changedPriceKeys.map(k => [k, oldPrices[k]])),
+            new_values: Object.fromEntries(changedPriceKeys.map(k => [k, newPrices[k]])),
+          });
+          if (auditError) console.error('Failed to log price change:', auditError);
+        }
 
         // If editing a parent product and supplier is known, propagate to child variants missing a supplier
         const resolvedParentSupplierId = effectiveSupplierId || displayProduct.supplier_id;
@@ -229,6 +280,8 @@ export function useProductSubmit({
             selling_price: p.sellingPrice, installment_price: installmentPrice ?? null,
             is_on_sale: parentProductId ? false : (isOnSale ?? false),
             sale_price: parentProductId ? null : (salePrice ?? null),
+            ads_price: parentProductId ? null : (adsPrice ?? null),
+            live_price: parentProductId ? null : (livePrice ?? null),
             initial_unit_cost: p.unitCost ?? supplierPricing?.[0]?.unitCost ?? 0,
             supplier_id: effectiveSupplierId,
             supplier_pricing: supplierPricing || [], stock_level: p.quantityOnHand, images: varImages,

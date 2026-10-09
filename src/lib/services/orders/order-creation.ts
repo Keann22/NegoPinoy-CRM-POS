@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { OrderFormValues } from '@/lib/schemas/order';
-import { computeOrderTotals, uploadProofOfPayment } from './order-utils';
+import { computeOrderTotals, saveOrderItemPriceTypes, uploadProofOfPayment } from './order-utils';
 
 export interface CreateOrderContext {
   userId: string;
@@ -70,6 +70,8 @@ export async function createOrder(
 
   const { data: orderId, error } = await supabase.rpc('process_order_transaction', { payload });
   if (error) throw error;
+
+  await saveOrderItemPriceTypes(supabase, orderId, values.orderItems);
 
   // Trigger OCR in background (fire-and-forget). The RPC inserts the payment row
   // server-side and only returns the order id, so look up the payment id it created.

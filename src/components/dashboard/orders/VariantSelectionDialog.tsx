@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import type { Product } from '@/lib/schemas/order';
-import { getEffectivePrice, isOnSale, hasSaleDiscount } from '@/lib/pricing';
+import { getEffectivePrice, isOnSale, hasSaleDiscount, buildPriceList, defaultPriceType, resolvePrice, type PriceType } from '@/lib/pricing';
 
 interface VariantOption {
   id: string;
@@ -14,6 +14,9 @@ interface VariantOption {
   selling_price: number;
   sale_price?: number | null;
   is_on_sale?: boolean | null;
+  ads_price?: number | null;
+  live_price?: number | null;
+  installment_price?: number | null;
   initial_unit_cost?: number;
   stock_batches?: { unitCost: number }[];
 }
@@ -22,7 +25,7 @@ interface VariantSelectionDialogProps {
   parentProduct: Product | null;
   options: VariantOption[];
   existingProductIds: string[];
-  onSelect: (variant: { productId: string; productName: string; quantity: number; costPriceAtSale: number; sellingPriceAtSale: number; discount: number }) => void;
+  onSelect: (variant: { productId: string; productName: string; quantity: number; costPriceAtSale: number; sellingPriceAtSale: number; discount: number; priceType: PriceType }) => void;
   onClose: () => void;
 }
 
@@ -58,13 +61,16 @@ export function VariantSelectionDialog({
                   });
                 } else {
                   const costPriceAtSale = v.stock_batches?.length ? v.stock_batches[0].unitCost : (v.initial_unit_cost || 0);
+                  const priceList = buildPriceList(v);
+                  const priceType = defaultPriceType(priceList);
                   onSelect({
                     productId: v.id,
                     productName: v.name,
                     quantity: 1,
                     costPriceAtSale,
-                    sellingPriceAtSale: getEffectivePrice(v.selling_price, v.sale_price, v.is_on_sale),
+                    sellingPriceAtSale: resolvePrice(priceList, priceType),
                     discount: 0,
+                    priceType,
                   });
                 }
                 onClose();

@@ -15,7 +15,7 @@ import { ProductSupplierSection } from './products/ProductSupplierSection';
 import { ProductVariationsSection } from './products/ProductVariationsSection';
 import { DuplicateProductAlert } from './products/DuplicateProductAlert';
 import { useProductDialog, type ProductDialogProps, type CreateProps, type EditProps } from '@/hooks/useProductDialog';
-import { hasSaleDiscount } from '@/lib/pricing';
+import { ProductPricingFields, ProductPriceHistory } from './products/ProductPricingFields';
 
 export function ProductDialog(props: ProductDialogProps) {
   const {
@@ -26,6 +26,7 @@ export function ProductDialog(props: ProductDialogProps) {
     displayProduct,
     isManagement,
     canManageProducts,
+    canManagePrices,
     form,
     existingImages,
     removeExistingImage,
@@ -151,43 +152,8 @@ export function ProductDialog(props: ProductDialogProps) {
               {isEdit && (
                 <div className="grid grid-cols-2 gap-4 rounded-lg border p-4">
                   <div className="col-span-2"><p className="text-sm font-semibold">Pricing</p></div>
-                  <FormField control={form.control} name="sellingPrice" render={({ field }) => (
-                    <FormItem><FormLabel>Cash Price (₱)</FormLabel><FormControl><Input type="number" step="0.01" placeholder="49.99" {...field} /></FormControl><FormMessage /></FormItem>
-                  )} />
-                  <FormField control={form.control} name="installmentPrice" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Installment Price (₱) <span className="text-muted-foreground text-xs font-normal">First-timers only</span></FormLabel>
-                      <FormControl><Input type="number" step="0.01" placeholder="Leave blank if not eligible" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="isOnSale" render={({ field }) => (
-                    <FormItem className="col-span-2 flex flex-row items-center justify-between rounded-lg border p-3">
-                      <div className="space-y-0.5 pr-4">
-                        <FormLabel className="text-sm">On Sale</FormLabel>
-                        <p className="text-xs text-muted-foreground">Shows a SALE badge. Add a lower price below for a real discount, or leave it blank for a same-price sale (e.g. Facebook Live).</p>
-                      </div>
-                      <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                    </FormItem>
-                  )} />
-                  {form.watch('isOnSale') && (
-                    <FormField control={form.control} name="salePrice" render={({ field }) => {
-                      const regular = Number(form.watch('sellingPrice')) || 0;
-                      const sale = field.value;
-                      const discounted = hasSaleDiscount(regular, sale);
-                      const hasValue = sale !== undefined && sale !== null && Number(sale) > 0;
-                      return (
-                        <FormItem className="col-span-2">
-                          <FormLabel>Sale Price (₱) <span className="text-muted-foreground text-xs font-normal">Optional — lower cash price while on sale</span></FormLabel>
-                          <FormControl><Input type="number" step="0.01" placeholder="Leave blank for a same-price sale" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))} /></FormControl>
-                          {discounted && <p className="text-xs font-medium text-green-600 dark:text-green-500">Discounted: ₱{Number(sale).toFixed(2)} (was ₱{regular.toFixed(2)})</p>}
-                          {hasValue && !discounted && <p className="text-xs text-amber-600 dark:text-amber-500">Not below the cash price — the SALE badge will show at the regular price.</p>}
-                          {!hasValue && <p className="text-xs text-muted-foreground">Same-price sale — SALE badge only, no discount.</p>}
-                          <FormMessage />
-                        </FormItem>
-                      );
-                    }} />
-                  )}
+                  <ProductPricingFields form={form} locked={!canManagePrices} />
+                  {displayProduct && <ProductPriceHistory productId={displayProduct.id} />}
                 </div>
               )}
 
@@ -198,7 +164,7 @@ export function ProductDialog(props: ProductDialogProps) {
                     <FormItem>
                       <FormLabel>Physical Stock Quantity (Available)</FormLabel>
                       <FormControl>
-                        <Input type="number" min="0" placeholder="0" {...field} />
+                        <Input type="number" placeholder="0" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -277,44 +243,8 @@ export function ProductDialog(props: ProductDialogProps) {
                 <div className="space-y-4 rounded-lg border p-4">
                   <p className="text-sm font-semibold">Pricing</p>
                   <div className="grid grid-cols-2 gap-4">
-                    <FormField control={form.control} name="sellingPrice" render={({ field }) => (
-                      <FormItem><FormLabel>Cash Price (₱)</FormLabel><FormControl><Input type="number" step="0.01" placeholder="49.99" {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                    <FormField control={form.control} name="installmentPrice" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Installment Price (₱) <span className="text-muted-foreground text-xs font-normal">First-timers only</span></FormLabel>
-                        <FormControl><Input type="number" step="0.01" placeholder="Leave blank if not eligible" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
+                    <ProductPricingFields form={form} locked={false} />
                   </div>
-                  <FormField control={form.control} name="isOnSale" render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                      <div className="space-y-0.5 pr-4">
-                        <FormLabel className="text-sm">On Sale</FormLabel>
-                        <p className="text-xs text-muted-foreground">Shows a SALE badge. Add a lower price below for a real discount, or leave it blank for a same-price sale (e.g. Facebook Live).</p>
-                      </div>
-                      <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                    </FormItem>
-                  )} />
-                  {form.watch('isOnSale') && (
-                    <FormField control={form.control} name="salePrice" render={({ field }) => {
-                      const regular = Number(form.watch('sellingPrice')) || 0;
-                      const sale = field.value;
-                      const discounted = hasSaleDiscount(regular, sale);
-                      const hasValue = sale !== undefined && sale !== null && Number(sale) > 0;
-                      return (
-                        <FormItem>
-                          <FormLabel>Sale Price (₱) <span className="text-muted-foreground text-xs font-normal">Optional — lower cash price while on sale</span></FormLabel>
-                          <FormControl><Input type="number" step="0.01" placeholder="Leave blank for a same-price sale" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))} /></FormControl>
-                          {discounted && <p className="text-xs font-medium text-green-600 dark:text-green-500">Discounted: ₱{Number(sale).toFixed(2)} (was ₱{regular.toFixed(2)})</p>}
-                          {hasValue && !discounted && <p className="text-xs text-amber-600 dark:text-amber-500">Not below the cash price — the SALE badge will show at the regular price.</p>}
-                          {!hasValue && <p className="text-xs text-muted-foreground">Same-price sale — SALE badge only, no discount.</p>}
-                          <FormMessage />
-                        </FormItem>
-                      );
-                    }} />
-                  )}
                   <FormField control={form.control} name="quantityOnHand" render={({ field }) => (
                     <FormItem><FormLabel>Initial Stock</FormLabel><FormControl><Input type="number" placeholder="120" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />

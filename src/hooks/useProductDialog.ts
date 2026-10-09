@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import stringSimilarity from 'string-similarity';
 import { useSupabase, useUser } from '@/lib/supabase/hooks';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { canManagePricesFor } from '@/hooks/useRoleCheck';
 import type { FormattedProduct } from '@/types';
 import { useProductFormSetup, type Supplier, type ProductDialogProps, type EditProps, type CreateProps, type SimilarProductWarning, type DuplicateMatch } from './useProductForm';
 export * from './useProductForm';
@@ -20,6 +21,7 @@ export function useProductDialog(props: ProductDialogProps) {
   const { userProfile } = useUserProfile();
   const isManagement = useMemo(() => userProfile?.roles?.some((r: string) => ['Admin', 'Owner'].includes(r)), [userProfile]);
   const canManageProducts = useMemo(() => userProfile?.roles?.some((r: string) => ['Admin', 'Owner', 'Inventory'].includes(r)), [userProfile]);
+  const canManagePrices = useMemo(() => canManagePricesFor(userProfile), [userProfile]);
 
   const [supplierSearch, setSupplierSearch] = useState('');
   const [componentSearch, setComponentSearch] = useState('');
@@ -179,6 +181,8 @@ export function useProductDialog(props: ProductDialogProps) {
           isOnSale: (displayProduct as any).is_on_sale ?? false,
           salePrice: (displayProduct as any).sale_price ?? undefined,
           installmentPrice: displayProduct.installment_price ?? undefined,
+          adsPrice: (displayProduct as any).ads_price ?? undefined,
+          livePrice: (displayProduct as any).live_price ?? undefined,
           quantityOnHand: displayProduct.quantityOnHand ?? 0,
           supplierPricing: displayProduct.supplierPricing || [],
           variations: [],
@@ -227,6 +231,7 @@ export function useProductDialog(props: ProductDialogProps) {
     displayProduct,
     isManagement,
     canManageProducts,
+    canManagePrices,
     form,
     existingImages,
     removeExistingImage,

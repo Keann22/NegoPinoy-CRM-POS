@@ -11,6 +11,7 @@ import { VariantSelectionDialog } from "./orders/VariantSelectionDialog";
 import { useOrderDialog } from "@/hooks/useOrderDialog";
 import { useSupabase } from "@/lib/supabase/hooks";
 import { useToast } from "@/hooks/use-toast";
+import { defaultPriceType, resolvePrice, selectWithPriceColumns, type PriceList } from "@/lib/pricing";
 
 type OrderDialogProps =
   | {
@@ -45,7 +46,9 @@ export function OrderDialog(props: OrderDialogProps) {
     setCustomerSearch,
     productSearch,
     setProductSearch,
-    setProductPriceCache,
+    productPriceCache,
+    canManagePrices,
+    currentUserName,
     customerResults,
     isSearchingCustomers,
     productResults,
@@ -116,6 +119,10 @@ export function OrderDialog(props: OrderDialogProps) {
               <OrderItemsPanel
                 control={form.control}
                 watch={form.watch}
+                setValue={form.setValue}
+                priceLists={productPriceCache}
+                canManagePrices={canManagePrices}
+                currentUserName={currentUserName}
                 fields={fields}
                 remove={remove}
                 formStateErrors={form.formState.errors}
@@ -131,19 +138,19 @@ export function OrderDialog(props: OrderDialogProps) {
                 productResults={productResults}
                 isSearchingProducts={isSearchingProducts}
                 onProductSelect={async (p) => {
-                  const { data: level1 } = await supabase
+                  const { data: level1 } = await selectWithPriceColumns((priceColumns) => supabase
                     .from('products')
-                    .select('id, name, variant_name, stock_level, selling_price, sale_price, is_on_sale, initial_unit_cost, stock_batches(*)')
+                    .select(`id, name, variant_name, stock_level, ${priceColumns}, initial_unit_cost, stock_batches(*)`)
                     .eq('parent_id', p.id)
-                    .not('name', 'ilike', '[DELETED]%');
+                    .not('name', 'ilike', '[DELETED]%'));
 
                   if (level1 && level1.length > 0) {
                     const level1Ids = level1.map((v: any) => v.id);
-                    const { data: level2 } = await supabase
+                    const { data: level2 } = await selectWithPriceColumns((priceColumns) => supabase
                       .from('products')
-                      .select('id, name, variant_name, stock_level, selling_price, sale_price, is_on_sale, initial_unit_cost, stock_batches(*)')
+                      .select(`id, name, variant_name, stock_level, ${priceColumns}, initial_unit_cost, stock_batches(*)`)
                       .in('parent_id', level1Ids)
-                      .not('name', 'ilike', '[DELETED]%');
+                      .not('name', 'ilike', '[DELETED]%'));
 
                     let leafVariants = level1;
                     if (level2 && level2.length > 0) {
@@ -168,21 +175,23 @@ export function OrderDialog(props: OrderDialogProps) {
                     const costPriceAtSale = productToAdd.stockBatches?.length > 0 ? productToAdd.stockBatches[0].unitCost : 0;
                     const isInstallmentFirstTimer = form.getValues('isInstallmentFirstTimer');
                     const paymentType = form.getValues('paymentType');
-                    const useInstallmentPrice = paymentType === 'Installment' && isInstallmentFirstTimer && productToAdd.installment_price && productToAdd.installment_price > 0;
+                    const priceList: PriceList = productToAdd.priceList;
+                    const useInstallmentPrice = paymentType === 'Installment' && isInstallmentFirstTimer && priceList.installment != null;
 
                     if (paymentType === 'Installment' && !productToAdd.installment_price) {
                       toast({ variant: 'default', title: 'Not eligible for installment', description: `This product has no installment price set.` });
                     }
 
+                    const priceType = useInstallmentPrice ? 'installment' : defaultPriceType(priceList);
                     append({
                       productId: productToAdd.id,
                       productName: productToAdd.name,
                       quantity: 1,
                       costPriceAtSale: costPriceAtSale,
-                      sellingPriceAtSale: useInstallmentPrice ? productToAdd.installment_price : productToAdd.sellingPrice,
-                      discount: 0
+                      sellingPriceAtSale: resolvePrice(priceList, priceType),
+                      discount: 0,
+                      priceType,
                     });
-                    setProductPriceCache(prev => ({ ...prev, [productToAdd.id]: { cashPrice: productToAdd.sellingPrice, installmentPrice: productToAdd.installment_price ?? null } }));
                   }
                   setProductSearch('');
                 }}

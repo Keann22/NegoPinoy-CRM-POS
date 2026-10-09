@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSupabase, useUser } from '@/lib/supabase/hooks';
 import { useToast } from '@/hooks/use-toast';
 import type { Product } from '@/lib/schemas/order';
-import { getEffectivePrice } from '@/lib/pricing';
+import { getEffectivePrice, buildPriceList, selectWithPriceColumns } from '@/lib/pricing';
 
 /**
  * useProductSearch
@@ -28,13 +28,15 @@ export function useProductSearch(query: string) {
 
       setIsSearching(true);
       try {
-        let q = supabase
-          .from('products')
-          .select('id, name, variant_name, sku, stock_level, selling_price, sale_price, is_on_sale, installment_price, parent_id, supplier_pricing')
-          .not('name', 'ilike', '[DELETED]%');
         const words = query.split(' ').filter(w => w.trim() !== '');
-        words.forEach(w => { q = q.or(`name.ilike.%${w}%,variant_name.ilike.%${w}%,sku.ilike.%${w}%`); });
-        const { data, error } = await q.limit(20);
+        const { data, error } = await selectWithPriceColumns((priceColumns) => {
+          let q = supabase
+            .from('products')
+            .select(`id, name, variant_name, sku, stock_level, ${priceColumns}, parent_id, supplier_pricing`)
+            .not('name', 'ilike', '[DELETED]%');
+          words.forEach(w => { q = q.or(`name.ilike.%${w}%,variant_name.ilike.%${w}%,sku.ilike.%${w}%`); });
+          return q.limit(20);
+        });
         if (error) throw error;
 
         setResults((data || []).map(doc => {
@@ -48,6 +50,7 @@ export function useProductSearch(query: string) {
             sku: doc.sku,
             quantityOnHand: doc.stock_level ?? 0,
             sellingPrice: getEffectivePrice(doc.selling_price, doc.sale_price, doc.is_on_sale) ?? 0,
+            priceList: buildPriceList(doc),
             installment_price: doc.installment_price,
             supplier_pricing: doc.supplier_pricing,
             stockBatches: [],

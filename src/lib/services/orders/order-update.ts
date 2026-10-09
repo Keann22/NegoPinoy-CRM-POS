@@ -6,7 +6,7 @@ import {
   resolveOrderIssuesForRemovedProducts,
   createOnHoldIssue
 } from '../order-issues-service';
-import { computeOrderTotals } from './order-utils';
+import { computeOrderTotals, saveOrderItemPriceTypes } from './order-utils';
 
 // ---------------------------------------------------------------------------
 // Cancellation stock effects
@@ -221,6 +221,8 @@ export async function editOrder(
 
   const { error } = await supabase.rpc('process_order_transaction', { payload });
   if (error) throw error;
+
+  await saveOrderItemPriceTypes(supabase, context.orderId, values.orderItems);
 
   // -- Auto-deduct from Procurement Sheet --
   const oldMap = new Map<string, number>();

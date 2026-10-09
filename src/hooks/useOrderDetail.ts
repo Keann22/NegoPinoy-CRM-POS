@@ -133,6 +133,9 @@ export function useOrderDetail(orderId: string) {
             costPriceAtSale: item.cost_price_at_sale,
             sellingPriceAtSale: item.selling_price_at_sale,
             discount: item.discount,
+            priceType: item.price_type ?? null,
+            priceOverrideReason: item.price_override_reason ?? null,
+            priceOverrideBy: item.price_override_by ?? null,
           }))
         );
       } catch (err) {

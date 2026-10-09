@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { AlertCircle, PackageX, CheckCircle2, Info } from 'lucide-react';
 import { useOrderItemsStatus, type EnrichedOrderItem } from '@/hooks/useOrderItemsStatus';
 import type { OrderItem, OrderStatus } from '@/types';
+import { PRICE_TYPE_LABELS } from '@/lib/pricing';
 
 interface OrderItemsCardProps {
   orderId: string;
@@ -81,7 +82,17 @@ export function OrderItemsCard({ orderId, orderStatus, items }: OrderItemsCardPr
                   <ItemStatusCell item={item} onViewIssue={() => setActiveItem(item)} />
                 </TableCell>
                 <TableCell className="text-center">{item.quantity}</TableCell>
-                <TableCell className="text-right">₱{(item.sellingPriceAtSale || 0).toFixed(2)}</TableCell>
+                <TableCell className="text-right">
+                  ₱{(item.sellingPriceAtSale || 0).toFixed(2)}
+                  {item.priceType && (
+                    <p
+                      className={`text-[11px] ${item.priceType === 'custom' ? 'text-amber-600' : 'text-muted-foreground'}`}
+                      title={item.priceType === 'custom' ? `${item.priceOverrideReason || 'No reason given'}${item.priceOverrideBy ? ` — set by ${item.priceOverrideBy}` : ''}` : undefined}
+                    >
+                      {PRICE_TYPE_LABELS[item.priceType]} price
+                    </p>
+                  )}
+                </TableCell>
                 <TableCell className="text-right text-destructive">- ₱{(item.discount || 0).toFixed(2)}</TableCell>
                 <TableCell className="text-right font-medium">₱{(((item.sellingPriceAtSale || 0) - (item.discount || 0)) * (item.quantity || 1)).toFixed(2)}</TableCell>
               </TableRow>

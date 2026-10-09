@@ -1,6 +1,6 @@
 'use client';
 
-import { Control, UseFieldArrayReturn, UseFormWatch } from 'react-hook-form';
+import { Control, UseFieldArrayReturn, UseFormSetValue, UseFormWatch } from 'react-hook-form';
 import { type OrderFormValues, type Product } from '@/lib/schemas/order';
 import { FormField, FormControl, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -8,11 +8,19 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Trash2, PlusCircle } from 'lucide-react';
+import { PRICE_TYPE_LABELS, resolvePrice, selectablePriceTypes, type PriceList, type PriceType } from '@/lib/pricing';
 
 interface OrderItemsPanelProps {
   control: Control<OrderFormValues>;
   watch: UseFormWatch<OrderFormValues>;
+  setValue: UseFormSetValue<OrderFormValues>;
+  /** Price list per product id; a line's price type stays disabled until its list has loaded. */
+  priceLists: Record<string, PriceList>;
+  /** Only price managers may type a price; everyone else picks a price type. */
+  canManagePrices: boolean;
+  currentUserName: string;
   fields: UseFieldArrayReturn<OrderFormValues, 'orderItems'>['fields'];
   remove: UseFieldArrayReturn<OrderFormValues, 'orderItems'>['remove'];
   formStateErrors: any;
@@ -37,6 +45,10 @@ interface OrderItemsPanelProps {
 export function OrderItemsPanel({
   control,
   watch,
+  setValue,
+  priceLists,
+  canManagePrices,
+  currentUserName,
   fields,
   remove,
   formStateErrors,
@@ -70,10 +82,40 @@ export function OrderItemsPanel({
             <span className="w-24 text-right">Discount</span>
             <span className="w-8"></span>
           </div>
-          {fields.map((field, index) => (
-            <div key={field.id} className="flex gap-2 items-center px-2 pb-2">
+          {fields.map((field, index) => {
+            const priceList = priceLists[field.productId];
+            const priceType = watch(`orderItems.${index}.priceType`);
+            const typeOptions: PriceType[] = priceList ? selectablePriceTypes(priceList) : [];
+            // Installment and custom are never picked directly, but must be listed while they are the current value.
+            if (priceType && !typeOptions.includes(priceType)) typeOptions.push(priceType);
+            return (
+            <div key={field.id} className="px-2 pb-2">
+            <div className="flex gap-2 items-center">
               <div className="flex-1 min-w-0 pr-2">
                 <p className="text-sm font-medium truncate">{field.productName}</p>
+                <Select
+                  value={priceType ?? ''}
+                  disabled={!priceList}
+                  onValueChange={(value) => {
+                    // Inside a <form>, Radix Select also fires this (with '') when the value is
+                    // changed from code to custom/installment — only act on a real pick.
+                    if (!priceList || !selectablePriceTypes(priceList).includes(value as PriceType)) return;
+                    setValue(`orderItems.${index}.priceType`, value as PriceType);
+                    setValue(`orderItems.${index}.sellingPriceAtSale`, resolvePrice(priceList, value as PriceType));
+                    setValue(`orderItems.${index}.priceOverrideReason`, null);
+                    setValue(`orderItems.${index}.priceOverrideBy`, null);
+                  }}
+                >
+                  <SelectTrigger className="mt-1 h-7 w-44 max-w-full text-xs"><SelectValue placeholder="Choose price type" /></SelectTrigger>
+                  <SelectContent>
+                    {typeOptions.map(type => (
+                      <SelectItem key={type} value={type} disabled={type === 'installment' || type === 'custom'} className="text-xs">
+                        {PRICE_TYPE_LABELS[type]}
+                        {type !== 'custom' && priceList ? ` — ₱${resolvePrice(priceList, type).toFixed(2)}` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="w-20 shrink-0">
                 <FormField control={control} name={`orderItems.${index}.quantity`} render={({ field: f }) => (
@@ -82,7 +124,17 @@ export function OrderItemsPanel({
               </div>
               <div className="w-24 shrink-0">
                 <FormField control={control} name={`orderItems.${index}.sellingPriceAtSale`} render={({ field: f }) => (
-                  <FormItem><FormControl><Input type="number" step="0.01" className="h-8 w-full text-right" {...f} /></FormControl></FormItem>
+                  <FormItem><FormControl>
+                    <Input type="number" step="0.01" className={`h-8 w-full text-right ${canManagePrices ? '' : 'bg-muted'}`}
+                      title={canManagePrices ? undefined : 'Prices come from the price list. Ask an Admin for a custom price.'}
+                      {...f} readOnly={!canManagePrices}
+                      onChange={(e) => {
+                        f.onChange(e);
+                        // A hand-typed price is a custom price: it needs a reason and records who set it.
+                        setValue(`orderItems.${index}.priceType`, 'custom');
+                        setValue(`orderItems.${index}.priceOverrideBy`, currentUserName);
+                      }} />
+                  </FormControl></FormItem>
                 )} />
               </div>
               <div className="w-24 shrink-0">
@@ -101,7 +153,20 @@ export function OrderItemsPanel({
                 </Button>
               </div>
             </div>
-          ))}
+            {priceType === 'custom' && (
+              <FormField control={control} name={`orderItems.${index}.priceOverrideReason`} render={({ field: f }) => (
+                <FormItem className="mt-1">
+                  <FormControl>
+                    <Input className="h-8 text-xs" placeholder="Reason for the custom price (required)"
+                      {...f} value={f.value ?? ''} readOnly={!canManagePrices} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            )}
+            </div>
+            );
+          })}
           {fields.length === 0 && <p className="text-sm text-center text-muted-foreground py-8">No items added to order.</p>}
         </div>
         <FormMessage>{formStateErrors.orderItems?.message || formStateErrors.orderItems?.root?.message}</FormMessage>

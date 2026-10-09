@@ -52,3 +52,100 @@ export function getEffectivePrice(
     ? Number(salePrice)
     : Number(sellingPrice) || 0;
 }
+
+/**
+ * Price list — one SKU, several prices.
+ *
+ * Staff never type a price on an order; they pick a price TYPE per line and the
+ * amount comes from the product's price list. The type is saved on the order
+ * line (`order_items.price_type`) so sales can be reported by channel.
+ *
+ *   regular     — `selling_price`
+ *   sale        — `sale_price`, only while the product is on sale with a real discount
+ *   ads         — `ads_price`; blank falls back to the sale price, then regular
+ *   live        — `live_price`; blank falls back to the sale price, then regular
+ *                 (Live is usually the sale price, and often just the regular price)
+ *   installment — `installment_price`, applied automatically for first-timer installment orders
+ *   custom      — a hand-typed price; price managers only, and a reason is required
+ */
+export type PriceType = 'regular' | 'sale' | 'ads' | 'live' | 'installment' | 'custom';
+
+export const PRICE_TYPE_LABELS: Record<PriceType, string> = {
+  regular: 'Regular',
+  sale: 'Sale',
+  ads: 'Ads',
+  live: 'Live',
+  installment: 'Installment',
+  custom: 'Custom',
+};
+
+export interface PriceList {
+  regular: number;
+  /** Null unless the product is on sale with a real discount. */
+  sale: number | null;
+  ads: number | null;
+  live: number | null;
+  installment: number | null;
+}
+
+const PRICE_LIST_COLUMNS = 'selling_price, sale_price, is_on_sale, ads_price, live_price, installment_price';
+const PRICE_LIST_COLUMNS_LEGACY = 'selling_price, sale_price, is_on_sale, installment_price';
+
+/**
+ * Runs a `products` select that needs the price-list columns. If the database
+ * does not have `ads_price` / `live_price` yet (migration add_price_list.sql not
+ * run), it retries without them so ordering keeps working at regular/sale prices.
+ */
+export async function selectWithPriceColumns(
+  run: (priceColumns: string) => PromiseLike<{ data: any; error: any }>
+): Promise<{ data: any; error: any }> {
+  const result = await run(PRICE_LIST_COLUMNS);
+  // 42703 = Postgres "undefined column"
+  return result.error?.code === '42703' ? run(PRICE_LIST_COLUMNS_LEGACY) : result;
+}
+
+function positiveOrNull(value?: number | null): number | null {
+  const n = Number(value);
+  return value != null && Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** Builds a product's price list from its raw `products` row. */
+export function buildPriceList(row: {
+  selling_price?: number | null;
+  sale_price?: number | null;
+  is_on_sale?: boolean | null;
+  ads_price?: number | null;
+  live_price?: number | null;
+  installment_price?: number | null;
+}): PriceList {
+  const regular = Number(row.selling_price) || 0;
+  return {
+    regular,
+    sale: isOnSale(row.is_on_sale) && hasSaleDiscount(regular, row.sale_price) ? Number(row.sale_price) : null,
+    ads: positiveOrNull(row.ads_price),
+    live: positiveOrNull(row.live_price),
+    installment: positiveOrNull(row.installment_price),
+  };
+}
+
+/** The amount charged for a price type. `custom` has no list amount, so it resolves to regular. */
+export function resolvePrice(list: PriceList, type: PriceType): number {
+  const cash = list.sale ?? list.regular;
+  switch (type) {
+    case 'sale': return cash;
+    case 'ads': return list.ads ?? cash;
+    case 'live': return list.live ?? cash;
+    case 'installment': return list.installment ?? list.regular;
+    default: return list.regular;
+  }
+}
+
+/** The type a newly added line starts on: the sale price while there is one, otherwise regular. */
+export function defaultPriceType(list: PriceList): PriceType {
+  return list.sale != null ? 'sale' : 'regular';
+}
+
+/** The types staff can pick for a line. Installment and custom are never picked directly. */
+export function selectablePriceTypes(list: PriceList): PriceType[] {
+  return list.sale != null ? ['regular', 'sale', 'live', 'ads'] : ['regular', 'live', 'ads'];
+}

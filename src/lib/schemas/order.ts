@@ -7,9 +7,17 @@ export const orderItemSchema = z.object({
   costPriceAtSale: z.coerce.number(),
   sellingPriceAtSale: z.coerce.number().min(0, "Price cannot be negative"),
   discount: z.coerce.number().min(0, "Discount must be non-negative").optional(),
+  // Which price from the product's price list this line uses (see lib/pricing.ts).
+  // Null on lines saved before price types existed.
+  priceType: z.enum(["regular", "sale", "ads", "live", "installment", "custom"]).nullable().optional(),
+  priceOverrideReason: z.string().nullable().optional(),
+  priceOverrideBy: z.string().nullable().optional(),
 }).refine(data => (data.discount || 0) <= data.sellingPriceAtSale, {
     message: "Discount cannot be greater than the selling price.",
     path: ["discount"],
+}).refine(data => data.priceType !== 'custom' || !!data.priceOverrideReason?.trim(), {
+    message: "A reason is required for a custom price.",
+    path: ["priceOverrideReason"],
 });
 
 export const orderSchema = z.object({

@@ -27,7 +27,11 @@ export const productSchema = z.object({
   isOnSale: z.boolean().default(false),
   salePrice: z.coerce.number().min(0, "Sale price must be positive").optional(),
   installmentPrice: z.coerce.number().min(0).optional(),
-  quantityOnHand: z.coerce.number().int().min(0).optional().default(0),
+  adsPrice: z.coerce.number().min(0).optional(),
+  livePrice: z.coerce.number().min(0).optional(),
+  // No min here: a product whose stock is already negative must still be editable
+  // (prices, name, etc.). useProductSubmit rejects setting a NEW negative value.
+  quantityOnHand: z.coerce.number().int().optional().default(0),
   supplierPricing: z.array(z.object({
     supplierId: z.string().optional(),
     supplierName: z.string(),

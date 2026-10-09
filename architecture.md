@@ -470,6 +470,32 @@ Both RPCs live in `scripts/migrations/add_settlement_and_terms_rpcs.sql` (applie
 
 ---
 
+## Price List & Price Types (added 2026-10-09)
+
+One physical product is **one SKU with several prices** — never a second "SALE" SKU, which splits stock and orders (see "Duplicate SKU" problems in inventory). All rules live in `src/lib/pricing.ts`; use its helpers everywhere a price is charged or shown.
+
+| Price type | Column on `products` | When blank |
+|---|---|---|
+| `regular` | `selling_price` | — |
+| `sale` | `sale_price`, only while `is_on_sale` and below `selling_price` | not offered (`is_on_sale` alone is a badge-only, same-price sale) |
+| `ads` | `ads_price` | sale price, else regular |
+| `live` | `live_price` | sale price, else regular |
+| `installment` | `installment_price` | regular; applied automatically for first-timer Installment orders |
+| `custom` | — (hand-typed) | price managers only, reason required |
+
+- **Order form** (`OrderItemsPanel`): staff pick a price **type** per line; the amount comes from the price list. The price box is read-only except for price managers, whose typed price becomes `custom` and needs a reason. A new line starts on `sale` if the product has one, otherwise `regular`.
+- **What is saved**: `order_items.price_type`, plus `price_override_reason` / `price_override_by` for custom lines. The `process_order_transaction` RPC does not know these columns (and deletes/re-inserts lines on edit), so `saveOrderItemPriceTypes` in `orders/order-utils.ts` writes them right after the RPC on both create and edit. Lines from before this change have `price_type = NULL`.
+- **Price managers**: Admin/Owner plus `PRICE_MANAGER_EMAILS` in `src/hooks/useRoleCheck.ts` (`canManagePrices`). Only they can edit a product's prices; other product editors see the pricing fields disabled and `useProductSubmit` does not write price columns for them.
+- **Price history**: every price change made in the product editor is written to `audit_logs` (`table_name = 'products'`, `record_id` = product id, old/new values of only the changed columns) and shown under Pricing in the Edit Product dialog (`ProductPriceHistory`).
+- **Guard**: non-managers cannot create a product or variation whose name contains the word "sale".
+- **Enforcement is in the app, not the database** — there is no RLS or trigger behind these rules.
+- **Where prices are set**: Products page → edit a product (or a single variant) → **Pricing** section (`ProductPricingFields`): Cash, Installment, Ads, Live, the On Sale switch and Sale Price. Prices are per SKU, so each variant is priced on its own; there is no bulk price editor.
+- **Sales workflow**: add the product to the order as usual → it arrives on Sale (if on sale) or Regular → if the customer came from an ad or the Live, change the picker under the product name to Ads or Live → the price fills in. One order can mix types. A special price needs a price manager to open the order, type it, and give a reason.
+- **Migration**: `scripts/migrations/add_price_list.sql` adds `products.ads_price / live_price` and `order_items.price_type / price_override_reason / price_override_by`. Applied to production 2026-10-09 via the Supabase Management API. `selectWithPriceColumns` (in `pricing.ts`) still retries product reads without the two new columns if they are ever missing (e.g. a fresh database), so the order form degrades to regular/sale prices instead of breaking.
+- Per-item `discount` on an order is still free-typed by any staff.
+
+---
+
 ## Cost of Goods Sold (COGS) & Just-In-Time Costing
 
 This business runs **just-in-time inventory** — a product is bought only after a customer orders it, so the real cost is not known at order-creation time. `order_items.cost_price_at_sale` is snapshotted from `products.initial_unit_cost` the moment an order is created (in the `process_order_transaction` Postgres RPC, defined in `update_order_func.sql` at the repo root) and **never updated automatically after that** — so for a JIT business this snapshot is usually `0` until something explicitly backfills it.

@@ -7,6 +7,8 @@
  * For form validation schemas, see /src/lib/schemas/order.ts
  */
 
+import type { PriceType } from '@/lib/pricing';
+
 export type OrderStatus =
   | 'Pending Payment'
   | 'Processing'
@@ -85,6 +87,10 @@ export type OrderItem = {
   sellingPriceAtSale: number;
   costPriceAtSale: number;
   discount?: number;
+  /** Which price from the product's price list was charged. Null on older lines. */
+  priceType?: PriceType | null;
+  priceOverrideReason?: string | null;
+  priceOverrideBy?: string | null;
 };
 
 export type PaymentRecord = {

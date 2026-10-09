@@ -18,6 +18,10 @@ export type Product = {
   is_on_sale?: boolean | null;
   /** Optional sale price. When on sale AND below sellingPrice, this is charged as the cash price. */
   sale_price?: number | null;
+  /** Optional price for customers who came from an ad. Blank falls back to the sale/cash price. */
+  ads_price?: number | null;
+  /** Optional Facebook Live price. Blank falls back to the sale/cash price. */
+  live_price?: number | null;
   quantityOnHand: number;
   hasVariations?: boolean;
   images?: string[];
