@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/lib/supabase/hooks';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { InventoryGuardianMemoryTimeline } from '@/components/dashboard/inventory/InventoryGuardianMemoryTimeline';
+import { ReceiveHistoryTimeline } from './receive-history-timeline';
 
 interface EditUnallocatedStockDialogProps {
   item: any | null;
@@ -86,7 +87,7 @@ export function EditUnallocatedStockDialog({ item, isOpen, onClose, onSuccess }:
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent className="sm:max-w-[480px] max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-lg font-bold flex items-center gap-2">
             <Package className="w-5 h-5 text-indigo-600" />
@@ -170,7 +171,8 @@ export function EditUnallocatedStockDialog({ item, isOpen, onClose, onSuccess }:
             />
           </div>
 
-          <div className="pt-2 border-t border-slate-200">
+          <div className="pt-2 border-t border-slate-200 space-y-2">
+            <ReceiveHistoryTimeline productId={item.productId} />
             <InventoryGuardianMemoryTimeline productId={item.productId} adjustmentsOnly />
           </div>
 
