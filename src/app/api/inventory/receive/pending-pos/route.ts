@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { createStaffMessage, getAdminAndInventoryLeadNames, fanOutStaffNotifications, resolveRecipientNames } from '@/lib/services/staff-message-service';
 import { getAffectedSalesRepOrders } from '@/lib/services/procurement-service';
 import { suggestSupplierAndCost, repairFromPurchaseItem } from '@/lib/services/purchase-repair-service';
+import { formatShortDelivery } from '@/lib/utils/messages';
 
 export const dynamic = 'force-dynamic';
 
@@ -168,7 +169,12 @@ export async function POST(req: Request) {
 
         let reason = 'Received from PO';
         if (r.discrepancyReason) {
-            reason = `Discrepancy reported: ${r.discrepancyReason} (Received ${r.receivedQty} out of ${poItem.expected_qty - (poItem.received_qty || 0)} remaining)`;
+            reason = formatShortDelivery({
+              note: r.discrepancyReason,
+              receivedNow: r.receivedQty,
+              orderedTotal: poItem.expected_qty,
+              receivedEarlier: poItem.received_qty || 0,
+            });
         }
 
         // 4. Log Movement. Booked uncosted when auto-recording so the repair step

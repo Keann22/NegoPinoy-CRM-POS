@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { parseShortDelivery } from '@/lib/utils/messages';
 
 type Escalation = {
   messageId: string;
@@ -212,6 +213,7 @@ export function EscalationModal() {
   const label = escalationContext(current);
   // Show a product line when the product isn't already the headline label.
   const showProductLine = !!current.productName && current.productName !== label;
+  const shortDelivery = current.issueType === 'purchase_discrepancy' ? parseShortDelivery(current.message) : null;
 
   return (
     <Dialog open={open} onOpenChange={() => { /* controlled: only our buttons close it */ }}>
@@ -250,7 +252,35 @@ export function EscalationModal() {
             {showProductLine && (
               <div className="text-xs text-muted-foreground mb-1">Product: {current.productName}</div>
             )}
-            <div className="text-sm whitespace-pre-wrap text-red-900 mt-1">{current.message}</div>
+            {shortDelivery ? (
+              <div className="mt-2 space-y-2">
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="rounded-md border border-red-200 bg-white px-2 py-1.5">
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Expected</div>
+                    <div className="text-lg font-semibold leading-tight">{shortDelivery.expectedNow}</div>
+                  </div>
+                  <div className="rounded-md border border-red-200 bg-white px-2 py-1.5">
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Arrived</div>
+                    <div className="text-lg font-semibold leading-tight">{shortDelivery.receivedNow}</div>
+                  </div>
+                  <div className="rounded-md border border-red-400 bg-red-100 px-2 py-1.5">
+                    <div className="text-[10px] uppercase tracking-wide text-red-800">Missing</div>
+                    <div className="text-lg font-bold leading-tight text-red-800">{shortDelivery.missing}</div>
+                  </div>
+                </div>
+                {shortDelivery.orderedTotal !== null && (
+                  <div className="text-xs text-muted-foreground">
+                    Ordered {shortDelivery.orderedTotal} in total
+                    {shortDelivery.receivedEarlier ? ` · ${shortDelivery.receivedEarlier} already received earlier` : ''}
+                  </div>
+                )}
+                <div className="text-sm whitespace-pre-wrap text-red-900">
+                  <span className="font-medium">Staff note:</span> {shortDelivery.note}
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm whitespace-pre-wrap text-red-900 mt-1">{current.message}</div>
+            )}
             {current.orderId && (
               <Button asChild variant="outline" size="sm" className="mt-2 gap-1">
                 <Link href={`/dashboard/orders/${current.orderId}`}>
