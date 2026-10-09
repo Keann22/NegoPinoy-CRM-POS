@@ -67,7 +67,8 @@ export default function ReportsPage() {
             <TabsTrigger value="discrepancies">Auto-Adjustments</TabsTrigger>
           )}
 
-          {(isManagement || isInventory) && (
+          {/* Suppliers and purchase costs: Owner/Admin only. */}
+          {isManagement && (
             <TabsTrigger value="purchases">Purchases</TabsTrigger>
           )}
           
@@ -127,7 +128,7 @@ export default function ReportsPage() {
         </TabsContent>
       )}
 
-      {(isManagement || isInventory) && (
+      {isManagement && (
         <TabsContent value="purchases">
           <PurchasesReport />
         </TabsContent>

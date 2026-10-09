@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { repairFromPurchaseItem } from '@/lib/services/purchase-repair-service';
+import { createClient as createSessionClient } from '@/lib/supabase/server';
+import { isManagementUser } from '@/lib/services/purchase-summary-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +17,12 @@ const supabase = createClient(supabaseUrl, supabaseKey);
  */
 export async function POST(req: Request) {
   try {
+    const sessionClient = await createSessionClient();
+    const { data: { user } } = await sessionClient.auth.getUser();
+    if (!isManagementUser(user)) {
+      return NextResponse.json({ error: 'Only an admin can record purchase details.' }, { status: 403 });
+    }
+
     const { itemId, supplierId, unitCost, receivedQty, receivedAt } = await req.json();
 
     if (!itemId) {

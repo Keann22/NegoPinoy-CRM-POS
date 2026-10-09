@@ -11,6 +11,13 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function GET(req: Request) {
   try {
+    // The Purchases report is Owner/Admin only - it is suppliers and costs.
+    const gate = await createSessionClient();
+    const { data: { user: caller } } = await gate.auth.getUser();
+    if (!isManagementUser(caller)) {
+      return NextResponse.json({ error: 'Only an admin can view the Purchases report.' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(req.url);
     const start = searchParams.get('start');
     const end = searchParams.get('end');
@@ -234,32 +241,6 @@ export async function GET(req: Request) {
       .from('suppliers')
       .select('id, name')
       .order('name');
-
-    // Enforce the confidentiality tier server-side so supplier names and costs
-    // never leave the server for non-management callers (the client also hides
-    // them, but that alone leaks the values in the network response).
-    const sessionClient = await createSessionClient();
-    const { data: { user } } = await sessionClient.auth.getUser();
-
-    if (!isManagementUser(user)) {
-      const safePurchases = purchases.map(p => ({
-        ...p,
-        supplierId: null,
-        supplierName: null,
-        unitCost: 0,
-        totalCost: 0,
-      }));
-      const safeUnrecorded = unrecorded.map(u => ({
-        ...u,
-        unitCost: 0,
-        suggestedSupplierId: null,
-        suggestedUnitCost: null,
-        costSource: null,
-        costSourceDate: null,
-        costConflict: null,
-      }));
-      return NextResponse.json({ purchases: safePurchases, unrecorded: safeUnrecorded, suppliers: [] });
-    }
 
     return NextResponse.json({ purchases, unrecorded, suppliers: supplierRows || [] });
   } catch (error: any) {
