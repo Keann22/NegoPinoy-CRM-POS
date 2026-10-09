@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
 import type { SupplierOption } from "@/types";
 import type { ReceivedRow, ReceivedKind } from "@/lib/services/purchase-summary-service";
@@ -24,19 +23,13 @@ const rank = (r: ReceivedRow) => {
   if (r.kind === "pending") return 2;
   return diffOf(r) !== 0 ? 1 : 3;
 };
+const byRank = (a: ReceivedRow, b: ReceivedRow) => rank(a) - rank(b) || a.productName.localeCompare(b.productName);
 
-function StatusBadge({ row }: { row: ReceivedRow }) {
-  if (row.kind === "auto") {
-    return <Badge className="bg-amber-100 text-amber-900 hover:bg-amber-100" title="Staff received this off the to-order list and the system created the purchase from their count. Nobody entered what was actually bought.">No purchase entered — not checked</Badge>;
-  }
-  if (row.kind === "unexpected" || row.kind === "draft") {
-    return <Badge className="bg-amber-100 text-amber-900 hover:bg-amber-100">No purchase</Badge>;
-  }
-  if (row.kind === "pending") return <Badge variant="secondary">Not received yet</Badge>;
-  const diff = diffOf(row);
-  if (diff === 0) return <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">OK</Badge>;
-  if (diff > 0) return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">+{diff} over</Badge>;
-  return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">{-diff} short</Badge>;
+function ResultBadge({ diff, unchecked }: { diff: number; unchecked: boolean }) {
+  if (diff > 0) return <Badge className="bg-red-100 text-red-800 hover:bg-red-100 whitespace-nowrap">+{diff} over</Badge>;
+  if (diff < 0) return <Badge className="bg-red-100 text-red-800 hover:bg-red-100 whitespace-nowrap">{-diff} short</Badge>;
+  if (unchecked) return <Badge className="bg-amber-100 text-amber-900 hover:bg-amber-100 whitespace-nowrap">Not checked</Badge>;
+  return <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 whitespace-nowrap">OK</Badge>;
 }
 
 export function ReceivedComparison({
@@ -72,9 +65,11 @@ export function ReceivedComparison({
   }), [rows]);
 
   const groups = useMemo(() => {
+    // Staff don't get the supplier dimension, so everything is one group.
+    const nameOf = (r: ReceivedRow) => (isManagement ? r.supplierName || NO_SUPPLIER : "");
     const map = new Map<string, { supplierName: string; items: ReceivedRow[]; total: number; toCheck: number }>();
     rows.forEach(r => {
-      const name = r.supplierName || NO_SUPPLIER;
+      const name = nameOf(r);
       if (!map.has(name)) map.set(name, { supplierName: name, items: [], total: 0, toCheck: 0 });
       const g = map.get(name)!;
       g.items.push(r);
@@ -84,13 +79,13 @@ export function ReceivedComparison({
       if (NEEDS_CHECK.includes(r.kind)) g.toCheck += 1;
     });
     const list = Array.from(map.values());
-    list.forEach(g => g.items.sort((a, b) => rank(a) - rank(b) || a.productName.localeCompare(b.productName)));
+    list.forEach(g => g.items.sort(byRank));
     return list.sort((a, b) => {
       if (a.supplierName === NO_SUPPLIER) return 1;
       if (b.supplierName === NO_SUPPLIER) return -1;
       return a.supplierName.localeCompare(b.supplierName);
     });
-  }, [rows]);
+  }, [rows, isManagement]);
 
   const save = async (row: ReceivedRow) => {
     const draft = drafts[row.key];
@@ -124,106 +119,101 @@ export function ReceivedComparison({
     }
   };
 
+  // One product = one line across both panels, so a blank on either side is a
+  // visible gap: bought but not received, or received but never bought.
   const renderRow = (row: ReceivedRow) => {
+    const unchecked = NEEDS_CHECK.includes(row.kind);
     const draft = drafts[row.key];
     // Admin fills these in from the supplier's receipt.
-    const editable = isManagement && !!draft && NEEDS_CHECK.includes(row.kind);
+    const editable = isManagement && unchecked && !!draft;
     const busy = savingKey === row.key;
     const setDraft = (patch: Partial<Draft>) => setDrafts(prev => ({ ...prev, [row.key]: { ...draft, ...patch } }));
-    const draftDiff = editable && draft.bought !== "" ? row.received - (Number(draft.bought) || 0) : 0;
+    // While typing, compare against the typed quantity so the gap shows before saving.
+    const diff = editable && draft.bought !== "" ? row.received - (Number(draft.bought) || 0) : diffOf(row);
 
     return (
-      <tr key={row.key} className={NEEDS_CHECK.includes(row.kind) ? "bg-amber-50/40" : "hover:bg-slate-50"}>
-        <td className="p-3 font-medium text-slate-800">
-          {row.productName}
-          {editable && (
-            <select
-              className={`mt-2 block w-full max-w-[240px] border p-2 rounded-md bg-white text-sm font-normal ${!draft.supplierId ? "border-amber-400" : ""}`}
-              value={draft.supplierId}
-              onChange={e => setDraft({ supplierId: e.target.value })}
-            >
-              <option value="">-- Select supplier --</option>
-              {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          )}
-        </td>
-        <td className="p-3 text-right font-bold">
+      <div key={row.key} className={`grid grid-cols-2 divide-x border-t ${unchecked ? "bg-amber-50/40" : ""}`}>
+        {/* BOUGHT */}
+        <div className="p-3 min-w-0">
           {editable ? (
-            <input
-              type="number"
-              inputMode="numeric"
-              min={1}
-              className="w-20 border border-indigo-300 p-2 rounded-md text-right"
-              value={draft.bought}
-              onChange={e => setDraft({ bought: e.target.value })}
-              title="Quantity on the supplier's receipt"
-            />
-          ) : row.bought === null ? <span className="text-slate-400 font-normal">—</span> : row.bought}
-        </td>
-        <td className="p-3 text-right font-bold">{row.received}</td>
-        <td className="p-3">
-          <StatusBadge row={row} />
-          {draftDiff !== 0 && (
-            <span className="block text-xs text-red-700 mt-1">
-              {draftDiff > 0 ? `${draftDiff} more received than bought` : `${-draftDiff} not received`}
-            </span>
+            <div className="space-y-2">
+              <p className="text-xs text-amber-800">
+                {row.kind === "auto" ? "Nothing entered — filled from the staff count and the last price" : "Nothing entered"}
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  className="w-16 border border-indigo-300 p-2 rounded-md text-right text-sm font-bold"
+                  value={draft.bought}
+                  onChange={e => setDraft({ bought: e.target.value })}
+                  title="Quantity on the supplier's receipt"
+                />
+                <span className="text-slate-400 text-sm">×</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  placeholder="price"
+                  className={`w-24 border p-2 rounded-md text-right text-sm ${!(Number(draft.unitCost) > 0) ? "border-amber-400" : ""}`}
+                  value={draft.unitCost}
+                  onChange={e => setDraft({ unitCost: e.target.value })}
+                  title="Unit price on the supplier's receipt"
+                />
+                <span className="text-sm font-semibold text-slate-700 ml-auto">
+                  {peso((Number(draft.bought) || 0) * (Number(draft.unitCost) || 0))}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  className={`flex-1 min-w-0 border p-2 rounded-md bg-white text-sm ${!draft.supplierId ? "border-amber-400" : ""}`}
+                  value={draft.supplierId}
+                  onChange={e => setDraft({ supplierId: e.target.value })}
+                >
+                  <option value="">-- Select supplier --</option>
+                  {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+                <Button
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
+                  onClick={() => save(row)}
+                  disabled={busy || savingKey !== null || !(Number(draft.bought) >= 1) || (row.kind !== "auto" && !(Number(draft.unitCost) > 0))}
+                >
+                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : row.kind === "auto" ? "Confirm" : "Record"}
+                </Button>
+              </div>
+            </div>
+          ) : row.bought === null ? (
+            <p className="text-sm text-slate-400 italic">(nothing entered)</p>
+          ) : (
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-sm font-medium text-slate-800 min-w-0">{row.productName}</p>
+              <p className="text-sm whitespace-nowrap text-right">
+                <span className="font-bold">{row.bought}</span>
+                {isManagement && <span className="text-slate-500"> × {peso(row.unitCost)}</span>}
+                {isManagement && <span className="block text-xs font-semibold text-slate-700">{peso(row.bought * row.unitCost)}</span>}
+              </p>
+            </div>
           )}
-        </td>
-        {isManagement && (
-          <td className="p-3 text-right text-slate-600">
-            {editable ? (
-              <input
-                type="number"
-                inputMode="decimal"
-                placeholder="0.00"
-                className={`w-24 border p-2 rounded-md text-right ${!(Number(draft.unitCost) > 0) ? "border-amber-400" : ""}`}
-                value={draft.unitCost}
-                onChange={e => setDraft({ unitCost: e.target.value })}
-                title="Unit price on the supplier's receipt"
-              />
-            ) : row.bought === null ? <span className="text-slate-400">—</span> : peso(row.unitCost)}
-          </td>
-        )}
-        {isManagement && (
-          <td className="p-3 text-right font-semibold">
-            {editable
-              ? peso((Number(draft.bought) || 0) * (Number(draft.unitCost) || 0))
-              : row.bought === null ? <span className="text-slate-400 font-normal">—</span> : peso(row.bought * row.unitCost)}
-          </td>
-        )}
-        <td className="p-3 text-xs text-slate-400 whitespace-nowrap">{format(new Date(row.at), "hh:mm a")}</td>
-        {isManagement && (
-          <td className="p-3 text-right">
-            {editable && (
-              <Button
-                size="sm"
-                className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                onClick={() => save(row)}
-                disabled={busy || savingKey !== null || !(Number(draft.bought) >= 1) || (row.kind !== "auto" && !(Number(draft.unitCost) > 0))}
-              >
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : row.kind === "auto" ? "Confirm" : "Record"}
-              </Button>
-            )}
-          </td>
-        )}
-      </tr>
+        </div>
+
+        {/* RECEIVED */}
+        <div className="p-3 min-w-0">
+          {row.kind === "pending" ? (
+            <p className="text-sm text-slate-400 italic">(not received)</p>
+          ) : (
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-sm font-medium text-slate-800 min-w-0">{row.productName}</p>
+              <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 shrink-0 max-w-[45%]">
+                <span className="text-sm font-bold">{row.received}</span>
+                <ResultBadge diff={diff} unchecked={unchecked} />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     );
   };
-
-  const tableHead = (
-    <thead>
-      <tr className="text-slate-500 text-xs border-b bg-white">
-        <th className="p-3 text-left font-medium">Product</th>
-        <th className="p-3 text-right font-medium">Bought</th>
-        <th className="p-3 text-right font-medium">Received</th>
-        <th className="p-3 text-left font-medium">Result</th>
-        {isManagement && <th className="p-3 text-right font-medium">Unit Cost</th>}
-        {isManagement && <th className="p-3 text-right font-medium">Total</th>}
-        <th className="p-3 text-left font-medium">Time</th>
-        {isManagement && <th className="p-3" />}
-      </tr>
-    </thead>
-  );
 
   if (rows.length === 0) {
     return (
@@ -244,53 +234,61 @@ export function ReceivedComparison({
 
       {counts.toCheck > 0 && (
         <p className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-md p-3">
-          Highlighted items were received without a purchase being entered first, so their quantity and price have not been checked against the supplier&apos;s receipt.
+          Highlighted items were received without a purchase being entered first, so nothing has been checked against the supplier&apos;s receipt.
           {isManagement
-            ? " Type the quantity and unit price from the receipt, then Confirm. Each supplier's total updates as you type, so you can match it to the receipt total before confirming."
+            ? " On the Bought side, type the quantity and unit price from the receipt, then Confirm. Each supplier's total updates as you type, so you can match it to the receipt total first."
             : " An admin needs to check them."}
         </p>
       )}
 
-      {isManagement ? (
-        groups.map(group => {
-          // What the supplier total becomes once the values typed so far are
-          // saved - the number to hold against the receipt before confirming.
-          const typed = group.items.reduce((acc, r) => {
-            const d = drafts[r.key];
-            return NEEDS_CHECK.includes(r.kind) && d ? acc + (Number(d.bought) || 0) * (Number(d.unitCost) || 0) : acc;
-          }, 0);
-          return (
-          <div key={group.supplierName} className="border rounded-md overflow-hidden">
-            <div className="flex flex-wrap justify-between items-center gap-2 px-4 py-3 bg-slate-50 border-b">
-              <p className="font-semibold text-slate-800">
-                {group.supplierName}
-                {group.toCheck > 0 && <span className="ml-2 text-xs font-medium text-amber-700">{group.toCheck} to check</span>}
-              </p>
-              <p className="text-sm text-slate-500" title="Bought quantity × unit cost for the purchases entered or confirmed so far">
-                Checked: <span className="font-semibold text-slate-900">{peso(group.total)}</span>
-                {group.toCheck > 0 && <>{" · "}with the values typed below: <span className="font-semibold text-amber-800">{peso(group.total + typed)}</span></>}
-              </p>
-            </div>
+      {groups.map(group => {
+        // What the supplier total becomes once the values typed so far are
+        // saved - the number to hold against the receipt before confirming.
+        const typed = group.items.reduce((acc, r) => {
+          const d = drafts[r.key];
+          return NEEDS_CHECK.includes(r.kind) && d ? acc + (Number(d.bought) || 0) * (Number(d.unitCost) || 0) : acc;
+        }, 0);
+        const receivedItems = group.items.filter(r => r.kind !== "pending");
+        return (
+          <div key={group.supplierName || "all"} className="border rounded-md overflow-hidden">
+            {isManagement && (
+              <div className="flex flex-wrap items-center gap-2 px-4 py-3 bg-slate-50">
+                <p className="font-semibold text-slate-800">{group.supplierName}</p>
+                {group.toCheck > 0 && <span className="text-xs font-medium text-amber-700">{group.toCheck} to check</span>}
+              </div>
+            )}
             <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[760px]">
-                {tableHead}
-                <tbody className="divide-y">{group.items.map(renderRow)}</tbody>
-              </table>
+              <div className="min-w-[500px]">
+                <div className="grid grid-cols-2 divide-x border-t bg-white text-xs font-semibold tracking-wide text-slate-500">
+                  <div className="px-3 py-2">BOUGHT</div>
+                  <div className="px-3 py-2">RECEIVED</div>
+                </div>
+                {group.items.map(renderRow)}
+                <div className="grid grid-cols-2 divide-x border-t bg-slate-50 text-sm">
+                  <div className="px-3 py-2 text-slate-600">
+                    {isManagement ? (
+                      <>
+                        Total: <span className="font-semibold text-slate-900">{peso(group.total)}</span>
+                        {group.toCheck > 0 && (
+                          <span className="block text-xs text-amber-800">
+                            With the values typed above: <span className="font-semibold">{peso(group.total + typed)}</span>
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <>{group.items.filter(r => r.bought !== null).length} items entered</>
+                    )}
+                  </div>
+                  <div className="px-3 py-2 text-slate-600">
+                    <span className="font-semibold text-slate-900">{receivedItems.length}</span> {receivedItems.length === 1 ? "item" : "items"}
+                    {" · "}<span className="font-semibold text-slate-900">{receivedItems.reduce((acc, r) => acc + r.received, 0).toLocaleString()}</span> pcs
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-          );
-        })
-      ) : (
-        // Staff view: supplier identities and costs are management-only.
-        <div className="border rounded-md overflow-x-auto">
-          <table className="w-full text-sm min-w-[480px]">
-            {tableHead}
-            <tbody className="divide-y">
-              {[...rows].sort((a, b) => rank(a) - rank(b) || a.productName.localeCompare(b.productName)).map(renderRow)}
-            </tbody>
-          </table>
-        </div>
-      )}
+        );
+      })}
     </div>
   );
 }
