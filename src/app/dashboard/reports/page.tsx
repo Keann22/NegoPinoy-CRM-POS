@@ -63,7 +63,7 @@ export default function ReportsPage() {
             <TabsTrigger value="packed">Packed Orders</TabsTrigger>
           )}
 
-          {(isManagement || isInventory) && (
+          {isManagement && (
             <TabsTrigger value="discrepancies">Auto-Adjustments</TabsTrigger>
           )}
 
@@ -122,7 +122,7 @@ export default function ReportsPage() {
         </TabsContent>
       )}
 
-      {(isManagement || isInventory) && (
+      {isManagement && (
         <TabsContent value="discrepancies">
           <DiscrepancyReport />
         </TabsContent>
