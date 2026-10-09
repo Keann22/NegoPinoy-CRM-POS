@@ -18,7 +18,7 @@ import { latestReviewFinding, type PhotoReviewOrder } from '@/lib/photo-review';
 import orderIds from './order-ids.json';
 
 // Snapshot of the 104 orders that were in Photo status on Oct 9, 2026.
-// The list is fixed so an order stays visible here even after it is cancelled or completed.
+// Only the ones still in Photo are listed; an order drops off once its status changes.
 const ORDER_IDS = orderIds as string[];
 const CHUNK_SIZE = 50;
 
@@ -43,6 +43,7 @@ export default function PhotoReviewPage() {
         Promise.all(idChunks.map(ids => supabase
           .from('orders')
           .select('id, customer_id, status, order_date, total_amount, balance_due, sales_person_name, notes, customers(full_name), order_items(quantity, product_name)')
+          .eq('status', 'Photo')
           .in('id', ids))),
         Promise.all(idChunks.map(ids => supabase
           .from('order_logs')
@@ -114,13 +115,13 @@ export default function PhotoReviewPage() {
         <CardHeader>
           <CardTitle className="font-headline">Photo Orders Review</CardTitle>
           <CardDescription>
-            These {ORDER_IDS.length} orders were stuck in the Photo stage. For each one, add a note saying what really happened to it
+            These orders are still stuck in the Photo stage. For each one, add a note saying what really happened to it
             (should be cancelled, already shipped, still waiting, etc.). The note is saved on the order itself.
           </CardDescription>
           <div className="flex items-center gap-3 pt-2">
             <Progress value={progress} className="h-2 max-w-sm" />
             <span className="text-sm text-muted-foreground whitespace-nowrap">
-              <strong className="text-foreground">{reviewedTotal}</strong> of {orders.length || ORDER_IDS.length} reviewed
+              <strong className="text-foreground">{reviewedTotal}</strong> of {orders.length} reviewed
             </span>
           </div>
         </CardHeader>
