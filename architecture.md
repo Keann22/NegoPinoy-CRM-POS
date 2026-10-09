@@ -585,6 +585,16 @@ A genuine purchase received short leaves a correct non-zero remainder: receiving
 
 **Cost-correction cascade** (`editPurchaseLine`): the buy flow copies a line's cost onto `products.initial_unit_cost`, the `supplier_pricing` price book and waiting orders' `cost_price_at_sale` (`backfillOrderItemCosts`), and receiving copies it onto the `RESTOCK` movement. A corrected cost is pushed to each of those **only where it still holds the old wrong value**, so a cost since set by a newer purchase is left alone. The movement is matched best-effort (latest `restock` of the product at the old cost — there is no FK from `inventory_movements` to the purchase line).
 
+**"Received but not recorded as bought" section (added 2026-10-09)**: when staff receive something that isn't on the Pending Incoming list, they add it by hand and `POST /api/inventory/receive/pending-pos` books it as an `unexpectedItems` entry — stock goes up and a `RESTOCK` movement is written with `reason = 'Unexpected Delivery Item'`, but **no `purchase_order_items` row is created**. Those buys are therefore invisible to `fetchPurchasesInRange()`, i.e. to both this popup's main list and the Purchases report. On 2026-10-08 that was 67 of 135 received items (445 of 737 pcs), which is why the summary looked like it was missing half the day.
+
+The popup now lists them in an amber section above the purchases (`fetchUnrecordedReceipts`: `RESTOCK` movements in the day's range whose `reason` is exactly `'Unexpected Delivery Item'`). They are bucketed by **receipt** time, so a delivery received yesterday shows under yesterday. Owner/Admin get supplier and cost pre-filled from `suggestSupplierAndCost()` and can **Record** one row or **Record all filled**; staff see product, qty and time only. `POST` on the route (`recordReceiptAsPurchase`, management-only, cost > 0 required) then:
+
+1. creates a `received` PO dated to the receipt (`createBackfillPurchaseOrder`) with one line where `expected_qty = received_qty = ` the movement quantity;
+2. stamps cost + supplier on the movement and changes its `reason` to `'Unexpected Delivery Item (recorded as purchase)'` — **that reason string is the only "already recorded" marker**, so don't reword either constant without migrating existing rows;
+3. applies the product cost / price book / primary supplier and backfills order COGS, same as a normal buy.
+
+Stock is not touched — receiving already counted the units. Encoding a cost through **Encode Costs** (`/api/inventory/pending-costs/save`) does *not* clear a row from this section: with no purchase line to link to, that screen fixes the ledger and COGS but still leaves no purchase record.
+
 **⚠️ Known limits**:
 - **Order COGS is only re-costed when the wrong price is unique to that one purchase line.** There is no link from an order line back to the buy that costed it, so if another purchase of the same product carries the same unit cost, `recostOrderLines` does nothing and those order lines need a manual check.
 - **Remove does not roll back costs.** The product default cost, price-book entry and order COGS the mistaken buy already wrote stay as they are — the previous values aren't stored anywhere to restore.

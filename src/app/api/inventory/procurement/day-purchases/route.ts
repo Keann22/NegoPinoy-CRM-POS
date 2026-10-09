@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import { createClient as createSessionClient } from '@/lib/supabase/server';
 import {
   fetchPurchasesInRange,
+  fetchUnrecordedReceipts,
+  recordReceiptAsPurchase,
   isManagementUser,
   editPurchaseLine,
   removePurchaseLine,
@@ -35,6 +37,8 @@ export async function GET(req: Request) {
 
     const purchases = await fetchPurchasesInRange(supabase, start, end);
     const isManagement = isManagementUser(await getSessionUser());
+    // Received by hand with no purchase behind it - see fetchUnrecordedReceipts.
+    const unrecorded = await fetchUnrecordedReceipts(supabase, start, end, isManagement);
 
     // Strip supplier names and costs server-side for non-management callers so
     // they never reach the browser.
@@ -42,15 +46,36 @@ export async function GET(req: Request) {
       return NextResponse.json({
         isManagement: false,
         suppliers: [],
+        unrecorded,
         purchases: purchases.map(p => ({ ...p, supplierId: null, supplierName: null, unitCost: 0, totalCost: 0 })),
       });
     }
 
     const { data: suppliers } = await supabase.from('suppliers').select('id, name').order('name');
-    return NextResponse.json({ isManagement: true, suppliers: suppliers || [], purchases });
+    return NextResponse.json({ isManagement: true, suppliers: suppliers || [], purchases, unrecorded });
   } catch (error: any) {
     console.error('Error in day-purchases GET:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+// Record an unexpected receipt as a purchase. Needs a supplier and a cost, so
+// it is management-only.
+export async function POST(req: Request) {
+  try {
+    const user = await getSessionUser();
+    if (!isManagementUser(user)) {
+      return NextResponse.json({ error: 'Only an admin can record a purchase with supplier and cost.' }, { status: 403 });
+    }
+
+    const { movementId, supplierId, unitCost } = await req.json();
+    if (!movementId) return NextResponse.json({ error: 'Missing movementId' }, { status: 400 });
+
+    await recordReceiptAsPurchase(supabase, movementId, supplierId || null, Number(unitCost));
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error('Error in day-purchases POST:', error);
+    return NextResponse.json({ error: error.message }, { status: 400 });
   }
 }
 

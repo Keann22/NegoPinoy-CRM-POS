@@ -5,12 +5,24 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format, startOfDay, endOfDay } from "date-fns";
-import { ClipboardList, Loader2, Pencil, Trash2, Check, X } from "lucide-react";
+import { ClipboardList, Loader2, Pencil, Trash2, Check, X, AlertTriangle } from "lucide-react";
 import type { PurchaseRow, SupplierOption } from "@/types";
 
 const peso = (n: number) => `₱${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const NO_SUPPLIER = "No Supplier";
+
+// Stock staff received by hand ("unexpected delivery") that has no purchase
+// behind it yet - see fetchUnrecordedReceipts.
+type UnrecordedReceipt = {
+  movementId: string;
+  productId: string;
+  productName: string;
+  qty: number;
+  receivedAt: string;
+  suggestedSupplierId: string | null;
+  suggestedUnitCost: number;
+};
 
 function StatusBadge({ item }: { item: PurchaseRow }) {
   if (item.status === "received") {
@@ -44,6 +56,11 @@ export function TodaysPurchasesDialog({
   const [editForm, setEditForm] = useState({ qty: "", unitCost: "", supplierId: "" });
   const [savingId, setSavingId] = useState<string | null>(null);
 
+  const [unrecorded, setUnrecorded] = useState<UnrecordedReceipt[]>([]);
+  // Supplier/cost being filled in per unrecorded receipt, keyed by movement id.
+  const [recordDrafts, setRecordDrafts] = useState<Record<string, { supplierId: string; unitCost: string }>>({});
+  const [recordingAll, setRecordingAll] = useState(false);
+
   const isToday = day === format(new Date(), "yyyy-MM-dd");
 
   const load = useCallback(async () => {
@@ -62,6 +79,13 @@ export function TodaysPurchasesDialog({
       setPurchases(data.purchases || []);
       setSuppliers(data.suppliers || []);
       setIsManagement(!!data.isManagement);
+      const rows: UnrecordedReceipt[] = data.unrecorded || [];
+      setUnrecorded(rows);
+      // Keep whatever is already typed; only seed rows not seen before.
+      setRecordDrafts(prev => Object.fromEntries(rows.map(r => [r.movementId, prev[r.movementId] || {
+        supplierId: r.suggestedSupplierId || "",
+        unitCost: r.suggestedUnitCost ? String(r.suggestedUnitCost) : "",
+      }])));
     } catch (e: any) {
       alert("Failed to load purchases: " + e.message);
     } finally {
@@ -147,6 +171,54 @@ export function TodaysPurchasesDialog({
     } finally {
       setSavingId(null);
     }
+  };
+
+  const postRecord = async (r: UnrecordedReceipt) => {
+    const draft = recordDrafts[r.movementId] || { supplierId: "", unitCost: "" };
+    const res = await fetch("/api/inventory/procurement/day-purchases", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ movementId: r.movementId, supplierId: draft.supplierId || null, unitCost: draft.unitCost }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Failed to record");
+  };
+
+  const recordOne = async (r: UnrecordedReceipt) => {
+    setSavingId(r.movementId);
+    try {
+      await postRecord(r);
+      await load();
+      onChanged();
+    } catch (e: any) {
+      alert("Could not record: " + e.message);
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const isReady = (r: UnrecordedReceipt) => {
+    const d = recordDrafts[r.movementId];
+    return !!d && !!d.supplierId && Number(d.unitCost) > 0;
+  };
+  const readyCount = unrecorded.filter(isReady).length;
+
+  const recordAllReady = async () => {
+    const ready = unrecorded.filter(isReady);
+    if (!confirm(`Record ${ready.length} received ${ready.length === 1 ? "item" : "items"} as purchases with the supplier and cost shown?`)) return;
+    setRecordingAll(true);
+    const failed: string[] = [];
+    for (const r of ready) {
+      try {
+        await postRecord(r);
+      } catch (e: any) {
+        failed.push(`${r.productName}: ${e.message}`);
+      }
+    }
+    await load();
+    onChanged();
+    setRecordingAll(false);
+    if (failed.length > 0) alert(`Could not record ${failed.length}:\n\n${failed.join("\n")}`);
   };
 
   const renderRow = (item: PurchaseRow) => {
@@ -274,15 +346,98 @@ export function TodaysPurchasesDialog({
           )}
         </div>
 
+        {!loading && unrecorded.length > 0 && (
+          <div className="border border-amber-300 rounded-md overflow-hidden">
+            <div className="flex flex-wrap justify-between items-center gap-2 px-4 py-3 bg-amber-50 border-b border-amber-200">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-amber-900">
+                    Received but not recorded as bought — {unrecorded.length} {unrecorded.length === 1 ? "item" : "items"}, {unrecorded.reduce((acc, r) => acc + r.qty, 0).toLocaleString()} pcs
+                  </p>
+                  <p className="text-xs text-amber-800 mt-0.5">
+                    Staff received these on this day, but no purchase was recorded, so they are not in the totals above.
+                    {isManagement ? " Set the supplier and cost to record them." : " An admin needs to record them."}
+                  </p>
+                </div>
+              </div>
+              {isManagement && readyCount > 0 && (
+                <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white" onClick={recordAllReady} disabled={recordingAll || savingId !== null}>
+                  {recordingAll && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                  Record all filled ({readyCount})
+                </Button>
+              )}
+            </div>
+            <div className="overflow-x-auto max-h-[45vh] overflow-y-auto">
+              <table className={`w-full text-sm ${isManagement ? "min-w-[720px]" : "min-w-[360px]"}`}>
+                <thead>
+                  <tr className="text-slate-500 text-xs border-b bg-white sticky top-0">
+                    <th className="p-3 text-left font-medium">Product</th>
+                    <th className="p-3 text-right font-medium">Received</th>
+                    {isManagement && <th className="p-3 text-left font-medium">Supplier</th>}
+                    {isManagement && <th className="p-3 text-left font-medium">Unit Cost (₱)</th>}
+                    <th className="p-3 text-left font-medium">Time</th>
+                    {isManagement && <th className="p-3" />}
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {unrecorded.map(r => {
+                    const draft = recordDrafts[r.movementId] || { supplierId: "", unitCost: "" };
+                    const busy = savingId === r.movementId;
+                    return (
+                      <tr key={r.movementId} className="hover:bg-amber-50/40">
+                        <td className="p-3 font-medium text-slate-800">{r.productName}</td>
+                        <td className="p-3 text-right font-bold">{r.qty}</td>
+                        {isManagement && (
+                          <td className="p-3">
+                            <select
+                              className={`w-full min-w-[160px] border p-2 rounded-md bg-white text-sm ${!draft.supplierId ? "border-amber-400" : ""}`}
+                              value={draft.supplierId}
+                              onChange={e => setRecordDrafts(prev => ({ ...prev, [r.movementId]: { ...draft, supplierId: e.target.value } }))}
+                            >
+                              <option value="">-- Select supplier --</option>
+                              {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select>
+                          </td>
+                        )}
+                        {isManagement && (
+                          <td className="p-3">
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              placeholder="0.00"
+                              className={`w-24 border p-2 rounded-md text-right ${!(Number(draft.unitCost) > 0) ? "border-amber-400" : ""}`}
+                              value={draft.unitCost}
+                              onChange={e => setRecordDrafts(prev => ({ ...prev, [r.movementId]: { ...draft, unitCost: e.target.value } }))}
+                            />
+                          </td>
+                        )}
+                        <td className="p-3 text-xs text-slate-400 whitespace-nowrap">{format(new Date(r.receivedAt), "hh:mm a")}</td>
+                        {isManagement && (
+                          <td className="p-3 text-right">
+                            <Button size="sm" onClick={() => recordOne(r)} disabled={busy || recordingAll || !(Number(draft.unitCost) > 0)}>
+                              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Record"}
+                            </Button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center py-12 text-slate-500">
             <Loader2 className="w-6 h-6 animate-spin mr-2" /> Loading purchases...
           </div>
-        ) : purchases.length === 0 ? (
+        ) : purchases.length === 0 && unrecorded.length === 0 ? (
           <div className="text-center py-12 border rounded-lg bg-slate-50 text-slate-500">
             No purchases recorded {isToday ? "today" : "on this day"}.
           </div>
-        ) : isManagement ? (
+        ) : purchases.length === 0 ? null : isManagement ? (
           <div className="space-y-5">
             {groups.map(group => (
               <div key={group.supplierName} className="border rounded-md overflow-hidden">

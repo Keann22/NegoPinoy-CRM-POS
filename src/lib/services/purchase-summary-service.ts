@@ -1,6 +1,11 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { VOID_ORDER_STATUSES } from './cost-backfill-service';
-import { resolveSupplierName } from './purchase-repair-service';
+import { VOID_ORDER_STATUSES, backfillOrderItemCosts } from './cost-backfill-service';
+import {
+  resolveSupplierName,
+  suggestSupplierAndCost,
+  applyProductCost,
+  createBackfillPurchaseOrder,
+} from './purchase-repair-service';
 
 // Supplier identities and costs are management-only. Roles live in the user's
 // metadata (same source the dashboard reads via useUserProfile). We check both
@@ -78,6 +83,118 @@ export async function fetchPurchasesInRange(supabase: SupabaseClient, start: str
 
   purchases.sort((a, b) => new Date(a.purchasedAt).getTime() - new Date(b.purchasedAt).getTime());
   return purchases;
+}
+
+// Receiving writes this exact reason for an item staff added by hand because it
+// wasn't on the pending list (see POST /api/inventory/receive/pending-pos).
+const UNEXPECTED_REASON = 'Unexpected Delivery Item';
+// Stamped once the receipt has been turned into a purchase, so it stops being
+// listed as unrecorded.
+const RECORDED_REASON = 'Unexpected Delivery Item (recorded as purchase)';
+
+/**
+ * Stock received in [start, end] that has no purchase behind it.
+ *
+ * An "unexpected" receipt bumps stock and writes a RESTOCK movement but never
+ * creates a purchase_order_items row, so the buy is invisible to
+ * fetchPurchasesInRange (and to the Purchases report). These are listed
+ * separately so the day's summary matches what actually arrived.
+ */
+export async function fetchUnrecordedReceipts(
+  supabase: SupabaseClient,
+  start: string,
+  end: string,
+  withSuggestions: boolean,
+) {
+  const { data, error } = await supabase
+    .from('inventory_movements')
+    .select('id, product_id, quantity_change, timestamp, unit_cost, products(name, variant_name)')
+    .ilike('movement_type', 'restock')
+    .eq('reason', UNEXPECTED_REASON)
+    .gte('timestamp', start)
+    .lte('timestamp', end)
+    .order('timestamp', { ascending: true })
+    .limit(1000);
+  if (error) throw error;
+
+  return Promise.all((data || []).map(async (m: any) => {
+    const prod = m.products;
+    let productName = prod?.name || 'Unknown Product';
+    if (prod?.variant_name && !productName.includes(prod.variant_name)) {
+      productName = `${productName} [${prod.variant_name}]`;
+    }
+    // Pre-fill from what we already know about the product (management only -
+    // the suggestion names a supplier and a cost).
+    const suggestion = withSuggestions
+      ? await suggestSupplierAndCost(supabase, m.product_id, Number(m.unit_cost) || null, null)
+      : null;
+    return {
+      movementId: m.id as string,
+      productId: m.product_id as string,
+      productName,
+      qty: Number(m.quantity_change) || 0,
+      receivedAt: m.timestamp as string,
+      suggestedSupplierId: suggestion?.supplierId || null,
+      suggestedUnitCost: suggestion?.unitCost || 0,
+    };
+  }));
+}
+
+/**
+ * Turn an unexpected receipt into a proper purchase: a received line on a PO
+ * dated to when the goods landed, with the cost pushed everywhere a normal buy
+ * puts it. Stock is NOT touched - receiving already counted these units.
+ */
+export async function recordReceiptAsPurchase(
+  supabase: SupabaseClient,
+  movementId: string,
+  supplierId: string | null,
+  unitCost: number,
+) {
+  if (!Number.isFinite(unitCost) || !(unitCost > 0)) {
+    throw new Error('Enter the unit cost to record this as a purchase.');
+  }
+
+  const { data: movement, error } = await supabase
+    .from('inventory_movements')
+    .select('id, product_id, quantity_change, timestamp, reason')
+    .eq('id', movementId)
+    .single();
+  if (error) throw error;
+  if (movement.reason !== UNEXPECTED_REASON) {
+    throw new Error('This receipt was already recorded as a purchase.');
+  }
+
+  const qty = Number(movement.quantity_change) || 0;
+  if (!(qty > 0)) throw new Error('This receipt has no quantity to record.');
+
+  const supplierName = await resolveSupplierName(supabase, supplierId);
+
+  const poId = await createBackfillPurchaseOrder(supabase, movement.timestamp);
+  const { error: insErr } = await supabase.from('purchase_order_items').insert({
+    po_id: poId,
+    product_id: movement.product_id,
+    supplier_id: supplierId || null,
+    expected_qty: qty,
+    received_qty: qty,
+    unit_cost: unitCost,
+    status: 'received',
+  });
+  if (insErr) {
+    await supabase.from('purchase_orders').delete().eq('id', poId);
+    throw insErr;
+  }
+
+  await supabase
+    .from('inventory_movements')
+    .update({ unit_cost: unitCost, supplier_name: supplierName, reason: RECORDED_REASON })
+    .eq('id', movementId);
+
+  await applyProductCost(supabase, movement.product_id, unitCost, supplierId, supplierName);
+  if (supplierId) {
+    await supabase.from('products').update({ supplier_id: supplierId }).eq('id', movement.product_id);
+  }
+  await backfillOrderItemCosts(supabase, movement.product_id, qty, unitCost);
 }
 
 async function loadPurchaseLine(supabase: SupabaseClient, itemId: string) {
