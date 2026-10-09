@@ -605,21 +605,39 @@ A genuine purchase received short leaves a correct non-zero remainder: receiving
 
 | Action | Who | Rule |
 |---|---|---|
-| Edit quantity | any signed-in user | Whole number ≥ 1 and never below `received_qty`. Recording a buy doesn't move stock (receiving does), so this only changes what receiving expects. Status becomes `received` when `received_qty` has caught up, else `pending_receipt`. |
+| Edit quantity | any signed-in user | Whole number ≥ 1; staff can't go below `received_qty`, Owner/Admin can (see Received tab). Recording a buy doesn't move stock (receiving does), so this only changes what receiving expects. Status becomes `received` when `received_qty` has caught up, else `pending_receipt`. |
 | Edit unit cost / supplier | Owner/Admin | See the cost cascade below. |
 | Remove | any signed-in user | Only while `received_qty = 0`; the trash icon is hidden otherwise. Deletes the line, and the PO too if it was its last line. The product reappears on the sheet if orders still need it. |
 
 **Cost-correction cascade** (`editPurchaseLine`): the buy flow copies a line's cost onto `products.initial_unit_cost`, the `supplier_pricing` price book and waiting orders' `cost_price_at_sale` (`backfillOrderItemCosts`), and receiving copies it onto the `RESTOCK` movement. A corrected cost is pushed to each of those **only where it still holds the old wrong value**, so a cost since set by a newer purchase is left alone. The movement is matched best-effort (latest `restock` of the product at the old cost — there is no FK from `inventory_movements` to the purchase line).
 
-**"Received but not recorded as bought" section (added 2026-10-09)**: when staff receive something that isn't on the Pending Incoming list, they add it by hand and `POST /api/inventory/receive/pending-pos` books it as an `unexpectedItems` entry — stock goes up and a `RESTOCK` movement is written with `reason = 'Unexpected Delivery Item'`, but **no `purchase_order_items` row is created**. Those buys are therefore invisible to `fetchPurchasesInRange()`, i.e. to both this popup's main list and the Purchases report. On 2026-10-08 that was 67 of 135 received items (445 of 737 pcs), which is why the summary looked like it was missing half the day.
+### Received tab: bought vs received (added 2026-10-09)
 
-The popup now lists them in an amber section above the purchases (`fetchUnrecordedReceipts`: `RESTOCK` movements in the day's range whose `reason` is exactly `'Unexpected Delivery Item'`). They are bucketed by **receipt** time, so a delivery received yesterday shows under yesterday. Owner/Admin get supplier and cost pre-filled from `suggestSupplierAndCost()` and can **Record** one row or **Record all filled**; staff see product, qty and time only. `POST` on the route (`recordReceiptAsPurchase`, management-only, cost > 0 required) then:
+The popup has two tabs. **Purchases** is the list above. **Received** lines up every receipt of the day against the purchase behind it (`fetchReceivedComparison`, rendered by [received-comparison.tsx](src/components/dashboard/procurement/received-comparison.tsx)) so the business can see what arrived versus what was bought.
 
-1. creates a `received` PO dated to the receipt (`createBackfillPurchaseOrder`) with one line where `expected_qty = received_qty = ` the movement quantity;
-2. stamps cost + supplier on the movement and changes its `reason` to `'Unexpected Delivery Item (recorded as purchase)'` — **that reason string is the only "already recorded" marker**, so don't reword either constant without migrating existing rows;
-3. applies the product cost / price book / primary supplier and backfills order COGS, same as a normal buy.
+**Why it exists — the "purchases" were mostly not purchases.** The intended flow is: the buyer records the buy, then staff receive against it. In practice the buy is often not entered (only the owner's wife may see supplier + price, so staff can't encode the receipt), and receiving then manufactures the record itself. On 2026-10-09 an H.A. Kitchenware receipt of 16 lines / ₱61,270 had **none** of its lines entered by a person, yet 7 showed up as purchases. Three paths produce a receipt with no real purchase:
 
-Stock is not touched — receiving already counted the units. Encoding a cost through **Encode Costs** (`/api/inventory/pending-costs/save`) does *not* clear a row from this section: with no purchase line to link to, that screen fixes the ledger and COGS but still leaves no purchase record.
+| Kind | How it happens | What exists afterwards |
+|---|---|---|
+| `auto` | Staff receive a to-order (`STAFF_DRAFT`) line and the product's cost + supplier are known from history → `repairFromPurchaseItem` auto-records it. | A purchase line whose qty is **whatever staff counted** and whose price is the **last** price. Looks like a normal buy; bought always equals received. |
+| `draft` | Same, but no cost is known, so nothing is auto-recorded. | Line stays on the `STAFF_DRAFT` PO with `received_qty > 0`; movement is `'Received from PO'` at cost 0. |
+| `unexpected` | Item wasn't on the pending list, staff add it by hand. | Only a `RESTOCK` movement with `reason = 'Unexpected Delivery Item'`. No purchase line at all. |
+
+The other kinds are `checked` (a buy was entered before the goods arrived — the only case where bought-vs-received is a real check), `confirmed` (one of the three above after an admin checked it) and `pending` (bought that day, nothing received yet).
+
+**How a receipt is linked to its purchase** — there is no FK from `inventory_movements` to `purchase_order_items`, so it is product + time: the latest non-draft line for the product whose PO was created at or before the receipt (30-day lookback). **A PO whose `created_at` equals the receipt's timestamp (±2s) was created BY that receipt** — `createBackfillPurchaseOrder` stamps the PO with the movement's timestamp — and that equality is the only thing that tells `auto` from `checked`. Don't change how backfill POs are dated without revisiting this.
+
+**"Checked" state lives in the movement's `reason`** (no schema change): recording an unexpected receipt rewrites it to `'Unexpected Delivery Item (recorded as purchase)'`; confirming an `auto`/`draft` one appends `' [purchase confirmed]'`. These strings are the only marker — don't reword the constants in `purchase-summary-service.ts` without migrating existing rows.
+
+**The admin flow** (Owner/Admin only; staff see product / bought / received / result, no inputs): for each highlighted row, type the **bought quantity and unit price from the supplier's receipt** and press Confirm (`auto` → `PATCH` with `confirmMovementId`) or Record (`unexpected` / `draft` → `POST`, cost > 0 required). Supplier and price are pre-filled from `suggestSupplierAndCost()` but are history, not this receipt. Each supplier header shows the checked total and the total *with the values typed so far*, so it can be matched to the receipt total before saving. Bought may differ from received in either direction — the row then shows "+N over" / "N short" — which is why management edits may set `expected_qty` below `received_qty` (`allowBelowReceived`); staff edits still can't. **None of this moves stock**: a miscount is corrected with a stock adjustment, not here.
+
+- `POST` for `unexpected`: creates a PO dated to the receipt with `expected_qty` = bought, `received_qty` = the movement quantity, stamps cost/supplier on the movement, applies product cost / price book / primary supplier, backfills order COGS.
+- `POST` for `draft`: runs `repairFromPurchaseItem` on the product's latest received `STAFF_DRAFT` line (same repair as the Purchases report banner), then applies the bought quantity.
+- Encoding a cost through **Encode Costs** (`/api/inventory/pending-costs/save`) does *not* clear an `unexpected` row: with no purchase line to link to, that screen fixes the ledger and COGS but still leaves no purchase record.
+
+**Badge**: the sheet's Today's Purchases button and the Received tab show the day's count of `auto` + `draft` + `unexpected` rows (`?countOnly=1`, which skips the supplier/cost suggestions). The Purchases tab flags `auto` lines inline and warns that its totals may be incomplete while that count is above zero.
+
+**Not covered**: a receipt line that staff never received and nobody entered has no row anywhere — it only shows as the supplier total coming up short.
 
 **⚠️ Known limits**:
 - **Order COGS is only re-costed when the wrong price is unique to that one purchase line.** There is no link from an order line back to the buy that costed it, so if another purchase of the same product carries the same unit cost, `recostOrderLines` does nothing and those order lines need a manual check.

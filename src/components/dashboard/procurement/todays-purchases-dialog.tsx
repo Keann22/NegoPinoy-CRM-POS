@@ -4,25 +4,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format, startOfDay, endOfDay } from "date-fns";
 import { ClipboardList, Loader2, Pencil, Trash2, Check, X, AlertTriangle } from "lucide-react";
 import type { PurchaseRow, SupplierOption } from "@/types";
+import type { ReceivedRow } from "@/lib/services/purchase-summary-service";
+import { ReceivedComparison } from "./received-comparison";
 
 const peso = (n: number) => `₱${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const NO_SUPPLIER = "No Supplier";
-
-// Stock staff received by hand ("unexpected delivery") that has no purchase
-// behind it yet - see fetchUnrecordedReceipts.
-type UnrecordedReceipt = {
-  movementId: string;
-  productId: string;
-  productName: string;
-  qty: number;
-  receivedAt: string;
-  suggestedSupplierId: string | null;
-  suggestedUnitCost: number;
-};
 
 function StatusBadge({ item }: { item: PurchaseRow }) {
   if (item.status === "received") {
@@ -56,16 +47,17 @@ export function TodaysPurchasesDialog({
   const [editForm, setEditForm] = useState({ qty: "", unitCost: "", supplierId: "" });
   const [savingId, setSavingId] = useState<string | null>(null);
 
-  const [unrecorded, setUnrecorded] = useState<UnrecordedReceipt[]>([]);
-  // Supplier/cost being filled in per unrecorded receipt, keyed by movement id.
-  const [recordDrafts, setRecordDrafts] = useState<Record<string, { supplierId: string; unitCost: string }>>({});
-  const [recordingAll, setRecordingAll] = useState(false);
+  const [tab, setTab] = useState<"purchases" | "received">("purchases");
+  // Bought vs received for the day - see fetchReceivedComparison.
+  const [received, setReceived] = useState<ReceivedRow[]>([]);
 
   const isToday = day === format(new Date(), "yyyy-MM-dd");
 
-  const load = useCallback(async () => {
+  // silent = refresh after a save: keep the tabs mounted so values typed on
+  // other rows aren't wiped by the loading state.
+  const load = useCallback(async (silent = false) => {
     if (!day) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const d = new Date(`${day}T00:00:00`);
       const start = startOfDay(d).toISOString();
@@ -79,13 +71,7 @@ export function TodaysPurchasesDialog({
       setPurchases(data.purchases || []);
       setSuppliers(data.suppliers || []);
       setIsManagement(!!data.isManagement);
-      const rows: UnrecordedReceipt[] = data.unrecorded || [];
-      setUnrecorded(rows);
-      // Keep whatever is already typed; only seed rows not seen before.
-      setRecordDrafts(prev => Object.fromEntries(rows.map(r => [r.movementId, prev[r.movementId] || {
-        supplierId: r.suggestedSupplierId || "",
-        unitCost: r.suggestedUnitCost ? String(r.suggestedUnitCost) : "",
-      }])));
+      setReceived(data.received || []);
     } catch (e: any) {
       alert("Failed to load purchases: " + e.message);
     } finally {
@@ -118,6 +104,12 @@ export function TodaysPurchasesDialog({
     });
   }, [purchases]);
 
+  // Received with no purchase entered first; nobody has checked these against
+  // the supplier's receipt.
+  const toCheck = useMemo(() => received.filter(r => r.kind === "auto" || r.kind === "unexpected" || r.kind === "draft").length, [received]);
+  // Purchases the system created from the staff count, still unchecked.
+  const uncheckedItemIds = useMemo(() => new Set(received.filter(r => r.kind === "auto" && r.itemId).map(r => r.itemId as string)), [received]);
+
   const totals = useMemo(() => ({
     pieces: purchases.reduce((acc, p) => acc + p.qty, 0),
     spend: purchases.reduce((acc, p) => acc + p.totalCost, 0),
@@ -148,7 +140,7 @@ export function TodaysPurchasesDialog({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to save");
       setEditingId(null);
-      await load();
+      await load(true);
       onChanged();
     } catch (e: any) {
       alert("Could not save: " + e.message);
@@ -164,61 +156,13 @@ export function TodaysPurchasesDialog({
       const res = await fetch(`/api/inventory/procurement/day-purchases?itemId=${encodeURIComponent(item.id)}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to remove");
-      await load();
+      await load(true);
       onChanged();
     } catch (e: any) {
       alert("Could not remove: " + e.message);
     } finally {
       setSavingId(null);
     }
-  };
-
-  const postRecord = async (r: UnrecordedReceipt) => {
-    const draft = recordDrafts[r.movementId] || { supplierId: "", unitCost: "" };
-    const res = await fetch("/api/inventory/procurement/day-purchases", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ movementId: r.movementId, supplierId: draft.supplierId || null, unitCost: draft.unitCost }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Failed to record");
-  };
-
-  const recordOne = async (r: UnrecordedReceipt) => {
-    setSavingId(r.movementId);
-    try {
-      await postRecord(r);
-      await load();
-      onChanged();
-    } catch (e: any) {
-      alert("Could not record: " + e.message);
-    } finally {
-      setSavingId(null);
-    }
-  };
-
-  const isReady = (r: UnrecordedReceipt) => {
-    const d = recordDrafts[r.movementId];
-    return !!d && !!d.supplierId && Number(d.unitCost) > 0;
-  };
-  const readyCount = unrecorded.filter(isReady).length;
-
-  const recordAllReady = async () => {
-    const ready = unrecorded.filter(isReady);
-    if (!confirm(`Record ${ready.length} received ${ready.length === 1 ? "item" : "items"} as purchases with the supplier and cost shown?`)) return;
-    setRecordingAll(true);
-    const failed: string[] = [];
-    for (const r of ready) {
-      try {
-        await postRecord(r);
-      } catch (e: any) {
-        failed.push(`${r.productName}: ${e.message}`);
-      }
-    }
-    await load();
-    onChanged();
-    setRecordingAll(false);
-    if (failed.length > 0) alert(`Could not record ${failed.length}:\n\n${failed.join("\n")}`);
   };
 
   const renderRow = (item: PurchaseRow) => {
@@ -228,6 +172,9 @@ export function TodaysPurchasesDialog({
       <tr key={item.id} className={editing ? "bg-indigo-50/60" : "hover:bg-slate-50"}>
         <td className="p-3 font-medium text-slate-800">
           {item.productName}
+          {uncheckedItemIds.has(item.id) && (
+            <span className="block text-xs font-normal text-amber-700 mt-0.5">No purchase entered — created from the staff count. Check it in the Received tab.</span>
+          )}
           {editing && isManagement && (
             <select
               className="mt-2 block w-full border p-2 rounded-md bg-white text-sm font-normal"
@@ -244,7 +191,7 @@ export function TodaysPurchasesDialog({
             <input
               type="number"
               inputMode="numeric"
-              min={Math.max(1, item.receivedQty)}
+              min={isManagement ? 1 : Math.max(1, item.receivedQty)}
               className="w-20 border border-indigo-300 p-2 rounded-md text-right"
               value={editForm.qty}
               onChange={e => setEditForm(prev => ({ ...prev, qty: e.target.value }))}
@@ -325,7 +272,7 @@ export function TodaysPurchasesDialog({
             {isToday ? "Today's Purchases" : `Purchases — ${format(new Date(`${day}T00:00:00`), "MMM d, yyyy")}`}
           </DialogTitle>
           <DialogDescription>
-            Everything recorded as bought on this day{isManagement ? ", grouped by supplier" : ""}. Use the pencil to fix a mistake.
+            What was bought and what was received on this day{isManagement ? ", grouped by supplier" : ""}. Use the pencil to fix a mistake.
           </DialogDescription>
         </DialogHeader>
 
@@ -346,125 +293,80 @@ export function TodaysPurchasesDialog({
           )}
         </div>
 
-        {!loading && unrecorded.length > 0 && (
-          <div className="border border-amber-300 rounded-md overflow-hidden">
-            <div className="flex flex-wrap justify-between items-center gap-2 px-4 py-3 bg-amber-50 border-b border-amber-200">
-              <div className="flex items-start gap-2">
-                <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600 mt-0.5" />
-                <div>
-                  <p className="font-semibold text-amber-900">
-                    Received but not recorded as bought — {unrecorded.length} {unrecorded.length === 1 ? "item" : "items"}, {unrecorded.reduce((acc, r) => acc + r.qty, 0).toLocaleString()} pcs
-                  </p>
-                  <p className="text-xs text-amber-800 mt-0.5">
-                    Staff received these on this day, but no purchase was recorded, so they are not in the totals above.
-                    {isManagement ? " Set the supplier and cost to record them." : " An admin needs to record them."}
-                  </p>
-                </div>
-              </div>
-              {isManagement && readyCount > 0 && (
-                <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white" onClick={recordAllReady} disabled={recordingAll || savingId !== null}>
-                  {recordingAll && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                  Record all filled ({readyCount})
-                </Button>
-              )}
-            </div>
-            <div className="overflow-x-auto max-h-[45vh] overflow-y-auto">
-              <table className={`w-full text-sm ${isManagement ? "min-w-[720px]" : "min-w-[360px]"}`}>
-                <thead>
-                  <tr className="text-slate-500 text-xs border-b bg-white sticky top-0">
-                    <th className="p-3 text-left font-medium">Product</th>
-                    <th className="p-3 text-right font-medium">Received</th>
-                    {isManagement && <th className="p-3 text-left font-medium">Supplier</th>}
-                    {isManagement && <th className="p-3 text-left font-medium">Unit Cost (₱)</th>}
-                    <th className="p-3 text-left font-medium">Time</th>
-                    {isManagement && <th className="p-3" />}
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {unrecorded.map(r => {
-                    const draft = recordDrafts[r.movementId] || { supplierId: "", unitCost: "" };
-                    const busy = savingId === r.movementId;
-                    return (
-                      <tr key={r.movementId} className="hover:bg-amber-50/40">
-                        <td className="p-3 font-medium text-slate-800">{r.productName}</td>
-                        <td className="p-3 text-right font-bold">{r.qty}</td>
-                        {isManagement && (
-                          <td className="p-3">
-                            <select
-                              className={`w-full min-w-[160px] border p-2 rounded-md bg-white text-sm ${!draft.supplierId ? "border-amber-400" : ""}`}
-                              value={draft.supplierId}
-                              onChange={e => setRecordDrafts(prev => ({ ...prev, [r.movementId]: { ...draft, supplierId: e.target.value } }))}
-                            >
-                              <option value="">-- Select supplier --</option>
-                              {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                            </select>
-                          </td>
-                        )}
-                        {isManagement && (
-                          <td className="p-3">
-                            <input
-                              type="number"
-                              inputMode="decimal"
-                              placeholder="0.00"
-                              className={`w-24 border p-2 rounded-md text-right ${!(Number(draft.unitCost) > 0) ? "border-amber-400" : ""}`}
-                              value={draft.unitCost}
-                              onChange={e => setRecordDrafts(prev => ({ ...prev, [r.movementId]: { ...draft, unitCost: e.target.value } }))}
-                            />
-                          </td>
-                        )}
-                        <td className="p-3 text-xs text-slate-400 whitespace-nowrap">{format(new Date(r.receivedAt), "hh:mm a")}</td>
-                        {isManagement && (
-                          <td className="p-3 text-right">
-                            <Button size="sm" onClick={() => recordOne(r)} disabled={busy || recordingAll || !(Number(draft.unitCost) > 0)}>
-                              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Record"}
-                            </Button>
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
         {loading ? (
           <div className="flex items-center justify-center py-12 text-slate-500">
-            <Loader2 className="w-6 h-6 animate-spin mr-2" /> Loading purchases...
-          </div>
-        ) : purchases.length === 0 && unrecorded.length === 0 ? (
-          <div className="text-center py-12 border rounded-lg bg-slate-50 text-slate-500">
-            No purchases recorded {isToday ? "today" : "on this day"}.
-          </div>
-        ) : purchases.length === 0 ? null : isManagement ? (
-          <div className="space-y-5">
-            {groups.map(group => (
-              <div key={group.supplierName} className="border rounded-md overflow-hidden">
-                <div className="flex flex-wrap justify-between items-center gap-2 px-4 py-3 bg-slate-50 border-b">
-                  <p className="font-semibold text-slate-800">{group.supplierName}</p>
-                  <p className="text-sm text-slate-500">
-                    {group.pieces.toLocaleString()} pcs · <span className="font-semibold text-slate-900">{peso(group.totalCost)}</span>
-                  </p>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm min-w-[640px]">
-                    {tableHead}
-                    <tbody className="divide-y">{group.items.map(renderRow)}</tbody>
-                  </table>
-                </div>
-              </div>
-            ))}
+            <Loader2 className="w-6 h-6 animate-spin mr-2" /> Loading...
           </div>
         ) : (
-          // Staff view: supplier identities and costs are management-only, so
-          // this is a flat list with no supplier dimension.
-          <div className="border rounded-md overflow-x-auto">
-            <table className="w-full text-sm min-w-[480px]">
-              {tableHead}
-              <tbody className="divide-y">{purchases.map(renderRow)}</tbody>
-            </table>
-          </div>
+          <Tabs value={tab} onValueChange={v => setTab(v as "purchases" | "received")}>
+            <TabsList>
+              <TabsTrigger value="purchases">Purchases</TabsTrigger>
+              <TabsTrigger value="received" className="gap-2">
+                Received
+                {toCheck > 0 && (
+                  <Badge className="bg-amber-500 text-white hover:bg-amber-500 text-xs px-1.5 py-0 min-w-[20px] h-5 flex items-center justify-center rounded-full">{toCheck}</Badge>
+                )}
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="purchases" className="space-y-4 mt-4">
+              {toCheck > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setTab("received")}
+                  className="w-full flex items-start gap-2 text-left rounded-md border border-amber-300 bg-amber-50 p-3 hover:bg-amber-100 transition-colors"
+                >
+                  <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600 mt-0.5" />
+                  <span className="text-sm text-amber-900">
+                    <span className="font-semibold">{toCheck} received {toCheck === 1 ? "item has" : "items have"} not been checked against a receipt.</span>{" "}
+                    The totals here may be incomplete or use old prices. Open the Received tab to check them.
+                  </span>
+                </button>
+              )}
+              {purchases.length === 0 ? (
+                <div className="text-center py-12 border rounded-lg bg-slate-50 text-slate-500">
+                  No purchases recorded {isToday ? "today" : "on this day"}.
+                </div>
+              ) : isManagement ? (
+                <div className="space-y-5">
+                  {groups.map(group => (
+                    <div key={group.supplierName} className="border rounded-md overflow-hidden">
+                      <div className="flex flex-wrap justify-between items-center gap-2 px-4 py-3 bg-slate-50 border-b">
+                        <p className="font-semibold text-slate-800">{group.supplierName}</p>
+                        <p className="text-sm text-slate-500">
+                          {group.pieces.toLocaleString()} pcs · <span className="font-semibold text-slate-900">{peso(group.totalCost)}</span>
+                        </p>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm min-w-[640px]">
+                          {tableHead}
+                          <tbody className="divide-y">{group.items.map(renderRow)}</tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                // Staff view: supplier identities and costs are management-only, so
+                // this is a flat list with no supplier dimension.
+                <div className="border rounded-md overflow-x-auto">
+                  <table className="w-full text-sm min-w-[480px]">
+                    {tableHead}
+                    <tbody className="divide-y">{purchases.map(renderRow)}</tbody>
+                  </table>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="received" className="mt-4">
+              <ReceivedComparison
+                rows={received}
+                suppliers={suppliers}
+                isManagement={isManagement}
+                onSaved={async () => { await load(true); onChanged(); }}
+              />
+            </TabsContent>
+          </Tabs>
         )}
       </DialogContent>
     </Dialog>

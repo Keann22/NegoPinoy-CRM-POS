@@ -67,6 +67,22 @@ export default function ProcurementSheet() {
   const { drafts, loading: draftsLoading, saveDraft, completeDraft, deleteDraft } = useReceiptDrafts();
   const [savedScansOpen, setSavedScansOpen] = useState(false);
   const [todaysPurchasesOpen, setTodaysPurchasesOpen] = useState(false);
+  // Items received today with no purchase entered first - shown as a badge so
+  // an unchecked delivery can't be missed.
+  const [toCheckCount, setToCheckCount] = useState(0);
+
+  const fetchToCheckCount = async () => {
+    try {
+      const now = new Date();
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString();
+      const res = await fetch(`/api/inventory/procurement/day-purchases?countOnly=1&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`, { cache: 'no-store' });
+      const data = await res.json();
+      if (res.ok) setToCheckCount(data.toCheck || 0);
+    } catch (e) {
+      console.error(e);
+    }
+  };
   const [activeDraft, setActiveDraft] = useState<ReceiptScanDraft | null>(null);
   const [scanDialogOpen, setScanDialogOpen] = useState(false);
   const [scanGroup, setScanGroup] = useState<{ id: string | null; name: string; items: any[] } | null>(null);
@@ -93,6 +109,7 @@ export default function ProcurementSheet() {
 
   useEffect(() => {
     fetchData();
+    fetchToCheckCount();
   }, []);
 
   const toggleItemSelection = (productId: string) => {
@@ -301,6 +318,11 @@ export default function ProcurementSheet() {
             >
               <ClipboardList className="w-4 h-4 text-emerald-600" />
               Today&apos;s Purchases
+              {toCheckCount > 0 && (
+                <Badge className="bg-amber-500 text-white hover:bg-amber-500 text-xs px-1.5 py-0 min-w-[20px] h-5 flex items-center justify-center rounded-full" title="Received today without a purchase entered - not yet checked against a receipt">
+                  {toCheckCount}
+                </Badge>
+              )}
             </Button>
             <Button
               onClick={() => setSavedScansOpen(true)}
@@ -456,7 +478,7 @@ export default function ProcurementSheet() {
       <TodaysPurchasesDialog
         open={todaysPurchasesOpen}
         onOpenChange={setTodaysPurchasesOpen}
-        onChanged={() => fetchData(true)}
+        onChanged={() => { fetchData(true); fetchToCheckCount(); }}
       />
 
       <ReservedStockDialog
