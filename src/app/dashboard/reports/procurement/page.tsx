@@ -13,9 +13,10 @@ import { PurchasedItemsTable } from "@/components/dashboard/procurement/purchase
 import { SupplierGroupCard } from "@/components/dashboard/procurement/supplier-group-card";
 import { ScanReceiptDialog } from "@/components/dashboard/procurement/scan-receipt-dialog";
 import { SavedReceiptsDialog } from "@/components/dashboard/procurement/saved-receipts-dialog";
+import { TodaysPurchasesDialog } from "@/components/dashboard/procurement/todays-purchases-dialog";
 import { useReceiptDrafts } from "@/hooks/useReceiptDrafts";
 import type { ReceiptScanDraft } from "@/types";
-import { PlusCircle, RefreshCw, Receipt } from "lucide-react";
+import { PlusCircle, RefreshCw, Receipt, ClipboardList } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -65,6 +66,7 @@ export default function ProcurementSheet() {
 
   const { drafts, loading: draftsLoading, saveDraft, completeDraft, deleteDraft } = useReceiptDrafts();
   const [savedScansOpen, setSavedScansOpen] = useState(false);
+  const [todaysPurchasesOpen, setTodaysPurchasesOpen] = useState(false);
   const [activeDraft, setActiveDraft] = useState<ReceiptScanDraft | null>(null);
   const [scanDialogOpen, setScanDialogOpen] = useState(false);
   const [scanGroup, setScanGroup] = useState<{ id: string | null; name: string; items: any[] } | null>(null);
@@ -293,6 +295,14 @@ export default function ProcurementSheet() {
         </div>
         <div className="flex flex-col md:flex-row gap-2">
             <Button
+              onClick={() => setTodaysPurchasesOpen(true)}
+              variant="outline"
+              className="font-bold px-4 py-2 flex items-center justify-center gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+            >
+              <ClipboardList className="w-4 h-4 text-emerald-600" />
+              Today&apos;s Purchases
+            </Button>
+            <Button
               onClick={() => setSavedScansOpen(true)}
               variant="outline"
               className="font-bold px-4 py-2 flex items-center justify-center gap-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50"
@@ -441,6 +451,12 @@ export default function ProcurementSheet() {
         loading={draftsLoading}
         onResume={handleResumeDraft}
         onDelete={deleteDraft}
+      />
+
+      <TodaysPurchasesDialog
+        open={todaysPurchasesOpen}
+        onOpenChange={setTodaysPurchasesOpen}
+        onChanged={() => fetchData(true)}
       />
 
       <ReservedStockDialog

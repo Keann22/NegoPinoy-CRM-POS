@@ -561,6 +561,35 @@ A genuine purchase received short leaves a correct non-zero remainder: receiving
 
 **Gap worth closing**: the Receive screen only offers "receive more" or "delete" — there's no "delivery complete / close the short remainder" action that would set `expected_qty := received_qty` from the UI. Until that exists, closing a short line without deleting the purchase record is a manual DB edit.
 
+**Update 2026-10-09**: the Procurement Sheet's **Today's Purchases** popup (next section) can now lower a purchase's quantity down to what was received, which closes the line as `received` and keeps it in the Purchases report.
+
+---
+
+## Today's Purchases summary on the Procurement Sheet (added 2026-10-09)
+
+**Location**: green **Today's Purchases** button in the Procurement Sheet header → [todays-purchases-dialog.tsx](src/components/dashboard/procurement/todays-purchases-dialog.tsx), backed by [/api/inventory/procurement/day-purchases](src/app/api/inventory/procurement/day-purchases/route.ts) and [purchase-summary-service.ts](src/lib/services/purchase-summary-service.ts).
+
+**What it is**: the end-of-buying-day review — every recorded buy for one PHT day (defaults to today, date picker for earlier days), including lines already received, each with a Pending / Partial / Received status. This differs from the sheet's bottom "Purchased & Expected to Receive" table, which only lists lines still awaiting receipt.
+
+**Same definition of "a purchase" as the Purchases report**: both call `fetchPurchasesInRange()` (non-`STAFF_DRAFT` `purchase_order_items`, bucketed by the parent PO's `created_at`), so the popup and Reports → Purchases can never disagree. The popup has its own route only because `/api/reports/purchases` also builds the all-time uncosted-receipts backlog and scans the whole product catalog, which is too slow for a quick popup. `isManagementUser()` lives in the same service and is shared by both routes.
+
+**Confidentiality tier**: Owner/Admin see the list **grouped by supplier** with unit cost, line total, per-supplier subtotal and day total. Everyone else gets a flat list (product, qty, status, time) — the route blanks `supplierId` / `supplierName` / `unitCost` / `totalCost` and returns no supplier list, so the values never reach the browser. `PATCH` likewise ignores `unitCost` / `supplierId` from non-management callers.
+
+**Fixing mistakes** — `PATCH` (edit) and `DELETE` (remove) on the same route, both requiring a signed-in session:
+
+| Action | Who | Rule |
+|---|---|---|
+| Edit quantity | any signed-in user | Whole number ≥ 1 and never below `received_qty`. Recording a buy doesn't move stock (receiving does), so this only changes what receiving expects. Status becomes `received` when `received_qty` has caught up, else `pending_receipt`. |
+| Edit unit cost / supplier | Owner/Admin | See the cost cascade below. |
+| Remove | any signed-in user | Only while `received_qty = 0`; the trash icon is hidden otherwise. Deletes the line, and the PO too if it was its last line. The product reappears on the sheet if orders still need it. |
+
+**Cost-correction cascade** (`editPurchaseLine`): the buy flow copies a line's cost onto `products.initial_unit_cost`, the `supplier_pricing` price book and waiting orders' `cost_price_at_sale` (`backfillOrderItemCosts`), and receiving copies it onto the `RESTOCK` movement. A corrected cost is pushed to each of those **only where it still holds the old wrong value**, so a cost since set by a newer purchase is left alone. The movement is matched best-effort (latest `restock` of the product at the old cost — there is no FK from `inventory_movements` to the purchase line).
+
+**⚠️ Known limits**:
+- **Order COGS is only re-costed when the wrong price is unique to that one purchase line.** There is no link from an order line back to the buy that costed it, so if another purchase of the same product carries the same unit cost, `recostOrderLines` does nothing and those order lines need a manual check.
+- **Remove does not roll back costs.** The product default cost, price-book entry and order COGS the mistaken buy already wrote stay as they are — the previous values aren't stored anywhere to restore.
+- A supplier change adds/updates the new supplier's price-book entry but does not delete the entry the mistaken buy created for the wrong supplier.
+
 ---
 
 ## Procurement Sheet: three numbers that must not be confused
