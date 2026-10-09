@@ -25,7 +25,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 import { useRoleCheck } from "@/hooks/useRoleCheck";
 
 export default function ProcurementSheet() {
-  const { isManagement } = useRoleCheck();
+  const { isManagement, isLoading: roleLoading } = useRoleCheck();
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [groupedItems, setGroupedItems] = useState<any[]>([]);
   const [purchasedItems, setPurchasedItems] = useState<any[]>([]);
@@ -108,9 +108,10 @@ export default function ProcurementSheet() {
   };
 
   useEffect(() => {
+    if (roleLoading || !isManagement) return;
     fetchData();
     fetchToCheckCount();
-  }, []);
+  }, [roleLoading, isManagement]);
 
   const toggleItemSelection = (productId: string) => {
     setSelectedItems(prev => ({...prev, [productId]: !prev[productId]}));
@@ -300,6 +301,19 @@ export default function ProcurementSheet() {
       alert("Failed to copy text: " + err.message);
     }
   };
+
+  // Supplier names and costs are management-only, and this sheet is built
+  // around both, so the whole page is closed to everyone else. The API enforces
+  // the same rule; this just avoids showing an empty shell.
+  if (roleLoading) return <div className="p-8 text-center text-slate-500">Loading...</div>;
+  if (!isManagement) {
+    return (
+      <div className="max-w-xl mx-auto p-8 mt-8 text-center bg-white shadow rounded-lg">
+        <h1 className="text-xl font-bold text-slate-800">Admins only</h1>
+        <p className="text-slate-600 mt-2">The Procurement Sheet shows suppliers and purchase costs, so it is only available to Owner and Admin accounts.</p>
+      </div>
+    );
+  }
 
   if (loading) return <div className="p-8 text-center text-slate-500">Loading Procurement Sheet...</div>;
 

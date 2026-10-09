@@ -15,8 +15,8 @@ import {
 export function isManagementUser(user: any): boolean {
   const collect = (meta: any): string[] => {
     if (!meta) return [];
-    if (Array.isArray(meta.roles)) return meta.roles.map((r: string) => String(r).toLowerCase());
-    if (meta.role) return [String(meta.role).toLowerCase()];
+    if (Array.isArray(meta.roles)) return meta.roles.map((r: string) => String(r).toLowerCase().trim());
+    if (meta.role) return [String(meta.role).toLowerCase().trim()];
     return [];
   };
   const roles = [...collect(user?.app_metadata), ...collect(user?.user_metadata)];

@@ -591,6 +591,21 @@ A genuine purchase received short leaves a correct non-zero remainder: receiving
 
 ---
 
+## Procurement Sheet is Owner/Admin only (enforced 2026-10-09)
+
+The sidebar only ever listed the Procurement Sheet for management, but nothing stopped an Inventory account from opening `/dashboard/reports/procurement` by URL — where it saw supplier names as section headings, unit costs, and working Buy / Change Supplier controls. Closed on both sides:
+
+- **Pages**: `reports/procurement` and `reports/trial-procurement` render an "Admins only" notice for non-management and skip their data fetch.
+- **API** ([/api/inventory/procurement](src/app/api/inventory/procurement/route.ts)): `POST` / `PATCH` / `DELETE` return 403 for non-management. `GET` returns **only `reconciliationItems`** (product, stock, explaining order — no supplier or cost) with the other three arrays empty, because Reports → Stock Reconciliation ([to-order-report.tsx](src/components/dashboard/reports/to-order-report.tsx)) is open to Inventory and reads that list from this route. Don't turn the `GET` into a flat 403 without moving that report off it.
+- **Staff entry point for Today's Purchases**: since the sheet is closed to them, Inventory staff open the popup from the **Today's Purchases & Received** button on Bulk Receive (`inventory/receive`). It is the same component; the server decides what it shows.
+- Reports → Purchases no longer shows staff the saved-receipt-scans banner (the scan carries the supplier name and a photo of the receipt).
+
+The role check is `isManagementUser()` in `purchase-summary-service.ts`, reading `roles` / `role` from the session user's `app_metadata` and `user_metadata` — the same metadata `useUserProfile` builds the client-side roles from, so the two can't disagree.
+
+**⚠️ Not closed by this**: several screens read Supabase directly from the browser (e.g. `useReceiptDrafts` on `procurement_receipt_scans`, and `products.supplier_pricing` in `to-order-report.tsx` / the product details dialog). Hiding UI does not stop a staff session from querying those tables; that needs row/column-level security in the database, which has not been done.
+
+---
+
 ## Today's Purchases summary on the Procurement Sheet (added 2026-10-09)
 
 **Location**: green **Today's Purchases** button in the Procurement Sheet header → [todays-purchases-dialog.tsx](src/components/dashboard/procurement/todays-purchases-dialog.tsx), backed by [/api/inventory/procurement/day-purchases](src/app/api/inventory/procurement/day-purchases/route.ts) and [purchase-summary-service.ts](src/lib/services/purchase-summary-service.ts).

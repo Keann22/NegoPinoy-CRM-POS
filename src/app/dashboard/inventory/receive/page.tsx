@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
-import { CalendarIcon, Loader2, Trash2 } from 'lucide-react';
+import { CalendarIcon, ClipboardList, Loader2, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -15,10 +15,15 @@ import { useRoleCheck } from '@/hooks/useRoleCheck';
 import { ProductSearch } from '@/components/dashboard/inventory/product-search';
 import { PendingPurchases } from '@/components/dashboard/pending-purchases';
 import { useBulkReceive } from '@/hooks/useBulkReceive';
+import { useState } from 'react';
+import { TodaysPurchasesDialog } from '@/components/dashboard/procurement/todays-purchases-dialog';
 
 export default function BulkReceivePage() {
   const { toast } = useToast();
   const { isManagement } = useRoleCheck();
+  // The Procurement Sheet is admin-only, so this is where inventory staff
+  // open the day's bought-vs-received summary.
+  const [todaysPurchasesOpen, setTodaysPurchasesOpen] = useState(false);
   
   const {
     form,
@@ -36,6 +41,23 @@ export default function BulkReceivePage() {
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       <div>
+        <div className="mb-4 flex justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setTodaysPurchasesOpen(true)}
+            className="font-bold flex items-center gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+          >
+            <ClipboardList className="w-4 h-4 text-emerald-600" />
+            Today&apos;s Purchases &amp; Received
+          </Button>
+        </div>
+        <TodaysPurchasesDialog
+          open={todaysPurchasesOpen}
+          onOpenChange={setTodaysPurchasesOpen}
+          onChanged={() => {}}
+        />
+
         <PendingPurchases onReceiveComplete={() => {}} />
 
         <Card>

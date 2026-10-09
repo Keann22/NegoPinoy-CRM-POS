@@ -59,7 +59,8 @@ export function PurchasesReport() {
         <ReportDateFilter date={date} setDate={setDate} className="mt-2 mb-0" />
       </CardHeader>
       <CardContent className="space-y-6">
-        {!loading && receiptDrafts.length > 0 && (
+        {/* Saved scans carry the supplier name and a photo of the receipt (prices), so management only. */}
+        {!loading && canSeeSuppliers && receiptDrafts.length > 0 && (
           <div className="rounded-md border border-indigo-200 bg-indigo-50/70 p-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-start gap-3">
