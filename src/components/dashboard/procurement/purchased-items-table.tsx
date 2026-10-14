@@ -75,6 +75,7 @@ export function PurchasedItemsTable({
                       {lines.map((it) => (
                         <li key={it.id}>
                           <span className="font-bold">{it.expectedQty - (it.receivedQty || 0)}x</span> {it.productName}
+                          <span className="text-xs text-slate-500"> @ ₱{Number(it.unitCost || 0).toLocaleString('en-PH')}</span>
                           {it.receivedQty > 0 && <span className="text-xs text-slate-400"> ({it.receivedQty} received)</span>}
                           {it.supplierCode && <span className="text-xs text-slate-400 font-mono"> · {it.supplierCode}</span>}
                         </li>

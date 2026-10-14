@@ -27,7 +27,7 @@ type Tracking = {
     stageAt: string | null;
     expectedArrival: string | null;
   };
-  items: { id: string; productName: string; supplierName: string | null; expectedQty: number; receivedQty: number }[];
+  items: { id: string; productName: string; supplierName: string | null; expectedQty: number; receivedQty: number; unitCost: number }[];
   events: { id: string; stage: string; note: string | null; by: string | null; at: string }[];
 };
 
@@ -57,6 +57,8 @@ export function ShipmentTrackingDialog({
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ route: "" as TrackingRoute | "", platformOrderNo: "", trackingNo: "", expectedArrival: "" });
   const [note, setNote] = useState("");
+  // Unit cost typed per purchase line, keyed by item id (online prices change often).
+  const [costs, setCosts] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (open) setSelectedPoId(poIds[0] || null);
@@ -65,6 +67,7 @@ export function ShipmentTrackingDialog({
 
   const applyData = (d: Tracking) => {
     setData(d);
+    setCosts(Object.fromEntries(d.items.map((it) => [it.id, it.unitCost ? String(it.unitCost) : ""])));
     setForm({
       route: d.po.route || "",
       platformOrderNo: d.po.platformOrderNo || "",
@@ -108,6 +111,44 @@ export function ShipmentTrackingDialog({
       setSaving(false);
     }
   };
+
+  const changedCosts = (data?.items || []).filter(
+    (it) => costs[it.id] !== undefined && costs[it.id] !== "" && Number(costs[it.id]) !== it.unitCost
+  );
+
+  // Same correction path as Today's Purchases: updates the purchase line, the
+  // product's default cost / supplier price, received stock cost and order COGS.
+  const saveCosts = async () => {
+    if (!selectedPoId) return;
+    const bad = changedCosts.find((it) => !(Number(costs[it.id]) >= 0));
+    if (bad) return alert(`Invalid unit cost for ${bad.productName}.`);
+    setSaving(true);
+    try {
+      for (const it of changedCosts) {
+        const res = await fetch("/api/inventory/procurement/day-purchases", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ itemId: it.id, unitCost: Number(costs[it.id]) }),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(`${it.productName}: ${d.error || "Failed to save price"}`);
+      }
+      const res = await fetch(`/api/inventory/procurement/tracking?poId=${selectedPoId}`, { cache: "no-store" });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Failed to reload shipment");
+      applyData(d);
+      onChanged?.();
+    } catch (e: any) {
+      alert("Error: " + e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const orderTotal = (data?.items || []).reduce(
+    (sum, it) => sum + it.expectedQty * (Number(costs[it.id]) || 0),
+    0
+  );
 
   const route = data?.po.route || null;
   const stages = route ? ROUTE_STAGES[route] : [];
@@ -303,22 +344,52 @@ export function ShipmentTrackingDialog({
               </div>
             )}
 
-            {/* What's in this shipment */}
+            {/* What's in this shipment, with the price actually paid */}
             <div className="space-y-1">
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Items in this order</div>
-              <div className="border rounded-md divide-y text-sm">
-                {data.items.map((it) => (
-                  <div key={it.id} className="flex justify-between gap-2 px-3 py-1.5">
-                    <span className="text-slate-700">
-                      {it.productName}
-                      {it.supplierName && <span className="text-xs text-slate-400"> · {it.supplierName}</span>}
-                    </span>
-                    <span className="font-bold shrink-0">
-                      {it.receivedQty > 0 ? `${it.receivedQty}/${it.expectedQty} received` : `${it.expectedQty}x`}
-                    </span>
-                  </div>
-                ))}
+              <div className="flex items-baseline justify-between">
+                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Items in this order</div>
+                <div className="text-xs text-slate-500">
+                  Total <span className="font-bold text-slate-800">₱{orderTotal.toLocaleString("en-PH", { maximumFractionDigits: 2 })}</span>
+                </div>
               </div>
+              <div className="border rounded-md divide-y text-sm">
+                {data.items.map((it) => {
+                  const edited = changedCosts.some((c) => c.id === it.id);
+                  return (
+                    <div key={it.id} className="flex items-center justify-between gap-2 px-3 py-1.5">
+                      <span className="text-slate-700 min-w-0">
+                        {it.productName}
+                        {it.supplierName && <span className="text-xs text-slate-400"> · {it.supplierName}</span>}
+                        <span className="block text-xs font-bold text-slate-600">
+                          {it.receivedQty > 0 ? `${it.receivedQty}/${it.expectedQty} received` : `${it.expectedQty} pcs`}
+                        </span>
+                      </span>
+                      <div className="relative shrink-0" title="Unit cost actually paid">
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">₱</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          className={`w-24 pl-5 pr-2 py-1 border rounded-md text-right text-sm ${edited ? "border-amber-400 bg-amber-50" : ""}`}
+                          value={costs[it.id] ?? ""}
+                          onChange={(e) => setCosts((c) => ({ ...c, [it.id]: e.target.value }))}
+                          placeholder="0.00"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {changedCosts.length > 0 && (
+                <Button
+                  size="sm"
+                  disabled={saving}
+                  onClick={saveCosts}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold"
+                >
+                  {saving ? "Saving..." : `Save ${changedCosts.length} price${changedCosts.length > 1 ? "s" : ""}`}
+                </Button>
+              )}
             </div>
 
             {/* History */}
