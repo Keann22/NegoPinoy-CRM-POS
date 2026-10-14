@@ -425,12 +425,23 @@ export function ShipmentTrackingDialog({
                           {it.productName}
                           {it.supplierName && <span className="text-xs text-slate-400"> · {it.supplierName}</span>}
                         </span>
-                        {it.receivedQty === 0 && (
+                        {it.receivedQty === 0 ? (
                           <button
                             onClick={() => removeLine(it)}
                             disabled={saving}
                             className="text-slate-400 hover:text-red-500 p-0.5 shrink-0"
                             title="Remove from this purchase"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        ) : (
+                          // Received units are in stock and this line is their purchase record.
+                          <button
+                            onClick={() =>
+                              alert(`${it.receivedQty} pcs were already received, so this item can't be removed. Lower the quantity to ${it.receivedQty} instead if the rest won't arrive.`)
+                            }
+                            className="text-slate-300 cursor-not-allowed p-0.5 shrink-0"
+                            title="Already received — lower the quantity instead"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
