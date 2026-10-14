@@ -4,9 +4,15 @@ import { Fragment } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Trash2, CheckSquare } from "lucide-react";
+import { Loader2, Trash2, CheckSquare, Truck } from "lucide-react";
 import { usePendingPurchases } from "@/hooks/usePendingPurchases";
 import { PendingProductSearch } from "@/components/dashboard/inventory/pending-product-search";
+import { STATUS_STYLES } from "@/components/dashboard/procurement/in-transit-chip";
+import type { TransitStatus } from "@/lib/online-order-tracking";
+
+// "2026-11-13" -> "Nov 13"
+const formatShortDate = (ymd: string) =>
+  new Date(`${ymd}T00:00:00+08:00`).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric" });
 
 export function PendingPurchases({ onReceiveComplete }: { onReceiveComplete: () => void }) {
   const {
@@ -113,6 +119,18 @@ export function PendingPurchases({ onReceiveComplete }: { onReceiveComplete: () 
                         <tr key={item.id} className="hover:bg-slate-50">
                           <td className="p-4 font-medium text-slate-900">
                               {item.productName}
+                              {item.shipping && (
+                                  <div
+                                    className={`mt-1 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${STATUS_STYLES[item.shipping.status as TransitStatus]}`}
+                                    title={item.shipping.stage}
+                                  >
+                                      <Truck className="w-3 h-3" />
+                                      {item.shipping.status === 'delivered'
+                                        ? 'Delivered — ready to receive'
+                                        : `${item.shipping.phase}${item.shipping.expectedArrival ? ` · expected ${formatShortDate(item.shipping.expectedArrival)}` : ''}`}
+                                      {item.shipping.status === 'overdue' && ' · overdue'}
+                                  </div>
+                              )}
                               {isDiscrepancy && (
                                   <div className="mt-2">
                                       <Input 

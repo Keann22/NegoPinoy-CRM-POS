@@ -4,12 +4,26 @@ import { createStaffMessage, getAdminAndInventoryLeadNames, fanOutStaffNotificat
 import { getAffectedSalesRepOrders } from '@/lib/services/procurement-service';
 import { suggestSupplierAndCost, repairFromPurchaseItem } from '@/lib/services/purchase-repair-service';
 import { formatShortDelivery } from '@/lib/utils/messages';
+import { findStage, PHASE_LABELS, transitStatus } from '@/lib/online-order-tracking';
 
 export const dynamic = 'force-dynamic';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Where an online order is, for staff waiting on it. Status only - no
+// platform, order number, supplier or cost (those are management-only).
+function shippingFor(po: any) {
+  const stage = findStage(po?.tracking_route, po?.tracking_stage);
+  if (!stage) return null;
+  return {
+    phase: PHASE_LABELS[stage.phase],
+    stage: stage.label,
+    status: transitStatus({ stage: stage.key, expectedArrival: po.expected_arrival, orderedAt: po.created_at }),
+    expectedArrival: po.expected_arrival || null,
+  };
+}
 
 export async function GET() {
   try {
@@ -18,7 +32,7 @@ export async function GET() {
       .select(`
         id, expected_qty, received_qty,
         products (name, variant_name),
-        purchase_orders!inner(notes, created_at)
+        purchase_orders!inner(notes, created_at, tracking_route, tracking_stage, expected_arrival)
       `)
       .eq('status', 'pending_receipt')
       .order('created_at', { ascending: false });
@@ -69,6 +83,7 @@ export async function GET() {
         remainingQty: Math.max(0, i.expected_qty - (i.received_qty || 0)),
         batchName,
         batchSortKey,
+        shipping: shippingFor(i.purchase_orders),
       };
     });
 
