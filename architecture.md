@@ -309,22 +309,17 @@ To guarantee 100% backward compatibility with POS orders, P&L reports, and the s
 - **Inbound Receiving** (`/dashboard/inventory/receive`): Defaults receiving destination to **Unit 2 (Reserve & Inbound)** with a dropdown to select Unit 1 for urgent direct-to-shelf restocks.
 - **Picker Alert** (`/dashboard/pick`): If an item on Unit 1 shelf is empty, the picker UI displays Unit 2 reserve stock so pickers can request replenishment rather than reporting false out-of-stock issues.
 
-### Physical Stock Allocation & Unallocated Processing Orders (added 2026-10-08)
+### Order Stock Deduction: at Creation Only (corrected 2026-10-14)
 
-`products.stock_level` represents the **Physical Stock Count Available on Shelf**.
-
-#### Order Status & Allocation Rule
-Orders created by sales staff enter the `Processing` status. Because inventory staff have not yet physically picked or packed the items off the shelf, **`Processing` orders do NOT reduce Available Stock (`stock_level`)**.
-
-Stock allocation and physical deduction occur **ONLY** when items are physically picked or packed by inventory staff (or when status moves to an allocated status):
-- **`UNALLOCATED_STATUSES`**: `Processing`, `Pending Payment`, `On-Hold`, `Draft`
-- **`ALLOCATED_STATUSES`**: `Picked`, `Picked (with issue)`, `Packed`, `For Shipping`, `For Pick-up`, `Completed`, `Delivered`, `Payment Received (COD)`, `Shipped`
+`products.stock_level` is **Available (Unreserved) Stock** = physical shelf − unpicked reservations (see "Physical Shelf Count Audits" above). The `process_order_transaction` RPC deducts stock **when the order is created**, and order edits (`editOrder`) reverse and re-deduct on that same assumption.
 
 #### Stock Transition Handling
-The `handleStockStatusTransition(supabase, orderId, oldStatus, newStatus)` helper function in `@/lib/services/orders/order-update`:
-1. When transitioning from an **Unallocated** status to an **Allocated** status (e.g., `Processing` → `Picked` or `Packed`), physical stock is decremented (`applyOrderStockDelta(..., -1)`).
-2. When transitioning from an **Allocated** status back to an **Unallocated** status (or `Cancelled`), physical stock is restored (`applyOrderStockDelta(..., +1)`).
-3. Cancelling a `Processing` order does NOT alter stock, because stock was never deducted.
+`handleStockStatusTransition(supabase, orderId, oldStatus, newStatus)` in `@/lib/services/orders/order-update` (called by the Orders page, picker, and packer):
+1. Moving through `Picked` / `Picked (with issue)` / `Packed` / `Shipped` / etc. does **not** touch stock — it was already taken out at creation.
+2. → `Cancelled`: stock is restored (`applyOrderStockDelta(..., +1)`, reason `Order Cancelled: #<id>`).
+3. `Cancelled` → anything else: stock is re-deducted (reason `Order Un-cancelled: #<id>`).
+
+**Regression history:** commit `0144a8b` (2026-10-08) switched to "deduct only at pick/pack" in app code but never removed the creation-time deduction from `process_order_transaction`. From 2026-10-08 to 2026-10-14 every picked/packed order was deducted twice (movements with reason `Order Allocated (<status>): #<id>`), and cancelling a `Processing` order did not restore its stock. Fixed by reverting to the creation-only rule above. A one-off repair added the extra deductions back, skipping any that a later manual shelf count had already absorbed. If deduct-at-pick is ever wanted, the RPC, `editOrder`, the cancel helpers, and Inventory Guardian's reservation math must all change together.
 
 #### Manual Stock Adjustments
 Authorized inventory/management staff can manually adjust physical stock levels directly:

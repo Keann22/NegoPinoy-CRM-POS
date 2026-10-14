@@ -14,7 +14,8 @@ import { computeOrderTotals, saveOrderItemPriceTypes } from './order-utils';
 
 /**
  * Applies a stock delta for every item on an order, exploding bundle products
- * onto their components. `sign` is +1 to restore stock (cancel/deallocate) or -1 to deduct (allocate/pick/pack).
+ * onto their components exactly the way process_order_transaction does at sale
+ * time. `sign` is +1 to restore stock (cancel) or -1 to re-deduct (un-cancel).
  */
 export async function applyOrderStockDelta(
   supabase: SupabaseClient,
@@ -71,28 +72,12 @@ export async function applyOrderStockDelta(
   }
 }
 
-export const UNALLOCATED_STATUSES = ['Processing', 'Pending Payment', 'On-Hold', 'Draft'];
-export const ALLOCATED_STATUSES = [
-  'Picked',
-  'Picked (with issue)',
-  'Packed',
-  'For Shipping',
-  'For Pick-up',
-  'Completed',
-  'Delivered',
-  'Payment Received (COD)',
-  'Shipped'
-];
-
-export function isAllocatedStatus(status: string | undefined | null): boolean {
-  if (!status) return false;
-  return ALLOCATED_STATUSES.includes(status);
-}
-
 /**
- * Handles stock adjustments when an order's status transitions.
- * Processing orders do NOT deduct available stock.
- * Stock is ONLY deducted when moving to an allocated status (Picked, Packed, Completed, etc.).
+ * Applies the stock side-effect of an order status change.
+ * process_order_transaction deducts stock when the order is CREATED, so moving
+ * through Picked / Packed / Shipped changes nothing — deducting again there
+ * double-counts every picked order (the 2026-10-08 regression). Only cancelling
+ * (restore) and un-cancelling (re-deduct) touch stock.
  */
 export async function handleStockStatusTransition(
   supabase: SupabaseClient,
@@ -100,39 +85,31 @@ export async function handleStockStatusTransition(
   oldStatus: string | undefined,
   newStatus: string
 ): Promise<void> {
-  const wasAllocated = isAllocatedStatus(oldStatus);
-  const isAllocated = isAllocatedStatus(newStatus);
-
-  if (!wasAllocated && isAllocated) {
-    await applyOrderStockDelta(supabase, orderId, -1, `Order Allocated (${newStatus}): #${orderId}`);
-  } else if (wasAllocated && !isAllocated) {
-    await applyOrderStockDelta(supabase, orderId, 1, `Order De-allocated (${newStatus}): #${orderId}`);
+  if (oldStatus === newStatus) return;
+  if (newStatus === 'Cancelled') {
+    await restoreStockForCancelledOrder(supabase, orderId);
+  } else if (oldStatus === 'Cancelled') {
+    await deductStockForUncancelledOrder(supabase, orderId);
   }
 }
 
 /**
- * Restores stock for an order if it was previously allocated (Picked/Packed/Completed).
- * Processing orders were never deducted, so cancelling them does not alter stock.
+ * Restores stock for every item on an order that is being cancelled.
+ * Stock is deducted immediately at order creation, so cancelling must reverse that deduction.
  */
 export async function restoreStockForCancelledOrder(
   supabase: SupabaseClient,
   orderId: string
 ): Promise<void> {
-  const { data: order } = await supabase.from('orders').select('status').eq('id', orderId).single();
-  if (order && isAllocatedStatus(order.status)) {
-    await applyOrderStockDelta(supabase, orderId, 1, `Order Cancelled: #${orderId}`);
-  }
+  await applyOrderStockDelta(supabase, orderId, 1, `Order Cancelled: #${orderId}`);
 }
 
-/** Deducts stock when moving an uncancelled order back to an allocated status. */
+/** Symmetric reversal for when a Cancelled order is moved back to an active status. */
 export async function deductStockForUncancelledOrder(
   supabase: SupabaseClient,
   orderId: string
 ): Promise<void> {
-  const { data: order } = await supabase.from('orders').select('status').eq('id', orderId).single();
-  if (order && isAllocatedStatus(order.status)) {
-    await applyOrderStockDelta(supabase, orderId, -1, `Order Un-cancelled: #${orderId}`);
-  }
+  await applyOrderStockDelta(supabase, orderId, -1, `Order Un-cancelled: #${orderId}`);
 }
 
 
