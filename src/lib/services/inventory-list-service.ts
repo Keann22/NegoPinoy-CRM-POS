@@ -31,8 +31,9 @@ export async function getInventoryListStockInfo(
   const purchased = await fetchAllPages<any>((from, to) =>
     supabase
       .from('purchase_order_items')
-      .select('id, product_id, expected_qty, purchase_orders!inner(notes)')
-      .neq('purchase_orders.notes', 'STAFF_DRAFT')
+      .select('id, product_id, expected_qty, received_qty, purchase_orders!inner(notes)')
+      // Buy-flow POs have notes = null; a plain neq would drop them (SQL null semantics).
+      .or('notes.is.null,notes.neq.STAFF_DRAFT', { foreignTable: 'purchase_orders' })
       .eq('status', 'pending_receipt')
       .order('id')
       .range(from, to)

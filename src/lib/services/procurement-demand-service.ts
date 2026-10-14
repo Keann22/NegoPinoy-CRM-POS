@@ -184,8 +184,11 @@ export async function calculateProcurementDemand(
   });
 
   const pendingReceiptMap = new Map<string, number>();
+  // Only what hasn't arrived yet: units already received are in stock, and a
+  // part-received line can stay open for weeks (online orders).
   purchased?.forEach((p: any) => {
-    pendingReceiptMap.set(p.product_id, (pendingReceiptMap.get(p.product_id) || 0) + p.expected_qty);
+    const notYetReceived = Math.max(0, (Number(p.expected_qty) || 0) - (Number(p.received_qty) || 0));
+    pendingReceiptMap.set(p.product_id, (pendingReceiptMap.get(p.product_id) || 0) + notYetReceived);
   });
 
   const openUnscannedMap = new Map(needToBuyMap);
@@ -243,7 +246,8 @@ export async function getSingleProductProcurementDemand(
       purchase_orders!inner(id, notes, status)
     `)
     .eq('product_id', productId)
-    .neq('purchase_orders.notes', 'STAFF_DRAFT')
+    // Buy-flow POs have notes = null; a plain neq would drop them (SQL null semantics).
+    .or('notes.is.null,notes.neq.STAFF_DRAFT', { foreignTable: 'purchase_orders' })
     .eq('status', 'pending_receipt');
 
   const result = await calculateProcurementDemand(

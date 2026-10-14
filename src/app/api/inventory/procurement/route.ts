@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { createClient as createSessionClient } from '@/lib/supabase/server';
 import { getProcurementDashboardData } from '@/lib/services/procurement-dashboard-service';
 import { isManagementUser } from '@/lib/services/purchase-summary-service';
+import { actorNameFor } from '@/lib/services/online-order-tracking-service';
 import { processProcurementPurchases, updateProductSupplierPricing, setSupplierProductCode } from '@/lib/services/procurement-purchase-service';
 
 export const dynamic = 'force-dynamic';
@@ -14,10 +15,14 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 // The Procurement Sheet is built around supplier names and purchase costs,
 // which are management-only. Everything here is closed to other accounts
 // except the negative-stock list the Stock Reconciliation report reads.
-async function callerIsManagement() {
+async function getCaller() {
   const sessionClient = await createSessionClient();
   const { data: { user } } = await sessionClient.auth.getUser();
-  return isManagementUser(user);
+  return user;
+}
+
+async function callerIsManagement() {
+  return isManagementUser(await getCaller());
 }
 
 const forbidden = () => NextResponse.json({ error: 'Only an admin can use the Procurement Sheet.' }, { status: 403 });
@@ -42,9 +47,10 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    if (!(await callerIsManagement())) return forbidden();
-    const { purchases } = await req.json();
-    const poId = await processProcurementPurchases(supabase, purchases);
+    const user = await getCaller();
+    if (!isManagementUser(user)) return forbidden();
+    const { purchases, tracking } = await req.json();
+    const poId = await processProcurementPurchases(supabase, purchases, tracking, actorNameFor(user));
     return NextResponse.json({ success: true, poId });
   } catch (error: any) {
     console.error('Error in procurement POST:', error);

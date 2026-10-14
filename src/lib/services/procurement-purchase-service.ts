@@ -1,8 +1,15 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { backfillOrderItemCosts } from './cost-backfill-service';
 import { splitStaffDraftLine } from './procurement-service';
+import { updatePoTracking, type TrackingInput } from './online-order-tracking-service';
 
-export async function processProcurementPurchases(supabase: SupabaseClient, purchases: any[]) {
+export async function processProcurementPurchases(
+  supabase: SupabaseClient,
+  purchases: any[],
+  // Online orders (Pinduoduo, Shopee, ...): shipment details for the new PO.
+  tracking?: TrackingInput | null,
+  actorName = 'Admin'
+) {
   if (!purchases || purchases.length === 0) {
     throw new Error('No purchases provided');
   }
@@ -14,6 +21,10 @@ export async function processProcurementPurchases(supabase: SupabaseClient, purc
     .single();
 
   if (poErr) throw poErr;
+
+  if (tracking?.route) {
+    await updatePoTracking(supabase, po.id, tracking, actorName);
+  }
 
   for (const p of purchases) {
     const parsedCost = Number(p.cost) || 0;

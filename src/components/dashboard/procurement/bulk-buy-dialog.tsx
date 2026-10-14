@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { OnlineOrderFields, onlineOrderFormFor, trackingPayload, EMPTY_ONLINE_ORDER } from "./online-order-fields";
 
 export function BulkBuyDialog({
   open,
@@ -18,6 +19,12 @@ export function BulkBuyDialog({
   onSuccess: () => void;
 }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // One "Record Selected" = one platform checkout, so the shipment covers all items.
+  const [onlineOrder, setOnlineOrder] = useState(EMPTY_ONLINE_ORDER);
+
+  useEffect(() => {
+    if (open) setOnlineOrder(onlineOrderFormFor(bulkBuyGroup?.name));
+  }, [open, bulkBuyGroup?.name]);
 
   const handleBulkPurchaseSubmit = async () => {
     setIsSubmitting(true);
@@ -33,7 +40,7 @@ export function BulkBuyDialog({
       const res = await fetch("/api/inventory/procurement", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ purchases: apiPurchases })
+        body: JSON.stringify({ purchases: apiPurchases, tracking: trackingPayload(onlineOrder) })
       });
       if (!res.ok) throw new Error(await res.text());
       
@@ -48,7 +55,7 @@ export function BulkBuyDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Record Selected Purchases</DialogTitle>
         </DialogHeader>
@@ -67,6 +74,7 @@ export function BulkBuyDialog({
               </div>
             ))}
           </div>
+          <OnlineOrderFields value={onlineOrder} onChange={setOnlineOrder} />
           <div className="flex gap-2 justify-end pt-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button 

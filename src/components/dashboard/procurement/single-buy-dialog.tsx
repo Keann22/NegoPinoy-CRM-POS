@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { OnlineOrderFields, onlineOrderFormFor, trackingPayload, EMPTY_ONLINE_ORDER } from "./online-order-fields";
 
 export function SingleBuyDialog({
   open,
@@ -24,7 +25,10 @@ export function SingleBuyDialog({
   onSuccess: () => void;
 }) {
   const [buyForm, setBuyForm] = useState({ qty: '', cost: '', supplierId: '' });
+  const [onlineOrder, setOnlineOrder] = useState(EMPTY_ONLINE_ORDER);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const supplierName = (id: string) => suppliers.find(s => s.id === id)?.name;
 
   useEffect(() => {
     if (open && buyItem) {
@@ -33,7 +37,9 @@ export function SingleBuyDialog({
         cost: initialCost,
         supplierId: initialSupplierId,
       });
+      setOnlineOrder(onlineOrderFormFor(supplierName(initialSupplierId)));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, buyItem, initialQty, initialCost, initialSupplierId]);
 
   const handleSinglePurchaseSubmit = async () => {
@@ -52,7 +58,7 @@ export function SingleBuyDialog({
       const res = await fetch("/api/inventory/procurement", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ purchases })
+        body: JSON.stringify({ purchases, tracking: trackingPayload(onlineOrder) })
       });
       if (!res.ok) throw new Error(await res.text());
       
@@ -66,7 +72,7 @@ export function SingleBuyDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-sm max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Record Purchase</DialogTitle>
         </DialogHeader>
@@ -86,7 +92,10 @@ export function SingleBuyDialog({
               <select 
                 className="w-full border p-2 rounded-md bg-white"
                 value={buyForm.supplierId}
-                onChange={(e) => setBuyForm(prev => ({...prev, supplierId: e.target.value}))}
+                onChange={(e) => {
+                  setBuyForm(prev => ({...prev, supplierId: e.target.value}));
+                  setOnlineOrder(onlineOrderFormFor(supplierName(e.target.value)));
+                }}
               >
                 <option value="">-- No Supplier --</option>
                 {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -113,6 +122,8 @@ export function SingleBuyDialog({
                 />
               </div>
             </div>
+
+            <OnlineOrderFields value={onlineOrder} onChange={setOnlineOrder} />
 
             <Button 
               onClick={handleSinglePurchaseSubmit} 

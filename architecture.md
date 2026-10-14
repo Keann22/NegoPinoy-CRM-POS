@@ -752,6 +752,21 @@ Implemented `splitStaffDraftLine` in [`procurement-service.ts`](src/lib/services
 2. Linked `procurement_request_sources` are split proportionally (oldest orders first assigned to the purchase row; unfulfilled remainder kept on the draft).
 3. The remaining quantity (`expected_qty - boughtQty`) stays on the existing `STAFF_DRAFT` line so `Staff Req.` remains accurate and matches unfulfilled demand until fully purchased.
 
+### Bought-but-not-received was invisible to Need to Buy (fixed 2026-10-14)
+
+The "purchased, pending receipt" query in `procurement-dashboard-service.ts`, `getSingleProductProcurementDemand` and `inventory-list-service.ts` filtered with `.neq('purchase_orders.notes', 'STAFF_DRAFT')`. Buy-flow POs have `notes = null`, and `null <> 'STAFF_DRAFT'` is null in SQL, so **every real purchase was dropped**: Need to Buy never netted off units already bought, and the "Purchased & Expected to Receive" table was always empty. All three now use `.or('notes.is.null,notes.neq.STAFF_DRAFT', { foreignTable: 'purchase_orders' })` (the same filter `fetchPurchasesInRange` already used). Any new query that means "real purchases" must handle the null case the same way. The netting also changed from `expected_qty` to **`expected_qty − received_qty`**: received units are already stock, and a part-received line (e.g. 49 of 50) can stay `pending_receipt` indefinitely, which would otherwise hide 49 units of demand.
+
+### Online order tracking — Pinduoduo / Shopee (added 2026-10-14)
+
+Online buys take 1–4+ weeks to arrive, so a bought line can sit in `pending_receipt` for a month. Tracking records where it is.
+
+- **Data**: one purchase order = one platform checkout, so shipment fields live on `purchase_orders`: `tracking_route` (`china_import` | `local`; null = not tracked), `platform_order_no`, `tracking_no`, `tracking_stage`, `tracking_stage_at`, `expected_arrival`. Every stage change (and note-only entries, `stage = 'note'`) is logged to `purchase_order_tracking_events` with the admin's name. Migration: `scripts/migrations/add_online_order_tracking.sql`.
+- **Stages** are defined once in [online-order-tracking.ts](src/lib/online-order-tracking.ts): the 24-step Pinduoduo → consolidator → sea freight → PH customs → J&T path (`china_import`), and a short domestic path (`local`). Each stage belongs to a phase (With seller, China warehouse, China customs, Shipping to PH, PH customs, PH courier, Out for delivery, Delivered). Stage **keys are stored in the DB — rename labels, never keys**.
+- **Recording**: the Buy and Record Selected dialogs have an "Online order — track shipment" section, switched on automatically when the supplier name looks like Pinduoduo/Taobao/1688 (`china_import`, default ETA +30 days) or Shopee/Lazada/TikTok (`local`, +7 days). It sends `tracking` alongside `purchases` to `POST /api/inventory/procurement`; the PO starts at `ordered`.
+- **Sheet**: under Need to Buy, an `InTransitChip` shows units still on the way (expected − received on tracked POs) and the oldest order's age. Colour: sky = on track, amber = due within 3 days, red = past expected arrival (or 30+ days with no date), green = delivered (go receive it). Need to Buy itself already excludes these units (see the fix above); the chip explains why.
+- **Updating**: the chip, or the Track / Add tracking button on the "Purchased & Expected to Receive" table (now one row per order), opens `ShipmentTrackingDialog` → `GET/PATCH /api/inventory/procurement/tracking` (Owner/Admin only). "Mark next" advances one stage; any stage can be clicked to jump. Status is updated by hand: Pinduoduo has no buyer API.
+- **"Delivered" is not "received"**: stock only moves through the normal Receive flow. Once the PO lines are fully received they leave `pending_receipt` and drop off the sheet.
+
 ### Stock Reconciliation report (added 2026-07-16)
 
 **Location**: Reports → "Stock Reconciliation" tab (`to-order-report.tsx`, still the `to-order` tab value under the hood — only the label changed). Reads `reconciliationItems` from the same `GET /api/inventory/procurement` response used by the sheet above.

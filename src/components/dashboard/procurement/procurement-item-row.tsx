@@ -6,6 +6,7 @@ import { Flag, ShoppingCart, Trash2, Pencil, Plus, Clock } from "lucide-react";
 import { StaffRequestDialog } from "./staff-request-dialog";
 import { ProcurementStockDetailDialog } from "./stock-detail-dialog";
 import { EditUnallocatedStockDialog } from "./edit-unallocated-stock-dialog";
+import { InTransitChip } from "./in-transit-chip";
 
 export function ProcurementItemRow({
   item,
@@ -26,6 +27,7 @@ export function ProcurementItemRow({
   handleDeleteDraftItem,
   onViewAllocated,
   onRefreshData,
+  onOpenTracking,
 }: {
   item: any;
   groupId: string | null;
@@ -45,6 +47,7 @@ export function ProcurementItemRow({
   handleDeleteDraftItem: (id: string) => void;
   onViewAllocated: (item: { id: string; name: string; context: 'total' | 'needToBuy' }) => void;
   onRefreshData?: () => void;
+  onOpenTracking?: (poIds: string[], title: string) => void;
 }) {
   const [showReassign, setShowReassign] = useState(false);
   const [staffRequestOpen, setStaffRequestOpen] = useState(false);
@@ -336,12 +339,22 @@ export function ProcurementItemRow({
           <span className="font-bold text-lg text-slate-500 text-xs text-slate-400 font-normal">-</span>
         )}
       </td>
-      <td
-        className="p-3 font-bold text-center text-lg cursor-pointer text-blue-600 hover:underline hover:text-indigo-600"
-        title="Orders still waiting on this item to be picked — this is the Buy quantity. Excludes already-packed orders."
-        onClick={() => onViewAllocated({ id: item.productId, name: item.productName, context: 'needToBuy' })}
-      >
+      <td className="p-3 text-center">
+        <button
+          className="font-bold text-lg text-blue-600 hover:underline hover:text-indigo-600"
+          title="Orders still waiting on this item to be picked — this is the Buy quantity. Excludes already-packed orders and units already bought."
+          onClick={() => onViewAllocated({ id: item.productId, name: item.productName, context: 'needToBuy' })}
+        >
           {item.needToBuyQty > 0 ? item.needToBuyQty : <span className="text-xs text-slate-400 font-normal">None</span>}
+        </button>
+        {item.inTransit?.length > 0 && onOpenTracking && (
+          <div>
+            <InTransitChip
+              shipments={item.inTransit}
+              onClick={() => onOpenTracking(item.inTransit.map((s: any) => s.poId), item.productName)}
+            />
+          </div>
+        )}
       </td>
       <td className="p-3 text-center">
         <div className="relative flex items-center justify-center">

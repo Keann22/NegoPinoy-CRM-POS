@@ -42,9 +42,10 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
       po_id, 
       created_at, 
       supplier_id,
-      purchase_orders!inner(id, notes, status)
+      purchase_orders!inner(id, notes, status, created_at, tracking_route, platform_order_no, tracking_no, tracking_stage, tracking_stage_at, expected_arrival)
     `)
-    .neq('purchase_orders.notes', 'STAFF_DRAFT')
+    // Buy-flow POs have notes = null; a plain neq would drop them (SQL null semantics).
+    .or('notes.is.null,notes.neq.STAFF_DRAFT', { foreignTable: 'purchase_orders' })
     .eq('status', 'pending_receipt');
 
   if (pErr) throw pErr;
@@ -171,6 +172,29 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
     });
   }
 
+  // Online orders (tracked POs) still on the way, per product, for the
+  // in-transit chip under Need to Buy.
+  const inTransitByProduct = new Map<string, any[]>();
+  purchased?.forEach((p: any) => {
+    const po = p.purchase_orders;
+    if (!po?.tracking_route) return;
+    const remaining = Math.max(0, (Number(p.expected_qty) || 0) - (Number(p.received_qty) || 0));
+    if (remaining <= 0) return;
+    const list = inTransitByProduct.get(p.product_id) || [];
+    list.push({
+      poId: po.id,
+      qty: remaining,
+      route: po.tracking_route,
+      stage: po.tracking_stage,
+      stageAt: po.tracking_stage_at,
+      platformOrderNo: po.platform_order_no,
+      trackingNo: po.tracking_no,
+      expectedArrival: po.expected_arrival,
+      orderedAt: po.created_at,
+    });
+    inTransitByProduct.set(p.product_id, list);
+  });
+
   const healingUpdates: PromiseLike<any>[] = [];
   const osMap = new Map();
 
@@ -246,6 +270,7 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
       openUnscannedQty: openUnscannedQty,
       supplierId: resolvedSupplierId,
       unitCost: matchedCost,
+      inTransit: inTransitByProduct.get(p.id) || [],
     });
   }
 
@@ -300,6 +325,12 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
       poId: p.po_id,
       poNotes: p.purchase_orders?.notes,
       createdAt: p.created_at,
+      orderedAt: p.purchase_orders?.created_at || p.created_at,
+      trackingRoute: p.purchase_orders?.tracking_route || null,
+      trackingStage: p.purchase_orders?.tracking_stage || null,
+      platformOrderNo: p.purchase_orders?.platform_order_no || null,
+      trackingNo: p.purchase_orders?.tracking_no || null,
+      expectedArrival: p.purchase_orders?.expected_arrival || null,
       supplierId: supId,
     };
   });

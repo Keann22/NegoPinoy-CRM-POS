@@ -14,6 +14,7 @@ import { SupplierGroupCard } from "@/components/dashboard/procurement/supplier-g
 import { ScanReceiptDialog } from "@/components/dashboard/procurement/scan-receipt-dialog";
 import { SavedReceiptsDialog } from "@/components/dashboard/procurement/saved-receipts-dialog";
 import { TodaysPurchasesDialog } from "@/components/dashboard/procurement/todays-purchases-dialog";
+import { ShipmentTrackingDialog } from "@/components/dashboard/procurement/shipment-tracking-dialog";
 import { useReceiptDrafts } from "@/hooks/useReceiptDrafts";
 import type { ReceiptScanDraft } from "@/types";
 import { PlusCircle, RefreshCw, Receipt, ClipboardList } from "lucide-react";
@@ -61,6 +62,9 @@ export default function ProcurementSheet() {
 
   const [issueDialogOpen, setIssueDialogOpen] = useState(false);
   const [issueProduct, setIssueProduct] = useState<any>(null);
+
+  const [tracking, setTracking] = useState<{ poIds: string[]; title: string } | null>(null);
+  const openTracking = (poIds: string[], title: string) => setTracking({ poIds, title });
 
   const [viewingAllocatedItem, setViewingAllocatedItem] = useState<{ id: string; name: string; context?: 'total' | 'needToBuy' } | null>(null);
 
@@ -402,13 +406,14 @@ export default function ProcurementSheet() {
               handleDeleteDraftItem={handleDeleteDraftItem}
               setViewingAllocatedItem={setViewingAllocatedItem}
               onRefreshData={fetchData}
+              onOpenTracking={openTracking}
             />
           ))}
         </div>
       )}
 
       {purchasedItems.length > 0 && (
-        <PurchasedItemsTable items={purchasedItems} />
+        <PurchasedItemsTable items={purchasedItems} suppliers={suppliers} onOpenTracking={openTracking} />
       )}
 
       <SingleBuyDialog
@@ -493,6 +498,14 @@ export default function ProcurementSheet() {
         open={todaysPurchasesOpen}
         onOpenChange={setTodaysPurchasesOpen}
         onChanged={() => { fetchData(true); fetchToCheckCount(); }}
+      />
+
+      <ShipmentTrackingDialog
+        open={!!tracking}
+        onOpenChange={(isOpen) => !isOpen && setTracking(null)}
+        poIds={tracking?.poIds || []}
+        title={tracking?.title}
+        onChanged={() => fetchData(true)}
       />
 
       <ReservedStockDialog
