@@ -9,7 +9,8 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 export interface ProductPickerProps {
   label: string;
   onSelect: (p: { id: string; name: string }) => void;
-  onAddNew: (term: string) => void;
+  /** Omit to hide the "add as new product" option. */
+  onAddNew?: (term: string) => void;
 }
 
 /** Local product search + "add new" picker (no react-hook-form dependency). */
@@ -73,7 +74,7 @@ export function ProductPicker({ label, onSelect, onAddNew }: ProductPickerProps)
                 ))}
               </CommandGroup>
             )}
-            {!loading && search.trim().length > 1 && (
+            {!loading && onAddNew && search.trim().length > 1 && (
               <>
                 {results.length > 0 && <CommandSeparator />}
                 <CommandItem

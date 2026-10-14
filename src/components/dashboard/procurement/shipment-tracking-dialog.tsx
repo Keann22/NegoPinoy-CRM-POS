@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Check, ChevronRight, Copy, Truck } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Copy, Plus, Trash2, Truck } from "lucide-react";
 import {
   daysSince,
   findStage,
@@ -15,6 +15,7 @@ import {
   type TrackingRoute,
 } from "@/lib/online-order-tracking";
 import { STATUS_STYLES } from "./in-transit-chip";
+import { ProductPicker } from "./product-picker";
 
 type Tracking = {
   po: {
@@ -57,8 +58,10 @@ export function ShipmentTrackingDialog({
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ route: "" as TrackingRoute | "", platformOrderNo: "", trackingNo: "", expectedArrival: "" });
   const [note, setNote] = useState("");
-  // Unit cost typed per purchase line, keyed by item id (online prices change often).
-  const [costs, setCosts] = useState<Record<string, string>>({});
+  // Qty / unit cost typed per purchase line, keyed by item id (online prices change often).
+  const [edits, setEdits] = useState<Record<string, { qty: string; cost: string }>>({});
+  const [showReceived, setShowReceived] = useState(false);
+  const [newLine, setNewLine] = useState({ productId: "", name: "", qty: "1", cost: "" });
 
   useEffect(() => {
     if (open) setSelectedPoId(poIds[0] || null);
@@ -67,7 +70,7 @@ export function ShipmentTrackingDialog({
 
   const applyData = (d: Tracking) => {
     setData(d);
-    setCosts(Object.fromEntries(d.items.map((it) => [it.id, it.unitCost ? String(it.unitCost) : ""])));
+    setEdits(Object.fromEntries(d.items.map((it) => [it.id, { qty: String(it.expectedQty), cost: it.unitCost ? String(it.unitCost) : "" }])));
     setForm({
       route: d.po.route || "",
       platformOrderNo: d.po.platformOrderNo || "",
@@ -81,6 +84,8 @@ export function ShipmentTrackingDialog({
     setLoading(true);
     setData(null);
     setNote("");
+    setShowReceived(false);
+    setNewLine({ productId: "", name: "", qty: "1", cost: "" });
     fetch(`/api/inventory/procurement/tracking?poId=${selectedPoId}`, { cache: "no-store" })
       .then(async (res) => {
         const d = await res.json();
@@ -112,31 +117,84 @@ export function ShipmentTrackingDialog({
     }
   };
 
-  const changedCosts = (data?.items || []).filter(
-    (it) => costs[it.id] !== undefined && costs[it.id] !== "" && Number(costs[it.id]) !== it.unitCost
-  );
+  const lineChanges = (it: Tracking["items"][number]) => {
+    const e = edits[it.id];
+    if (!e) return null;
+    const patch: { qty?: number; unitCost?: number } = {};
+    if (e.qty !== "" && Number(e.qty) !== it.expectedQty) patch.qty = Number(e.qty);
+    if (e.cost !== "" && Number(e.cost) !== it.unitCost) patch.unitCost = Number(e.cost);
+    return Object.keys(patch).length > 0 ? patch : null;
+  };
+  const changedLines = (data?.items || []).filter((it) => lineChanges(it));
+
+  const reload = async () => {
+    if (!selectedPoId) return;
+    const res = await fetch(`/api/inventory/procurement/tracking?poId=${selectedPoId}`, { cache: "no-store" });
+    const d = await res.json();
+    if (!res.ok) {
+      // Removing the last line deletes the purchase itself.
+      onOpenChange(false);
+      return;
+    }
+    applyData(d);
+  };
 
   // Same correction path as Today's Purchases: updates the purchase line, the
   // product's default cost / supplier price, received stock cost and order COGS.
-  const saveCosts = async () => {
-    if (!selectedPoId) return;
-    const bad = changedCosts.find((it) => !(Number(costs[it.id]) >= 0));
-    if (bad) return alert(`Invalid unit cost for ${bad.productName}.`);
+  const saveLines = async () => {
     setSaving(true);
     try {
-      for (const it of changedCosts) {
+      for (const it of changedLines) {
         const res = await fetch("/api/inventory/procurement/day-purchases", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ itemId: it.id, unitCost: Number(costs[it.id]) }),
+          body: JSON.stringify({ itemId: it.id, ...lineChanges(it) }),
         });
         const d = await res.json();
-        if (!res.ok) throw new Error(`${it.productName}: ${d.error || "Failed to save price"}`);
+        if (!res.ok) throw new Error(`${it.productName}: ${d.error || "Failed to save"}`);
       }
-      const res = await fetch(`/api/inventory/procurement/tracking?poId=${selectedPoId}`, { cache: "no-store" });
+      await reload();
+      onChanged?.();
+    } catch (e: any) {
+      alert("Error: " + e.message);
+      await reload();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const removeLine = async (it: Tracking["items"][number]) => {
+    if (!confirm(`Remove ${it.productName} from this purchase?`)) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/inventory/procurement/day-purchases?itemId=${it.id}`, { method: "DELETE" });
       const d = await res.json();
-      if (!res.ok) throw new Error(d.error || "Failed to reload shipment");
+      if (!res.ok) throw new Error(d.error || "Failed to remove");
+      await reload();
+      onChanged?.();
+    } catch (e: any) {
+      alert("Error: " + e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addLine = async () => {
+    if (!selectedPoId || !newLine.productId) return alert("Pick a product first.");
+    setSaving(true);
+    try {
+      const res = await fetch("/api/inventory/procurement/tracking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          poId: selectedPoId,
+          lines: [{ productId: newLine.productId, qty: Number(newLine.qty), cost: Number(newLine.cost || 0) }],
+        }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Failed to add item");
       applyData(d);
+      setNewLine({ productId: "", name: "", qty: "1", cost: "" });
       onChanged?.();
     } catch (e: any) {
       alert("Error: " + e.message);
@@ -146,9 +204,11 @@ export function ShipmentTrackingDialog({
   };
 
   const orderTotal = (data?.items || []).reduce(
-    (sum, it) => sum + it.expectedQty * (Number(costs[it.id]) || 0),
+    (sum, it) => sum + (Number(edits[it.id]?.qty) || 0) * (Number(edits[it.id]?.cost) || 0),
     0
   );
+  const waitingItems = (data?.items || []).filter((it) => it.receivedQty < it.expectedQty);
+  const receivedItems = (data?.items || []).filter((it) => it.receivedQty >= it.expectedQty);
 
   const route = data?.po.route || null;
   const stages = route ? ROUTE_STAGES[route] : [];
@@ -344,50 +404,120 @@ export function ShipmentTrackingDialog({
               </div>
             )}
 
-            {/* What's in this shipment, with the price actually paid */}
+            {/* What's in this purchase: qty and price actually paid, editable */}
             <div className="space-y-1">
               <div className="flex items-baseline justify-between">
-                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Items in this order</div>
+                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Items in this purchase</div>
                 <div className="text-xs text-slate-500">
                   Total <span className="font-bold text-slate-800">₱{orderTotal.toLocaleString("en-PH", { maximumFractionDigits: 2 })}</span>
                 </div>
               </div>
               <div className="border rounded-md divide-y text-sm">
-                {data.items.map((it) => {
-                  const edited = changedCosts.some((c) => c.id === it.id);
+                {[...waitingItems, ...(showReceived ? receivedItems : [])].map((it) => {
+                  const e = edits[it.id] || { qty: "", cost: "" };
+                  const qtyEdited = e.qty !== "" && Number(e.qty) !== it.expectedQty;
+                  const costEdited = e.cost !== "" && Number(e.cost) !== it.unitCost;
+                  const done = it.receivedQty >= it.expectedQty;
                   return (
-                    <div key={it.id} className="flex items-center justify-between gap-2 px-3 py-1.5">
-                      <span className="text-slate-700 min-w-0">
-                        {it.productName}
-                        {it.supplierName && <span className="text-xs text-slate-400"> · {it.supplierName}</span>}
-                        <span className="block text-xs font-bold text-slate-600">
-                          {it.receivedQty > 0 ? `${it.receivedQty}/${it.expectedQty} received` : `${it.expectedQty} pcs`}
+                    <div key={it.id} className={`px-3 py-2 space-y-1 ${done ? "bg-slate-50" : ""}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-slate-700 min-w-0">
+                          {it.productName}
+                          {it.supplierName && <span className="text-xs text-slate-400"> · {it.supplierName}</span>}
                         </span>
-                      </span>
-                      <div className="relative shrink-0" title="Unit cost actually paid">
+                        {it.receivedQty === 0 && (
+                          <button
+                            onClick={() => removeLine(it)}
+                            disabled={saving}
+                            className="text-slate-400 hover:text-red-500 p-0.5 shrink-0"
+                            title="Remove from this purchase"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-semibold flex-1 ${done ? "text-emerald-600" : "text-slate-500"}`}>
+                          {it.receivedQty > 0 ? `${it.receivedQty} received` : "Not received yet"}
+                        </span>
+                        <input
+                          type="number"
+                          min="1"
+                          className={`w-16 px-2 py-1 border rounded-md text-right text-sm ${qtyEdited ? "border-amber-400 bg-amber-50" : ""}`}
+                          value={e.qty}
+                          onChange={(ev) => setEdits((x) => ({ ...x, [it.id]: { ...e, qty: ev.target.value } }))}
+                          title="Quantity bought"
+                        />
+                        <span className="text-xs text-slate-400">pcs ×</span>
+                        <div className="relative" title="Unit cost actually paid">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">₱</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            className={`w-24 pl-5 pr-2 py-1 border rounded-md text-right text-sm ${costEdited ? "border-amber-400 bg-amber-50" : ""}`}
+                            value={e.cost}
+                            onChange={(ev) => setEdits((x) => ({ ...x, [it.id]: { ...e, cost: ev.target.value } }))}
+                            placeholder="0.00"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {receivedItems.length > 0 && (
+                  <button
+                    onClick={() => setShowReceived((v) => !v)}
+                    className="w-full flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-semibold text-slate-500 hover:bg-slate-50"
+                  >
+                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showReceived ? "rotate-180" : ""}`} />
+                    {showReceived ? "Hide" : "Show"} {receivedItems.length} already received
+                  </button>
+                )}
+                {/* Add something to this purchase */}
+                <div className="px-3 py-2 space-y-2 bg-slate-50/60">
+                  <ProductPicker
+                    label={newLine.name || "+ Add item to this purchase..."}
+                    onSelect={(p) => setNewLine((n) => ({ ...n, productId: p.id, name: p.name }))}
+                  />
+                  {newLine.productId && (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        className="w-16 px-2 py-1 border rounded-md text-right text-sm"
+                        value={newLine.qty}
+                        onChange={(ev) => setNewLine((n) => ({ ...n, qty: ev.target.value }))}
+                        title="Quantity bought"
+                      />
+                      <span className="text-xs text-slate-400">pcs ×</span>
+                      <div className="relative">
                         <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">₱</span>
                         <input
                           type="number"
                           min="0"
                           step="0.01"
-                          className={`w-24 pl-5 pr-2 py-1 border rounded-md text-right text-sm ${edited ? "border-amber-400 bg-amber-50" : ""}`}
-                          value={costs[it.id] ?? ""}
-                          onChange={(e) => setCosts((c) => ({ ...c, [it.id]: e.target.value }))}
+                          className="w-24 pl-5 pr-2 py-1 border rounded-md text-right text-sm"
+                          value={newLine.cost}
+                          onChange={(ev) => setNewLine((n) => ({ ...n, cost: ev.target.value }))}
                           placeholder="0.00"
                         />
                       </div>
+                      <Button size="sm" disabled={saving} onClick={addLine} className="ml-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold">
+                        <Plus className="w-4 h-4 mr-1" /> Add
+                      </Button>
                     </div>
-                  );
-                })}
+                  )}
+                </div>
               </div>
-              {changedCosts.length > 0 && (
+              {changedLines.length > 0 && (
                 <Button
                   size="sm"
                   disabled={saving}
-                  onClick={saveCosts}
+                  onClick={saveLines}
                   className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold"
                 >
-                  {saving ? "Saving..." : `Save ${changedCosts.length} price${changedCosts.length > 1 ? "s" : ""}`}
+                  {saving ? "Saving..." : `Save changes to ${changedLines.length} item${changedLines.length > 1 ? "s" : ""}`}
                 </Button>
               )}
             </div>

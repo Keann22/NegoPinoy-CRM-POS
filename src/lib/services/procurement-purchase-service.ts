@@ -27,97 +27,171 @@ export async function processProcurementPurchases(
   }
 
   for (const p of purchases) {
-    const parsedCost = Number(p.cost) || 0;
-    
-    if (p.draftItemId) {
-      // Buying less than staff requested must leave the rest on the draft.
-      const itemId = await splitStaffDraftLine(supabase, p.draftItemId, Number(p.qty) || 0, po.id);
-      const { error: updErr } = await supabase
-        .from('purchase_order_items')
-        .update({
-          po_id: po.id,
-          supplier_id: p.supplierId || null,
-          expected_qty: p.qty,
-          unit_cost: parsedCost,
-          status: 'pending_receipt'
-        })
-        .eq('id', itemId);
-      if (updErr) throw updErr;
+    await recordPurchaseLine(supabase, po.id, p);
+  }
+
+  await removeEmptyDraftPos(supabase);
+
+  return po.id;
+}
+
+/**
+ * Adds items to an already-recorded purchase (e.g. something left out of a
+ * Pinduoduo checkout). Each line is recorded exactly like a Buy, including
+ * taking over the product's open staff request.
+ */
+export async function addLinesToPurchaseOrder(
+  supabase: SupabaseClient,
+  poId: string,
+  lines: { productId: string; qty: number; cost: number; supplierId?: string | null }[]
+) {
+  if (!lines || lines.length === 0) throw new Error('No items provided');
+  for (const l of lines) {
+    if (!l.productId) throw new Error('Pick a product');
+    if (!Number.isInteger(Number(l.qty)) || Number(l.qty) < 1) throw new Error('Quantity must be a whole number of at least 1');
+    if (!(Number(l.cost) >= 0)) throw new Error('Unit cost must be zero or more');
+  }
+
+  const { data: po, error: poErr } = await supabase
+    .from('purchase_orders')
+    .select('id, notes, status, purchase_order_items(supplier_id)')
+    .eq('id', poId)
+    .single();
+  if (poErr || !po) throw new Error('Purchase order not found');
+  if (po.notes === 'STAFF_DRAFT') throw new Error('Staff requests cannot be edited here');
+
+  // Default to the supplier most of the order's lines were bought from.
+  const counts = new Map<string, number>();
+  (po.purchase_order_items || []).forEach((i: any) => {
+    if (i.supplier_id) counts.set(i.supplier_id, (counts.get(i.supplier_id) || 0) + 1);
+  });
+  const orderSupplierId = Array.from(counts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+
+  const { data: drafts } = await supabase
+    .from('purchase_order_items')
+    .select('id, product_id, purchase_orders!inner(notes)')
+    .eq('purchase_orders.notes', 'STAFF_DRAFT')
+    .eq('status', 'pending_receipt')
+    .in('product_id', lines.map((l) => l.productId));
+  const draftByProduct = new Map((drafts || []).map((d: any) => [d.product_id, d.id]));
+
+  for (const l of lines) {
+    await recordPurchaseLine(supabase, poId, {
+      productId: l.productId,
+      qty: Number(l.qty),
+      cost: Number(l.cost),
+      supplierId: l.supplierId || orderSupplierId,
+      draftItemId: draftByProduct.get(l.productId) || null,
+    });
+  }
+
+  // The order has something to receive again.
+  if (po.status === 'received') {
+    await supabase.from('purchase_orders').update({ status: 'partially_received' }).eq('id', poId);
+  }
+
+  await removeEmptyDraftPos(supabase);
+}
+
+/**
+ * Records one bought line on a purchase order: takes over the product's staff
+ * request (if any), stamps supplier/cost onto the product, backfills waiting
+ * orders' COGS and resolves open procurement issues.
+ */
+async function recordPurchaseLine(supabase: SupabaseClient, poId: string, p: any) {
+  const parsedCost = Number(p.cost) || 0;
+  
+  if (p.draftItemId) {
+    // Buying less than staff requested must leave the rest on the draft.
+    const itemId = await splitStaffDraftLine(supabase, p.draftItemId, Number(p.qty) || 0, poId);
+    const { error: updErr } = await supabase
+      .from('purchase_order_items')
+      .update({
+        po_id: poId,
+        supplier_id: p.supplierId || null,
+        expected_qty: p.qty,
+        unit_cost: parsedCost,
+        status: 'pending_receipt'
+      })
+      .eq('id', itemId);
+    if (updErr) throw updErr;
+  } else {
+    const { error: insErr } = await supabase
+      .from('purchase_order_items')
+      .insert({
+        po_id: poId,
+        product_id: p.productId,
+        supplier_id: p.supplierId || null,
+        expected_qty: p.qty,
+        unit_cost: parsedCost,
+        status: 'pending_receipt'
+      });
+    if (insErr) throw insErr;
+  }
+
+  const productUpdate: any = {};
+  if (parsedCost > 0) {
+    productUpdate.initial_unit_cost = parsedCost;
+  }
+  if (p.supplierId) {
+    productUpdate.supplier_id = p.supplierId;
+
+    const { data: currentProduct } = await supabase
+      .from('products')
+      .select('supplier_pricing')
+      .eq('id', p.productId)
+      .single();
+    const pricing = currentProduct?.supplier_pricing || [];
+    const { data: sup } = await supabase
+      .from('suppliers')
+      .select('name')
+      .eq('id', p.supplierId)
+      .single();
+    const supplierName = sup?.name || 'Unknown Supplier';
+    const idx = pricing.findIndex((sp: any) => sp.supplierId === p.supplierId);
+    if (idx >= 0) {
+      if (parsedCost > 0) pricing[idx].unitCost = parsedCost;
+      pricing[idx].supplierName = supplierName;
     } else {
-      const { error: insErr } = await supabase
-        .from('purchase_order_items')
+      pricing.push({ supplierId: p.supplierId, supplierName, unitCost: parsedCost });
+    }
+    productUpdate.supplier_pricing = pricing;
+  }
+  if (Object.keys(productUpdate).length > 0) {
+    await supabase.from('products').update(productUpdate).eq('id', p.productId);
+  }
+
+  if (parsedCost > 0) {
+    await backfillOrderItemCosts(supabase, p.productId, Number(p.qty) || 0, parsedCost);
+  }
+
+  const { data: issues } = await supabase
+    .from('procurement_issues')
+    .select('id')
+    .eq('product_id', p.productId)
+    .eq('status', 'open');
+
+  if (issues && issues.length > 0) {
+    for (const issue of issues) {
+      await supabase
+        .from('procurement_issues')
+        .update({ status: 'resolved' })
+        .eq('id', issue.id);
+
+      await supabase
+        .from('procurement_issue_messages')
         .insert({
-          po_id: po.id,
-          product_id: p.productId,
-          supplier_id: p.supplierId || null,
-          expected_qty: p.qty,
-          unit_cost: parsedCost,
-          status: 'pending_receipt'
+          issue_id: issue.id,
+          sender_role: 'system',
+          sender_name: 'System',
+          message: 'Issue automatically resolved because the item was purchased.'
         });
-      if (insErr) throw insErr;
-    }
-
-    const productUpdate: any = {};
-    if (parsedCost > 0) {
-      productUpdate.initial_unit_cost = parsedCost;
-    }
-    if (p.supplierId) {
-      productUpdate.supplier_id = p.supplierId;
-
-      const { data: currentProduct } = await supabase
-        .from('products')
-        .select('supplier_pricing')
-        .eq('id', p.productId)
-        .single();
-      const pricing = currentProduct?.supplier_pricing || [];
-      const { data: sup } = await supabase
-        .from('suppliers')
-        .select('name')
-        .eq('id', p.supplierId)
-        .single();
-      const supplierName = sup?.name || 'Unknown Supplier';
-      const idx = pricing.findIndex((sp: any) => sp.supplierId === p.supplierId);
-      if (idx >= 0) {
-        if (parsedCost > 0) pricing[idx].unitCost = parsedCost;
-        pricing[idx].supplierName = supplierName;
-      } else {
-        pricing.push({ supplierId: p.supplierId, supplierName, unitCost: parsedCost });
-      }
-      productUpdate.supplier_pricing = pricing;
-    }
-    if (Object.keys(productUpdate).length > 0) {
-      await supabase.from('products').update(productUpdate).eq('id', p.productId);
-    }
-
-    if (parsedCost > 0) {
-      await backfillOrderItemCosts(supabase, p.productId, Number(p.qty) || 0, parsedCost);
-    }
-
-    const { data: issues } = await supabase
-      .from('procurement_issues')
-      .select('id')
-      .eq('product_id', p.productId)
-      .eq('status', 'open');
-
-    if (issues && issues.length > 0) {
-      for (const issue of issues) {
-        await supabase
-          .from('procurement_issues')
-          .update({ status: 'resolved' })
-          .eq('id', issue.id);
-
-        await supabase
-          .from('procurement_issue_messages')
-          .insert({
-            issue_id: issue.id,
-            sender_role: 'system',
-            sender_name: 'System',
-            message: 'Issue automatically resolved because the item was purchased.'
-          });
-      }
     }
   }
-  
+}
+
+// Don't leave an empty STAFF_DRAFT PO behind once its lines were bought.
+async function removeEmptyDraftPos(supabase: SupabaseClient) {
   const { data: emptyDraftPos } = await supabase
     .from('purchase_orders')
     .select('id, purchase_order_items(id)')
@@ -130,8 +204,6 @@ export async function processProcurementPurchases(
       }
     }
   }
-
-  return po.id;
 }
 
 /**

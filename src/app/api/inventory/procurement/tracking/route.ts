@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { createClient as createSessionClient } from '@/lib/supabase/server';
 import { isManagementUser } from '@/lib/services/purchase-summary-service';
 import { actorNameFor, getPoTracking, updatePoTracking } from '@/lib/services/online-order-tracking-service';
+import { addLinesToPurchaseOrder } from '@/lib/services/procurement-purchase-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,5 +48,20 @@ export async function PATCH(req: Request) {
   } catch (error: any) {
     console.error('Error in procurement tracking PATCH:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+// Add items to an already-recorded purchase. Qty / price changes and removals
+// go through /api/inventory/procurement/day-purchases (editPurchaseLine).
+export async function POST(req: Request) {
+  try {
+    if (!(await getManagementCaller())) return forbidden();
+    const { poId, lines } = await req.json();
+    if (!poId) return NextResponse.json({ error: 'Missing poId' }, { status: 400 });
+    await addLinesToPurchaseOrder(supabase, poId, lines);
+    return NextResponse.json(await getPoTracking(supabase, poId));
+  } catch (error: any) {
+    console.error('Error in procurement tracking POST:', error);
+    return NextResponse.json({ error: error.message }, { status: 400 });
   }
 }
