@@ -27,7 +27,7 @@ export function AlertReviewView() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [stockFilter, setStockFilter] = useState<'all' | 'negative' | 'zero' | 'positive'>('all');
-  const [rangeFilter, setRangeFilter] = useState<'recent' | 'today' | 'all'>('recent');
+  const [rangeFilter, setRangeFilter] = useState<'recent' | 'today' | 'all'>('all');
   const [reviewStatus, setReviewStatus] = useState<'pending' | 'resolved' | 'all'>('pending');
 
   // Confirmation & bulk selection state
