@@ -146,6 +146,8 @@ function ProductActionsMenu({ product, isManagement, canManageProducts, onViewDe
   onDelete: (p: FormattedProduct) => void;
 }) {
   const isGroupParent = product.children && product.children.length > 0;
+  // Bundles hold no stock of their own (sales explode into components).
+  const isBundle = Array.isArray(product.assembly_recipe) && product.assembly_recipe.length > 0;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -160,7 +162,7 @@ function ProductActionsMenu({ product, isManagement, canManageProducts, onViewDe
         {canManageProducts && (
           <DropdownMenuItem onClick={() => onEdit(product)}>Edit Details</DropdownMenuItem>
         )}
-        {canManageProducts && onAdjustStock && !isGroupParent && (
+        {canManageProducts && onAdjustStock && !isGroupParent && !isBundle && (
           <DropdownMenuItem onClick={() => onAdjustStock(product)}>Adjust Stock</DropdownMenuItem>
         )}
         <DropdownMenuItem onClick={() => onViewHistory(product)}>View History</DropdownMenuItem>

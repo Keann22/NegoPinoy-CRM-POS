@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { calculateProcurementDemand, fetchAllPages } from './procurement-demand-service';
+import { calculateProcurementDemand, fetchAllPages, getSingleProductProcurementDemand } from './procurement-demand-service';
 
 export interface InventoryListStockInfo {
   unallocatedStock: number;
@@ -69,17 +69,55 @@ export async function getInventoryListStockInfo(
 
   const result: Record<string, InventoryListStockInfo> = {};
   for (const p of products) {
-    const unscannedLayawayQty = unscannedLayawayMap.get(p.id) || 0;
-    const physicalStock = Math.max(0, (p.stock_level ?? 0) + unscannedLayawayQty);
-    const lastEdit = lastEditMap.get(p.id);
-    result[p.id] = {
-      unallocatedStock: Math.max(0, physicalStock - (needToBuyMap.get(p.id) || 0)),
-      unscannedLayawayQty,
-      isBundle: Array.isArray(p.assembly_recipe) && p.assembly_recipe.length > 0,
-      lastEditedAt: lastEdit ? lastEdit.editedAt : null,
-      lastEditedBy: lastEdit ? lastEdit.editedBy : null,
-      manualAdjustmentCount: lastEdit ? lastEdit.count : 0,
-    };
+    result[p.id] = buildStockInfo(
+      p,
+      unscannedLayawayMap.get(p.id) || 0,
+      needToBuyMap.get(p.id) || 0,
+      lastEditMap.get(p.id)
+    );
   }
   return result;
+}
+
+/** Same figure as getInventoryListStockInfo, for one product (e.g. the Products page's Adjust Stock). */
+export async function getSingleProductStockInfo(
+  supabase: SupabaseClient,
+  productId: string
+): Promise<InventoryListStockInfo | null> {
+  const [{ data: product }, demand, { data: memories, count }] = await Promise.all([
+    supabase.from('products').select('id, stock_level, assembly_recipe').eq('id', productId).single(),
+    getSingleProductProcurementDemand(supabase, productId),
+    supabase
+      .from('inventory_guardian_memory')
+      .select('actor_name, created_at', { count: 'exact' })
+      .eq('product_id', productId)
+      .eq('action_type', 'physical_count_audit')
+      .neq('discrepancy', 0)
+      .order('created_at', { ascending: false })
+      .limit(1),
+  ]);
+  if (!product) return null;
+
+  const latest = memories?.[0];
+  const lastEdit = latest
+    ? { editedAt: latest.created_at, editedBy: latest.actor_name || 'Staff', count: count ?? 1 }
+    : undefined;
+  return buildStockInfo(product, demand.unscannedLayawayQty, demand.needToBuyQty, lastEdit);
+}
+
+function buildStockInfo(
+  p: { stock_level: number | null; assembly_recipe: any },
+  unscannedLayawayQty: number,
+  needToBuyQty: number,
+  lastEdit: { editedAt: string; editedBy: string; count: number } | undefined
+): InventoryListStockInfo {
+  const physicalStock = Math.max(0, (p.stock_level ?? 0) + unscannedLayawayQty);
+  return {
+    unallocatedStock: Math.max(0, physicalStock - needToBuyQty),
+    unscannedLayawayQty,
+    isBundle: Array.isArray(p.assembly_recipe) && p.assembly_recipe.length > 0,
+    lastEditedAt: lastEdit ? lastEdit.editedAt : null,
+    lastEditedBy: lastEdit ? lastEdit.editedBy : null,
+    manualAdjustmentCount: lastEdit ? lastEdit.count : 0,
+  };
 }

@@ -39,11 +39,28 @@ export async function applyPhysicalShelfCount(
     throw new Error('Product not found for physical count correction');
   }
 
-  // 2. Fetch active unpicked orders claiming this product from the shelf
+  // 2. Fetch active unpicked orders claiming this product from the shelf. Bundles hold no
+  // stock of their own (sales explode into components), so a bundle order line claims
+  // qtyPerBundle of this product too — without them a component sold only through a
+  // bundle would always show 0 reservations.
+  const qtyPerUnit = new Map<string, number>([[productId, 1]]);
+  for (const key of ['productId', 'component_id']) {
+    const { data: bundles } = await supabase
+      .from('products')
+      .select('id, assembly_recipe')
+      // jsonb containment needs a JSON string; supabase-js turns a JS array into a Postgres array literal
+      .contains('assembly_recipe', JSON.stringify([{ [key]: productId }]));
+    for (const b of bundles || []) {
+      const recipe = Array.isArray(b.assembly_recipe) ? b.assembly_recipe : [];
+      const comp = recipe.find((c: any) => (c.productId || c.component_id) === productId);
+      if (comp) qtyPerUnit.set(b.id, Number(comp.quantity) || 1);
+    }
+  }
+
   const { data: activeItems, error: aErr } = await supabase
     .from('order_items')
-    .select('order_id, quantity, is_packed, orders!inner(id, status)')
-    .eq('product_id', productId)
+    .select('order_id, product_id, quantity, is_packed, orders!inner(id, status)')
+    .in('product_id', Array.from(qtyPerUnit.keys()))
     .in('orders.status', [...UNPICKED_STATUSES, 'Picked (with issue)']);
 
   if (aErr) {
@@ -64,6 +81,9 @@ export async function applyPhysicalShelfCount(
 
   let activeReservations = 0;
   let activeOrdersCount = 0;
+  // A shortage issue is logged once per order against this product (bundle shortages are
+  // logged on the component), so count it once even if the order has several lines for it.
+  const countedIssueOrders = new Set<string>();
 
   for (const item of (activeItems || [])) {
     const order = Array.isArray(item.orders) ? item.orders[0] : item.orders;
@@ -73,7 +93,8 @@ export async function applyPhysicalShelfCount(
 
     if (orderStatus === 'Picked (with issue)') {
       // Only count if this specific product has an open out-of-stock issue
-      if (openIssueMap.has(orderId)) {
+      if (openIssueMap.has(orderId) && !countedIssueOrders.has(orderId)) {
+        countedIssueOrders.add(orderId);
         const shortQty = openIssueMap.get(orderId)!;
         activeReservations += shortQty;
         activeOrdersCount++;
@@ -81,7 +102,7 @@ export async function applyPhysicalShelfCount(
     } else if (item.is_packed) {
       continue; // Already physically pulled from shelf and packed
     } else if (UNPICKED_STATUSES.includes(orderStatus)) {
-      activeReservations += (Number(item.quantity) || 1);
+      activeReservations += (Number(item.quantity) || 1) * (qtyPerUnit.get(item.product_id) || 1);
       activeOrdersCount++;
     }
   }

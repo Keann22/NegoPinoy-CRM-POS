@@ -291,6 +291,7 @@ When converting an audited physical shelf count into `stock_level`:
 1. Only count orders that **genuinely still need to be pulled from the shelf**: `Pending Payment`, `Processing`, `Waiting for Stock`, and `On-Hold` (where `is_packed = false`).
 2. For orders in `Picked (with issue)`, only count line items that have an **open** shortage issue in `order_issues` (`status = 'open'`). If an issue was already resolved or belongs to a different item, the unit was already successfully picked.
 3. Completely exclude orders in `Picked`, `Photo`, `Packed`, `For Shipping`, `For Pick-up`, and any item where `is_packed = true` — they are already physically off the shelf and must never be subtracted again.
+4. **Count bundle orders too** (fixed 2026-10-20). Bundles hold no stock, so an order line for a bundle claims `quantity × recipe qty` of each component. The audit looks up every bundle whose `assembly_recipe` contains the product and includes those order lines. Shortage issues on bundle orders are logged against the component, so the `Picked (with issue)` check works unchanged (counted once per order). Before this fix, a component sold only through a bundle (e.g. *Stainless Lid Cover for 60CM* via the 60CM wok-with-lid bundle) always showed "Active unfulfilled orders: 0". A shelf count then set `stock_level` = shelf count, and the Procurement Sheet added the bundle lay-aways back on top, so it showed phantom unallocated stock.
 
 ### Multi-Warehouse Tracking: Strategy A (added 2026-09-22)
 
@@ -322,9 +323,9 @@ To guarantee 100% backward compatibility with POS orders, P&L reports, and the s
 **Regression history:** commit `0144a8b` (2026-10-08) switched to "deduct only at pick/pack" in app code but never removed the creation-time deduction from `process_order_transaction`. From 2026-10-08 to 2026-10-14 every picked/packed order was deducted twice (movements with reason `Order Allocated (<status>): #<id>`), and cancelling a `Processing` order did not restore its stock. Fixed by reverting to the creation-only rule above. A one-off repair added the extra deductions back, skipping any that a later manual shelf count had already absorbed. If deduct-at-pick is ever wanted, the RPC, `editOrder`, the cancel helpers, and Inventory Guardian's reservation math must all change together.
 
 #### Manual Stock Adjustments
-Authorized inventory/management staff can manually adjust physical stock levels directly:
-- **UI**: Products Table (`ProductsTable.tsx` → "Adjust Stock" row action) or Product Edit Dialog (`AdjustStockDialog.tsx`).
-- **Audit**: Direct adjustments prompt for a target physical quantity or relative change (+/-), write an entry to `inventory_movements` with the reason and staff name, and update `products.stock_level` (which syncs across warehouses via database triggers).
+Authorized inventory/management staff adjust stock in **unallocated** terms (free pieces on the shelf), never raw `stock_level`:
+- **UI**: Products Table (`ProductsTable.tsx` → "Adjust Stock" row action; hidden for bundles) opens `ProductUnallocatedStockDialog`, which fetches `GET /api/inventory/unallocated-stock?productId=` and shows the shared `EditUnallocatedStockDialog` — the same dialog, number and audit trail as the Procurement Sheet and Inventory List.
+- **Why (changed 2026-10-20)**: the old `AdjustStockDialog` wrote the typed number straight into `stock_level`, which already has open orders netted out, and logged it as a Guardian "Physical Count". Staff typing a shelf count there double-counted lay-aways and pending orders. For example, *Water pot - Gold 2L* was set to 2, but the Procurement Sheet showed 3 because it adds unscanned lay-aways back.
 
 #### Unallocated Stock Tracking & Edit Audit History (added 2026-10-08)
 The Procurement Sheet tracks when unallocated stock was last edited and attributes the change to the specific staff member or owner:

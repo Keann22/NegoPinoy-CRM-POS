@@ -15,7 +15,7 @@ import { BulkUploadProductsDialog } from '@/components/dashboard/bulk-upload-pro
 import { ReservedStockDialog } from '@/components/dashboard/reserved-stock-dialog';
 import { ViewProductHistoryDialog } from '@/components/dashboard/view-product-history-dialog';
 import { ViewProductDetailsDialog } from '@/components/dashboard/view-product-details-dialog';
-import { AdjustStockDialog } from '@/components/dashboard/inventory/adjust-stock-dialog';
+import { ProductUnallocatedStockDialog } from '@/components/dashboard/products/product-unallocated-stock-dialog';
 import { ProductsTable } from '@/components/dashboard/products/ProductsTable';
 import { useProductsPage } from '@/hooks/useProductsPage';
 
@@ -191,10 +191,9 @@ export default function ProductsPage() {
         onSuccess={() => refetch()}
       />
 
-      <AdjustStockDialog
+      <ProductUnallocatedStockDialog
         product={adjustingStockProduct}
-        open={!!adjustingStockProduct}
-        onOpenChange={(isOpen: boolean) => !isOpen && setAdjustingStockProduct(null)}
+        onClose={() => setAdjustingStockProduct(null)}
         onSuccess={() => refetch()}
       />
 
