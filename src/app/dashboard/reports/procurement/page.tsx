@@ -15,9 +15,10 @@ import { ScanReceiptDialog } from "@/components/dashboard/procurement/scan-recei
 import { SavedReceiptsDialog } from "@/components/dashboard/procurement/saved-receipts-dialog";
 import { TodaysPurchasesDialog } from "@/components/dashboard/procurement/todays-purchases-dialog";
 import { ShipmentTrackingDialog } from "@/components/dashboard/procurement/shipment-tracking-dialog";
+import { RecordOnlineOrderDialog } from "@/components/dashboard/procurement/record-online-order-dialog";
 import { useReceiptDrafts } from "@/hooks/useReceiptDrafts";
 import type { ReceiptScanDraft } from "@/types";
-import { PlusCircle, RefreshCw, Receipt, ClipboardList } from "lucide-react";
+import { PlusCircle, RefreshCw, Receipt, ClipboardList, Truck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -63,6 +64,7 @@ export default function ProcurementSheet() {
   const [issueDialogOpen, setIssueDialogOpen] = useState(false);
   const [issueProduct, setIssueProduct] = useState<any>(null);
 
+  const [onlineOrderOpen, setOnlineOrderOpen] = useState(false);
   const [tracking, setTracking] = useState<{ poIds: string[]; title: string } | null>(null);
   const openTracking = (poIds: string[], title: string) => setTracking({ poIds, title });
 
@@ -369,6 +371,12 @@ export default function ProcurementSheet() {
                     Create Procurement Batch
                 </Button>
             )}
+            <Button
+              onClick={() => setOnlineOrderOpen(true)}
+              className="bg-sky-600 hover:bg-sky-700 text-white font-bold px-4 py-2 flex items-center justify-center gap-2"
+            >
+              <Truck className="w-5 h-5" /> Record Online Order
+            </Button>
             <Button onClick={() => setIsAddDialogOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 flex items-center justify-center gap-2">
               <PlusCircle className="w-5 h-5" /> Add Missing Item
             </Button>
@@ -498,6 +506,17 @@ export default function ProcurementSheet() {
         open={todaysPurchasesOpen}
         onOpenChange={setTodaysPurchasesOpen}
         onChanged={() => { fetchData(true); fetchToCheckCount(); }}
+      />
+
+      <RecordOnlineOrderDialog
+        open={onlineOrderOpen}
+        onOpenChange={setOnlineOrderOpen}
+        suppliers={suppliers}
+        groupedItems={groupedItems}
+        onSuccess={() => {
+          setOnlineOrderOpen(false);
+          fetchData(true);
+        }}
       />
 
       <ShipmentTrackingDialog
