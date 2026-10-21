@@ -60,6 +60,17 @@ export async function addLinesToPurchaseOrder(
   if (poErr || !po) throw new Error('Purchase order not found');
   if (po.notes === 'STAFF_DRAFT') throw new Error('Staff requests cannot be edited here');
 
+  // Bundles hold no stock; procurement tracks their parts.
+  const { data: products } = await supabase
+    .from('products')
+    .select('id, name, assembly_recipe')
+    .in('id', lines.map((l) => l.productId));
+  const bundle = (products || []).find((p: any) => Array.isArray(p.assembly_recipe) && p.assembly_recipe.length > 0);
+  if (bundle) {
+    const parts = bundle.assembly_recipe.map((c: any) => c.productName).filter(Boolean).join(' + ');
+    throw new Error(`"${bundle.name}" is a bundle. Add its parts instead${parts ? `: ${parts}` : ''}.`);
+  }
+
   // Default to the supplier most of the order's lines were bought from.
   const counts = new Map<string, number>();
   (po.purchase_order_items || []).forEach((i: any) => {

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2, Truck } from "lucide-react";
+import { Package, Plus, Trash2, Truck } from "lucide-react";
 import { ProductPicker } from "./product-picker";
 import { OnlineOrderFields, onlineOrderFormFor, trackingPayload, EMPTY_ONLINE_ORDER } from "./online-order-fields";
 
@@ -35,6 +35,7 @@ export function RecordOnlineOrderDialog({
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
   const [onlineOrder, setOnlineOrder] = useState(EMPTY_ONLINE_ORDER);
   const [saving, setSaving] = useState(false);
+  const [bundleNote, setBundleNote] = useState("");
 
   const supplierName = (id: string) => suppliers.find((s) => s.id === id)?.name;
 
@@ -45,33 +46,78 @@ export function RecordOnlineOrderDialog({
     setSupplierId(id);
     setOnlineOrder(onlineOrderFormFor(supplierName(id)));
     setLines([emptyLine()]);
+    setBundleNote("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const updateLine = (key: number, patch: Partial<Line>) =>
     setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
 
-  // Pre-fill the last known price; the user overwrites it with today's price.
-  const pickProduct = async (key: number, p: { id: string; name: string }) => {
-    updateLine(key, { productId: p.id, name: p.name });
-    const { data } = await createClient()
-      .from("products")
-      .select("initial_unit_cost, supplier_pricing")
-      .eq("id", p.id)
-      .single();
-    const fromSupplier = (data?.supplier_pricing || []).find((sp: any) => sp.supplierId === supplierId)?.unitCost;
-    const cost = Number(fromSupplier || data?.initial_unit_cost) || 0;
-    if (cost > 0) setLines((ls) => ls.map((l) => (l.key === key && l.cost === "" ? { ...l, cost: String(cost) } : l)));
+  // Last known price for this supplier (or the product's default cost); the
+  // user overwrites it with today's price.
+  const lastCost = (prod: any) => {
+    const fromSupplier = (prod?.supplier_pricing || []).find((sp: any) => sp.supplierId === supplierId)?.unitCost;
+    return Number(fromSupplier || prod?.initial_unit_cost) || 0;
   };
 
-  // A product already on the sheet with a staff request: this buy takes it over, like Buy does.
-  const draftItemIdFor = (productId: string) => {
+  const pickProduct = async (key: number, p: { id: string; name: string }) => {
+    const supabase = createClient();
+    const { data: prod } = await supabase
+      .from("products")
+      .select("name, variant_name, initial_unit_cost, supplier_pricing, assembly_recipe")
+      .eq("id", p.id)
+      .single();
+    const recipe: any[] = Array.isArray(prod?.assembly_recipe) ? prod.assembly_recipe : [];
+
+    if (recipe.length === 0) {
+      const cost = lastCost(prod);
+      setLines((ls) => ls.map((l) => (l.key === key ? { ...l, productId: p.id, name: p.name, cost: l.cost || (cost > 0 ? String(cost) : "") } : l)));
+      return;
+    }
+
+    // Bundles hold no stock and the sheet tracks their parts, so a bundle is
+    // recorded as its components (bundle qty x qty per bundle).
+    const ids = recipe.map((c) => c.productId || c.component_id).filter(Boolean);
+    const { data: parts } = await supabase
+      .from("products")
+      .select("id, name, variant_name, initial_unit_cost, supplier_pricing")
+      .in("id", ids);
+    setLines((ls) => {
+      const line = ls.find((l) => l.key === key);
+      const bundleQty = Number(line?.qty) || 1;
+      let next = ls.filter((l) => l.key !== key);
+      const added: string[] = [];
+      recipe.forEach((c) => {
+        const id = c.productId || c.component_id;
+        const part = (parts || []).find((x: any) => x.id === id);
+        if (!part) return;
+        const name = part.variant_name && !part.name.includes(part.variant_name) ? `${part.name} [${part.variant_name}]` : part.name;
+        const qty = bundleQty * (Number(c.quantity) || 1);
+        added.push(`${qty}x ${name}`);
+        const existing = next.find((l) => l.productId === id);
+        if (existing) {
+          next = next.map((l) => (l.key === existing.key ? { ...l, qty: String((Number(l.qty) || 0) + qty) } : l));
+        } else {
+          const cost = lastCost(part);
+          next = [...next, { key: nextKey++, productId: id, name, qty: String(qty), cost: cost > 0 ? String(cost) : "" }];
+        }
+      });
+      setBundleNote(`"${p.name}" is a bundle, so its parts were added instead: ${added.join(", ")}.`);
+      return next.length > 0 ? next : [emptyLine()];
+    });
+  };
+
+  // What the sheet already has for a product, so it's clear the order is linked to that row.
+  const sheetItemFor = (productId: string) => {
     for (const g of groupedItems) {
       const item = g.items.find((i: any) => i.productId === productId);
-      if (item?.draftItemId) return item.draftItemId;
+      if (item) return item;
     }
     return null;
   };
+
+  // A product already on the sheet with a staff request: this buy takes it over, like Buy does.
+  const draftItemIdFor = (productId: string) => sheetItemFor(productId)?.draftItemId || null;
 
   const filled = lines.filter((l) => l.productId);
   const total = filled.reduce((sum, l) => sum + (Number(l.qty) || 0) * (Number(l.cost) || 0), 0);
@@ -158,6 +204,7 @@ export function RecordOnlineOrderDialog({
                       </button>
                     )}
                   </div>
+                  {l.productId && <SheetHint item={sheetItemFor(l.productId)} />}
                   {l.productId && (
                     <div className="flex items-center gap-2">
                       <input
@@ -186,6 +233,12 @@ export function RecordOnlineOrderDialog({
                 </div>
               ))}
             </div>
+            {bundleNote && (
+              <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                <Package className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{bundleNote}</span>
+              </div>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -208,5 +261,20 @@ export function RecordOnlineOrderDialog({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** "On the sheet: Need to Buy 24 · 20 already on the way" for a picked product. */
+function SheetHint({ item }: { item: any }) {
+  if (!item) {
+    return <div className="text-[11px] text-slate-400">Not on the sheet — nothing is short for this item right now.</div>;
+  }
+  const onTheWay = (item.inTransit || []).reduce((sum: number, s: any) => sum + s.qty, 0);
+  return (
+    <div className="text-[11px] text-sky-700">
+      On the sheet: Need to Buy <span className="font-bold">{item.needToBuyQty > 0 ? item.needToBuyQty : "none"}</span>
+      {onTheWay > 0 && <> · <span className="font-bold">{onTheWay}</span> already on the way</>}
+      {item.staffRequestedQty != null && <> · staff request {item.staffRequestedQty}</>}
+    </div>
   );
 }
