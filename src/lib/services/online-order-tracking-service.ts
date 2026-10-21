@@ -47,6 +47,20 @@ export async function updatePoTracking(
     Object.assign(update, { tracking_stage: null, tracking_stage_at: null });
   }
 
+  if (input.platformOrderNo !== undefined || input.trackingNo !== undefined) {
+    const { data: full } = await supabase
+      .from('purchase_orders')
+      .select('platform_order_no, tracking_no, purchase_order_items(product_id)')
+      .eq('id', poId)
+      .single();
+    await assertNoDuplicateOrderLines(supabase, {
+      platformOrderNo: input.platformOrderNo !== undefined ? input.platformOrderNo : full?.platform_order_no,
+      trackingNo: input.trackingNo !== undefined ? input.trackingNo : full?.tracking_no,
+      productIds: (full?.purchase_order_items || []).map((i: any) => i.product_id),
+      excludePoId: poId,
+    });
+  }
+
   if (input.platformOrderNo !== undefined) update.platform_order_no = clean(input.platformOrderNo);
   if (input.trackingNo !== undefined) update.tracking_no = clean(input.trackingNo);
   if (input.expectedArrival !== undefined) update.expected_arrival = clean(input.expectedArrival);
@@ -148,4 +162,66 @@ export function actorNameFor(user: any): string {
   const m = user?.user_metadata || {};
   const profileName = `${m.first_name ?? ''} ${m.last_name ?? ''}`.trim();
   return profileName || m.full_name || user?.email || 'Admin';
+}
+
+const norm = (v: string | null | undefined) => (v ?? '').trim().toLowerCase();
+
+export type OrderNoCheck = {
+  /** Other purchases already recorded under this order #. */
+  existing: { poId: string; orderedAt: string; trackingNo: string | null; items: { productId: string; productName: string; qty: number }[] }[];
+  /** Same product, same order #, same (or blank) tracking # — would count it twice. */
+  conflicts: { productId: string; productName: string; qty: number; orderedAt: string; trackingNo: string | null }[];
+  /** Same product and order # but a different tracking # — can be a split box. */
+  warnings: { productId: string; productName: string; qty: number; orderedAt: string; trackingNo: string | null }[];
+};
+
+/**
+ * One order # can hold many products (several items packed in one box), but
+ * the same product under the same order # and tracking # is a double entry.
+ */
+export async function checkOrderNo(
+  supabase: SupabaseClient,
+  opts: { platformOrderNo: string | null | undefined; trackingNo?: string | null; productIds: string[]; excludePoId?: string | null }
+): Promise<OrderNoCheck> {
+  const orderNo = (opts.platformOrderNo ?? '').trim();
+  const empty: OrderNoCheck = { existing: [], conflicts: [], warnings: [] };
+  if (!orderNo) return empty;
+
+  // ilike for a case-insensitive exact match; escape its wildcards.
+  const pattern = orderNo.replace(/[\%_]/g, (c) => `\${c}`);
+  const { data, error } = await supabase
+    .from('purchase_orders')
+    .select('id, created_at, notes, platform_order_no, tracking_no, purchase_order_items(product_id, expected_qty, products(name, variant_name))')
+    .ilike('platform_order_no', pattern);
+  if (error) throw error;
+
+  const result: OrderNoCheck = { existing: [], conflicts: [], warnings: [] };
+  const wanted = new Set(opts.productIds);
+  for (const po of data || []) {
+    if (po.id === opts.excludePoId || po.notes === 'STAFF_DRAFT' || norm(po.platform_order_no) !== norm(orderNo)) continue;
+    const items = (po.purchase_order_items || []).map((i: any) => {
+      let name = i.products?.name || 'Unknown Product';
+      if (i.products?.variant_name && !name.includes(i.products.variant_name)) name = `${name} [${i.products.variant_name}]`;
+      return { productId: i.product_id, productName: name, qty: Number(i.expected_qty) || 0 };
+    });
+    result.existing.push({ poId: po.id, orderedAt: po.created_at, trackingNo: po.tracking_no, items });
+    const sameBox = !norm(po.tracking_no) || !norm(opts.trackingNo) || norm(po.tracking_no) === norm(opts.trackingNo);
+    for (const it of items) {
+      if (!wanted.has(it.productId)) continue;
+      (sameBox ? result.conflicts : result.warnings).push({ ...it, orderedAt: po.created_at, trackingNo: po.tracking_no });
+    }
+  }
+  return result;
+}
+
+/** Throws when saving would record the same product twice under one order #. */
+export async function assertNoDuplicateOrderLines(
+  supabase: SupabaseClient,
+  opts: { platformOrderNo: string | null | undefined; trackingNo?: string | null; productIds: string[]; excludePoId?: string | null }
+) {
+  const { conflicts } = await checkOrderNo(supabase, opts);
+  if (conflicts.length > 0) {
+    const list = conflicts.map((c) => `${c.productName} ×${c.qty}`).join(', ');
+    throw new Error(`Already recorded under order ${(opts.platformOrderNo ?? '').trim()}: ${list}. Saving again would count it twice — edit the existing order instead.`);
+  }
 }

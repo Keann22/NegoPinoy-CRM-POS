@@ -1,7 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { backfillOrderItemCosts } from './cost-backfill-service';
 import { splitStaffDraftLine } from './procurement-service';
-import { updatePoTracking, type TrackingInput } from './online-order-tracking-service';
+import { assertNoDuplicateOrderLines, updatePoTracking, type TrackingInput } from './online-order-tracking-service';
 
 export async function processProcurementPurchases(
   supabase: SupabaseClient,
@@ -12,6 +12,15 @@ export async function processProcurementPurchases(
 ) {
   if (!purchases || purchases.length === 0) {
     throw new Error('No purchases provided');
+  }
+
+  // Before anything is written: the same product under the same order # is a double entry.
+  if (tracking?.route && tracking.platformOrderNo) {
+    await assertNoDuplicateOrderLines(supabase, {
+      platformOrderNo: tracking.platformOrderNo,
+      trackingNo: tracking.trackingNo,
+      productIds: purchases.map((p) => p.productId),
+    });
   }
 
   const { data: po, error: poErr } = await supabase
@@ -54,7 +63,7 @@ export async function addLinesToPurchaseOrder(
 
   const { data: po, error: poErr } = await supabase
     .from('purchase_orders')
-    .select('id, notes, status, purchase_order_items(supplier_id)')
+    .select('id, notes, status, purchase_order_items(supplier_id, product_id)')
     .eq('id', poId)
     .single();
   if (poErr || !po) throw new Error('Purchase order not found');
@@ -66,6 +75,18 @@ export async function addLinesToPurchaseOrder(
     .select('id, name, assembly_recipe')
     .in('id', lines.map((l) => l.productId));
   const bundle = (products || []).find((p: any) => Array.isArray(p.assembly_recipe) && p.assembly_recipe.length > 0);
+  // Same product twice in one purchase, or already under this order # elsewhere.
+  const already = new Set((po.purchase_order_items || []).map((i: any) => i.product_id));
+  const dupHere = lines.find((l) => already.has(l.productId));
+  if (dupHere) throw new Error('That item is already in this purchase. Change its quantity instead of adding it again.');
+  const { data: poNos } = await supabase.from('purchase_orders').select('platform_order_no, tracking_no').eq('id', poId).single();
+  await assertNoDuplicateOrderLines(supabase, {
+    platformOrderNo: poNos?.platform_order_no,
+    trackingNo: poNos?.tracking_no,
+    productIds: lines.map((l) => l.productId),
+    excludePoId: poId,
+  });
+
   if (bundle) {
     const parts = bundle.assembly_recipe.map((c: any) => c.productName).filter(Boolean).join(' + ');
     throw new Error(`"${bundle.name}" is a bundle. Add its parts instead${parts ? `: ${parts}` : ''}.`);

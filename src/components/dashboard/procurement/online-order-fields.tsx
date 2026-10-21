@@ -1,6 +1,7 @@
 "use client";
 
 import { Truck } from "lucide-react";
+import { OrderNoCheckNotice } from "./order-no-check";
 import {
   defaultExpectedArrival,
   guessRouteForSupplier,
@@ -40,9 +41,15 @@ export function trackingPayload(form: OnlineOrderForm) {
 export function OnlineOrderFields({
   value,
   onChange,
+  productIds = [],
+  onBlockedChange,
 }: {
   value: OnlineOrderForm;
   onChange: (next: OnlineOrderForm) => void;
+  /** Products being saved, for the duplicate order # check. */
+  productIds?: string[];
+  /** Told whether saving must be blocked (same product already under this order #). */
+  onBlockedChange?: (blocked: boolean) => void;
 }) {
   const setRoute = (route: TrackingRoute | "") =>
     onChange({
@@ -98,6 +105,14 @@ export function OnlineOrderFields({
               />
             </div>
           </div>
+          {onBlockedChange && (
+            <OrderNoCheckNotice
+              orderNo={value.platformOrderNo}
+              trackingNo={value.trackingNo}
+              productIds={productIds}
+              onBlockedChange={onBlockedChange}
+            />
+          )}
           <div className="space-y-1">
             <label className="text-xs text-slate-600">Expected arrival</label>
             <input

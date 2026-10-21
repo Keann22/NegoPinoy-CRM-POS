@@ -34,6 +34,7 @@ export function RecordOnlineOrderDialog({
   const [supplierId, setSupplierId] = useState("");
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
   const [onlineOrder, setOnlineOrder] = useState(EMPTY_ONLINE_ORDER);
+  const [duplicateBlocked, setDuplicateBlocked] = useState(false);
   const [saving, setSaving] = useState(false);
   const [bundleNote, setBundleNote] = useState("");
 
@@ -249,11 +250,11 @@ export function RecordOnlineOrderDialog({
             </Button>
           </div>
 
-          <OnlineOrderFields value={onlineOrder} onChange={setOnlineOrder} />
+          <OnlineOrderFields value={onlineOrder} onChange={setOnlineOrder} productIds={filled.map((l) => l.productId)} onBlockedChange={setDuplicateBlocked} />
 
           <Button
             onClick={save}
-            disabled={saving || filled.length === 0}
+            disabled={saving || filled.length === 0 || (!!onlineOrder.route && duplicateBlocked)}
             className="w-full bg-sky-600 hover:bg-sky-700 text-white font-bold h-11"
           >
             {saving ? "Saving..." : `Save order (${filled.length} item${filled.length === 1 ? "" : "s"})`}

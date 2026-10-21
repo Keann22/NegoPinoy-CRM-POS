@@ -21,6 +21,7 @@ export function BulkBuyDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   // One "Record Selected" = one platform checkout, so the shipment covers all items.
   const [onlineOrder, setOnlineOrder] = useState(EMPTY_ONLINE_ORDER);
+  const [duplicateBlocked, setDuplicateBlocked] = useState(false);
 
   useEffect(() => {
     if (open) setOnlineOrder(onlineOrderFormFor(bulkBuyGroup?.name));
@@ -74,12 +75,12 @@ export function BulkBuyDialog({
               </div>
             ))}
           </div>
-          <OnlineOrderFields value={onlineOrder} onChange={setOnlineOrder} />
+          <OnlineOrderFields value={onlineOrder} onChange={setOnlineOrder} productIds={purchases.map((p: any) => p.productId)} onBlockedChange={setDuplicateBlocked} />
           <div className="flex gap-2 justify-end pt-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button 
               onClick={handleBulkPurchaseSubmit} 
-              disabled={isSubmitting}
+              disabled={isSubmitting || (!!onlineOrder.route && duplicateBlocked)}
               className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold"
             >
               {isSubmitting ? "Saving..." : "Confirm & Save All"}

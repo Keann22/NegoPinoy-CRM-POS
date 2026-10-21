@@ -26,6 +26,7 @@ export function SingleBuyDialog({
 }) {
   const [buyForm, setBuyForm] = useState({ qty: '', cost: '', supplierId: '' });
   const [onlineOrder, setOnlineOrder] = useState(EMPTY_ONLINE_ORDER);
+  const [duplicateBlocked, setDuplicateBlocked] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const supplierName = (id: string) => suppliers.find(s => s.id === id)?.name;
@@ -123,11 +124,11 @@ export function SingleBuyDialog({
               </div>
             </div>
 
-            <OnlineOrderFields value={onlineOrder} onChange={setOnlineOrder} />
+            <OnlineOrderFields value={onlineOrder} onChange={setOnlineOrder} productIds={buyItem?.productId ? [buyItem.productId] : []} onBlockedChange={setDuplicateBlocked} />
 
             <Button 
               onClick={handleSinglePurchaseSubmit} 
-              disabled={isSubmitting}
+              disabled={isSubmitting || (!!onlineOrder.route && duplicateBlocked)}
               className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-12 text-lg mt-4"
             >
               {isSubmitting ? "Saving..." : "Save Purchase"}
