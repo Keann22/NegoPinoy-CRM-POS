@@ -142,7 +142,10 @@ export async function listReceipts(
       const list = notesByReceipt.get(r.corrects_movement_id) || [];
       list.push({ at: r.timestamp, text: r.reason });
       notesByReceipt.set(r.corrects_movement_id, list);
-    } else {
+    } else if (String(r.reason || '').startsWith('Receipt undone')) {
+      // Undoing deletes the receipt, which also unlinks any earlier "corrected"
+      // notes on it (ON DELETE SET NULL). Only the undo itself is listed - one
+      // line per undone receipt; the full history stays in the movement log.
       undone.push({ id: r.id, productName: displayName(r.products), at: r.timestamp, text: r.reason });
     }
   }
