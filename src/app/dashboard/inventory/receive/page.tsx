@@ -17,6 +17,7 @@ import { PendingPurchases } from '@/components/dashboard/pending-purchases';
 import { useBulkReceive } from '@/hooks/useBulkReceive';
 import { useState } from 'react';
 import { TodaysPurchasesDialog } from '@/components/dashboard/procurement/todays-purchases-dialog';
+import { ReceivedToday } from '@/components/dashboard/inventory/received-today';
 
 export default function BulkReceivePage() {
   const { toast } = useToast();
@@ -24,7 +25,11 @@ export default function BulkReceivePage() {
   // The Procurement Sheet is admin-only, so this is where inventory staff
   // open the day's bought-vs-received summary.
   const [todaysPurchasesOpen, setTodaysPurchasesOpen] = useState(false);
-  
+  // Receiving adds to "Received today"; correcting a receipt there can put a
+  // line back on Pending Incoming Items. Each bump refreshes the other list.
+  const [receivedTick, setReceivedTick] = useState(0);
+  const [pendingTick, setPendingTick] = useState(0);
+
   const {
     form,
     fields,
@@ -58,7 +63,9 @@ export default function BulkReceivePage() {
           onChanged={() => {}}
         />
 
-        <PendingPurchases onReceiveComplete={() => {}} />
+        <PendingPurchases onReceiveComplete={() => setReceivedTick(t => t + 1)} refreshKey={pendingTick} />
+
+        <ReceivedToday refreshKey={receivedTick} onChanged={() => setPendingTick(t => t + 1)} />
 
         <Card>
       <CardHeader>

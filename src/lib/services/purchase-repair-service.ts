@@ -278,6 +278,8 @@ export type RepairResult = {
   /** Set when the line was valued at stale demand and is now valued at delivery. */
   expectedWas: number | null;
   expectedNow: number | null;
+  /** The line that now holds the received units (a new line when a staff draft was split). */
+  lineId: string;
 };
 
 /**
@@ -331,6 +333,15 @@ export async function repairFromPurchaseItem(
   // A partial delivery against a staff request records only what arrived; the
   // undelivered remainder stays on the draft instead of vanishing with the move.
   const lineId = isStaffDraft && newQty > 0 ? await splitStaffDraftLine(supabase, itemId, newQty, poId) : itemId;
+  // The split moved every received unit onto the new line, so the receipts
+  // that point at the draft now belong to it (they're what Receive → Edit uses).
+  if (lineId !== itemId) {
+    const { error: relinkErr } = await supabase
+      .from('inventory_movements')
+      .update({ po_item_id: lineId })
+      .eq('po_item_id', itemId);
+    if (relinkErr) console.error('Could not relink receipts to the split purchase line:', relinkErr.message);
+  }
 
   let movementUpdated = false;
   if (cost > 0 || qtyDelta !== 0) {
@@ -398,5 +409,6 @@ export async function repairFromPurchaseItem(
     qtyDelta,
     expectedWas: expectedChanged ? previousExpected : null,
     expectedNow: expectedChanged ? newQty : null,
+    lineId,
   };
 }

@@ -96,7 +96,7 @@ const RECORDED_REASON = 'Unexpected Delivery Item (recorded as purchase)';
 // receiving auto-created for it against the supplier's receipt.
 const CONFIRMED_SUFFIX = ' [purchase confirmed]';
 
-const isConfirmedReason = (reason: string | null) =>
+export const isConfirmedReason = (reason: string | null) =>
   reason === RECORDED_REASON || !!reason?.endsWith(CONFIRMED_SUFFIX);
 
 /**
@@ -354,7 +354,7 @@ async function recordUnexpectedReceipt(
   const supplierName = await resolveSupplierName(supabase, supplierId);
 
   const poId = await createBackfillPurchaseOrder(supabase, movement.timestamp);
-  const { error: insErr } = await supabase.from('purchase_order_items').insert({
+  const { data: newLine, error: insErr } = await supabase.from('purchase_order_items').insert({
     po_id: poId,
     product_id: movement.product_id,
     supplier_id: supplierId || null,
@@ -362,7 +362,7 @@ async function recordUnexpectedReceipt(
     received_qty: qty,
     unit_cost: unitCost,
     status: qty >= expected ? 'received' : 'pending_receipt',
-  });
+  }).select('id').single();
   if (insErr) {
     await supabase.from('purchase_orders').delete().eq('id', poId);
     throw insErr;
@@ -372,6 +372,10 @@ async function recordUnexpectedReceipt(
     .from('inventory_movements')
     .update({ unit_cost: unitCost, supplier_name: supplierName, reason: RECORDED_REASON })
     .eq('id', movementId);
+  // Separate, best-effort: lets an admin's later receipt correction keep this
+  // line's received qty in step. Kept apart so a missing column can't block the
+  // update above.
+  await supabase.from('inventory_movements').update({ po_item_id: newLine.id }).eq('id', movementId);
 
   await applyProductCost(supabase, movement.product_id, unitCost, supplierId, supplierName);
   if (supplierId) {

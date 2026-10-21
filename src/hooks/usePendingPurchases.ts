@@ -4,7 +4,7 @@ import { useUserProfile } from '@/hooks/useUserProfile';
 import { useSupabase } from '@/lib/supabase/hooks';
 import type { Warehouse } from '@/types';
 
-export function usePendingPurchases(onReceiveComplete: () => void) {
+export function usePendingPurchases(onReceiveComplete: () => void, refreshKey = 0) {
   const supabase = useSupabase();
   const [items, setItems] = useState<any[]>([]);
   const [unexpectedItems, setUnexpectedItems] = useState<any[]>([]);
@@ -53,6 +53,11 @@ export function usePendingPurchases(onReceiveComplete: () => void) {
 
     fetchWh();
   }, [supabase]);
+
+  // A receipt corrected in "Received today" can put a line back in this queue.
+  useEffect(() => {
+    if (refreshKey > 0) fetchPending();
+  }, [refreshKey]);
 
   const handleQtyChange = (id: string, qty: string) => {
     setItems(items.map(i => i.id === id ? { ...i, receivedQty: qty } : i));

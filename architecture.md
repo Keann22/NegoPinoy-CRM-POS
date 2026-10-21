@@ -661,6 +661,27 @@ The other kinds are `checked` (a buy was entered before the goods arrived — th
 
 ---
 
+## Correcting a mis-counted receipt: "Received today" (added 2026-10-21)
+
+**Where**: Bulk Receive (`/dashboard/inventory/receive`), the **Received today** card under Pending Incoming Items ([received-today.tsx](src/components/dashboard/inventory/received-today.tsx)) → `GET/POST /api/inventory/receive/receipts` → [receipt-correction-service.ts](src/lib/services/receipt-correction-service.ts).
+
+**Who can edit** (checked server-side from the session, not the request body):
+- The person who received it, **same PHT day**, until an admin has checked it on the Today's Purchases → Received tab (`isConfirmedReason(reason)`: `[purchase confirmed]` suffix or `recorded as purchase`). A `checked` line (buy entered before arrival) has no confirm step, so it stays editable all that day.
+- Owner/Admin: any receipt, any day (date picker). Staff only see today.
+
+**Links that make it possible** (migration `scripts/migrations/add_receipt_links_to_movements.sql`, all nullable): `inventory_movements.po_item_id`, `warehouse_id`, `performed_by_id`, `performed_by_name`, `corrects_movement_id`. Written by `POST /api/inventory/receive/pending-pos` for PO receipts and unexpected items via `insertLinkedMovement` (falls back to a plain insert if the columns are missing, so receiving never breaks). **Receipts made before the migration have no `warehouse_id` and can't be edited** — they show a lock; use Adjust Stock. `repairFromPurchaseItem` repoints `po_item_id` when it splits a staff draft onto a new line (returns `lineId`), and `recordUnexpectedReceipt` links the movement to the line it creates.
+
+**What one correction (old → new qty, 0 = undo) does**, in this order:
+1. **Purchase line** `received_qty += delta`, status recomputed — a line that drops below `expected_qty` goes back on Pending Incoming Items. An **auto-recorded** line (PO `created_at` within 2s of the receipt, not confirmed — its "bought" is just the staff count) also moves `expected_qty`; undone to 0 it is deleted with its `procurement_request_sources` and its PO if empty. Confirmed/checked lines keep `expected_qty` (bought is the admin's number).
+2. **Stock** `increment_warehouse_stock(product, movement.warehouse_id, delta)`. **Allowed to go negative** — `stock_level` is net of reservations, so negative = orders waiting for units that never arrived, which Need to Buy already picks up. The dialog warns instead of blocking.
+3. **The receipt movement is amended in place** (`quantity_change := new`), or **deleted** when undone. Every consumer that reads RESTOCK movements (Received tab, receive history, Encode Costs, `findReceiptMovement`) therefore sees what arrived without netting anything.
+4. **Trail**: a zero-quantity `movement_type = 'receipt_correction'` note row ("Receipt corrected: 10 → 1 pcs by …", `corrects_movement_id` → the receipt, null when undone) + an `audit_logs` row with old/new qty.
+5. Staff corrections ping Admins/Inventory leads on the bell (`fanOutStaffNotifications`); admin corrections don't.
+
+**Not covered**: the Bulk Inventory Receiving form at the bottom of the page (client-side `useBulkReceive`, writes an expense; ~2 uses/month). Order COGS backfilled by an auto-record is not un-costed when the quantity drops (unit cost is still right). A wrong-product receipt is fixed as Undo + receive again on the right line.
+
+---
+
 ## Procurement Sheet: three numbers that must not be confused
 
 **Location**: `src/app/dashboard/reports/procurement/page.tsx`, backed by `GET /api/inventory/procurement`.

@@ -5,6 +5,8 @@ import { getAffectedSalesRepOrders } from '@/lib/services/procurement-service';
 import { suggestSupplierAndCost, repairFromPurchaseItem } from '@/lib/services/purchase-repair-service';
 import { formatShortDelivery } from '@/lib/utils/messages';
 import { findStage, PHASE_LABELS, transitStatus } from '@/lib/online-order-tracking';
+import { createClient as createSessionClient } from '@/lib/supabase/server';
+import { insertLinkedMovement, editorFromUser } from '@/lib/services/receipt-correction-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -113,6 +115,18 @@ export async function POST(req: Request) {
       if (u2) targetWarehouseId = u2.id;
     }
 
+    // Who received it and where, so the receipt can be corrected later from
+    // "Received today" (the person, same day, or an admin). Taken from the
+    // session, not the request body.
+    const sessionClient = await createSessionClient();
+    const { data: { user: sessionUser } } = await sessionClient.auth.getUser();
+    const editor = editorFromUser(sessionUser);
+    const receiptLinks = {
+      warehouse_id: targetWarehouseId || null,
+      performed_by_id: editor?.id || null,
+      performed_by_name: reportedByName || editor?.name || null,
+    };
+
     // Fetched lazily (only if at least one item actually has a discrepancy) and
     // cached across the loop so multiple discrepant items in one submission
     // don't each re-fetch the same admin/lead list.
@@ -194,15 +208,16 @@ export async function POST(req: Request) {
 
         // 4. Log Movement. Booked uncosted when auto-recording so the repair step
         // can find this exact receipt and stamp the cost/supplier onto it.
-        await supabase
-          .from('inventory_movements')
-          .insert({
-            product_id: poItem.product_id,
-            quantity_change: r.receivedQty,
-            movement_type: 'RESTOCK',
-            unit_cost: canAutoRecord ? 0 : poItem.unit_cost,
-            reason: reason
-          });
+        // Not fatal (as before): stock has already moved, and a 500 here would
+        // invite a retry that receives the same units twice.
+        await insertLinkedMovement(supabase, {
+          product_id: poItem.product_id,
+          quantity_change: r.receivedQty,
+          movement_type: 'RESTOCK',
+          unit_cost: canAutoRecord ? 0 : poItem.unit_cost,
+          reason: reason
+        }, { ...receiptLinks, po_item_id: r.itemId })
+          .catch((mvErr: any) => console.error('Receipt movement insert failed:', mvErr?.message || mvErr));
 
         // 5. Raise an urgent purchase issue for the Inbox when fewer items arrived than expected
         if (r.discrepancyReason) {
@@ -332,15 +347,14 @@ export async function POST(req: Request) {
         if (updateError) throw updateError;
 
         // 2. Log Movement
-        await supabase
-          .from('inventory_movements')
-          .insert({
-            product_id: item.productId,
-            quantity_change: item.receivedQty,
-            movement_type: 'RESTOCK',
-            unit_cost: item.unitCost || 0,
-            reason: 'Unexpected Delivery Item'
-          });
+        await insertLinkedMovement(supabase, {
+          product_id: item.productId,
+          quantity_change: item.receivedQty,
+          movement_type: 'RESTOCK',
+          unit_cost: item.unitCost || 0,
+          reason: 'Unexpected Delivery Item'
+        }, receiptLinks)
+          .catch((mvErr: any) => console.error('Receipt movement insert failed:', mvErr?.message || mvErr));
 
         // Auto-resolve any open procurement issues for this product
         const { data: issues } = await supabase

@@ -14,7 +14,7 @@ import type { TransitStatus } from "@/lib/online-order-tracking";
 const formatShortDate = (ymd: string) =>
   new Date(`${ymd}T00:00:00+08:00`).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric" });
 
-export function PendingPurchases({ onReceiveComplete }: { onReceiveComplete: () => void }) {
+export function PendingPurchases({ onReceiveComplete, refreshKey = 0 }: { onReceiveComplete: () => void; refreshKey?: number }) {
   const {
     items,
     setItems,
@@ -33,7 +33,7 @@ export function PendingPurchases({ onReceiveComplete }: { onReceiveComplete: () 
     handleCloseShort,
     handleReceive,
     closeBatch
-  } = usePendingPurchases(onReceiveComplete);
+  } = usePendingPurchases(onReceiveComplete, refreshKey);
 
   if (loading) return <div>Loading pending purchases...</div>;
   
