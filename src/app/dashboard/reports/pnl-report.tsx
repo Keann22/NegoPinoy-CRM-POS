@@ -1,4 +1,5 @@
 'use client';
+
 import { useState, useEffect } from 'react';
 import { DateRange } from 'react-day-picker';
 import { startOfMonth, endOfMonth } from 'date-fns';
@@ -14,6 +15,7 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
+import { fetchOrdersInRange, fetchAllPages, fetchOrderItemsForOrders } from '@/lib/services/report-orders-service';
 
 type ReportData = {
     grossSales: number;
@@ -39,11 +41,19 @@ const EMPTY_REPORT: ReportData = {
 
 const VOID_ORDER_STATUSES = ['Cancelled', 'Returned'];
 
-export function PnlReport() {
-    const [date, setDate] = useState<DateRange | undefined>({
+interface PnlReportProps {
+    date?: DateRange | undefined;
+    setDate?: (date: DateRange | undefined) => void;
+}
+
+export function PnlReport({ date: externalDate, setDate: externalSetDate }: PnlReportProps = {}) {
+    const [internalDate, setInternalDate] = useState<DateRange | undefined>({
         from: startOfMonth(new Date()),
         to: endOfMonth(new Date()),
     });
+
+    const date = externalDate ?? internalDate;
+    const setDate = externalSetDate ?? setInternalDate;
 
     const supabase = useSupabase();
     const { user } = useUser();
@@ -53,37 +63,45 @@ export function PnlReport() {
 
     useEffect(() => {
         if (!supabase || !user) return;
-        if (!date?.from || !date?.to) {
+        if (!date?.from) {
             setReportData(EMPTY_REPORT);
             setIsLoading(false);
             return;
         }
 
         const fromISO = date.from.toISOString();
-        const toDate = new Date(date.to);
-        toDate.setHours(23, 59, 59, 999);
-        const toISO = toDate.toISOString();
+        const toDateObj = new Date(date.to || date.from);
+        toDateObj.setHours(23, 59, 59, 999);
+        const toISO = toDateObj.toISOString();
+
+        let isMounted = true;
 
         const fetchReport = async () => {
             setIsLoading(true);
             try {
-                // Scope both queries to the selected period at the database level -
-                // an unbounded select() silently caps at 1000 rows, which previously
-                // made this report drop the majority of the business's order history.
-                const [ordersRes, expensesRes] = await Promise.all([
-                    supabase
-                        .from('orders')
-                        .select('id, subtotal, total_discount, total_amount, status')
-                        .gte('order_date', fromISO)
-                        .lte('order_date', toISO),
-                    supabase
-                        .from('expenses')
-                        .select('amount, category')
-                        .gte('expense_date', fromISO)
-                        .lte('expense_date', toISO),
+                // Fetch orders using pagination helper to prevent 1000-row cap truncation
+                const [ordersData, expensesData] = await Promise.all([
+                    fetchOrdersInRange(supabase, {
+                        selectCols: 'id, subtotal, total_discount, total_amount, status, order_date',
+                        fromISO,
+                        toISO,
+                        dateColumn: 'order_date',
+                        statusesToExclude: [],
+                    }),
+                    // Expenses also pass 1000 rows over a few months, so page them too.
+                    fetchAllPages(() =>
+                        supabase
+                            .from('expenses')
+                            .select('id, amount, category')
+                            .gte('expense_date', fromISO)
+                            .lte('expense_date', toISO)
+                            .order('id')
+                    ),
                 ]);
 
-                const orders = (ordersRes.data || []).map((o: any) => ({
+                if (!isMounted) return;
+
+                const orders = (ordersData || []).map((o: any) => ({
                     id: o.id,
                     subtotal: Number(o.subtotal) || 0,
                     totalDiscount: Number(o.total_discount) || 0,
@@ -91,43 +109,32 @@ export function PnlReport() {
                     orderStatus: o.status,
                 }));
 
-                const validOrders = orders.filter(o => !VOID_ORDER_STATUSES.includes(o.orderStatus));
-                const returnedOrders = orders.filter(o => VOID_ORDER_STATUSES.includes(o.orderStatus));
+                const validOrders = orders.filter((o: any) => !VOID_ORDER_STATUSES.includes(o.orderStatus));
+                const returnedOrders = orders.filter((o: any) => VOID_ORDER_STATUSES.includes(o.orderStatus));
 
-                const grossSales = validOrders.reduce((sum, o) => sum + (o.subtotal || (o.totalAmount + o.totalDiscount)), 0);
-                const salesDiscounts = validOrders.reduce((sum, o) => sum + o.totalDiscount, 0);
-                const salesReturns = returnedOrders.reduce((sum, o) => sum + o.totalAmount, 0);
+                const grossSales = validOrders.reduce((sum: number, o: any) => sum + (o.subtotal || (o.totalAmount + o.totalDiscount)), 0);
+                const salesDiscounts = validOrders.reduce((sum: number, o: any) => sum + o.totalDiscount, 0);
+                const salesReturns = returnedOrders.reduce((sum: number, o: any) => sum + o.totalAmount, 0);
                 const netSales = grossSales - salesDiscounts;
 
-                // Fetch order_items in chunks keyed off the already date-scoped orders,
-                // same pattern the dashboard home page uses, to stay under row limits.
-                let cogs = 0;
-                const validOrderIds = validOrders.map(o => o.id);
-                const chunkSize = 500;
-                for (let i = 0; i < validOrderIds.length; i += chunkSize) {
-                    const chunk = validOrderIds.slice(i, i + chunkSize);
-                    const { data: itemsData } = await supabase
-                        .from('order_items')
-                        .select('quantity, cost_price_at_sale')
-                        .in('order_id', chunk);
-                    if (itemsData) {
-                        cogs += itemsData.reduce((sum: number, item: any) => sum + (Number(item.cost_price_at_sale || 0) * Number(item.quantity || 0)), 0);
-                    }
-                }
+                // Fetch order_items in chunks keyed off valid orders
+                const validOrderIds = validOrders.map((o: any) => o.id);
+                const itemsData = await fetchOrderItemsForOrders(supabase, validOrderIds, 'quantity, cost_price_at_sale');
+                const cogs = itemsData.reduce((sum: number, item: any) => sum + (Number(item.cost_price_at_sale || 0) * Number(item.quantity || 0)), 0);
 
                 const grossProfit = netSales - cogs;
 
-                const expenses = (expensesRes.data || []).map((e: any) => ({
+                const expenses = expensesData.map((e: any) => ({
                     amount: Number(e.amount) || 0,
-                    category: e.category || 'Uncategorized',
+                    category: (e.category as string) || 'Uncategorized',
                 }));
-                const opBreakdown = expenses.reduce((acc, e) => {
+                const opBreakdown = expenses.reduce((acc: Record<string, number>, e: { amount: number; category: string }) => {
                     if (e.category.toLowerCase() !== 'cost of goods sold') {
                         acc[e.category] = (acc[e.category] || 0) + e.amount;
                     }
                     return acc;
                 }, {} as Record<string, number>);
-                const operatingExpenses = Object.values(opBreakdown).reduce((s, a) => s + a, 0);
+                const operatingExpenses = (Object.values(opBreakdown) as number[]).reduce((s: number, a: number) => s + a, 0);
 
                 const totalOtherLosses = salesReturns;
                 const netProfit = grossProfit - operatingExpenses - totalOtherLosses;
@@ -139,12 +146,16 @@ export function PnlReport() {
                 });
             } catch (err) {
                 console.error('P&L fetch error:', err);
-                setReportData(EMPTY_REPORT);
+                if (isMounted) setReportData(EMPTY_REPORT);
             } finally {
-                setIsLoading(false);
+                if (isMounted) setIsLoading(false);
             }
         };
         fetchReport();
+
+        return () => {
+            isMounted = false;
+        };
     }, [supabase, user, date]);
 
     const ReportItem = ({ label, value, isBold = false, isNegative = false, isSubItem = false, isFinal = false }: { label: string; value: number; isBold?: boolean; isNegative?: boolean; isSubItem?: boolean; isFinal?: boolean }) => (
@@ -157,11 +168,15 @@ export function PnlReport() {
     return (
         <Card>
             <CardHeader>
-                <CardTitle className="font-headline">Profit &amp; Loss Statement</CardTitle>
-                <CardDescription>An accrual-based P&amp;L report for the selected period, reflecting your business operations.</CardDescription>
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <CardTitle className="font-headline">Profit &amp; Loss Statement</CardTitle>
+                        <CardDescription>An accrual-based P&amp;L report for the selected period, reflecting your business operations.</CardDescription>
+                    </div>
+                    <ReportDateFilter date={date} setDate={setDate} className="mb-0" />
+                </div>
             </CardHeader>
             <CardContent>
-                <ReportDateFilter date={date} setDate={setDate} />
                 {isLoading ? (
                     <div className="space-y-4 mt-4 max-w-2xl mx-auto">
                         <Skeleton className="h-8 w-full" />

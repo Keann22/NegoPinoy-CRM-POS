@@ -31,6 +31,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSupabase, useUser } from '@/lib/supabase/hooks';
 import { Badge } from '@/components/ui/badge';
+import { fetchAllPages } from '@/lib/services/report-orders-service';
 
 type Order = {
   id: string;
@@ -64,23 +65,23 @@ export default function SalesBreakdownPage(props: { params: Promise<{ id: string
     const fetchOrders = async () => {
       setIsLoadingOrders(true);
       try {
-        const { data, error } = await supabase
-          .from('orders')
-          .select('id, total_amount, order_date, created_at, status, sales_person_id, customer_id')
-          .eq('sales_person_id', params.id);
-          
-        if (error) throw error;
-        
-        if (data) {
-          setAllOrders(data.map((o: any) => ({
-            id: o.id,
-            totalAmount: Number(o.total_amount) || 0,
-            orderDate: o.order_date || o.created_at,
-            orderStatus: o.status,
-            salesPersonId: o.sales_person_id,
-            customerId: o.customer_id,
-          })));
-        }
+        // Top salespeople have well over 1000 orders, so page through all of them.
+        const data = await fetchAllPages(() =>
+          supabase
+            .from('orders')
+            .select('id, total_amount, order_date, created_at, status, sales_person_id, customer_id')
+            .eq('sales_person_id', params.id)
+            .order('id')
+        );
+
+        setAllOrders(data.map((o: any) => ({
+          id: o.id,
+          totalAmount: Number(o.total_amount) || 0,
+          orderDate: o.order_date || o.created_at,
+          orderStatus: o.status,
+          salesPersonId: o.sales_person_id,
+          customerId: o.customer_id,
+        })));
       } catch (err) {
         console.error('Error fetching orders:', err);
       } finally {
@@ -127,16 +128,17 @@ export default function SalesBreakdownPage(props: { params: Promise<{ id: string
           }
           const map = new Map<string, string>();
           
-          const { data, error } = await supabase
-            .from('customers')
-            .select('id, full_name')
-            .in('id', customerIds);
-            
-          if (error) throw error;
-          
-          if (data) {
-            data.forEach(c => {
-               map.set(c.id, c.full_name || 'Unknown Customer');
+          // Look up names in batches; one request with every id would make the URL too long.
+          const chunkSize = 200;
+          for (let i = 0; i < customerIds.length; i += chunkSize) {
+            const { data, error } = await supabase
+              .from('customers')
+              .select('id, full_name')
+              .in('id', customerIds.slice(i, i + chunkSize));
+
+            if (error) throw error;
+            (data || []).forEach((c: any) => {
+              map.set(c.id, c.full_name || 'Unknown Customer');
             });
           }
           setCustomerMap(map);

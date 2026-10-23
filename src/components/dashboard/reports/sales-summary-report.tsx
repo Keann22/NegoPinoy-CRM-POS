@@ -5,31 +5,32 @@ import { DateRange } from 'react-day-picker';
 import {
   startOfMonth,
   endOfMonth,
-  format,
 } from 'date-fns';
-import { Calendar as CalendarIcon, CheckCircle2, PackageCheck } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
+import { CheckCircle2, PackageCheck } from 'lucide-react';
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSupabase, useUser } from '@/lib/supabase/hooks';
+import { ReportDateFilter } from '@/components/dashboard/reports/report-date-filter';
+import { fetchOrdersInRange } from '@/lib/services/report-orders-service';
 
-export function SalesSummaryReport() {
-  const [date, setDate] = useState<DateRange | undefined>({
+interface SalesSummaryReportProps {
+  date?: DateRange | undefined;
+  setDate?: (date: DateRange | undefined) => void;
+}
+
+export function SalesSummaryReport({ date: externalDate, setDate: externalSetDate }: SalesSummaryReportProps = {}) {
+  const [internalDate, setInternalDate] = useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date()),
   });
+
+  const date = externalDate ?? internalDate;
+  const setDate = externalSetDate ?? setInternalDate;
 
   const supabase = useSupabase();
   const { user } = useUser();
@@ -39,24 +40,28 @@ export function SalesSummaryReport() {
   const [totalProcessed, setTotalProcessed] = useState({ amount: 0, count: 0 });
 
   useEffect(() => {
-    if (!supabase || !user || !date?.from || !date?.to) return;
+    if (!supabase || !user || !date?.from) return;
     
+    let isMounted = true;
+
     const fetchSummary = async () => {
       setIsLoading(true);
       try {
         const fromDate = date.from!.toISOString();
-        const toDateObj = new Date(date.to!);
+        const toDateObj = new Date(date.to || date.from!);
         toDateObj.setHours(23, 59, 59, 999);
         const toDate = toDateObj.toISOString();
 
-        // We fetch ALL orders within the creation date range
-        const { data, error } = await supabase
-          .from('orders')
-          .select('id, total_amount, status, created_at')
-          .gte('created_at', fromDate)
-          .lte('created_at', toDate);
+        // Fetch ALL orders in range without hitting the 1000-row cap
+        const data = await fetchOrdersInRange(supabase, {
+          selectCols: 'id, total_amount, status, created_at, order_date',
+          fromISO: fromDate,
+          toISO: toDate,
+          dateColumn: 'order_date',
+          statusesToExclude: [],
+        });
 
-        if (error) throw error;
+        if (!isMounted) return;
 
         let sAmount = 0;
         let sCount = 0;
@@ -85,28 +90,22 @@ export function SalesSummaryReport() {
       } catch (err) {
         console.error('Error fetching sales summary:', err);
       } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     };
 
     fetchSummary();
+
+    return () => {
+      isMounted = false;
+    };
   }, [supabase, user, date]);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <h2 className="text-xl font-headline tracking-tight">Sales & Processing Summary</h2>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant={"outline"} size="sm" className={cn("w-[240px] justify-start text-left font-normal bg-background", !date && "text-muted-foreground")}>
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {date?.from ? (date.to ? <>{format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}</> : format(date.from, "LLL dd, y")) : <span>Pick a date</span>}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="end">
-            <Calendar initialFocus mode="range" defaultMonth={date?.from} selected={date} onSelect={setDate} numberOfMonths={2} />
-          </PopoverContent>
-        </Popover>
+        <ReportDateFilter date={date} setDate={setDate} className="mb-0" />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -125,7 +124,7 @@ export function SalesSummaryReport() {
               <>
                 <div className="text-2xl font-bold font-headline text-primary">₱{totalSales.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Based on {totalSales.count} completed orders created in this period.
+                  Based on {totalSales.count} completed orders in this period.
                 </p>
               </>
             )}

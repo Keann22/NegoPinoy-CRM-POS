@@ -49,6 +49,16 @@ function updateState(newState: Partial<AuthState>) {
     emitChange();
 }
 
+// Supabase re-sends SIGNED_IN every time the tab becomes visible again. Keep the
+// existing user object when nothing changed, so effects that depend on `user`
+// don't all re-run (and restart their data loads) on every tab switch.
+function setUser(user: User) {
+    const next = formatUserData(user);
+    const prev = state.user;
+    if (prev && !state.isLoading && JSON.stringify(prev) === JSON.stringify(next)) return;
+    updateState({ user: next, isLoading: false });
+}
+
 let isInitialized = false;
 
 function initAuth() {
@@ -58,10 +68,7 @@ function initAuth() {
     // Single unified listener for auth state changes
     supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
         if (session?.user) {
-            updateState({
-                user: formatUserData(session.user),
-                isLoading: false,
-            });
+            setUser(session.user);
         } else if (event === 'SIGNED_OUT') {
             updateState({ user: null, isLoading: false });
         }
@@ -70,10 +77,7 @@ function initAuth() {
     // Resolve initial session / user
     supabase.auth.getUser().then(({ data }: { data: { user: User | null } }) => {
         if (data?.user) {
-            updateState({
-                user: formatUserData(data.user),
-                isLoading: false,
-            });
+            setUser(data.user);
         } else {
             updateState({ user: null, isLoading: false });
         }

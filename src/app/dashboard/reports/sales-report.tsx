@@ -4,17 +4,14 @@ import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { DateRange } from 'react-day-picker';
 import {
-  startOfToday, endOfToday, startOfYesterday, endOfYesterday, format, subMonths,
+  startOfToday, endOfToday, subMonths,
 } from 'date-fns';
-import { Calendar as CalendarIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter as ReportTableFooter } from '@/components/ui/table';
-import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUser, useSupabase } from '@/lib/supabase/hooks';
+import { ReportDateFilter } from '@/components/dashboard/reports/report-date-filter';
+import { fetchOrdersInRange } from '@/lib/services/report-orders-service';
 
 type Order = {
   id: string;
@@ -30,28 +27,35 @@ type SalesData = {
   name: string;
   salesCount: number;
   totalAmount: number;
+};
+
+interface SalesReportProps {
+  date?: DateRange | undefined;
+  setDate?: (date: DateRange | undefined) => void;
 }
 
-export function SalesReport() {
-  const [date, setDate] = useState<DateRange | undefined>({
+export function SalesReport({ date: externalDate, setDate: externalSetDate }: SalesReportProps = {}) {
+  const [internalDate, setInternalDate] = useState<DateRange | undefined>({
     from: subMonths(startOfToday(), 1),
     to: endOfToday(),
   });
+
+  const date = externalDate ?? internalDate;
+  const setDate = externalSetDate ?? setInternalDate;
 
   const supabase = useSupabase();
   const { user } = useUser();
   const router = useRouter();
 
-  const [allOrders, setAllOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [userMap, setUserMap] = useState<Map<string, string>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
 
+  // Load user directory once
   useEffect(() => {
     if (!supabase || !user) return;
-    const fetchAll = async () => {
-      setIsLoading(true);
+    const fetchUsers = async () => {
       try {
-        // Fetch users using the RPC that the UsersPage uses
         const { data: usersData } = await supabase.rpc('get_all_users');
         const map = new Map<string, string>();
         if (usersData) {
@@ -62,17 +66,43 @@ export function SalesReport() {
           });
           setUserMap(map);
         }
+      } catch (err) {
+        console.error('Error fetching users map:', err);
+      }
+    };
+    fetchUsers();
+  }, [supabase, user]);
 
-        // Fetch orders - REMOVED sales_person_name to prevent crashes if column doesn't exist
-        const { data: ordersData, error: ordersError } = await supabase
-          .from('orders')
-          .select('id, total_amount, order_date, created_at, status, sales_person_id');
+  // Fetch orders scoped to date range without 1000-row cap
+  useEffect(() => {
+    if (!supabase || !user) return;
+    if (!date?.from) {
+      setOrders([]);
+      setIsLoading(false);
+      return;
+    }
 
-        if (ordersError) {
-           console.error('Error fetching orders:', ordersError);
-        }
+    let isMounted = true;
 
-        setAllOrders((ordersData || []).map((o: any) => ({
+    const fetchOrders = async () => {
+      setIsLoading(true);
+      try {
+        const fromISO = date.from!.toISOString();
+        const toDateObj = new Date(date.to || date.from!);
+        toDateObj.setHours(23, 59, 59, 999);
+        const toISO = toDateObj.toISOString();
+
+        const ordersData = await fetchOrdersInRange(supabase, {
+          selectCols: 'id, total_amount, order_date, created_at, status, sales_person_id',
+          fromISO,
+          toISO,
+          dateColumn: 'order_date',
+          statusesToExclude: ['Cancelled', 'Returned'],
+        });
+
+        if (!isMounted) return;
+
+        setOrders(ordersData.map((o: any) => ({
           id: o.id,
           totalAmount: Number(o.total_amount) || 0,
           orderDate: o.order_date || o.created_at,
@@ -81,31 +111,23 @@ export function SalesReport() {
         })));
       } catch (err) {
         console.error('Sales report fetch error:', err);
+        if (isMounted) setOrders([]);
       } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     };
-    fetchAll();
-  }, [supabase, user]);
 
-  const orders = useMemo(() => {
-    if (!allOrders || !date?.from || !date?.to) return [];
-    const fromTime = date.from.getTime();
-    const toDate = new Date(date.to); toDate.setHours(23, 59, 59, 999);
-    const toTime = toDate.getTime();
-    return allOrders.filter(order => {
-      const orderTime = new Date(order.orderDate).getTime();
-      return orderTime >= fromTime && orderTime <= toTime
-        && order.orderStatus !== 'Cancelled'
-        && order.orderStatus !== 'Returned';
-    });
-  }, [allOrders, date]);
+    fetchOrders();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [supabase, user, date]);
 
   const salesByPerson = useMemo(() => {
-    if (!orders) return [];
+    if (!orders || orders.length === 0) return [];
     const salesData = orders.reduce((acc, order) => {
       const key = order.salesPersonId || 'unknown';
-      // Fallback: order.salesPersonName -> userMap -> short ID
       const displayName = order.salesPersonName || userMap.get(key) || `User ${(order.salesPersonId || '').substring(0, 6)}`;
       if (!acc[key]) {
         acc[key] = { userId: key, name: displayName, salesCount: 0, totalAmount: 0 };
@@ -119,36 +141,18 @@ export function SalesReport() {
 
   const grandTotal = useMemo(() => salesByPerson.reduce((sum, item) => sum + item.totalAmount, 0), [salesByPerson]);
 
-  const setDatePreset = (preset: 'today' | 'yesterday') => {
-    const from = preset === 'today' ? startOfToday() : startOfYesterday();
-    const to = preset === 'today' ? endOfToday() : endOfYesterday();
-    setDate({ from, to });
-  };
-
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="font-headline">Sales Report by Person</CardTitle>
-        <CardDescription>View sales for each salesperson within a selected date range.</CardDescription>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <CardTitle className="font-headline">Sales Report by Person</CardTitle>
+            <CardDescription>View sales for each salesperson within the selected date range.</CardDescription>
+          </div>
+          <ReportDateFilter date={date} setDate={setDate} className="mb-0" />
+        </div>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-wrap items-center gap-2 mb-4">
-            <span className="text-sm font-medium">Filter by:</span>
-            <Button variant={date?.from?.toDateString() === startOfToday().toDateString() ? 'default': 'outline'} size="sm" onClick={() => setDatePreset('today')}>Today</Button>
-            <Button variant={date?.from?.toDateString() === startOfYesterday().toDateString() ? 'default': 'outline'} size="sm" onClick={() => setDatePreset('yesterday')}>Yesterday</Button>
-            <Popover>
-                <PopoverTrigger asChild>
-                <Button id="sales-date-picker" variant={"outline"} size="sm"
-                    className={cn("w-[240px] justify-start text-left font-normal", !date && "text-muted-foreground")}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {date?.from ? (date.to ? <>{format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}</> : format(date.from, "LLL dd, y")) : <span>Pick a date</span>}
-                </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                <Calendar initialFocus mode="range" defaultMonth={date?.from} selected={date} onSelect={setDate} numberOfMonths={2} />
-                </PopoverContent>
-            </Popover>
-        </div>
         <Table>
           <TableHeader>
             <TableRow>
@@ -165,7 +169,7 @@ export function SalesReport() {
                 <TableCell className="text-right"><Skeleton className="h-4 w-24 ml-auto" /></TableCell>
               </TableRow>
             ))}
-            {salesByPerson.map((sale) => (
+            {!isLoading && salesByPerson.map((sale) => (
               <TableRow 
                 key={sale.userId}
                 className="cursor-pointer hover:bg-muted/50 transition-colors"

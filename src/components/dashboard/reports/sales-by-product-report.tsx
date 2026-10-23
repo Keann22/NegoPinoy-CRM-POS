@@ -16,8 +16,14 @@ import {
 } from '@/components/ui/select';
 import { ReportDateFilter } from '@/components/dashboard/reports/report-date-filter';
 import { useSalesByProductReport, type ProductSortOption } from '@/hooks/useSalesByProductReport';
+import { DateRange } from 'react-day-picker';
 
-export function SalesByProductReport() {
+interface SalesByProductReportProps {
+  date?: DateRange | undefined;
+  setDate?: (date: DateRange | undefined) => void;
+}
+
+export function SalesByProductReport({ date: externalDate, setDate: externalSetDate }: SalesByProductReportProps = {}) {
   const {
     date,
     setDate,
@@ -29,7 +35,7 @@ export function SalesByProductReport() {
     isLoading,
     filteredProductSales,
     summary,
-  } = useSalesByProductReport();
+  } = useSalesByProductReport(externalDate, externalSetDate);
 
   const isToday = date?.from?.toDateString() === startOfToday().toDateString() &&
     date?.to?.toDateString() === startOfToday().toDateString();

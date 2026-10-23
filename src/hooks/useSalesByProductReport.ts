@@ -12,19 +12,27 @@ import {
 } from 'date-fns';
 import { useSupabase, useUser } from '@/lib/supabase/hooks';
 import type { ProductSaleStat, ProductSalesSummary } from '@/types';
+import { fetchOrdersInRange, fetchOrderItemsForOrders } from '@/lib/services/report-orders-service';
 
 const VOID_ORDER_STATUSES = ['Cancelled', 'Returned'];
 
 export type ProductSortOption = 'qty-desc' | 'qty-asc' | 'revenue-desc' | 'revenue-asc' | 'name-asc';
 
-export function useSalesByProductReport() {
+export function useSalesByProductReport(
+  externalDate?: DateRange,
+  externalSetDate?: (date: DateRange | undefined) => void
+) {
   const supabase = useSupabase();
   const { user } = useUser();
 
-  const [date, setDate] = useState<DateRange | undefined>({
+  const [internalDate, setInternalDate] = useState<DateRange | undefined>({
     from: startOfToday(),
     to: endOfToday(),
   });
+
+  const date = externalDate ?? internalDate;
+  const setDate = externalSetDate ?? setInternalDate;
+
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<ProductSortOption>('qty-desc');
   const [productSales, setProductSales] = useState<ProductSaleStat[]>([]);
@@ -39,11 +47,11 @@ export function useSalesByProductReport() {
       const now = new Date();
       setDate({ from: startOfMonth(now), to: endOfMonth(now) });
     }
-  }, []);
+  }, [setDate]);
 
   useEffect(() => {
     if (!supabase || !user) return;
-    if (!date?.from || !date?.to) {
+    if (!date?.from) {
       setProductSales([]);
       setIsLoading(false);
       return;
@@ -55,22 +63,18 @@ export function useSalesByProductReport() {
       setIsLoading(true);
       try {
         const fromISO = date.from!.toISOString();
-        const toDateObj = new Date(date.to!);
+        const toDateObj = new Date(date.to || date.from!);
         toDateObj.setHours(23, 59, 59, 999);
         const toISO = toDateObj.toISOString();
 
-        // 1. Fetch orders in the selected date range
-        const { data: orders, error: ordersError } = await supabase
-          .from('orders')
-          .select('id, status, order_date, created_at')
-          .gte('order_date', fromISO)
-          .lte('order_date', toISO);
-
-        if (ordersError) throw ordersError;
-
-        const validOrders = (orders || []).filter(
-          (o: any) => !VOID_ORDER_STATUSES.includes(o.status)
-        );
+        // 1. Fetch ALL orders in the selected date range without 1000-row cap truncation
+        const validOrders = await fetchOrdersInRange(supabase, {
+          selectCols: 'id, status, order_date, created_at',
+          fromISO,
+          toISO,
+          dateColumn: 'order_date',
+          statusesToExclude: VOID_ORDER_STATUSES,
+        });
 
         if (validOrders.length === 0) {
           if (isMounted) {
@@ -83,21 +87,11 @@ export function useSalesByProductReport() {
         const validOrderIds = validOrders.map((o: any) => o.id);
 
         // 2. Fetch order items in chunks to prevent row cap truncation
-        const chunkSize = 200;
-        const allItems: any[] = [];
-
-        for (let i = 0; i < validOrderIds.length; i += chunkSize) {
-          const chunk = validOrderIds.slice(i, i + chunkSize);
-          const { data: itemsData, error: itemsError } = await supabase
-            .from('order_items')
-            .select('order_id, product_id, product_name, quantity, selling_price_at_sale, products(name)')
-            .in('order_id', chunk);
-
-          if (itemsError) throw itemsError;
-          if (itemsData) {
-            allItems.push(...itemsData);
-          }
-        }
+        const allItems = await fetchOrderItemsForOrders(
+          supabase,
+          validOrderIds,
+          'order_id, product_id, product_name, quantity, selling_price_at_sale, products(name)'
+        );
 
         // 3. Aggregate by product
         const map = new Map<string, {

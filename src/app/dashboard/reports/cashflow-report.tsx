@@ -9,15 +9,23 @@ import { ReportDateFilter } from '@/components/dashboard/reports/report-date-fil
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import Link from 'next/link';
+import { fetchAllPages } from '@/lib/services/report-orders-service';
 
 type Payment = { amount: number; paymentDate: string; method?: string; orderId?: string; };
 type Expense = { amount: number; expenseDate: string; category: string; description?: string; };
 
-export function CashFlowReport() {
-    const [date, setDate] = useState<DateRange | undefined>({
+interface CashFlowReportProps {
+  date?: DateRange | undefined;
+  setDate?: (date: DateRange | undefined) => void;
+}
+
+export function CashFlowReport({ date: externalDate, setDate: externalSetDate }: CashFlowReportProps = {}) {
+    const [internalDate, setInternalDate] = useState<DateRange | undefined>({
         from: startOfMonth(new Date()),
         to: endOfMonth(new Date()),
     });
+    const date = externalDate ?? internalDate;
+    const setDate = externalSetDate ?? setInternalDate;
 
     const supabase = useSupabase();
     const { user } = useUser();
@@ -31,19 +39,20 @@ export function CashFlowReport() {
         const fetchAll = async () => {
             setIsLoading(true);
             try {
-                const [paymentsRes, expensesRes] = await Promise.all([
-                    supabase.from('payments').select('amount, payment_date, created_at, payment_method, order_id'),
-                    supabase.from('expenses').select('amount, created_at, category, description'),
+                // Page through both tables: payments and expenses each exceed the 1000-row limit.
+                const [paymentsData, expensesData] = await Promise.all([
+                    fetchAllPages(() => supabase.from('payments').select('id, amount, payment_date, created_at, payment_method, order_id').order('id')),
+                    fetchAllPages(() => supabase.from('expenses').select('id, amount, created_at, category, description').order('id')),
                 ]);
 
-                setAllPayments((paymentsRes.data || []).map((p: any) => ({
+                setAllPayments(paymentsData.map((p: any) => ({
                     amount: Number(p.amount) || 0,
                     paymentDate: p.payment_date || p.created_at,
                     method: p.payment_method || 'Unknown',
                     orderId: p.order_id,
                 })));
 
-                setAllExpenses((expensesRes.data || []).map((e: any) => ({
+                setAllExpenses(expensesData.map((e: any) => ({
                     amount: Number(e.amount) || 0,
                     expenseDate: e.created_at,
                     category: e.category || 'Uncategorized',
