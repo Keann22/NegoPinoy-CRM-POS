@@ -130,6 +130,9 @@ export function ReceivedComparison({
     const setDraft = (patch: Partial<Draft>) => setDrafts(prev => ({ ...prev, [row.key]: { ...draft, ...patch } }));
     // While typing, compare against the typed quantity so the gap shows before saving.
     const diff = editable && draft.bought !== "" ? row.received - (Number(draft.bought) || 0) : diffOf(row);
+    // Staff have no inputs, so an unchecked row shows them the same quantity the
+    // admin's box starts with (the staff count). It still reads "Not checked".
+    const shownBought = row.bought ?? (isManagement ? null : row.received);
 
     return (
       <div key={row.key} className={`grid grid-cols-2 divide-x border-t ${unchecked ? "bg-amber-50/40" : ""}`}>
@@ -183,15 +186,15 @@ export function ReceivedComparison({
                 </Button>
               </div>
             </div>
-          ) : row.bought === null ? (
+          ) : shownBought === null ? (
             <p className="text-sm text-slate-400 italic">(nothing entered)</p>
           ) : (
             <div className="flex items-start justify-between gap-3">
               <p className="text-sm font-medium text-slate-800 min-w-0">{row.productName}</p>
               <p className="text-sm whitespace-nowrap text-right">
-                <span className="font-bold">{row.bought}</span>
+                <span className="font-bold">{shownBought}</span>
                 {isManagement && <span className="text-slate-500"> × {peso(row.unitCost)}</span>}
-                {isManagement && <span className="block text-xs font-semibold text-slate-700">{peso(row.bought * row.unitCost)}</span>}
+                {isManagement && <span className="block text-xs font-semibold text-slate-700">{peso(shownBought * row.unitCost)}</span>}
               </p>
             </div>
           )}

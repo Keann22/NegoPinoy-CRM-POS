@@ -2,29 +2,17 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { Button } from "@/components/ui/button";
-import { ViewProductDetailsDialog } from "@/components/dashboard/view-product-details-dialog";
-import { SingleBuyDialog } from "@/components/dashboard/procurement/single-buy-dialog";
-import { BulkBuyDialog } from "@/components/dashboard/procurement/bulk-buy-dialog";
-import { AddMissingItemDialog } from "@/components/dashboard/procurement/add-missing-item-dialog";
-import { ReportIssueDialog } from "@/components/dashboard/procurement/report-issue-dialog";
-import { ReservedStockDialog } from "@/components/dashboard/reserved-stock-dialog";
 import { PurchasedItemsTable } from "@/components/dashboard/procurement/purchased-items-table";
 import { SupplierGroupCard } from "@/components/dashboard/procurement/supplier-group-card";
-import { ScanReceiptDialog } from "@/components/dashboard/procurement/scan-receipt-dialog";
-import { SavedReceiptsDialog } from "@/components/dashboard/procurement/saved-receipts-dialog";
-import { TodaysPurchasesDialog } from "@/components/dashboard/procurement/todays-purchases-dialog";
-import { ShipmentTrackingDialog } from "@/components/dashboard/procurement/shipment-tracking-dialog";
-import { RecordOnlineOrderDialog } from "@/components/dashboard/procurement/record-online-order-dialog";
+import { ProcurementHeaderActions } from "@/components/dashboard/procurement/procurement-header-actions";
+import { ProcurementDialogs } from "@/components/dashboard/procurement/procurement-dialogs";
 import { useReceiptDrafts } from "@/hooks/useReceiptDrafts";
 import type { ReceiptScanDraft } from "@/types";
-import { PlusCircle, RefreshCw, Receipt, ClipboardList, Truck } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { useRoleCheck } from "@/hooks/useRoleCheck";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
-import { useRoleCheck } from "@/hooks/useRoleCheck";
 
 export default function ProcurementSheet() {
   const { isManagement, isLoading: roleLoading } = useRoleCheck();
@@ -33,17 +21,6 @@ export default function ProcurementSheet() {
   const [purchasedItems, setPurchasedItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  
-  const handleCreateBatch = async () => {
-      try {
-          const res = await fetch('/api/inventory/procurement-batch', { method: 'POST' });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || 'Failed to create batch');
-          alert(`Successfully created ${data.batchName}! Check the Receive page to view the batch.`);
-      } catch (err: any) {
-          alert(`Error: ${err.message}`);
-      }
-  };
 
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [isLoadingProduct, setIsLoadingProduct] = useState(false);
@@ -65,6 +42,7 @@ export default function ProcurementSheet() {
   const [issueProduct, setIssueProduct] = useState<any>(null);
 
   const [onlineOrderOpen, setOnlineOrderOpen] = useState(false);
+  const [searchOrdersOpen, setSearchOrdersOpen] = useState(false);
   const [tracking, setTracking] = useState<{ poIds: string[]; title: string } | null>(null);
   const openTracking = (poIds: string[], title: string) => setTracking({ poIds, title });
 
@@ -330,57 +308,17 @@ export default function ProcurementSheet() {
           <h1 className="text-2xl md:text-3xl font-bold text-slate-800">Procurement Master Sheet</h1>
           <p className="text-slate-600 text-sm md:text-base">Your on-the-go shopping list. Click &apos;Buy&apos; to record items as you shop.</p>
         </div>
-        <div className="flex flex-col md:flex-row gap-2">
-            <Button
-              onClick={() => setTodaysPurchasesOpen(true)}
-              variant="outline"
-              className="font-bold px-4 py-2 flex items-center justify-center gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-            >
-              <ClipboardList className="w-4 h-4 text-emerald-600" />
-              Today&apos;s Purchases
-              {toCheckCount > 0 && (
-                <Badge className="bg-amber-500 text-white hover:bg-amber-500 text-xs px-1.5 py-0 min-w-[20px] h-5 flex items-center justify-center rounded-full" title="Received today without a purchase entered - not yet checked against a receipt">
-                  {toCheckCount}
-                </Badge>
-              )}
-            </Button>
-            <Button
-              onClick={() => setSavedScansOpen(true)}
-              variant="outline"
-              className="font-bold px-4 py-2 flex items-center justify-center gap-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50"
-            >
-              <Receipt className="w-4 h-4 text-indigo-600" />
-              Saved Scans
-              {drafts.length > 0 && (
-                <Badge className="bg-indigo-600 text-white hover:bg-indigo-600 text-xs px-1.5 py-0 min-w-[20px] h-5 flex items-center justify-center rounded-full">
-                  {drafts.length}
-                </Badge>
-              )}
-            </Button>
-            <Button
-              onClick={() => fetchData(true)}
-              disabled={refreshing}
-              variant="outline"
-              className="font-bold px-4 py-2 flex items-center justify-center gap-2"
-            >
-              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-              {refreshing ? 'Refreshing...' : 'Refresh'}
-            </Button>
-            {isManagement && (
-                <Button onClick={handleCreateBatch} variant="secondary" className="font-bold px-4 py-2">
-                    Create Procurement Batch
-                </Button>
-            )}
-            <Button
-              onClick={() => setOnlineOrderOpen(true)}
-              className="bg-sky-600 hover:bg-sky-700 text-white font-bold px-4 py-2 flex items-center justify-center gap-2"
-            >
-              <Truck className="w-5 h-5" /> Record Online Order
-            </Button>
-            <Button onClick={() => setIsAddDialogOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 flex items-center justify-center gap-2">
-              <PlusCircle className="w-5 h-5" /> Add Missing Item
-            </Button>
-        </div>
+        <ProcurementHeaderActions
+          onRefresh={() => fetchData(true)}
+          refreshing={refreshing}
+          onOpenSavedScans={() => setSavedScansOpen(true)}
+          draftsCount={drafts.length}
+          onOpenTodaysPurchases={() => setTodaysPurchasesOpen(true)}
+          toCheckCount={toCheckCount}
+          onOpenSearchOrders={() => setSearchOrdersOpen(true)}
+          onOpenOnlineOrder={() => setOnlineOrderOpen(true)}
+          onOpenAddMissingItem={() => setIsAddDialogOpen(true)}
+        />
       </div>
 
       {groupedItems.length === 0 ? (
@@ -421,124 +359,61 @@ export default function ProcurementSheet() {
       )}
 
       {purchasedItems.length > 0 && (
-        <PurchasedItemsTable items={purchasedItems} suppliers={suppliers} onOpenTracking={openTracking} />
-      )}
-
-      <SingleBuyDialog
-        open={buyDialogOpen}
-        onOpenChange={setBuyDialogOpen}
-        buyItem={buyDialogData?.item}
-        initialQty={buyDialogData?.qty || ''}
-        initialCost={buyDialogData?.cost || ''}
-        initialSupplierId={buyDialogData?.supplierId || ''}
-        suppliers={suppliers}
-        onSuccess={() => {
-          setBuyDialogOpen(false);
-          fetchData();
-        }}
-      />
-
-      <BulkBuyDialog
-        open={bulkBuyDialogOpen}
-        onOpenChange={setBulkBuyDialogOpen}
-        bulkBuyGroup={bulkBuyGroup}
-        purchases={bulkBuyPurchases}
-        onSuccess={() => {
-          handleClearBulkSelection();
-          setBulkBuyDialogOpen(false);
-          fetchData();
-        }}
-      />
-
-      <ViewProductDetailsDialog 
-        product={selectedProduct} 
-        open={selectedProduct !== null} 
-        onOpenChange={(open) => !open && setSelectedProduct(null)} 
-      />
-
-      <AddMissingItemDialog
-        open={isAddDialogOpen}
-        onOpenChange={setIsAddDialogOpen}
-        groupedItems={groupedItems}
-        onSuccess={() => {
-          fetchData();
-        }}
-      />
-
-      <ReportIssueDialog
-        open={issueDialogOpen}
-        onOpenChange={setIssueDialogOpen}
-        issueProduct={issueProduct}
-        onSuccess={() => {
-          setIssueDialogOpen(false);
-          setIssueProduct(null);
-        }}
-      />
-
-      {scanGroup && (
-        <ScanReceiptDialog
-          open={scanDialogOpen}
-          onOpenChange={(isOpen) => {
-            setScanDialogOpen(isOpen);
-            if (!isOpen) setActiveDraft(null);
-          }}
-          supplierId={scanGroup.id}
-          supplierName={scanGroup.name}
-          tableItems={scanGroup.items}
-          isManagement={isManagement}
-          onConfirm={handleScanConfirm}
-          initialDraft={activeDraft}
-          onSaveDraft={saveDraft}
-          onCompleteDraft={completeDraft}
+        <PurchasedItemsTable
+          items={purchasedItems}
+          suppliers={suppliers}
+          onOpenTracking={openTracking}
+          onOpenSearchDialog={() => setSearchOrdersOpen(true)}
         />
       )}
 
-      <SavedReceiptsDialog
-        open={savedScansOpen}
-        onOpenChange={setSavedScansOpen}
-        drafts={drafts}
-        loading={draftsLoading}
-        onResume={handleResumeDraft}
-        onDelete={deleteDraft}
-      />
-
-      <TodaysPurchasesDialog
-        open={todaysPurchasesOpen}
-        onOpenChange={setTodaysPurchasesOpen}
-        onChanged={() => { fetchData(true); fetchToCheckCount(); }}
-      />
-
-      <RecordOnlineOrderDialog
-        open={onlineOrderOpen}
-        onOpenChange={setOnlineOrderOpen}
+      <ProcurementDialogs
         suppliers={suppliers}
         groupedItems={groupedItems}
-        onSuccess={() => {
-          setOnlineOrderOpen(false);
-          fetchData(true);
-        }}
-      />
-
-      <ShipmentTrackingDialog
-        open={!!tracking}
-        onOpenChange={(isOpen) => !isOpen && setTracking(null)}
-        poIds={tracking?.poIds || []}
-        title={tracking?.title}
-        onChanged={() => fetchData(true)}
-      />
-
-      <ReservedStockDialog
-        productId={viewingAllocatedItem?.id || ''}
-        productName={viewingAllocatedItem?.name || ''}
-        isOpen={!!viewingAllocatedItem}
-        onClose={() => setViewingAllocatedItem(null)}
-        statusFilter={
-          viewingAllocatedItem?.context === 'needToBuy' 
-            ? ['Processing', 'Picked (with issue)', 'Waiting for Stock'] 
-            : ['Pending Payment', 'Processing', 'Picked (with issue)', 'On-Hold', 'Waiting for Stock']
-        }
-        excludeLayaway={viewingAllocatedItem?.context === 'needToBuy'}
-        title={viewingAllocatedItem?.context === 'needToBuy' ? "Orders Needing This Item" : "Total Open Demand"}
+        onRefreshData={fetchData}
+        fetchToCheckCount={fetchToCheckCount}
+        buyDialogOpen={buyDialogOpen}
+        setBuyDialogOpen={setBuyDialogOpen}
+        buyDialogData={buyDialogData}
+        bulkBuyDialogOpen={bulkBuyDialogOpen}
+        setBulkBuyDialogOpen={setBulkBuyDialogOpen}
+        bulkBuyGroup={bulkBuyGroup}
+        bulkBuyPurchases={bulkBuyPurchases}
+        onClearBulkSelection={handleClearBulkSelection}
+        selectedProduct={selectedProduct}
+        setSelectedProduct={setSelectedProduct}
+        isAddDialogOpen={isAddDialogOpen}
+        setIsAddDialogOpen={setIsAddDialogOpen}
+        issueDialogOpen={issueDialogOpen}
+        setIssueDialogOpen={setIssueDialogOpen}
+        issueProduct={issueProduct}
+        setIssueProduct={setIssueProduct}
+        scanDialogOpen={scanDialogOpen}
+        setScanDialogOpen={setScanDialogOpen}
+        scanGroup={scanGroup}
+        activeDraft={activeDraft}
+        setActiveDraft={setActiveDraft}
+        isManagement={isManagement}
+        onScanConfirm={handleScanConfirm}
+        saveDraft={saveDraft}
+        completeDraft={completeDraft}
+        savedScansOpen={savedScansOpen}
+        setSavedScansOpen={setSavedScansOpen}
+        drafts={drafts}
+        draftsLoading={draftsLoading}
+        onResumeDraft={handleResumeDraft}
+        deleteDraft={deleteDraft}
+        todaysPurchasesOpen={todaysPurchasesOpen}
+        setTodaysPurchasesOpen={setTodaysPurchasesOpen}
+        onlineOrderOpen={onlineOrderOpen}
+        setOnlineOrderOpen={setOnlineOrderOpen}
+        searchOrdersOpen={searchOrdersOpen}
+        setSearchOrdersOpen={setSearchOrdersOpen}
+        tracking={tracking}
+        setTracking={setTracking}
+        openTracking={openTracking}
+        viewingAllocatedItem={viewingAllocatedItem}
+        setViewingAllocatedItem={setViewingAllocatedItem}
       />
     </div>
   );

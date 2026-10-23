@@ -28,16 +28,6 @@ export default function TrialProcurementSheet() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   
-  const handleCreateBatch = async () => {
-      try {
-          const res = await fetch('/api/inventory/procurement-batch', { method: 'POST' });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || 'Failed to create batch');
-          alert(`Successfully created ${data.batchName}! Check the Receive page to view the batch.`);
-      } catch (err: any) {
-          alert(`Error: ${err.message}`);
-      }
-  };
 
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [isLoadingProduct, setIsLoadingProduct] = useState(false);
@@ -301,11 +291,6 @@ export default function TrialProcurementSheet() {
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
               {refreshing ? 'Refreshing...' : 'Refresh'}
             </Button>
-            {isManagement && (
-                <Button onClick={handleCreateBatch} variant="secondary" className="font-bold px-4 py-2">
-                    Create Procurement Batch
-                </Button>
-            )}
             <Button onClick={() => setIsAddDialogOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 flex items-center justify-center gap-2">
               <PlusCircle className="w-5 h-5" /> Add Missing Item
             </Button>
