@@ -13,6 +13,7 @@ import {
   CreditCard,
   LineChart,
   ListChecks,
+  ListOrdered,
   LogOut,
   Menu,
   MessageCircle,
@@ -89,6 +90,7 @@ export default function DashboardLayout({
     // Dashboard for Sales, Management, or Inventory
     if (isManagement || isSales || isInventory) {
       links.push({ href: '/dashboard', label: 'Dashboard', icon: Home });
+      links.push({ href: '/dashboard/priority', label: 'Priority List', icon: ListOrdered });
     }
 
     links.push({ href: '/dashboard/orders', label: 'Orders', icon: ShoppingCart });

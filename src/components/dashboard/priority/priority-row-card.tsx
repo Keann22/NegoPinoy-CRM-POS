@@ -1,0 +1,150 @@
+'use client';
+
+import Link from 'next/link';
+import { useState } from 'react';
+import { ChevronDown, Clock, MessageSquarePlus, PauseCircle, PlayCircle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import {
+  OWNER_LABELS, STEP_LABELS, phtDate,
+  type MissingState, type PriorityOwner, type PriorityRow,
+} from '@/lib/priority/priority-rules';
+
+const peso = (n: number) => `₱${(n || 0).toLocaleString('en-PH', { maximumFractionDigits: 0 })}`;
+const shortDate = (iso: string) =>
+  new Intl.DateTimeFormat('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric' }).format(new Date(iso));
+
+const OWNER_STYLE: Record<PriorityOwner, string> = {
+  warehouse: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200',
+  sales: 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-200',
+  buyer: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200',
+  none: 'bg-muted text-muted-foreground',
+};
+
+const ITEM_STATE: Record<MissingState, string> = {
+  decide: 'OS — no buy request yet',
+  buy: 'To buy',
+  in_transit: 'Bought',
+  transit_late: 'Bought — late',
+  arrived: 'Arrived',
+};
+
+/** "Late 3d" / "Due today" / "Due in 2d" for the current step. */
+function timer(row: PriorityRow): { text: string; tone: 'late' | 'today' | 'ok' } | null {
+  if (row.group === 'hold') return row.hold ? { text: `Back on ${shortDate(row.hold.until)}`, tone: 'ok' } : null;
+  if (!row.dueAt) return null;
+  if (row.daysLate > 0) return { text: `Late ${row.daysLate}d`, tone: 'late' };
+  const today = phtDate(new Date());
+  if (phtDate(row.dueAt) <= today) return { text: 'Due today', tone: 'today' };
+  const days = Math.ceil((new Date(row.dueAt).getTime() - Date.now()) / 86400000);
+  return { text: `Due in ${days}d`, tone: 'ok' };
+}
+
+interface Props {
+  row: PriorityRow;
+  rank: number;
+  canEdit: boolean;
+  onFollowUp: (row: PriorityRow) => void;
+  onHold: (row: PriorityRow) => void;
+  onClearHold: (row: PriorityRow) => void;
+}
+
+export function PriorityRowCard({ row, rank, canEdit, onFollowUp, onHold, onClearHold }: Props) {
+  const [showWhy, setShowWhy] = useState(false);
+  const t = timer(row);
+  const shortId = row.id.slice(0, 7).toUpperCase();
+
+  return (
+    <div className={cn('rounded-lg border bg-card p-3 sm:p-4', row.daysLate > 0 && 'border-red-300 dark:border-red-900')}>
+      <div className="flex gap-3">
+        <div className="w-10 shrink-0 text-center">
+          <div className="text-xl font-bold tabular-nums">{rank}</div>
+          <div className="text-[11px] text-muted-foreground tabular-nums">{row.score} pts</div>
+        </div>
+
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <Link href={`/dashboard/orders/${row.id}`} className="font-semibold hover:underline">#{shortId}</Link>
+            <span className="truncate">{row.customerName || 'Unknown customer'}</span>
+            <span className="text-sm text-muted-foreground">· {peso(row.totalAmount)} · {row.paymentMethod || '—'}</span>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {row.salesPersonName || 'No sales person'} · Status: {row.status}
+            {row.paidAt && <> · {row.paymentMethod === 'COD' ? 'Ordered' : 'Fully paid'} {shortDate(row.paidAt)}</>}
+            {!row.paidAt && row.totalAmount > 0 && <> · {Math.round((row.amountPaid / row.totalAmount) * 100)}% paid</>}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={cn('rounded px-2 py-0.5 text-xs font-medium', OWNER_STYLE[row.owner])}>{OWNER_LABELS[row.owner]}</span>
+            <span className="text-sm font-medium">{STEP_LABELS[row.step]}</span>
+            {t && (
+              <Badge variant={t.tone === 'late' ? 'destructive' : 'outline'} className={cn('gap-1', t.tone === 'today' && 'border-amber-500 text-amber-700 dark:text-amber-300')}>
+                <Clock className="h-3 w-3" />{t.text}
+              </Badge>
+            )}
+          </div>
+
+          {row.missing.length > 0 && (
+            <ul className="space-y-0.5 text-sm">
+              {row.missing.map((m) => (
+                <li key={m.productId} className="flex flex-wrap gap-x-2">
+                  <span>{m.qty}× {m.name}</span>
+                  <span className="text-muted-foreground">
+                    — {ITEM_STATE[m.state]}
+                    {m.state === 'decide' && ` since ${shortDate(m.since)}`}
+                    {(m.state === 'in_transit' || m.state === 'transit_late') && m.eta && `, ETA ${shortDate(m.eta)}`}
+                    {m.stageLabel && ` (${m.stageLabel})`}
+                    {m.state === 'arrived' && ` ${shortDate(m.since)}`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {(row.followUps > 0 || row.hold) && (
+            <div className="text-xs text-muted-foreground">
+              {row.followUps > 0 && row.lastFollowUp && (
+                <div>Followed up {row.followUps}× · last: “{row.lastFollowUp.note}” — {row.lastFollowUp.byName}, {shortDate(row.lastFollowUp.at)}</div>
+              )}
+              {row.hold && <div>Hold: “{row.hold.note}” — {row.hold.byName}</div>}
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            {canEdit && row.group !== 'hold' && (
+              <>
+                <Button size="sm" variant="outline" className="h-8" onClick={() => onFollowUp(row)}>
+                  <MessageSquarePlus className="mr-1.5 h-4 w-4" />Customer followed up
+                </Button>
+                <Button size="sm" variant="ghost" className="h-8" onClick={() => onHold(row)}>
+                  <PauseCircle className="mr-1.5 h-4 w-4" />Hold
+                </Button>
+              </>
+            )}
+            {canEdit && row.hold && (
+              <Button size="sm" variant="outline" className="h-8" onClick={() => onClearHold(row)}>
+                <PlayCircle className="mr-1.5 h-4 w-4" />Remove hold
+              </Button>
+            )}
+            {row.scoreParts.length > 0 && (
+              <Button size="sm" variant="ghost" className="h-8 text-muted-foreground" onClick={() => setShowWhy((v) => !v)}>
+                Why this rank <ChevronDown className={cn('ml-1 h-4 w-4 transition-transform', showWhy && 'rotate-180')} />
+              </Button>
+            )}
+          </div>
+
+          {showWhy && (
+            <ul className="rounded-md bg-muted/50 p-2 text-xs">
+              {row.scoreParts.map((p) => (
+                <li key={p.label} className="flex justify-between gap-4">
+                  <span>{p.label}</span><span className="tabular-nums">+{p.points}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
