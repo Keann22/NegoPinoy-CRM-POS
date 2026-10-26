@@ -4,7 +4,7 @@ import { findStage } from '@/lib/online-order-tracking';
 import {
   PRIORITY_RULES, rankOrder, compareRows, transitState, phtDate,
   type MissingItem, type PriorityOrderInput, type PriorityRow, type PriorityHold,
-  type SendTodayMark, type SendTodayBlock, type BlockReason,
+  type SendTodayMark, type SendTodayBlock, type BlockReason, type OsDecision,
 } from '@/lib/priority/priority-rules';
 
 /**
@@ -152,7 +152,7 @@ export async function getPriorityList(
       : isFullyPaid(o) ? maxIso(lastPayment.get(o.id) || null, o.order_date || o.created_at) : null;
 
     const orderIssues = issuesByOrder.get(o.id) || [];
-    const missing = missingItems(orderIssues, sourcesByOrder.get(o.id) || [], poiById, receivedAt, productById, now);
+    const missing = missingItems(orderIssues, sourcesByOrder.get(o.id) || [], poiById, receivedAt, productById, eventsByOrder.get(o.id) || [], now);
     const osRounds = new Set(orderIssues.map((i) => String(i.created_at).slice(0, 16))).size;
     const { followUps, lastFollowUp, hold, sendToday, sendTodayBlock } = summarizeEvents(eventsByOrder.get(o.id) || [], now);
 
@@ -191,8 +191,18 @@ function missingItems(
   poiById: Map<string, any>,
   receivedAt: Map<string, string>,
   productById: Map<string, any>,
+  orderEvents: any[],
   now: Date
 ): MissingItem[] {
+  // Latest sales decision per product on this order.
+  const decisions = new Map<string, MissingItem['decision']>();
+  orderEvents
+    .filter((e) => e.kind === 'os_decision' && e.product_id)
+    .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
+    .forEach((e) => decisions.set(e.product_id, {
+      kind: (e.reason_code || 'wait') as OsDecision, note: e.note, byName: e.created_by_name, at: e.created_at,
+    }));
+
   const firstOsAt = new Map<string, string>();
   orderIssues.forEach((i) => {
     if (!i.product_id) return;
@@ -215,7 +225,13 @@ function missingItems(
       qty: Number(issue.out_of_stock_qty || 1),
       eta: null as string | null,
       stageLabel: null as string | null,
+      decision: decisions.get(issue.product_id) || null,
     };
+
+    // Sales decided to send the rest / drop it, but the item is still on the order.
+    if (base.decision && base.decision.kind !== 'wait') {
+      return { ...base, state: 'remove_item' as const, since: base.decision.at };
+    }
 
     // A buy request counts for this OS scan if it was linked for this scan, or
     // hasn't been fully received yet. An older request whose stock already
@@ -227,7 +243,11 @@ function missingItems(
         (new Date(s.created_at).getTime() >= issueAt - SOURCE_MATCH_SLACK_MS || !isFullyReceived(poi)))
       .sort((a, b) => String(b.s.created_at).localeCompare(String(a.s.created_at)))[0];
 
-    if (!link) return { ...base, state: 'decide' as const, since: firstOsAt.get(issue.product_id) || issue.created_at };
+    if (!link) {
+      // "Customer will wait" with no buy request (e.g. the request failed): the buyer still owns it.
+      if (base.decision?.kind === 'wait') return { ...base, state: 'buy' as const, since: base.decision.at };
+      return { ...base, state: 'decide' as const, since: firstOsAt.get(issue.product_id) || issue.created_at };
+    }
 
     const { s, poi } = link;
     const po = poi.purchase_orders || {};
@@ -301,7 +321,10 @@ function groupBy<T>(items: T[], key: (item: T) => string): Map<string, T[]> {
 
 // ---- Writes (follow-ups and holds) ----
 
-export type PriorityEventKind = 'followup' | 'hold' | 'hold_cleared' | 'send_today' | 'send_today_blocked' | 'send_today_cancelled';
+export type PriorityEventKind =
+  | 'followup' | 'hold' | 'hold_cleared'
+  | 'send_today' | 'send_today_blocked' | 'send_today_cancelled'
+  | 'os_decision';
 
 /** Just the orders due to go out today (for the warehouse reminder pop-up). */
 export async function getSendTodayList(supabase: SupabaseClient, now = new Date()): Promise<PriorityRow[]> {
@@ -324,7 +347,8 @@ export async function addPriorityEvent(
     note?: string | null;
     holdUntil?: string | null;
     sendDate?: string | null;
-    reasonCode?: BlockReason | null;
+    reasonCode?: BlockReason | OsDecision | null;
+    productId?: string | null;
   },
   editor: PriorityEditor
 ): Promise<void> {
@@ -334,14 +358,17 @@ export async function addPriorityEvent(
     note: input.note?.trim() || null,
     hold_until: input.kind === 'hold' ? input.holdUntil : null,
     ...(input.kind === 'send_today' ? { send_date: input.sendDate } : {}),
-    ...(input.kind === 'send_today_blocked' ? { reason_code: input.reasonCode } : {}),
+    ...(input.kind === 'send_today_blocked' || input.kind === 'os_decision' ? { reason_code: input.reasonCode } : {}),
+    ...(input.kind === 'os_decision' ? { product_id: input.productId } : {}),
     created_by_id: editor.id,
     created_by_name: editor.name,
   });
   if (error) {
     if (isMissingTable(error)) throw new Error('Priority list is not set up yet - run the order_priority_events migration.');
     if (['23514', '42703', 'PGRST204'].includes(error.code)) {
-      throw new Error('Send today is not set up yet - run scripts/migrations/add_send_today_to_priority_events.sql.');
+      throw new Error(input.kind === 'os_decision'
+        ? 'OS decisions are not set up yet - run scripts/migrations/add_os_decisions_and_carryovers.sql.'
+        : 'Send today is not set up yet - run scripts/migrations/add_send_today_to_priority_events.sql.');
     }
     throw error;
   }

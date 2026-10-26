@@ -13,9 +13,14 @@ import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useUserProfile } from '@/hooks/useUserProfile';
-import { JAS_EMAILS, OWNER_LABELS, type PriorityGroup, type PriorityOwner, type PriorityRow } from '@/lib/priority/priority-rules';
+import { JAS_EMAILS, OWNER_LABELS, type MissingItem, type PriorityGroup, type PriorityOwner, type PriorityRow } from '@/lib/priority/priority-rules';
 import { PriorityRowCard, type RowAction } from '@/components/dashboard/priority/priority-row-card';
 import { PriorityActionDialog, type PriorityAction } from '@/components/dashboard/priority/priority-action-dialog';
+import { OsDecisionDialog } from '@/components/dashboard/priority/os-decision-dialog';
+import { CarryOverList } from '@/components/dashboard/priority/carryover-list';
+
+type Tab = PriorityGroup | 'to_follow';
+const TO_FOLLOW_HINT = 'Items customers are still owed from an earlier order. Add them when the customer orders again (the New Order form reminds you).';
 
 const GROUPS: { key: PriorityGroup; label: string; hint: string }[] = [
   { key: 'send_today', label: 'Send today', hint: "Must be booked for the 2 PM pickup (done = moved to For Pick-up by the SPX upload). If one can't go, tap \"Can't send today\" so sales knows why." },
@@ -38,7 +43,9 @@ export default function PriorityListPage() {
   const [rows, setRows] = useState<PriorityRow[]>([]);
   const [eventsReady, setEventsReady] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
-  const [group, setGroup] = useState<PriorityGroup>('ready');
+  const [group, setGroup] = useState<Tab>('ready');
+  const [toFollowCount, setToFollowCount] = useState<number | null>(null);
+  const [decide, setDecide] = useState<{ row: PriorityRow; item: MissingItem } | null>(null);
   const [owner, setOwner] = useState<'all' | PriorityOwner>('all');
   const [salesPerson, setSalesPerson] = useState('all');
   const [lateOnly, setLateOnly] = useState(false);
@@ -105,6 +112,7 @@ export default function PriorityListPage() {
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase().replace(/^#/, '');
+    if (group === 'to_follow') return [];
     return (ranked.get(group) || []).filter(({ row }) =>
       (owner === 'all' || row.owner === owner) &&
       (salesPerson === 'all' || row.salesPersonName === salesPerson) &&
@@ -114,7 +122,7 @@ export default function PriorityListPage() {
   }, [ranked, group, owner, salesPerson, lateOnly, search]);
 
   const lateCount = (g: PriorityGroup) => (ranked.get(g) || []).filter(({ row }) => row.daysLate > 0).length;
-  const hint = GROUPS.find((g) => g.key === group)!.hint;
+  const hint = group === 'to_follow' ? TO_FOLLOW_HINT : GROUPS.find((g) => g.key === group)!.hint;
 
   return (
     <div className="space-y-4">
@@ -140,7 +148,7 @@ export default function PriorityListPage() {
         </Alert>
       )}
 
-      <Tabs value={group} onValueChange={(v) => setGroup(v as PriorityGroup)}>
+      <Tabs value={group} onValueChange={(v) => setGroup(v as Tab)}>
         <TabsList className="h-auto w-full flex-wrap justify-start">
           {GROUPS.map((g) => {
             const total = ranked.get(g.key)?.length || 0;
@@ -152,6 +160,9 @@ export default function PriorityListPage() {
               </TabsTrigger>
             );
           })}
+          <TabsTrigger value="to_follow" className="gap-1.5">
+            To follow {toFollowCount != null && <span className="tabular-nums text-muted-foreground">{toFollowCount}</span>}
+          </TabsTrigger>
         </TabsList>
       </Tabs>
       <p className="text-sm text-muted-foreground">{hint}</p>
@@ -159,8 +170,9 @@ export default function PriorityListPage() {
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative w-full sm:w-64">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-8" placeholder="Order # or customer" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input className="pl-8" placeholder={group === 'to_follow' ? 'Customer or item' : 'Order # or customer'} value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
+        {group !== 'to_follow' && (<>
         <Select value={owner} onValueChange={(v) => setOwner(v as any)}>
           <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -179,9 +191,12 @@ export default function PriorityListPage() {
           <Switch id="late-only" checked={lateOnly} onCheckedChange={setLateOnly} />
           <Label htmlFor="late-only">Late only</Label>
         </div>
+        </>)}
       </div>
 
-      {isLoading && rows.length === 0 ? (
+      {group === 'to_follow' ? (
+        <CarryOverList canCancel={canMark} search={search} onCount={setToFollowCount} />
+      ) : isLoading && rows.length === 0 ? (
         <div className="space-y-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-32 w-full" />)}</div>
       ) : visible.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">Nothing here with these filters.</div>
@@ -194,12 +209,14 @@ export default function PriorityListPage() {
               rank={rank}
               perms={{ canEdit: canMark && eventsReady, canMark: canMark && eventsReady, canBlock: canBlock && eventsReady }}
               onAction={onAction}
+              onDecide={(r, item) => setDecide({ row: r, item })}
             />
           ))}
         </div>
       )}
 
       <PriorityActionDialog row={dialog?.row || null} action={dialog?.action || null} canOverride={isAdmin || isJas} onClose={() => setDialog(null)} onSaved={load} />
+      <OsDecisionDialog row={decide?.row || null} item={decide?.item || null} onClose={() => setDecide(null)} onSaved={load} />
     </div>
   );
 }

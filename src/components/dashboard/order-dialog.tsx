@@ -8,6 +8,7 @@ import { AddProductDialog } from "./product-dialog";
 import { OrderLeftPanel } from "./orders/OrderLeftPanel";
 import { OrderItemsPanel } from "./orders/OrderItemsPanel";
 import { VariantSelectionDialog } from "./orders/VariantSelectionDialog";
+import { CarryOverPanel } from "./orders/CarryOverPanel";
 import { useOrderDialog } from "@/hooks/useOrderDialog";
 import { useSupabase } from "@/lib/supabase/hooks";
 import { useToast } from "@/hooks/use-toast";
@@ -70,6 +71,10 @@ export function OrderDialog(props: OrderDialogProps) {
     addProductOpen,
     setAddProductOpen,
     canAddProduct,
+    carryOverAdds,
+    setCarryOverAdds,
+    toFollow,
+    setToFollow,
     onSubmit
   } = useOrderDialog(props);
 
@@ -199,6 +204,40 @@ export function OrderDialog(props: OrderDialogProps) {
                 canAddProduct={canAddProduct}
               />
             </div>
+            {isEditing ? (
+              <CarryOverPanel
+                mode="edit"
+                originalItems={props.orderItems || []}
+                currentItems={form.watch('orderItems')}
+                selected={toFollow}
+                onToggle={(productId, checked) => setToFollow((prev) => ({ ...prev, [productId]: checked }))}
+              />
+            ) : (
+              <CarryOverPanel
+                mode="create"
+                customerId={selectedCustomer?.id}
+                storeCredit={selectedCustomer?.store_credit}
+                addedIds={carryOverAdds.map((c) => c.id)}
+                onAdd={(c) => {
+                  if (fields.some((item) => item.productId === c.productId)) {
+                    toast({ title: 'Already in this order', description: `${c.productName} is already on the order — raise its quantity instead.` });
+                    return;
+                  }
+                  append({
+                    productId: c.productId,
+                    productName: c.productName,
+                    quantity: c.qty,
+                    costPriceAtSale: c.unitCost,
+                    sellingPriceAtSale: c.unitPrice,
+                    discount: 0,
+                    priceType: 'custom',
+                    priceOverrideReason: `To follow from #${(c.fromOrderId || '').slice(0, 7).toUpperCase()} — price already paid`,
+                    priceOverrideBy: currentUserName,
+                  });
+                  setCarryOverAdds((prev) => [...prev, c]);
+                }}
+              />
+            )}
             <DialogFooter className="pt-8">
               <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>Cancel</Button>
               <Button type="submit">{isEditing ? 'Save Changes' : 'Create Order'}</Button>

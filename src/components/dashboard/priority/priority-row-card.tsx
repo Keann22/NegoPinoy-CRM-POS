@@ -8,8 +8,8 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { PriorityAction } from './priority-action-dialog';
 import {
-  BLOCK_REASONS, OWNER_LABELS, STEP_LABELS, phtDate,
-  type MissingState, type PriorityOwner, type PriorityRow,
+  BLOCK_REASONS, OS_DECISIONS, OWNER_LABELS, STEP_LABELS, phtDate,
+  type MissingItem, type MissingState, type PriorityOwner, type PriorityRow,
 } from '@/lib/priority/priority-rules';
 
 const peso = (n: number) => `₱${(n || 0).toLocaleString('en-PH', { maximumFractionDigits: 0 })}`;
@@ -24,7 +24,8 @@ const OWNER_STYLE: Record<PriorityOwner, string> = {
 };
 
 const ITEM_STATE: Record<MissingState, string> = {
-  decide: 'OS — no buy request yet',
+  decide: 'OS — waiting for sales to decide',
+  remove_item: 'Remove it from the order',
   buy: 'To buy',
   in_transit: 'Bought',
   transit_late: 'Bought — late',
@@ -58,9 +59,10 @@ interface Props {
   rank: number;
   perms: RowPermissions;
   onAction: (row: PriorityRow, action: RowAction) => void;
+  onDecide: (row: PriorityRow, item: MissingItem) => void;
 }
 
-export function PriorityRowCard({ row, rank, perms, onAction }: Props) {
+export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props) {
   const { canEdit, canMark, canBlock } = perms;
   const today = phtDate(new Date());
   const [showWhy, setShowWhy] = useState(false);
@@ -103,7 +105,7 @@ export function PriorityRowCard({ row, rank, perms, onAction }: Props) {
           {row.missing.length > 0 && (
             <ul className="space-y-0.5 text-sm">
               {row.missing.map((m) => (
-                <li key={m.productId} className="flex flex-wrap gap-x-2">
+                <li key={m.productId} className="flex flex-wrap items-center gap-x-2">
                   <span>{m.qty}× {m.name}</span>
                   <span className="text-muted-foreground">
                     — {ITEM_STATE[m.state]}
@@ -112,6 +114,19 @@ export function PriorityRowCard({ row, rank, perms, onAction }: Props) {
                     {m.stageLabel && ` (${m.stageLabel})`}
                     {m.state === 'arrived' && ` ${shortDate(m.since)}`}
                   </span>
+                  {m.decision && (
+                    <span className="text-xs text-muted-foreground">
+                      · {OS_DECISIONS[m.decision.kind]} ({m.decision.byName}{m.decision.note ? `: “${m.decision.note}”` : ''})
+                    </span>
+                  )}
+                  {m.state === 'remove_item' && (
+                    <Link href={`/dashboard/orders/${row.id}`} className="text-xs font-medium text-primary underline">Edit order</Link>
+                  )}
+                  {canMark && (m.state === 'decide' || m.decision) && (
+                    <Button size="sm" variant={m.state === 'decide' ? 'default' : 'ghost'} className="h-6 px-2 text-xs" onClick={() => onDecide(row, m)}>
+                      {m.state === 'decide' ? 'Decide' : 'Change'}
+                    </Button>
+                  )}
                 </li>
               ))}
             </ul>

@@ -11,6 +11,8 @@ import { useProductSearch } from "@/hooks/useProductSearch";
 import { orderSchema, type OrderFormValues, type Customer, type Product } from "@/lib/schemas/order";
 import { createOrder, editOrder } from "@/lib/services/order-service";
 import { buildPriceList, defaultPriceType, resolvePrice, selectWithPriceColumns, type PriceList } from "@/lib/pricing";
+import type { CarryOver } from "@/lib/services/carryover-service";
+import { closeAddedCarryOvers, openOsProductIds, recordToFollow } from "@/lib/services/carryover-client";
 
 type UseOrderDialogProps = {
     mode: 'create' | 'edit';
@@ -40,6 +42,9 @@ export function useOrderDialog(props: UseOrderDialogProps) {
     const dialogOpen = isEditing ? (props.open ?? false) : internalOpen;
 
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+    // "To follow" items: added from earlier orders (new order) / ticked when removed (edit).
+    const [carryOverAdds, setCarryOverAdds] = useState<CarryOver[]>([]);
+    const [toFollow, setToFollow] = useState<Record<string, boolean>>({});
 
     const [customerSearch, setCustomerSearch] = useState('');
     const [productSearch, setProductSearch] = useState('');
@@ -87,6 +92,8 @@ export function useOrderDialog(props: UseOrderDialogProps) {
             }
             setCustomerSearch('');
             setProductSearch('');
+            setCarryOverAdds([]);
+            setToFollow({});
             // Price lists are re-read on the next open so price changes show up.
             setProductPriceCache({});
             requestedPriceListIds.current.clear();
@@ -241,6 +248,7 @@ export function useOrderDialog(props: UseOrderDialogProps) {
             return;
         }
 
+        const addedCarryOvers = carryOverAdds;
         handleOpenChange(false);
         toast({ title: "Creating Order...", description: "Your new order is being saved." });
 
@@ -257,6 +265,9 @@ export function useOrderDialog(props: UseOrderDialogProps) {
                 title: "Order Created",
                 description: "The new order has been successfully saved and inventory updated.",
             });
+
+            await closeAddedCarryOvers(addedCarryOvers, values.orderItems, newOrderId).catch((e) =>
+                toast({ variant: 'destructive', title: 'Order saved, but the to-follow list was not updated', description: e.message }));
 
             if (props.mode === 'create' && props.onOrderAdded) {
                 props.onOrderAdded();
@@ -280,10 +291,13 @@ export function useOrderDialog(props: UseOrderDialogProps) {
         }
 
         const order = props.order;
+        const ticked = toFollow;
         if (props.onOpenChange) props.onOpenChange(false);
         toast({ title: "Updating Order...", description: "Your order edits are being saved." });
 
         try {
+            // Which items were OS must be read before the edit resolves their issues.
+            const osProductIds = Object.values(ticked).some(Boolean) ? await openOsProductIds(supabase, order.id) : new Set<string>();
             await editOrder(supabase, values, {
                 userProfileId: userProfile.id,
                 userProfileName: `${userProfile.firstName} ${userProfile.lastName}`.trim() || userProfile.email,
@@ -297,6 +311,9 @@ export function useOrderDialog(props: UseOrderDialogProps) {
                 title: "Order Updated",
                 description: "The order has been successfully edited and inventory re-adjusted.",
             });
+
+            await recordToFollow(order.id, props.orderItems || [], values.orderItems, ticked, osProductIds).catch((e) =>
+                toast({ variant: 'destructive', title: 'Order saved, but the to-follow items were not', description: e.message }));
 
             window.location.reload();
         } catch (e: any) {
@@ -353,6 +370,10 @@ export function useOrderDialog(props: UseOrderDialogProps) {
         addProductOpen,
         setAddProductOpen,
         canAddProduct,
+        carryOverAdds,
+        setCarryOverAdds,
+        toFollow,
+        setToFollow,
         onSubmit
     };
 }

@@ -68,7 +68,15 @@ export type BlockReason = keyof typeof BLOCK_REASONS;
 
 export type PriorityGroup = 'send_today' | 'ready' | 'waiting' | 'prep' | 'stale' | 'hold';
 export type PriorityOwner = 'warehouse' | 'sales' | 'buyer' | 'none';
-export type MissingState = 'decide' | 'buy' | 'in_transit' | 'transit_late' | 'arrived';
+export type MissingState = 'decide' | 'remove_item' | 'buy' | 'in_transit' | 'transit_late' | 'arrived';
+
+/** Sales' answer for an OS item. */
+export const OS_DECISIONS = {
+  wait: 'Customer will wait',
+  carry_over: 'Send the rest now — item to follow',
+  remove: 'Remove the item (customer cancelled it)',
+} as const;
+export type OsDecision = keyof typeof OS_DECISIONS;
 export type PriorityStep = 'send_today' | 'send_upload' | 'pack' | 'book' | 'prep' | 'stale' | 'hold' | MissingState;
 
 export interface MissingItem {
@@ -82,6 +90,8 @@ export interface MissingItem {
   eta: string | null;
   /** Online order stage label, when tracked. */
   stageLabel: string | null;
+  /** Sales' latest decision for this item on this order. */
+  decision: { kind: OsDecision; note: string | null; byName: string | null; at: string } | null;
 }
 
 export interface PriorityHold {
@@ -153,7 +163,8 @@ export const STEP_LABELS: Record<PriorityStep, string> = {
   send_upload: 'Send today — packed, waiting for SPX upload',
   pack: 'Pick, pack & book',
   book: 'Packed — book with SPX',
-  decide: 'OS — sales to decide (wait or remove)',
+  decide: 'OS — sales to decide (wait, send the rest, or remove)',
+  remove_item: 'Decided — sales to remove the item from the order (Edit order)',
   buy: 'OS — to buy',
   in_transit: 'Bought — waiting for delivery',
   transit_late: 'Bought — delivery is late',
@@ -171,10 +182,11 @@ export const OWNER_LABELS: Record<PriorityOwner, string> = {
 };
 
 /** Which blocked item decides the order's next step, most urgent first. */
-const STATE_PRECEDENCE: MissingState[] = ['decide', 'buy', 'transit_late', 'in_transit', 'arrived'];
+const STATE_PRECEDENCE: MissingState[] = ['decide', 'remove_item', 'buy', 'transit_late', 'in_transit', 'arrived'];
 
 const STATE_OWNER: Record<MissingState, PriorityOwner> = {
   decide: 'sales',
+  remove_item: 'sales',
   buy: 'buyer',
   transit_late: 'buyer',
   in_transit: 'none',
@@ -183,6 +195,7 @@ const STATE_OWNER: Record<MissingState, PriorityOwner> = {
 
 const STATE_DAYS: Record<MissingState, number | null> = {
   decide: PRIORITY_RULES.decideDays,
+  remove_item: PRIORITY_RULES.decideDays,
   buy: PRIORITY_RULES.buyDays,
   transit_late: null, // due = eta
   in_transit: null, // due = eta

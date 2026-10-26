@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { createClient as createSessionClient } from '@/lib/supabase/server';
-import { editorFromUser } from '@/lib/services/receipt-correction-service';
+import { getPriorityCaller } from '@/lib/priority/priority-auth';
 import { addPriorityEvent, type PriorityEventKind } from '@/lib/services/priority-list-service';
-import { phtDate, sendDateFor, BLOCK_REASONS, JAS_EMAILS, type BlockReason } from '@/lib/priority/priority-rules';
+import { phtDate, sendDateFor, BLOCK_REASONS, type BlockReason } from '@/lib/priority/priority-rules';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,17 +13,8 @@ const supabase = createClient(
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
+// os_decision has its own route (/api/priority/decision).
 const KINDS: PriorityEventKind[] = ['followup', 'hold', 'hold_cleared', 'send_today', 'send_today_blocked', 'send_today_cancelled'];
-
-function rolesOf(user: any): string[] {
-  const collect = (meta: any): string[] => {
-    if (!meta) return [];
-    if (Array.isArray(meta.roles)) return meta.roles.map((r: string) => String(r).toLowerCase().trim());
-    if (meta.role) return [String(meta.role).toLowerCase().trim()];
-    return [];
-  };
-  return [...collect(user?.app_metadata), ...collect(user?.user_metadata)];
-}
 
 const bad = (error: string, status = 400) => NextResponse.json({ error }, { status });
 
@@ -38,15 +28,9 @@ const bad = (error: string, status = 400) => NextResponse.json({ error }, { stat
  */
 export async function POST(req: Request) {
   try {
-    const session = await createSessionClient();
-    const { data: { user } } = await session.auth.getUser();
-    const editor = editorFromUser(user);
-    if (!editor) return bad('Not signed in', 401);
-
-    const roles = rolesOf(user);
-    const isAdmin = roles.includes('owner') || roles.includes('admin');
-    const isJas = JAS_EMAILS.includes(String(user?.email || '').toLowerCase().trim());
-    const canMark = isAdmin || isJas || roles.includes('sales');
+    const caller = await getPriorityCaller();
+    if (!caller) return bad('Not signed in', 401);
+    const { isAdmin, isJas, canDecide: canMark } = caller;
 
     const { orderId, kind, note, holdUntil, override, reason } = await req.json();
     const cleanNote = typeof note === 'string' ? note.trim().slice(0, 500) : '';
@@ -74,7 +58,7 @@ export async function POST(req: Request) {
     const { data: order } = await supabase.from('orders').select('id').eq('id', orderId).maybeSingle();
     if (!order) return bad('Order not found', 404);
 
-    const who = { id: editor.id, name: editor.name };
+    const who = { id: caller.id, name: caller.name };
     let sendDate: string | null = null;
     if (kind === 'send_today') sendDate = sendDateFor(new Date(), override === true && (isAdmin || isJas));
 
