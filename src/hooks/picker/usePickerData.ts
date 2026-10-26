@@ -4,6 +4,7 @@ import { resolveOpenOrderIssues } from '@/lib/services/order-issues-service';
 import { handleStockStatusTransition } from '@/lib/services/orders/order-update';
 import type { OrderItem, PickGroup, PickRow, ProductMemoryHint } from './types';
 import { fetchProductMemoriesForPicker } from './pickerMemoryHelper';
+import { usePickMarks } from './usePickMarks';
 
 export function usePickerData(
   supabase: SupabaseClient | null,
@@ -15,8 +16,8 @@ export function usePickerData(
   const [orderDetails, setOrderDetails] = useState<any>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [pickGroups, setPickGroups] = useState<PickGroup[]>([]);
-  const [outOfStockQty, setOutOfStockQty] = useState<Map<string, number>>(new Map());
-  const [qtyDrafts, setQtyDrafts] = useState<Map<string, string>>(new Map());
+  const marks = usePickMarks();
+  const { outOfStockQty } = marks;
   const [productMemories, setProductMemories] = useState<Map<string, ProductMemoryHint>>(new Map());
   const [loading, setLoading] = useState(false);
   const [viewingPhotoItem, setViewingPhotoItem] = useState<OrderItem | null>(null);
@@ -25,8 +26,7 @@ export function usePickerData(
     setOrderDetails(null);
     setOrderItems([]);
     setPickGroups([]);
-    setOutOfStockQty(new Map());
-    setQtyDrafts(new Map());
+    marks.resetMarks();
     setProductMemories(new Map());
     setViewingPhotoItem(null);
   };
@@ -161,7 +161,6 @@ export function usePickerData(
         .eq('status', 'open');
 
       const nextQty = new Map<string, number>();
-      const nextDrafts = new Map<string, string>();
 
       if (existingIssues && existingIssues.length > 0) {
         const flatRows = groups.flatMap((g: PickGroup) => g.rows);
@@ -169,12 +168,10 @@ export function usePickerData(
           const matchingRow = flatRows.find((r: PickRow) => r.productId === issue.product_id);
           if (matchingRow) {
             nextQty.set(matchingRow.key, issue.out_of_stock_qty);
-            nextDrafts.set(matchingRow.key, String(issue.out_of_stock_qty));
           }
         }
       }
-      setOutOfStockQty(nextQty);
-      setQtyDrafts(nextDrafts);
+      marks.preloadOutOfStock(nextQty);
 
       if (['Picked', 'Picked (with issue)', 'Photo', 'Packed', 'For Shipping', 'For Pick-up'].includes(data.status)) {
         toast({
@@ -193,46 +190,19 @@ export function usePickerData(
     }
   };
 
-  const toggleOutOfStock = (rowKey: string, fullQty: number) => {
-    const nextQty = new Map(outOfStockQty);
-    const nextDrafts = new Map(qtyDrafts);
-    if (nextQty.has(rowKey)) {
-      nextQty.delete(rowKey);
-      nextDrafts.delete(rowKey);
-    } else {
-      nextQty.set(rowKey, fullQty);
-      nextDrafts.set(rowKey, String(fullQty));
-    }
-    setOutOfStockQty(nextQty);
-    setQtyDrafts(nextDrafts);
-  };
-
-  const handleQtyDraftChange = (rowKey: string, rawValue: string) => {
-    const nextDrafts = new Map(qtyDrafts);
-    nextDrafts.set(rowKey, rawValue);
-    setQtyDrafts(nextDrafts);
-
-    const parsed = parseInt(rawValue, 10);
-    if (!isNaN(parsed) && parsed > 0) {
-      const nextQty = new Map(outOfStockQty);
-      nextQty.set(rowKey, parsed);
-      setOutOfStockQty(nextQty);
-    }
-  };
-
-  const commitOutOfStockQty = (rowKey: string, fullQty: number) => {
-    const clamped = Math.min(Math.max(1, outOfStockQty.get(rowKey) || 1), fullQty);
-    const nextQty = new Map(outOfStockQty);
-    nextQty.set(rowKey, clamped);
-    setOutOfStockQty(nextQty);
-    const nextDrafts = new Map(qtyDrafts);
-    nextDrafts.set(rowKey, String(clamped));
-    setQtyDrafts(nextDrafts);
-  };
-
   const handleSubmitPicking = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supabase || !scannedOrderId) return;
+
+    const unmarked = marks.unmarkedRows(pickGroups.flatMap(g => g.rows));
+    if (unmarked.length > 0) {
+      toast({
+        title: `${unmarked.length} item${unmarked.length === 1 ? '' : 's'} not checked yet`,
+        description: 'Mark every item as Found or OS before submitting.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setLoading(true);
 
@@ -373,15 +343,18 @@ export function usePickerData(
     orderItems,
     pickGroups,
     outOfStockQty,
-    qtyDrafts,
+    qtyDrafts: marks.qtyDrafts,
+    foundKeys: marks.foundKeys,
     productMemories,
     loading,
     viewingPhotoItem,
     setViewingPhotoItem,
     handleScanSuccess,
-    toggleOutOfStock,
-    handleQtyDraftChange,
-    commitOutOfStockQty,
+    markFound: marks.markFound,
+    markOutOfStock: marks.markOutOfStock,
+    unmarkedRows: marks.unmarkedRows,
+    handleQtyDraftChange: marks.handleQtyDraftChange,
+    commitOutOfStockQty: marks.commitOutOfStockQty,
     handleSubmitPicking
   };
 }

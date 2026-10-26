@@ -36,6 +36,8 @@ export const PRIORITY_RULES = {
     value5k: 10,
     value10k: 20,
     perExtraOsRound: 10,
+    /** An item was taken from this order for another one: it shouldn't lose its place. */
+    borrowedFrom: 30,
   },
 };
 
@@ -90,6 +92,8 @@ export interface MissingItem {
   eta: string | null;
   /** Online order stage label, when tracked. */
   stageLabel: string | null;
+  /** This item was taken from this order to fill another order. */
+  borrowedFor?: { toOrderId: string; byName: string | null; at: string } | null;
   /** Sales' latest decision for this item on this order. */
   decision: { kind: OsDecision; note: string | null; byName: string | null; at: string } | null;
 }
@@ -304,6 +308,8 @@ function scoreFor(o: PriorityOrderInput, daysLate: number, daysSincePaid: number
   if (o.totalAmount >= 10000) parts.push({ label: 'Order ₱10k+', points: p.value10k });
   else if (o.totalAmount >= 5000) parts.push({ label: 'Order ₱5k+', points: p.value5k });
   if (o.osRounds > 1) parts.push({ label: `Picked ${o.osRounds}× with OS`, points: (o.osRounds - 1) * p.perExtraOsRound });
+  const borrowed = o.missing.filter((m) => m.borrowedFor).length;
+  if (borrowed > 0) parts.push({ label: `Item borrowed for another order${borrowed > 1 ? ` (${borrowed})` : ''}`, points: borrowed * p.borrowedFrom });
   return parts;
 }
 

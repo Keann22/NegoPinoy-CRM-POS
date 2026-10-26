@@ -114,6 +114,11 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
                     {m.stageLabel && ` (${m.stageLabel})`}
                     {m.state === 'arrived' && ` ${shortDate(m.since)}`}
                   </span>
+                  {m.borrowedFor && (
+                    <span className="text-xs font-medium text-violet-700 dark:text-violet-300">
+                      · borrowed for <Link href={`/dashboard/orders/${m.borrowedFor.toOrderId}`} className="underline">#{m.borrowedFor.toOrderId.slice(0, 7).toUpperCase()}</Link> by {m.borrowedFor.byName}, {shortDate(m.borrowedFor.at)}
+                    </span>
+                  )}
                   {m.decision && (
                     <span className="text-xs text-muted-foreground">
                       · {OS_DECISIONS[m.decision.kind]} ({m.decision.byName}{m.decision.note ? `: “${m.decision.note}”` : ''})

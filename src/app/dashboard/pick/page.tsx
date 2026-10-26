@@ -5,10 +5,11 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ClipboardList, ScanLine, X, Check, AlertCircle, AlertTriangle, CameraOff } from 'lucide-react';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Loader2, ClipboardList, ScanLine, X, Check, AlertCircle, AlertTriangle, CameraOff, ArrowLeftRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { usePicker } from '@/hooks/usePicker';
 import { ProductPhotoDialog } from '@/components/dashboard/product-photo-dialog';
+import { BorrowDialog, type BorrowTarget } from '@/components/dashboard/picker/borrow-dialog';
 
 function formatMemoryAge(dateStr?: string): string {
   if (!dateStr) return '';
@@ -34,17 +35,40 @@ export default function PickerApp() {
     pickGroups,
     outOfStockQty,
     qtyDrafts,
+    foundKeys,
     productMemories,
     loading,
     viewingPhotoItem,
     setViewingPhotoItem,
     startScanner,
     stopScanner,
-    toggleOutOfStock,
+    markFound,
+    markOutOfStock,
+    unmarkedRows,
     handleQtyDraftChange,
     commitOutOfStockQty,
     handleSubmitPicking
   } = usePicker();
+
+  const allRows = pickGroups.flatMap((g) => g.rows);
+  const unmarkedCount = unmarkedRows(allRows).length;
+  const checkedCount = allRows.length - unmarkedCount;
+
+  // Borrowing an item already picked for another order (see borrow-dialog).
+  const [borrowTarget, setBorrowTarget] = React.useState<BorrowTarget | null>(null);
+  const [borrowedFrom, setBorrowedFrom] = React.useState<Map<string, string>>(new Map());
+  React.useEffect(() => { setBorrowedFrom(new Map()); }, [scannedOrderId]);
+
+  const openBorrow = (key: string) => {
+    const row = allRows.find((r) => r.key === key);
+    if (row) setBorrowTarget({ rowKey: key, productId: row.productId, productName: row.productName, missingQty: outOfStockQty.get(key) || row.quantity });
+  };
+
+  const onBorrowed = (target: BorrowTarget, qty: number, fromShortId: string) => {
+    setBorrowedFrom(new Map(borrowedFrom).set(target.rowKey, `${qty} borrowed from #${fromShortId}`));
+    if (qty >= target.missingQty) markFound(target.rowKey);
+    else handleQtyDraftChange(target.rowKey, String(target.missingQty - qty));
+  };
 
   return (
     <div className="flex flex-col h-full max-w-2xl mx-auto p-4 space-y-4">
@@ -142,7 +166,7 @@ export default function PickerApp() {
                       <tr>
                         <th className="p-3 font-medium text-muted-foreground">Item Name</th>
                         <th className="p-3 font-medium text-muted-foreground text-center">Qty</th>
-                        <th className="p-3 font-medium text-muted-foreground text-center">Out of Stock</th>
+                        <th className="p-3 font-medium text-muted-foreground text-center">Found / OS</th>
                         <th className="p-3 font-medium text-muted-foreground text-center">Missing Qty</th>
                       </tr>
                     </thead>
@@ -156,6 +180,7 @@ export default function PickerApp() {
                           indent: boolean
                         ) => {
                           const isFlagged = outOfStockQty.has(key);
+                          const isFound = foundKeys.has(key);
                           const memoryHint = productMemories.get(productId);
                           const hasVerifiedMemory = !!(memoryHint && memoryHint.verifiedCount > 0 && memoryHint.actorName);
                           const hasSystemStock = !!(memoryHint && (memoryHint.systemStock ?? 0) > 0);
@@ -164,25 +189,52 @@ export default function PickerApp() {
 
                           return (
                             <React.Fragment key={key}>
-                              <tr className={`border-b ${showHint ? '' : 'last:border-0'} ${isFlagged ? 'bg-red-50' : ''}`}>
+                              <tr className={`border-b ${showHint ? '' : 'last:border-0'} ${isFlagged ? 'bg-red-50' : isFound ? 'bg-green-50' : ''}`}>
                                 <td className={`p-3 ${indent ? 'pl-8' : ''}`}>
                                   <div className="flex items-center flex-wrap gap-1.5">
                                     {name}
+                                    {borrowedFrom.has(key) && (
+                                      <Badge variant="outline" className="text-[10px] text-violet-700 bg-violet-50 border-violet-300 font-semibold">
+                                        {borrowedFrom.get(key)}
+                                      </Badge>
+                                    )}
                                     {hasReserveStock && (
                                       <Badge variant="outline" className="text-[10px] text-blue-700 bg-blue-50 border-blue-300 font-semibold">
                                         Unit 2: {memoryHint.unit2ReserveStock} in reserve
                                       </Badge>
                                     )}
                                   </div>
+                                  {isFlagged && (
+                                    <button type="button" onClick={() => openBorrow(key)}
+                                      className="mt-1.5 inline-flex items-center gap-1 rounded-md border border-violet-300 px-2 py-1 text-[11px] font-semibold text-violet-700 hover:bg-violet-50">
+                                      <ArrowLeftRight className="h-3 w-3" />Borrow from another order
+                                    </button>
+                                  )}
                                 </td>
                                 <td className="p-3 text-center">
                                   <span className="font-bold">{qty}</span>
                                 </td>
-                                <td className="p-3 text-center">
-                                  <Checkbox
-                                    checked={isFlagged}
-                                    onCheckedChange={() => toggleOutOfStock(key, qty)}
-                                  />
+                                <td className="p-2 text-center">
+                                  <div className="inline-flex gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => markFound(key)}
+                                      aria-pressed={isFound}
+                                      className={cn('h-9 min-w-[3.5rem] rounded-md border px-2 text-xs font-semibold',
+                                        isFound ? 'border-green-600 bg-green-600 text-white' : 'border-green-300 text-green-700 hover:bg-green-50')}
+                                    >
+                                      Found
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => markOutOfStock(key, qty)}
+                                      aria-pressed={isFlagged}
+                                      className={cn('h-9 min-w-[3rem] rounded-md border px-2 text-xs font-semibold',
+                                        isFlagged ? 'border-red-600 bg-red-600 text-white' : 'border-red-300 text-red-700 hover:bg-red-50')}
+                                    >
+                                      OS
+                                    </button>
+                                  </div>
                                 </td>
                                 <td className="p-3 text-center">
                                   {isFlagged && (
@@ -259,7 +311,7 @@ export default function PickerApp() {
                                   {setNameButton}
                                   <Badge variant="secondary" className="text-[10px]">Set</Badge>
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-0.5">Flag any part below that&apos;s out of stock.</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">Mark each part below as Found or OS.</p>
                               </td>
                               <td className="p-3 text-center">
                                 <span className="font-bold">{group.quantity}</span>
@@ -284,11 +336,17 @@ export default function PickerApp() {
                 </div>
               )}
 
+              <p className={cn('text-sm font-medium', unmarkedCount > 0 ? 'text-amber-700' : 'text-green-700')}>
+                {unmarkedCount > 0
+                  ? `Checked ${checkedCount} of ${allRows.length} — mark every item as Found or OS to submit.`
+                  : `All ${allRows.length} item${allRows.length === 1 ? '' : 's'} checked.`}
+              </p>
+
               <div className="pt-4 flex gap-3 border-t mt-6">
                 <Button type="button" variant="outline" className="flex-1" onClick={() => setScannedOrderId(null)}>
                   Cancel
                 </Button>
-                <Button type="submit" className="flex-1" variant={outOfStockQty.size > 0 ? "destructive" : "default"} disabled={loading}>
+                <Button type="submit" className="flex-1" variant={outOfStockQty.size > 0 ? "destructive" : "default"} disabled={loading || unmarkedCount > 0}>
                   {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
                   Submit Picking
                 </Button>
@@ -297,6 +355,8 @@ export default function PickerApp() {
           </CardContent>
         </Card>
       )}
+
+      <BorrowDialog target={borrowTarget} toOrderId={scannedOrderId} onClose={() => setBorrowTarget(null)} onBorrowed={onBorrowed} />
 
       <ProductPhotoDialog
         product={viewingPhotoItem}

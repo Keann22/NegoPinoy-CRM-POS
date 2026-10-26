@@ -95,7 +95,7 @@ export async function getPriorityList(
   const ids = eligible.map((o) => o.id);
 
   // 2. Everything else, keyed by order.
-  const [payments, issues, sources, events, logs] = await Promise.all([
+  const [payments, issues, sources, events, borrows, logs] = await Promise.all([
     inChunks(ids, (c) => fetchAllPages<any>((f, t) =>
       supabase.from('payments').select('order_id, payment_date, created_at').in('order_id', c).order('id').range(f, t))),
     inChunks(ids, (c) => fetchAllPages<any>((f, t) =>
@@ -104,6 +104,7 @@ export async function getPriorityList(
     inChunks(ids, (c) => fetchAllPages<any>((f, t) =>
       supabase.from('procurement_request_sources').select('order_id, purchase_order_item_id, created_at').in('order_id', c).order('id').range(f, t))),
     loadEvents(supabase, ids),
+    loadBorrows(supabase, ids),
     inChunks(ids, (c) => fetchAllPages<any>((f, t) =>
       supabase.from('order_logs').select('order_id, created_at').in('order_id', c).order('id').range(f, t))),
   ]);
@@ -145,6 +146,7 @@ export async function getPriorityList(
   const issuesByOrder = groupBy(issues, (i) => i.order_id);
   const sourcesByOrder = groupBy(sources, (s) => s.order_id);
   const eventsByOrder = groupBy(events.rows, (e) => e.order_id);
+  const borrowsByOrder = groupBy(borrows, (b) => b.from_order_id);
 
   const rows = eligible.map((o) => {
     const paidAt = o.payment_method === 'COD'
@@ -152,7 +154,7 @@ export async function getPriorityList(
       : isFullyPaid(o) ? maxIso(lastPayment.get(o.id) || null, o.order_date || o.created_at) : null;
 
     const orderIssues = issuesByOrder.get(o.id) || [];
-    const missing = missingItems(orderIssues, sourcesByOrder.get(o.id) || [], poiById, receivedAt, productById, eventsByOrder.get(o.id) || [], now);
+    const missing = missingItems(orderIssues, sourcesByOrder.get(o.id) || [], poiById, receivedAt, productById, eventsByOrder.get(o.id) || [], borrowsByOrder.get(o.id) || [], now);
     const osRounds = new Set(orderIssues.map((i) => String(i.created_at).slice(0, 16))).size;
     const { followUps, lastFollowUp, hold, sendToday, sendTodayBlock } = summarizeEvents(eventsByOrder.get(o.id) || [], now);
 
@@ -192,6 +194,7 @@ function missingItems(
   receivedAt: Map<string, string>,
   productById: Map<string, any>,
   orderEvents: any[],
+  orderBorrows: any[],
   now: Date
 ): MissingItem[] {
   // Latest sales decision per product on this order.
@@ -226,6 +229,7 @@ function missingItems(
       eta: null as string | null,
       stageLabel: null as string | null,
       decision: decisions.get(issue.product_id) || null,
+      borrowedFor: borrowFor(orderBorrows, issue),
     };
 
     // Sales decided to send the rest / drop it, but the item is still on the order.
@@ -267,6 +271,25 @@ function missingItems(
       stageLabel: findStage(po.tracking_route, po.tracking_stage)?.label || null,
     };
   });
+}
+
+/** The borrow that caused this OS issue (recorded at the same moment), if any. */
+function borrowFor(orderBorrows: any[], issue: any): MissingItem['borrowedFor'] {
+  const issueAt = new Date(issue.created_at).getTime();
+  const b = orderBorrows
+    .filter((x) => x.product_id === issue.product_id && Math.abs(new Date(x.created_at).getTime() - issueAt) < SOURCE_MATCH_SLACK_MS)
+    .sort((a, z) => String(z.created_at).localeCompare(String(a.created_at)))[0];
+  return b ? { toOrderId: b.to_order_id, byName: b.created_by_name, at: b.created_at } : null;
+}
+
+async function loadBorrows(supabase: SupabaseClient, ids: string[]): Promise<any[]> {
+  try {
+    return await inChunks(ids, (c) => fetchAllPages<any>((f, t) =>
+      supabase.from('order_borrows').select('id, product_id, from_order_id, to_order_id, created_by_name, created_at').in('from_order_id', c).order('id').range(f, t)));
+  } catch (error) {
+    if (isMissingTable(error)) return [];
+    throw error;
+  }
 }
 
 function isFullyReceived(poi: any): boolean {
