@@ -128,8 +128,11 @@ export function LogPaymentDialog(props: LogPaymentDialogProps) {
             newBalanceDue = 0; // Cap at 0
         }
 
+        // Fully paid only closes the order once it is already with the courier. A paid
+        // lay-away that hasn't been packed must stay open, or it drops off the
+        // picker, packer and Priority List and nobody ships it.
         let newStatus = currentOrderData.status;
-        if (newBalanceDue <= 0) {
+        if (newBalanceDue <= 0 && ['Shipped', 'For Pick-up'].includes(currentOrderData.status)) {
             newStatus = isCOD ? 'Payment Received (COD)' : 'Completed';
         }
 
@@ -199,6 +202,15 @@ export function LogPaymentDialog(props: LogPaymentDialogProps) {
             });
         }
         
+        // If this payment finished paying the order, the owner and warehouse get told once.
+        if (newBalanceDue <= 0) {
+            fetch('/api/priority/paid-check', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ orderId: order.id }),
+            }).catch(() => {});
+        }
+
         if (props.onSuccess) props.onSuccess();
         props.onOpenChange(false);
       } catch (error: any) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshCw, Search } from 'lucide-react';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -13,7 +13,7 @@ import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useUserProfile } from '@/hooks/useUserProfile';
-import { JAS_EMAILS, OWNER_LABELS, type MissingItem, type PriorityGroup, type PriorityOwner, type PriorityRow } from '@/lib/priority/priority-rules';
+import { JAS_EMAILS, LAYER_LABELS, OWNER_LABELS, layerOf, type MissingItem, type PriorityGroup, type PriorityOwner, type PriorityRow } from '@/lib/priority/priority-rules';
 import { PriorityRowCard, type RowAction } from '@/components/dashboard/priority/priority-row-card';
 import { PriorityActionDialog, type PriorityAction } from '@/components/dashboard/priority/priority-action-dialog';
 import { OsDecisionDialog } from '@/components/dashboard/priority/os-decision-dialog';
@@ -49,6 +49,7 @@ export default function PriorityListPage() {
   const [owner, setOwner] = useState<'all' | PriorityOwner>('all');
   const [salesPerson, setSalesPerson] = useState('all');
   const [lateOnly, setLateOnly] = useState(false);
+  const [urgentOnly, setUrgentOnly] = useState(false);
   const [search, setSearch] = useState('');
   const [dialog, setDialog] = useState<{ row: PriorityRow; action: PriorityAction } | null>(null);
   const loadedOnce = useRef(false);
@@ -75,7 +76,7 @@ export default function PriorityListPage() {
   useEffect(() => { load(); }, [load]);
 
   // One-tap actions (no dialog): remove a hold, remove a send-today mark.
-  const quickEvent = async (row: PriorityRow, kind: 'hold_cleared' | 'send_today_cancelled', done: string) => {
+  const quickEvent = async (row: PriorityRow, kind: 'hold_cleared' | 'send_today_cancelled' | 'urgent_cleared', done: string) => {
     const res = await fetch('/api/priority/events', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -90,6 +91,7 @@ export default function PriorityListPage() {
   const onAction = (row: PriorityRow, action: RowAction) => {
     if (action === 'clear_hold') return quickEvent(row, 'hold_cleared', 'Hold removed');
     if (action === 'unmark') return quickEvent(row, 'send_today_cancelled', 'Removed from send today');
+    if (action === 'unurgent') return quickEvent(row, 'urgent_cleared', 'No longer nagmamadali');
     setDialog({ row, action });
   };
 
@@ -117,9 +119,10 @@ export default function PriorityListPage() {
       (owner === 'all' || row.owner === owner) &&
       (salesPerson === 'all' || row.salesPersonName === salesPerson) &&
       (!lateOnly || row.daysLate > 0) &&
+      (!urgentOnly || !!row.urgent) &&
       (!q || row.id.toLowerCase().startsWith(q) || (row.customerName || '').toLowerCase().includes(q))
     );
-  }, [ranked, group, owner, salesPerson, lateOnly, search]);
+  }, [ranked, group, owner, salesPerson, lateOnly, urgentOnly, search]);
 
   const lateCount = (g: PriorityGroup) => (ranked.get(g) || []).filter(({ row }) => row.daysLate > 0).length;
   const hint = group === 'to_follow' ? TO_FOLLOW_HINT : GROUPS.find((g) => g.key === group)!.hint;
@@ -191,6 +194,10 @@ export default function PriorityListPage() {
           <Switch id="late-only" checked={lateOnly} onCheckedChange={setLateOnly} />
           <Label htmlFor="late-only">Late only</Label>
         </div>
+        <div className="flex items-center gap-2 px-1">
+          <Switch id="urgent-only" checked={urgentOnly} onCheckedChange={setUrgentOnly} />
+          <Label htmlFor="urgent-only">Nagmamadali only</Label>
+        </div>
         </>)}
       </div>
 
@@ -202,7 +209,13 @@ export default function PriorityListPage() {
         <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">Nothing here with these filters.</div>
       ) : (
         <div className="space-y-2">
-          {visible.map(({ row, rank }) => (
+          {visible.map(({ row, rank }, i) => (
+            <React.Fragment key={row.id}>
+            {(i === 0 || layerOf(visible[i - 1].row) !== layerOf(row)) && (
+              <h3 className={`pt-2 text-sm font-semibold ${layerOf(row) === 0 ? 'text-red-700 dark:text-red-300' : layerOf(row) === 1 ? 'text-green-700 dark:text-green-300' : 'text-muted-foreground'}`}>
+                {layerOf(row) === 0 ? '🔥 ' : layerOf(row) === 1 ? '✅ ' : ''}{LAYER_LABELS[layerOf(row)]}
+              </h3>
+            )}
             <PriorityRowCard
               key={row.id}
               row={row}
@@ -211,6 +224,7 @@ export default function PriorityListPage() {
               onAction={onAction}
               onDecide={(r, item) => setDecide({ row: r, item })}
             />
+            </React.Fragment>
           ))}
         </div>
       )}

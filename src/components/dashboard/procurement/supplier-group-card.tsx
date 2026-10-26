@@ -2,6 +2,7 @@ import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Copy, ScanLine } from "lucide-react";
 import { ProcurementItemRow } from "@/components/dashboard/procurement/procurement-item-row";
+import { ProcurementPriorityCounts } from "./procurement-priority-chips";
 
 export function SupplierGroupCard({
   group,
@@ -31,7 +32,10 @@ export function SupplierGroupCard({
   return (
     <div className="border rounded-lg overflow-hidden shadow-sm">
       <div className={`px-4 py-3 border-b flex flex-col md:flex-row justify-between md:items-center gap-3 ${group.id === null ? 'bg-orange-100' : 'bg-slate-100'}`}>
-        <h2 className="text-xl font-bold text-slate-800">{group.name}</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-xl font-bold text-slate-800">{group.name}</h2>
+          <ProcurementPriorityCounts items={group.items} />
+        </div>
         <div className="flex items-center gap-2">
           {group.id !== null && (
             <>

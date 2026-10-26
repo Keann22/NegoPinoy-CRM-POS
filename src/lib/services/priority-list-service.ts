@@ -71,31 +71,47 @@ async function sendTodayOrderIds(supabase: SupabaseClient, now: Date): Promise<S
   }
 }
 
+/** Orders whose customer is currently marked nagmamadali (latest urgent* event is 'urgent'). */
+async function urgentOrderIds(supabase: SupabaseClient): Promise<Set<string>> {
+  try {
+    const rows = await fetchAllPages<any>((f, t) =>
+      supabase.from(PRIORITY_EVENTS_TABLE).select('order_id, kind, created_at').in('kind', ['urgent', 'urgent_cleared']).order('id').range(f, t));
+    const latest = new Map<string, any>();
+    rows.forEach((r) => { const p = latest.get(r.order_id); if (!p || r.created_at > p.created_at) latest.set(r.order_id, r); });
+    return new Set(Array.from(latest.values()).filter((r) => r.kind === 'urgent').map((r) => r.order_id));
+  } catch (error) {
+    if (isMissingTable(error)) return new Set();
+    throw error;
+  }
+}
+
 export async function getPriorityList(
   supabase: SupabaseClient,
   now = new Date(),
   opts: { onlyOrderIds?: string[] } = {}
 ): Promise<PriorityListResult> {
   // 1. Open orders, paginated past the 1000-row cap.
-  const [orders, markedIds] = await Promise.all([
+  const [orders, markedIds, urgentIds] = await Promise.all([
     opts.onlyOrderIds
       ? inChunks(opts.onlyOrderIds, (c) => fetchAllPages<any>((from, to) =>
           supabase.from('orders').select(ORDER_COLUMNS).in('status', PRIORITY_STATUSES).in('id', c).order('id').range(from, to)))
       : fetchAllPages<any>((from, to) =>
           supabase.from('orders').select(ORDER_COLUMNS).in('status', PRIORITY_STATUSES).order('id').range(from, to)),
     sendTodayOrderIds(supabase, now),
+    urgentOrderIds(supabase),
   ]);
 
   const isFullyPaid = (o: any) => Number(o.balance_due || 0) < 1;
   const isPrep = (o: any) =>
     o.payment_method === 'Lay-away' && !isFullyPaid(o) &&
     Number(o.total_amount) > 0 && Number(o.amount_paid || 0) / Number(o.total_amount) >= PRIORITY_RULES.prepPaidRatio;
-  // Anything sales marked "send today" is on the list even if it still owes.
-  const eligible = orders.filter((o) => isFullyPaid(o) || o.payment_method === 'COD' || isPrep(o) || markedIds.has(o.id));
+  // Anything sales marked "send today" or "nagmamadali" is on the list even if it still owes.
+  const eligible = orders.filter((o) =>
+    isFullyPaid(o) || o.payment_method === 'COD' || isPrep(o) || markedIds.has(o.id) || urgentIds.has(o.id));
   const ids = eligible.map((o) => o.id);
 
   // 2. Everything else, keyed by order.
-  const [payments, issues, sources, events, borrows, logs] = await Promise.all([
+  const [payments, issues, sources, events, borrows, logs, lines] = await Promise.all([
     inChunks(ids, (c) => fetchAllPages<any>((f, t) =>
       supabase.from('payments').select('order_id, payment_date, created_at').in('order_id', c).order('id').range(f, t))),
     inChunks(ids, (c) => fetchAllPages<any>((f, t) =>
@@ -107,7 +123,11 @@ export async function getPriorityList(
     loadBorrows(supabase, ids),
     inChunks(ids, (c) => fetchAllPages<any>((f, t) =>
       supabase.from('order_logs').select('order_id, created_at').in('order_id', c).order('id').range(f, t))),
+    inChunks(ids, (c) => fetchAllPages<any>((f, t) =>
+      supabase.from('order_items').select('order_id').in('order_id', c).order('id').range(f, t))),
   ]);
+  const lineCount = new Map<string, number>();
+  lines.forEach((l) => lineCount.set(l.order_id, (lineCount.get(l.order_id) || 0) + 1));
 
   const poiIds = Array.from(new Set(sources.map((s) => s.purchase_order_item_id).filter(Boolean)));
   const openProductIds = Array.from(new Set(issues.filter((i) => i.status === 'open' && i.product_id).map((i) => i.product_id)));
@@ -156,7 +176,8 @@ export async function getPriorityList(
     const orderIssues = issuesByOrder.get(o.id) || [];
     const missing = missingItems(orderIssues, sourcesByOrder.get(o.id) || [], poiById, receivedAt, productById, eventsByOrder.get(o.id) || [], borrowsByOrder.get(o.id) || [], now);
     const osRounds = new Set(orderIssues.map((i) => String(i.created_at).slice(0, 16))).size;
-    const { followUps, lastFollowUp, hold, sendToday, sendTodayBlock } = summarizeEvents(eventsByOrder.get(o.id) || [], now);
+    const { followUps, lastFollowUp, hold, sendToday, sendTodayBlock, urgent } = summarizeEvents(eventsByOrder.get(o.id) || [], now);
+    const itemCount = lineCount.get(o.id) || 0;
 
     const input: PriorityOrderInput = {
       id: o.id,
@@ -178,6 +199,9 @@ export async function getPriorityList(
       hold,
       sendToday,
       sendTodayBlock,
+      urgent,
+      itemCount,
+      readyCount: Math.max(0, itemCount - missing.length),
     };
     return rankOrder(input, now);
   });
@@ -304,6 +328,10 @@ function summarizeEvents(events: any[], now: Date) {
   const hold: PriorityHold | null = holdRow?.kind === 'hold' && holdRow.hold_until
     ? { until: holdRow.hold_until, note: holdRow.note, byName: holdRow.created_by_name }
     : null;
+  const urgentRow = [...sorted].reverse().find((e) => e.kind === 'urgent' || e.kind === 'urgent_cleared');
+  const urgent = urgentRow?.kind === 'urgent'
+    ? { note: urgentRow.note, byName: urgentRow.created_by_name, at: urgentRow.created_at }
+    : null;
   const sendRow = [...sorted].reverse().find((e) => SEND_KINDS.includes(e.kind));
   const sendToday: SendTodayMark | null = sendRow?.kind === 'send_today' && sendRow.send_date
     ? { date: sendRow.send_date, note: sendRow.note, byName: sendRow.created_by_name, at: sendRow.created_at }
@@ -312,6 +340,7 @@ function summarizeEvents(events: any[], now: Date) {
     ? { reason: (sendRow.reason_code || 'other') as BlockReason, note: sendRow.note, byName: sendRow.created_by_name, at: sendRow.created_at }
     : null;
   return {
+    urgent,
     sendToday,
     sendTodayBlock,
     followUps: followUpRows.length,
@@ -347,7 +376,8 @@ function groupBy<T>(items: T[], key: (item: T) => string): Map<string, T[]> {
 export type PriorityEventKind =
   | 'followup' | 'hold' | 'hold_cleared'
   | 'send_today' | 'send_today_blocked' | 'send_today_cancelled'
-  | 'os_decision';
+  | 'os_decision'
+  | 'urgent' | 'urgent_cleared' | 'paid_notice';
 
 /** Just the orders due to go out today (for the warehouse reminder pop-up). */
 export async function getSendTodayList(supabase: SupabaseClient, now = new Date()): Promise<PriorityRow[]> {

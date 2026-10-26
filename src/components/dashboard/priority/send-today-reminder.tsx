@@ -59,6 +59,11 @@ export function SendTodayReminder() {
   }, []);
 
   const fetchRows = useCallback(async () => {
+    // Safety net for "now fully paid" notices (payments entered outside Log Payment / Edit Order).
+    // Live app only: a local dev server talks to the live database and would notify real staff.
+    if (process.env.NODE_ENV === 'production') {
+      fetch('/api/priority/paid-check', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {});
+    }
     try {
       const res = await fetch('/api/priority/send-today', { cache: 'no-store' });
       if (!res.ok) return;

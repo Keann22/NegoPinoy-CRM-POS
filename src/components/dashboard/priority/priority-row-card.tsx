@@ -2,13 +2,13 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Ban, ChevronDown, Clock, MessageSquarePlus, PauseCircle, PlayCircle, Truck, X } from 'lucide-react';
+import { Ban, BadgeCheck, ChevronDown, Clock, Flame, MessageSquarePlus, PauseCircle, PlayCircle, Truck, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { PriorityAction } from './priority-action-dialog';
 import {
-  BLOCK_REASONS, OS_DECISIONS, OWNER_LABELS, STEP_LABELS, phtDate,
+  BLOCK_REASONS, OS_DECISIONS, OWNER_LABELS, STEP_LABELS, phtDate, isFullyPaid,
   type MissingItem, type MissingState, type PriorityOwner, type PriorityRow,
 } from '@/lib/priority/priority-rules';
 
@@ -43,7 +43,7 @@ function timer(row: PriorityRow): { text: string; tone: 'late' | 'today' | 'ok' 
   return { text: `Due in ${days}d`, tone: 'ok' };
 }
 
-export type RowAction = PriorityAction | 'clear_hold' | 'unmark';
+export type RowAction = PriorityAction | 'clear_hold' | 'unmark' | 'unurgent';
 
 export interface RowPermissions {
   /** Follow-ups and holds (sales, admin, jas). */
@@ -67,6 +67,10 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
   const today = phtDate(new Date());
   const [showWhy, setShowWhy] = useState(false);
   const t = timer(row);
+  // "Fully paid today / 2 days ago" for the first 3 days, so a newly paid order is impossible to miss.
+  const paidBadge = isFullyPaid(row) && row.daysSincePaid != null && row.daysSincePaid <= 3
+    ? (row.daysSincePaid === 0 ? 'Fully paid today' : `Fully paid ${row.daysSincePaid}d ago`)
+    : null;
   const shortId = row.id.slice(0, 7).toUpperCase();
 
   return (
@@ -78,6 +82,20 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
         </div>
 
         <div className="min-w-0 flex-1 space-y-2">
+          {(row.urgent || paidBadge) && (
+            <div className="flex flex-wrap gap-1.5">
+              {row.urgent && (
+                <span className="inline-flex items-center gap-1 rounded bg-red-600 px-2 py-0.5 text-xs font-semibold text-white">
+                  <Flame className="h-3 w-3" />Nagmamadali
+                </span>
+              )}
+              {paidBadge && (
+                <span className="inline-flex items-center gap-1 rounded bg-green-600 px-2 py-0.5 text-xs font-semibold text-white">
+                  <BadgeCheck className="h-3 w-3" />{paidBadge}
+                </span>
+              )}
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <Link href={`/dashboard/orders/${row.id}`} className="font-semibold hover:underline">#{shortId}</Link>
             <span className="truncate">{row.customerName || 'Unknown customer'}</span>
@@ -87,6 +105,7 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
             {row.salesPersonName || 'No sales person'} · Status: {row.status}
             {row.paidAt && <> · {row.paymentMethod === 'COD' ? 'Ordered' : 'Fully paid'} {shortDate(row.paidAt)}</>}
             {!row.paidAt && row.totalAmount > 0 && <> · {Math.round((row.amountPaid / row.totalAmount) * 100)}% paid</>}
+            {row.itemCount > 1 && <> · <span className={cn(row.readyCount < row.itemCount && 'font-medium text-foreground')}>{row.readyCount} of {row.itemCount} items ready</span></>}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -137,6 +156,9 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
             </ul>
           )}
 
+          {row.urgent && (
+            <div className="text-xs text-red-700 dark:text-red-300">Nagmamadali: “{row.urgent.note}” — {row.urgent.byName}, {shortDate(row.urgent.at)}</div>
+          )}
           {row.sendToday && (
             <div className="text-xs text-muted-foreground">Send today: “{row.sendToday.note}” — {row.sendToday.byName}</div>
           )}
@@ -170,6 +192,16 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
             {canMark && row.sendToday && (
               <Button size="sm" variant="ghost" className="h-8" onClick={() => onAction(row, 'unmark')}>
                 <X className="mr-1.5 h-4 w-4" />Remove send today
+              </Button>
+            )}
+            {canEdit && !row.urgent && (
+              <Button size="sm" variant="outline" className="h-8 border-red-300 text-red-700 dark:text-red-300" onClick={() => onAction(row, 'urgent')}>
+                <Flame className="mr-1.5 h-4 w-4" />Nagmamadali
+              </Button>
+            )}
+            {canEdit && row.urgent && (
+              <Button size="sm" variant="ghost" className="h-8" onClick={() => onAction(row, 'unurgent')}>
+                <X className="mr-1.5 h-4 w-4" />Not in a hurry
               </Button>
             )}
             {canEdit && row.group !== 'hold' && (

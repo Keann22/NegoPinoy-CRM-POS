@@ -1,3 +1,4 @@
+import { getItemPriorities, priorityRank } from './procurement-priority-service';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { migrateLeakedBundleDrafts, autoCleanupStaffDrafts } from './procurement-service';
 import { calculateProcurementDemand } from './procurement-demand-service';
@@ -278,6 +279,13 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
     await Promise.allSettled(healingUpdates);
   }
 
+  // Mark items holding up a nagmamadali or fully paid customer, and list them first.
+  const linkedOrders = new Map<string, string[]>();
+  osMap.forEach((item: any, pid: string) => linkedOrders.set(pid, (item.sourceOrders || []).map((o: any) => o.orderId)));
+  const priorities = await getItemPriorities(supabase, Array.from(osMap.keys()), linkedOrders)
+    .catch((e) => { console.error('procurement priorities failed:', e?.message); return new Map(); });
+  osMap.forEach((item: any, pid: string) => { item.priority = priorities.get(pid) || null; });
+
   const grouped: Record<string, any> = {
     unassigned: { id: null, name: 'Unassigned (No Supplier)', items: [] },
   };
@@ -294,6 +302,9 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
     }
   }
 
+  for (const g of Object.values(grouped)) {
+    g.items.sort((a: any, b: any) => priorityRank(a.priority) - priorityRank(b.priority));
+  }
   const result = Object.values(grouped).filter((g) => g.items.length > 0 || g.id === null);
 
   const purchasedItems = (purchased || []).map((p: any) => {

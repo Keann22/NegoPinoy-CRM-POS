@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getPriorityCaller } from '@/lib/priority/priority-auth';
 import { addPriorityEvent, type PriorityEventKind } from '@/lib/services/priority-list-service';
+import { notifyUrgent } from '@/lib/services/priority-notify-service';
 import { phtDate, sendDateFor, BLOCK_REASONS, type BlockReason } from '@/lib/priority/priority-rules';
 
 export const dynamic = 'force-dynamic';
@@ -14,7 +15,11 @@ const supabase = createClient(
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 // os_decision has its own route (/api/priority/decision).
-const KINDS: PriorityEventKind[] = ['followup', 'hold', 'hold_cleared', 'send_today', 'send_today_blocked', 'send_today_cancelled'];
+const KINDS: PriorityEventKind[] = [
+  'followup', 'hold', 'hold_cleared',
+  'send_today', 'send_today_blocked', 'send_today_cancelled',
+  'urgent', 'urgent_cleared',
+];
 
 const bad = (error: string, status = 400) => NextResponse.json({ error }, { status });
 
@@ -50,6 +55,10 @@ export async function POST(req: Request) {
       return bad('Only sales and the jas accounts can mark orders for sending today.', 403);
     }
     if (kind === 'send_today' && cleanNote.length < 2) return bad('Add why it has to go out today.');
+    if ((kind === 'urgent' || kind === 'urgent_cleared') && !canMark) {
+      return bad('Only sales, admins and the jas accounts can mark a customer as nagmamadali.', 403);
+    }
+    if (kind === 'urgent' && cleanNote.length < 2) return bad('Add what the customer said (e.g. "kailangan bago Nov 5").');
     if (kind === 'send_today_blocked') {
       if (!(reason in BLOCK_REASONS)) return bad('Pick why it can\'t be sent today.');
       if (reason === 'other' && cleanNote.length < 2) return bad('Add what is stopping it.');
@@ -74,6 +83,11 @@ export async function POST(req: Request) {
     // "Customer asked to hold" from the warehouse also puts the order on hold.
     if (kind === 'send_today_blocked' && reason === 'customer_hold') {
       await addPriorityEvent(supabase, { orderId, kind: 'hold', note: cleanNote || 'Customer asked to hold (from send today)', holdUntil }, who);
+    }
+
+    // Owner/admins hear about it right away, with what's missing, so they can follow up or buy.
+    if (kind === 'urgent') {
+      await notifyUrgent(supabase, orderId, cleanNote, caller.name).catch((e) => console.error('urgent notify failed', e));
     }
 
     return NextResponse.json({ ok: true, sendDate });

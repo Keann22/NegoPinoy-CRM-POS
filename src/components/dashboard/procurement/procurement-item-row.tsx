@@ -7,6 +7,7 @@ import { StaffRequestDialog } from "./staff-request-dialog";
 import { ProcurementStockDetailDialog } from "./stock-detail-dialog";
 import { EditUnallocatedStockDialog } from "./edit-unallocated-stock-dialog";
 import { InTransitChip } from "./in-transit-chip";
+import { ProcurementPriorityChips } from "./procurement-priority-chips";
 
 export function ProcurementItemRow({
   item,
@@ -95,6 +96,7 @@ export function ProcurementItemRow({
         >
           {item.productName}
         </button>
+        <ProcurementPriorityChips priority={item.priority} />
         {isEditingCode ? (
           <div className="flex items-center gap-1.5 mt-1">
             <input

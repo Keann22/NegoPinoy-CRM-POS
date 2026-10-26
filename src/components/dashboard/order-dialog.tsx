@@ -9,6 +9,8 @@ import { OrderLeftPanel } from "./orders/OrderLeftPanel";
 import { OrderItemsPanel } from "./orders/OrderItemsPanel";
 import { VariantSelectionDialog } from "./orders/VariantSelectionDialog";
 import { CarryOverPanel } from "./orders/CarryOverPanel";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { useOrderDialog } from "@/hooks/useOrderDialog";
 import { useSupabase } from "@/lib/supabase/hooks";
 import { useToast } from "@/hooks/use-toast";
@@ -75,6 +77,8 @@ export function OrderDialog(props: OrderDialogProps) {
     setCarryOverAdds,
     toFollow,
     setToFollow,
+    urgentNote,
+    setUrgentNote,
     onSubmit
   } = useOrderDialog(props);
 
@@ -237,6 +241,19 @@ export function OrderDialog(props: OrderDialogProps) {
                   setCarryOverAdds((prev) => [...prev, c]);
                 }}
               />
+            )}
+            {!isEditing && (
+              <div className="rounded-md border border-red-200 p-3 text-sm dark:border-red-900">
+                <label className="flex items-center gap-2 font-medium">
+                  <Checkbox checked={urgentNote !== null} onCheckedChange={(v) => setUrgentNote(v === true ? '' : null)} />
+                  Nagmamadali ang customer
+                </label>
+                {urgentNote !== null && (
+                  <Input className="mt-2 h-8" maxLength={200} value={urgentNote} onChange={(e) => setUrgentNote(e.target.value)}
+                    placeholder="Ano ang sabi ng customer? (e.g. kailangan bago Nov 5)" />
+                )}
+                <p className="mt-1 text-xs text-muted-foreground">Moves the order up the Priority List and tells the owner/admins.</p>
+              </div>
             )}
             <DialogFooter className="pt-8">
               <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>Cancel</Button>

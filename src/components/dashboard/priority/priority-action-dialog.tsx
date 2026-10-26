@@ -14,7 +14,7 @@ import {
   type BlockReason, type PriorityRow,
 } from '@/lib/priority/priority-rules';
 
-export type PriorityAction = 'followup' | 'hold' | 'send_today' | 'block';
+export type PriorityAction = 'followup' | 'hold' | 'send_today' | 'block' | 'urgent';
 
 interface Props {
   row: PriorityRow | null;
@@ -46,6 +46,13 @@ const COPY: Record<PriorityAction, { title: string; description: string; notePla
     notePlaceholder: 'e.g. Customer needs it before the weekend',
     noteLabel: 'Why today',
     save: 'Mark send today',
+  },
+  urgent: {
+    title: 'Customer is in a hurry (nagmamadali)',
+    description: 'Moves the order up the list and tells the owner/admins right away, with what is missing, so they can follow up or buy it.',
+    notePlaceholder: 'e.g. Kailangan bago Nov 5, aalis ng bansa',
+    noteLabel: 'What the customer said',
+    save: 'Mark nagmamadali',
   },
   block: {
     title: "Can't send today",
@@ -98,6 +105,7 @@ export function PriorityActionDialog({ row, action, canOverride = false, onClose
         action === 'followup' ? 'Follow-up logged'
         : action === 'hold' ? `On hold until ${holdUntil}`
         : action === 'block' ? 'Sent back to sales'
+        : action === 'urgent' ? 'Marked nagmamadali — owner/admins notified'
         : data.sendDate === today ? 'On today\'s send list' : `On the send list for ${data.sendDate}`;
       toast({ title });
       onSaved();

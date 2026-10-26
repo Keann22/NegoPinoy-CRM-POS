@@ -32,9 +32,16 @@ export const PRIORITY_RULES = {
     perFollowUp: 30,
     maxFollowUps: 3,
     perDayPaid: 5,
-    layawayDone: 15,
-    value5k: 10,
-    value10k: 20,
+    /** Fully paid (not COD): the customer has done their part, so it outranks unpaid work. */
+    fullyPaid: 40,
+    value5k: 15,
+    value10k: 30,
+    value20k: 50,
+    /** Orders with this many lines or more count as big. */
+    bigOrderLines: 10,
+    bigOrder: 30,
+    /** Customer is in a hurry ("nagmamadali"). */
+    urgent: 60,
     perExtraOsRound: 10,
     /** An item was taken from this order for another one: it shouldn't lose its place. */
     borrowedFrom: 30,
@@ -139,6 +146,11 @@ export interface PriorityOrderInput {
   followUps: number;
   lastFollowUp: { note: string | null; byName: string | null; at: string } | null;
   hold: PriorityHold | null;
+  /** Order lines, and how many of them aren't short (for "18 of 22 items ready"). */
+  itemCount: number;
+  readyCount: number;
+  /** Customer is in a hurry (latest urgent/urgent_cleared event is urgent). */
+  urgent: { note: string | null; byName: string | null; at: string } | null;
   /** Active send-today mark (latest send_today* event is a mark). */
   sendToday: SendTodayMark | null;
   /** The warehouse said it can't send this today (latest send_today* event, today only). */
@@ -273,7 +285,9 @@ function classify(o: PriorityOrderInput, now: Date) {
     return { group: 'send_today' as const, owner: 'warehouse' as const, step, stepSince: o.sendToday.at, dueAt: pickupAt(o.sendToday.date) };
   }
 
-  if (!o.paidAt) {
+  // Missing items need someone to act (sales decides, buyer buys) even while the
+  // customer is still paying, so they go to Waiting before "Prep now".
+  if (!o.paidAt && o.missing.length === 0) {
     return { group: 'prep' as const, owner: 'warehouse' as const, step: 'prep' as const, stepSince: null, dueAt: null };
   }
 
@@ -284,6 +298,11 @@ function classify(o: PriorityOrderInput, now: Date) {
     const days = STATE_DAYS[state];
     const dueAt = days == null ? earliest(items.map((m) => m.eta).filter(Boolean) as string[]) : stepSince && addDays(stepSince, days);
     return { group: 'waiting' as const, owner: STATE_OWNER[state], step: state, stepSince, dueAt };
+  }
+
+  // Not reachable (unpaid orders without missing items returned as prep above); keeps the types honest.
+  if (!o.paidAt) {
+    return { group: 'prep' as const, owner: 'warehouse' as const, step: 'prep' as const, stepSince: null, dueAt: null };
   }
 
   if (['Packed', 'For Shipping'].includes(o.status)) {
@@ -304,13 +323,21 @@ function scoreFor(o: PriorityOrderInput, daysLate: number, daysSincePaid: number
     const label = o.paymentMethod === 'COD' ? 'ordered' : 'fully paid';
     parts.push({ label: `${daysSincePaid} day${daysSincePaid === 1 ? '' : 's'} since ${label}`, points: daysSincePaid * p.perDayPaid });
   }
-  if (o.paymentMethod === 'Lay-away' && o.paidAt) parts.push({ label: 'Lay-away completed', points: p.layawayDone });
-  if (o.totalAmount >= 10000) parts.push({ label: 'Order ₱10k+', points: p.value10k });
+  if (o.urgent) parts.push({ label: 'Customer is in a hurry (nagmamadali)', points: p.urgent });
+  if (isFullyPaid(o)) parts.push({ label: 'Fully paid', points: p.fullyPaid });
+  if (o.totalAmount >= 20000) parts.push({ label: 'Order ₱20k+', points: p.value20k });
+  else if (o.totalAmount >= 10000) parts.push({ label: 'Order ₱10k+', points: p.value10k });
   else if (o.totalAmount >= 5000) parts.push({ label: 'Order ₱5k+', points: p.value5k });
+  if (o.itemCount >= p.bigOrderLines) parts.push({ label: `Big order (${o.itemCount} items)`, points: p.bigOrder });
   if (o.osRounds > 1) parts.push({ label: `Picked ${o.osRounds}× with OS`, points: (o.osRounds - 1) * p.perExtraOsRound });
   const borrowed = o.missing.filter((m) => m.borrowedFor).length;
   if (borrowed > 0) parts.push({ label: `Item borrowed for another order${borrowed > 1 ? ` (${borrowed})` : ''}`, points: borrowed * p.borrowedFrom });
   return parts;
+}
+
+/** Paid in full by the customer (COD pays on delivery, so it doesn't count). */
+export function isFullyPaid(o: Pick<PriorityOrderInput, 'paidAt' | 'paymentMethod'>): boolean {
+  return !!o.paidAt && o.paymentMethod !== 'COD';
 }
 
 /** Forgotten orders go to their own tab so they don't bury today's work. */
@@ -332,8 +359,27 @@ export function rankOrder(o: PriorityOrderInput, now: Date): PriorityRow {
   return { ...o, ...c, daysLate, daysSincePaid, score, scoreParts };
 }
 
-/** Highest score first; ties go to whoever has waited longest since payment. */
+/**
+ * Layers within every tab: nagmamadali first, then fully paid, then the rest.
+ * A paid customer has done their part, so they never wait behind an unpaid
+ * order however late it is; points only order orders within a layer.
+ */
+export type PriorityLayer = 0 | 1 | 2;
+export const LAYER_LABELS: Record<PriorityLayer, string> = {
+  0: 'Nagmamadali',
+  1: 'Fully paid',
+  2: 'Others (COD and not yet fully paid)',
+};
+
+export function layerOf(row: Pick<PriorityRow, 'urgent' | 'paidAt' | 'paymentMethod'>): PriorityLayer {
+  if (row.urgent) return 0;
+  return isFullyPaid(row) ? 1 : 2;
+}
+
+/** Layer first, then highest score; ties go to whoever has waited longest since payment. */
 export function compareRows(a: PriorityRow, b: PriorityRow): number {
+  const layer = layerOf(a) - layerOf(b);
+  if (layer !== 0) return layer;
   if (b.score !== a.score) return b.score - a.score;
   return (a.paidAt || a.orderDate).localeCompare(b.paidAt || b.orderDate);
 }

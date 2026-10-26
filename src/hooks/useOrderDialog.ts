@@ -45,6 +45,8 @@ export function useOrderDialog(props: UseOrderDialogProps) {
     // "To follow" items: added from earlier orders (new order) / ticked when removed (edit).
     const [carryOverAdds, setCarryOverAdds] = useState<CarryOver[]>([]);
     const [toFollow, setToFollow] = useState<Record<string, boolean>>({});
+    // "Nagmamadali" on a new order: null = not ticked, otherwise the note.
+    const [urgentNote, setUrgentNote] = useState<string | null>(null);
 
     const [customerSearch, setCustomerSearch] = useState('');
     const [productSearch, setProductSearch] = useState('');
@@ -94,6 +96,7 @@ export function useOrderDialog(props: UseOrderDialogProps) {
             setProductSearch('');
             setCarryOverAdds([]);
             setToFollow({});
+            setUrgentNote(null);
             // Price lists are re-read on the next open so price changes show up.
             setProductPriceCache({});
             requestedPriceListIds.current.clear();
@@ -249,6 +252,7 @@ export function useOrderDialog(props: UseOrderDialogProps) {
         }
 
         const addedCarryOvers = carryOverAdds;
+        const urgent = urgentNote;
         handleOpenChange(false);
         toast({ title: "Creating Order...", description: "Your new order is being saved." });
 
@@ -268,6 +272,15 @@ export function useOrderDialog(props: UseOrderDialogProps) {
 
             await closeAddedCarryOvers(addedCarryOvers, values.orderItems, newOrderId).catch((e) =>
                 toast({ variant: 'destructive', title: 'Order saved, but the to-follow list was not updated', description: e.message }));
+
+            if (urgent !== null) {
+                const res = await fetch('/api/priority/events', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ orderId: newOrderId, kind: 'urgent', note: urgent.trim() || 'Nagmamadali (set on New Order)' }),
+                }).catch(() => null);
+                if (!res?.ok) toast({ variant: 'destructive', title: 'Order saved, but "nagmamadali" was not', description: 'Set it again from the order page.' });
+            }
 
             if (props.mode === 'create' && props.onOrderAdded) {
                 props.onOrderAdded();
@@ -314,6 +327,13 @@ export function useOrderDialog(props: UseOrderDialogProps) {
 
             await recordToFollow(order.id, props.orderItems || [], values.orderItems, ticked, osProductIds).catch((e) =>
                 toast({ variant: 'destructive', title: 'Order saved, but the to-follow items were not', description: e.message }));
+
+            // A payment entered through the edit may have finished paying the order.
+            await fetch('/api/priority/paid-check', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ orderId: order.id }),
+            }).catch(() => {});
 
             window.location.reload();
         } catch (e: any) {
@@ -374,6 +394,8 @@ export function useOrderDialog(props: UseOrderDialogProps) {
         setCarryOverAdds,
         toFollow,
         setToFollow,
+        urgentNote,
+        setUrgentNote,
         onSubmit
     };
 }

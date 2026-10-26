@@ -21,6 +21,7 @@ import { useOrderDetail } from '@/hooks/useOrderDetail';
 import { OrderItemsCard } from '@/components/dashboard/orders/order-items-card';
 import { OrderActivityCard } from '@/components/dashboard/orders/order-activity-card';
 import { resolveOpenOrderIssues } from '@/lib/services/order-issues-service';
+import { UrgentOrderButton } from '@/components/dashboard/orders/urgent-order-button';
 import type { OrderStatus } from '@/types';
 
 type StatusVariant = 'outline' | 'secondary' | 'destructive' | 'default';
@@ -129,6 +130,7 @@ export default function OrderDetailPage() {
               </CardDescription>
             </div>
             <div className="flex flex-wrap items-center gap-2 mt-4 sm:mt-0">
+              <UrgentOrderButton orderId={order.id} customerName={customer?.fullName ?? null} />
               {(order.orderStatus === 'Processing' || order.orderStatus === 'Pending Payment' || order.orderStatus === 'Shipped') && (
                 <Button variant="secondary" size="sm" onClick={() => setIsMarkShippedOpen(true)}>
                   <Truck className="mr-2 h-4 w-4" />
