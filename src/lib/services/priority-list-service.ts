@@ -21,6 +21,8 @@ const PRIORITY_STATUSES = [
 ];
 
 const CHUNK = 150;
+/** How many of an order's latest notes the list shows. */
+const RECENT_NOTES = 3;
 const ORDER_COLUMNS = 'id, status, payment_method, total_amount, amount_paid, balance_due, order_date, created_at, packed_at, sales_person_name, notes, customers(full_name)';
 const DAY = 24 * 60 * 60 * 1000;
 /** A buy request linked this long before the OS scan still belongs to that scan. */
@@ -202,7 +204,7 @@ export async function getPriorityList(
       sendToday,
       sendTodayBlock,
       urgent,
-      lastNote: notes[notes.length - 1] || null,
+      recentNotes: notes.slice(-RECENT_NOTES).reverse(),
       noteCount: notes.length,
       itemCount,
       readyCount: Math.max(0, itemCount - missing.length),

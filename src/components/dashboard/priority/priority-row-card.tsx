@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Ban, BadgeCheck, ChevronDown, Clock, Flame, MessageSquarePlus, NotebookPen, PauseCircle, PlayCircle, Truck, X } from 'lucide-react';
+import { Ban, BadgeCheck, ChevronDown, Clock, Flame, MessageSquarePlus, PauseCircle, PlayCircle, Truck, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { PriorityAction } from './priority-action-dialog';
+import { PriorityNotesPanel } from './priority-notes-panel';
 import {
   BLOCK_REASONS, OS_DECISIONS, OWNER_LABELS, STEP_LABELS, phtDate, isFullyPaid,
   type MissingItem, type MissingState, type PriorityOwner, type PriorityRow,
@@ -75,7 +76,8 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
 
   return (
     <div className={cn('rounded-lg border bg-card p-3 sm:p-4', row.daysLate > 0 && 'border-red-300 dark:border-red-900')}>
-      <div className="flex gap-3">
+      <div className="flex flex-col gap-3 lg:flex-row">
+      <div className="flex min-w-0 flex-1 gap-3">
         <div className="w-10 shrink-0 text-center">
           <div className="text-xl font-bold tabular-nums">{rank}</div>
           <div className="text-[11px] text-muted-foreground tabular-nums">{row.score} pts</div>
@@ -156,13 +158,6 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
             </ul>
           )}
 
-          {row.lastNote && (
-            <div className="rounded-md bg-muted/60 px-2 py-1 text-xs">
-              <span className="font-medium">📝 {row.lastNote.actor}</span>
-              <span className="text-muted-foreground"> · {row.lastNote.stamp}{row.noteCount > 1 && ` · ${row.noteCount} notes`}</span>
-              <div className="line-clamp-2 whitespace-pre-line">{row.lastNote.text}</div>
-            </div>
-          )}
           {row.urgent && (
             <div className="text-xs text-red-700 dark:text-red-300">Nagmamadali: “{row.urgent.note}” — {row.urgent.byName}, {shortDate(row.urgent.at)}</div>
           )}
@@ -186,9 +181,6 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
           )}
 
           <div className="flex flex-wrap items-center gap-2 pt-1">
-            <Button size="sm" variant="outline" className="h-8" onClick={() => onAction(row, 'note')}>
-              <NotebookPen className="mr-1.5 h-4 w-4" />Add note
-            </Button>
             {canBlock && row.group === 'send_today' && (
               <Button size="sm" variant="outline" className="h-8 border-red-300 text-red-700 dark:text-red-300" onClick={() => onAction(row, 'block')}>
                 <Ban className="mr-1.5 h-4 w-4" />Can&apos;t send today
@@ -246,6 +238,8 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
             </ul>
           )}
         </div>
+      </div>
+      <PriorityNotesPanel row={row} onAddNote={() => onAction(row, 'note')} />
       </div>
     </div>
   );

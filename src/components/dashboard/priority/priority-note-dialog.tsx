@@ -59,11 +59,11 @@ export function PriorityNoteDialog({ row, onClose, onSaved }: { row: PriorityRow
             #{shortId} · {row.customerName || 'Customer'} — saved to the order&apos;s Activity &amp; Notes. Type @ to tag staff; they get a message.
           </DialogDescription>
         </DialogHeader>
-        {row.lastNote && (
+        {row.recentNotes[0] && (
           <div className="rounded-md bg-muted/60 px-2 py-1.5 text-xs">
-            <span className="font-medium">Latest: {row.lastNote.actor}</span>
-            <span className="text-muted-foreground"> · {row.lastNote.stamp}</span>
-            <div className="line-clamp-3 whitespace-pre-line">{row.lastNote.text}</div>
+            <span className="font-medium">Latest: {row.recentNotes[0].actor}</span>
+            <span className="text-muted-foreground"> · {row.recentNotes[0].stamp}</span>
+            <div className="line-clamp-3 whitespace-pre-line">{row.recentNotes[0].text}</div>
           </div>
         )}
         <MentionInput
