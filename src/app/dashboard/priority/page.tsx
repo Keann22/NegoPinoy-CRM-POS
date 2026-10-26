@@ -17,6 +17,7 @@ import { JAS_EMAILS, LAYER_LABELS, OWNER_LABELS, layerOf, type MissingItem, type
 import { PriorityRowCard, type RowAction } from '@/components/dashboard/priority/priority-row-card';
 import { PriorityActionDialog, type PriorityAction } from '@/components/dashboard/priority/priority-action-dialog';
 import { OsDecisionDialog } from '@/components/dashboard/priority/os-decision-dialog';
+import { PriorityNoteDialog } from '@/components/dashboard/priority/priority-note-dialog';
 import { CarryOverList } from '@/components/dashboard/priority/carryover-list';
 
 type Tab = PriorityGroup | 'to_follow';
@@ -46,6 +47,7 @@ export default function PriorityListPage() {
   const [group, setGroup] = useState<Tab>('ready');
   const [toFollowCount, setToFollowCount] = useState<number | null>(null);
   const [decide, setDecide] = useState<{ row: PriorityRow; item: MissingItem } | null>(null);
+  const [noteRow, setNoteRow] = useState<PriorityRow | null>(null);
   const [owner, setOwner] = useState<'all' | PriorityOwner>('all');
   const [salesPerson, setSalesPerson] = useState('all');
   const [lateOnly, setLateOnly] = useState(false);
@@ -92,6 +94,7 @@ export default function PriorityListPage() {
     if (action === 'clear_hold') return quickEvent(row, 'hold_cleared', 'Hold removed');
     if (action === 'unmark') return quickEvent(row, 'send_today_cancelled', 'Removed from send today');
     if (action === 'unurgent') return quickEvent(row, 'urgent_cleared', 'No longer nagmamadali');
+    if (action === 'note') return setNoteRow(row);
     setDialog({ row, action });
   };
 
@@ -230,6 +233,7 @@ export default function PriorityListPage() {
       )}
 
       <PriorityActionDialog row={dialog?.row || null} action={dialog?.action || null} canOverride={isAdmin || isJas} onClose={() => setDialog(null)} onSaved={load} />
+      <PriorityNoteDialog row={noteRow} onClose={() => setNoteRow(null)} onSaved={load} />
       <OsDecisionDialog row={decide?.row || null} item={decide?.item || null} onClose={() => setDecide(null)} onSaved={load} />
     </div>
   );

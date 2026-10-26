@@ -23,13 +23,9 @@ import {
 } from 'lucide-react';
 import { MentionInput } from '@/components/dashboard/mention-input';
 import { useStaffDirectory } from '@/hooks/useStaffDirectory';
-import {
-  createStaffMessage,
-  resolveRecipientNames
-} from '@/lib/services/staff-message-service';
+import { postOrderNote } from '@/lib/services/order-note-service';
 import {
   fetchOrderTrail,
-  addOrderNote,
   type OrderTrailEntry,
   type OrderTrailEntryKind
 } from '@/lib/services/order-trail-service';
@@ -115,32 +111,8 @@ export function OrderActivityCard({ orderId }: OrderActivityCardProps) {
       : 'Staff';
 
     try {
-      // Find any manually typed @Names matching known staff
-      const lowerText = newNoteText.toLowerCase();
-      const manuallyTypedNames: string[] = [];
-      staff.forEach((s) => {
-        if (s.fullName && lowerText.includes(`@${s.fullName.toLowerCase()}`)) {
-          manuallyTypedNames.push(s.fullName);
-        }
-      });
-
-      const allTagged = resolveRecipientNames([...mentions, ...manuallyTypedNames], authorName);
-      const orderRef = `Order #${orderId.substring(0, 7).toUpperCase()}`;
-
-      // 1. If staff are tagged, create a staff message thread so it appears in Messages and notifies them
-      if (allTagged.length > 0) {
-        await createStaffMessage(supabase, {
-          issueType: 'order',
-          orderId,
-          message: newNoteText.trim(),
-          senderName: authorName,
-          recipientNames: allTagged,
-          title: `${authorName} tagged you in a note on ${orderRef}`,
-        });
-      }
-
-      // 2. Always persist into orders.notes for complete order history
-      const res = await addOrderNote(supabase, orderId, newNoteText.trim(), authorName);
+      // Saves to orders.notes (this card) and messages anyone @tagged.
+      const res = await postOrderNote(supabase, { orderId, text: newNoteText, authorName, mentions, staff });
       if (res.success) {
         setNewNoteText('');
         setMentions([]);

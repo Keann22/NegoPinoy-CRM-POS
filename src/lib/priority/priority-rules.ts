@@ -146,6 +146,9 @@ export interface PriorityOrderInput {
   followUps: number;
   lastFollowUp: { note: string | null; byName: string | null; at: string } | null;
   hold: PriorityHold | null;
+  /** Latest staff note from the order's Activity & Notes (stamp = as written, PHT). */
+  lastNote: { text: string; actor: string; stamp: string } | null;
+  noteCount: number;
   /** Order lines, and how many of them aren't short (for "18 of 22 items ready"). */
   itemCount: number;
   readyCount: number;

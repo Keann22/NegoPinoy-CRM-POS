@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Ban, BadgeCheck, ChevronDown, Clock, Flame, MessageSquarePlus, PauseCircle, PlayCircle, Truck, X } from 'lucide-react';
+import { Ban, BadgeCheck, ChevronDown, Clock, Flame, MessageSquarePlus, NotebookPen, PauseCircle, PlayCircle, Truck, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -43,7 +43,7 @@ function timer(row: PriorityRow): { text: string; tone: 'late' | 'today' | 'ok' 
   return { text: `Due in ${days}d`, tone: 'ok' };
 }
 
-export type RowAction = PriorityAction | 'clear_hold' | 'unmark' | 'unurgent';
+export type RowAction = PriorityAction | 'clear_hold' | 'unmark' | 'unurgent' | 'note';
 
 export interface RowPermissions {
   /** Follow-ups and holds (sales, admin, jas). */
@@ -156,6 +156,13 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
             </ul>
           )}
 
+          {row.lastNote && (
+            <div className="rounded-md bg-muted/60 px-2 py-1 text-xs">
+              <span className="font-medium">📝 {row.lastNote.actor}</span>
+              <span className="text-muted-foreground"> · {row.lastNote.stamp}{row.noteCount > 1 && ` · ${row.noteCount} notes`}</span>
+              <div className="line-clamp-2 whitespace-pre-line">{row.lastNote.text}</div>
+            </div>
+          )}
           {row.urgent && (
             <div className="text-xs text-red-700 dark:text-red-300">Nagmamadali: “{row.urgent.note}” — {row.urgent.byName}, {shortDate(row.urgent.at)}</div>
           )}
@@ -179,6 +186,9 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
           )}
 
           <div className="flex flex-wrap items-center gap-2 pt-1">
+            <Button size="sm" variant="outline" className="h-8" onClick={() => onAction(row, 'note')}>
+              <NotebookPen className="mr-1.5 h-4 w-4" />Add note
+            </Button>
             {canBlock && row.group === 'send_today' && (
               <Button size="sm" variant="outline" className="h-8 border-red-300 text-red-700 dark:text-red-300" onClick={() => onAction(row, 'block')}>
                 <Ban className="mr-1.5 h-4 w-4" />Can&apos;t send today

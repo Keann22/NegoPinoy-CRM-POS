@@ -48,6 +48,20 @@ function parseNoteEntries(notes: string | null | undefined, fallbackDate: string
 }
 
 /**
+ * Staff notes (the "[MMM d, yyyy h:mm a] Name: text" entries) for previews like
+ * the Priority List. `stamp` is the date exactly as written (staff local time), so
+ * it reads the same whether this runs in the browser or on a UTC server.
+ */
+export function staffNotes(notes: string | null | undefined): { text: string; actor: string; stamp: string }[] {
+  if (!notes || !notes.trim()) return [];
+  return notes
+    .split('\n\n')
+    .map((e) => e.trim().match(/^\[(.+?)\]\s*(.+?):\s*([\s\S]*)$/))
+    .filter((m): m is RegExpMatchArray => !!m)
+    .map((m) => ({ stamp: m[1].trim(), actor: m[2].trim(), text: m[3].trim() }));
+}
+
+/**
  * Builds the full, merged history for one order — status changes (order_logs),
  * freeform staff notes (orders.notes), and stock-issue reports + discussion
  * (order_issues / order_issue_messages) — sorted newest first. This is the single

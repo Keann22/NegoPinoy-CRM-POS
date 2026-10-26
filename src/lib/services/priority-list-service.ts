@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { fetchAllPages } from './procurement-demand-service';
 import { findStage } from '@/lib/online-order-tracking';
+import { staffNotes } from './order-trail-service';
 import {
   PRIORITY_RULES, rankOrder, compareRows, transitState, phtDate,
   type MissingItem, type PriorityOrderInput, type PriorityRow, type PriorityHold,
@@ -20,7 +21,7 @@ const PRIORITY_STATUSES = [
 ];
 
 const CHUNK = 150;
-const ORDER_COLUMNS = 'id, status, payment_method, total_amount, amount_paid, balance_due, order_date, created_at, packed_at, sales_person_name, customers(full_name)';
+const ORDER_COLUMNS = 'id, status, payment_method, total_amount, amount_paid, balance_due, order_date, created_at, packed_at, sales_person_name, notes, customers(full_name)';
 const DAY = 24 * 60 * 60 * 1000;
 /** A buy request linked this long before the OS scan still belongs to that scan. */
 const SOURCE_MATCH_SLACK_MS = 10 * 60 * 1000;
@@ -178,6 +179,7 @@ export async function getPriorityList(
     const osRounds = new Set(orderIssues.map((i) => String(i.created_at).slice(0, 16))).size;
     const { followUps, lastFollowUp, hold, sendToday, sendTodayBlock, urgent } = summarizeEvents(eventsByOrder.get(o.id) || [], now);
     const itemCount = lineCount.get(o.id) || 0;
+    const notes = staffNotes(o.notes);
 
     const input: PriorityOrderInput = {
       id: o.id,
@@ -200,6 +202,8 @@ export async function getPriorityList(
       sendToday,
       sendTodayBlock,
       urgent,
+      lastNote: notes[notes.length - 1] || null,
+      noteCount: notes.length,
       itemCount,
       readyCount: Math.max(0, itemCount - missing.length),
     };
