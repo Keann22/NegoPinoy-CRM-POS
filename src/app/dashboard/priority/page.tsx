@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshCw, Search } from 'lucide-react';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -13,11 +13,12 @@ import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useUserProfile } from '@/hooks/useUserProfile';
-import { OWNER_LABELS, type PriorityGroup, type PriorityOwner, type PriorityRow } from '@/lib/priority/priority-rules';
-import { PriorityRowCard } from '@/components/dashboard/priority/priority-row-card';
+import { JAS_EMAILS, OWNER_LABELS, type PriorityGroup, type PriorityOwner, type PriorityRow } from '@/lib/priority/priority-rules';
+import { PriorityRowCard, type RowAction } from '@/components/dashboard/priority/priority-row-card';
 import { PriorityActionDialog, type PriorityAction } from '@/components/dashboard/priority/priority-action-dialog';
 
 const GROUPS: { key: PriorityGroup; label: string; hint: string }[] = [
+  { key: 'send_today', label: 'Send today', hint: "Must be booked for the 2 PM pickup (done = moved to For Pick-up by the SPX upload). If one can't go, tap \"Can't send today\" so sales knows why." },
   { key: 'ready', label: 'Ready to pack', hint: 'Paid (or COD) and every item is in stock — pick, pack and book.' },
   { key: 'waiting', label: 'Waiting for items', hint: 'Something is OS. The owner shows who has to move next: sales decides, the buyer buys, or it is on the way.' },
   { key: 'prep', label: 'Prep now', hint: 'Lay-aways 80%+ paid. Check stock now so nothing is missing when the last payment comes in.' },
@@ -29,7 +30,10 @@ export default function PriorityListPage() {
   const { toast } = useToast();
   const { userProfile } = useUserProfile();
   const roles = (userProfile?.roles || []).map((r) => String(r).toLowerCase());
-  const canEdit = roles.some((r) => ['owner', 'admin', 'sales'].includes(r));
+  const isAdmin = roles.some((r) => ['owner', 'admin'].includes(r));
+  const isJas = JAS_EMAILS.includes((userProfile?.email || '').toLowerCase().trim());
+  const canMark = isAdmin || isJas || roles.includes('sales');
+  const canBlock = isAdmin || roles.includes('inventory');
 
   const [rows, setRows] = useState<PriorityRow[]>([]);
   const [eventsReady, setEventsReady] = useState(true);
@@ -40,6 +44,7 @@ export default function PriorityListPage() {
   const [lateOnly, setLateOnly] = useState(false);
   const [search, setSearch] = useState('');
   const [dialog, setDialog] = useState<{ row: PriorityRow; action: PriorityAction } | null>(null);
+  const loadedOnce = useRef(false);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -49,6 +54,10 @@ export default function PriorityListPage() {
       if (!res.ok) throw new Error(data.error || 'Failed to load');
       setRows(data.rows);
       setEventsReady(data.eventsReady);
+      if (!loadedOnce.current) {
+        loadedOnce.current = true;
+        if (data.rows.some((r: PriorityRow) => r.group === 'send_today')) setGroup('send_today');
+      }
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Could not load the priority list', description: error.message });
     } finally {
@@ -58,16 +67,23 @@ export default function PriorityListPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const clearHold = async (row: PriorityRow) => {
+  // One-tap actions (no dialog): remove a hold, remove a send-today mark.
+  const quickEvent = async (row: PriorityRow, kind: 'hold_cleared' | 'send_today_cancelled', done: string) => {
     const res = await fetch('/api/priority/events', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderId: row.id, kind: 'hold_cleared', note: 'Hold removed' }),
+      body: JSON.stringify({ orderId: row.id, kind, note: done }),
     });
     const data = await res.json();
-    if (!res.ok) return toast({ variant: 'destructive', title: 'Could not remove hold', description: data.error });
-    toast({ title: 'Hold removed' });
+    if (!res.ok) return toast({ variant: 'destructive', title: 'Could not save', description: data.error });
+    toast({ title: done });
     load();
+  };
+
+  const onAction = (row: PriorityRow, action: RowAction) => {
+    if (action === 'clear_hold') return quickEvent(row, 'hold_cleared', 'Hold removed');
+    if (action === 'unmark') return quickEvent(row, 'send_today_cancelled', 'Removed from send today');
+    setDialog({ row, action });
   };
 
   // Rank is the order's place in its whole group, so everyone means the same
@@ -176,16 +192,14 @@ export default function PriorityListPage() {
               key={row.id}
               row={row}
               rank={rank}
-              canEdit={canEdit && eventsReady}
-              onFollowUp={(r) => setDialog({ row: r, action: 'followup' })}
-              onHold={(r) => setDialog({ row: r, action: 'hold' })}
-              onClearHold={clearHold}
+              perms={{ canEdit: canMark && eventsReady, canMark: canMark && eventsReady, canBlock: canBlock && eventsReady }}
+              onAction={onAction}
             />
           ))}
         </div>
       )}
 
-      <PriorityActionDialog row={dialog?.row || null} action={dialog?.action || null} onClose={() => setDialog(null)} onSaved={load} />
+      <PriorityActionDialog row={dialog?.row || null} action={dialog?.action || null} canOverride={isAdmin || isJas} onClose={() => setDialog(null)} onSaved={load} />
     </div>
   );
 }

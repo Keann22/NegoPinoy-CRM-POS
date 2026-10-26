@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { ChevronDown, Clock, MessageSquarePlus, PauseCircle, PlayCircle } from 'lucide-react';
+import { Ban, ChevronDown, Clock, MessageSquarePlus, PauseCircle, PlayCircle, Truck, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import type { PriorityAction } from './priority-action-dialog';
 import {
-  OWNER_LABELS, STEP_LABELS, phtDate,
+  BLOCK_REASONS, OWNER_LABELS, STEP_LABELS, phtDate,
   type MissingState, type PriorityOwner, type PriorityRow,
 } from '@/lib/priority/priority-rules';
 
@@ -41,16 +42,27 @@ function timer(row: PriorityRow): { text: string; tone: 'late' | 'today' | 'ok' 
   return { text: `Due in ${days}d`, tone: 'ok' };
 }
 
+export type RowAction = PriorityAction | 'clear_hold' | 'unmark';
+
+export interface RowPermissions {
+  /** Follow-ups and holds (sales, admin, jas). */
+  canEdit: boolean;
+  /** Mark / remove send today (sales, admin, jas). */
+  canMark: boolean;
+  /** "Can't send today" (warehouse, admin). */
+  canBlock: boolean;
+}
+
 interface Props {
   row: PriorityRow;
   rank: number;
-  canEdit: boolean;
-  onFollowUp: (row: PriorityRow) => void;
-  onHold: (row: PriorityRow) => void;
-  onClearHold: (row: PriorityRow) => void;
+  perms: RowPermissions;
+  onAction: (row: PriorityRow, action: RowAction) => void;
 }
 
-export function PriorityRowCard({ row, rank, canEdit, onFollowUp, onHold, onClearHold }: Props) {
+export function PriorityRowCard({ row, rank, perms, onAction }: Props) {
+  const { canEdit, canMark, canBlock } = perms;
+  const today = phtDate(new Date());
   const [showWhy, setShowWhy] = useState(false);
   const t = timer(row);
   const shortId = row.id.slice(0, 7).toUpperCase();
@@ -78,6 +90,9 @@ export function PriorityRowCard({ row, rank, canEdit, onFollowUp, onHold, onClea
           <div className="flex flex-wrap items-center gap-2">
             <span className={cn('rounded px-2 py-0.5 text-xs font-medium', OWNER_STYLE[row.owner])}>{OWNER_LABELS[row.owner]}</span>
             <span className="text-sm font-medium">{STEP_LABELS[row.step]}</span>
+            {row.sendToday && row.group !== 'send_today' && (
+              <Badge variant="outline" className="gap-1"><Truck className="h-3 w-3" />Send {row.sendToday.date <= today ? 'today' : shortDate(`${row.sendToday.date}T12:00:00+08:00`)}</Badge>
+            )}
             {t && (
               <Badge variant={t.tone === 'late' ? 'destructive' : 'outline'} className={cn('gap-1', t.tone === 'today' && 'border-amber-500 text-amber-700 dark:text-amber-300')}>
                 <Clock className="h-3 w-3" />{t.text}
@@ -102,6 +117,16 @@ export function PriorityRowCard({ row, rank, canEdit, onFollowUp, onHold, onClea
             </ul>
           )}
 
+          {row.sendToday && (
+            <div className="text-xs text-muted-foreground">Send today: “{row.sendToday.note}” — {row.sendToday.byName}</div>
+          )}
+          {row.sendTodayBlock && (
+            <div className="rounded-md bg-red-50 px-2 py-1 text-xs text-red-900 dark:bg-red-950 dark:text-red-200">
+              Couldn&apos;t send today — {BLOCK_REASONS[row.sendTodayBlock.reason]}
+              {row.sendTodayBlock.note && `: “${row.sendTodayBlock.note}”`} ({row.sendTodayBlock.byName})
+            </div>
+          )}
+
           {(row.followUps > 0 || row.hold) && (
             <div className="text-xs text-muted-foreground">
               {row.followUps > 0 && row.lastFollowUp && (
@@ -112,18 +137,33 @@ export function PriorityRowCard({ row, rank, canEdit, onFollowUp, onHold, onClea
           )}
 
           <div className="flex flex-wrap items-center gap-2 pt-1">
+            {canBlock && row.group === 'send_today' && (
+              <Button size="sm" variant="outline" className="h-8 border-red-300 text-red-700 dark:text-red-300" onClick={() => onAction(row, 'block')}>
+                <Ban className="mr-1.5 h-4 w-4" />Can&apos;t send today
+              </Button>
+            )}
+            {canMark && !row.sendToday && row.group !== 'hold' && (
+              <Button size="sm" variant="outline" className="h-8" onClick={() => onAction(row, 'send_today')}>
+                <Truck className="mr-1.5 h-4 w-4" />Send today
+              </Button>
+            )}
+            {canMark && row.sendToday && (
+              <Button size="sm" variant="ghost" className="h-8" onClick={() => onAction(row, 'unmark')}>
+                <X className="mr-1.5 h-4 w-4" />Remove send today
+              </Button>
+            )}
             {canEdit && row.group !== 'hold' && (
               <>
-                <Button size="sm" variant="outline" className="h-8" onClick={() => onFollowUp(row)}>
+                <Button size="sm" variant="outline" className="h-8" onClick={() => onAction(row, 'followup')}>
                   <MessageSquarePlus className="mr-1.5 h-4 w-4" />Customer followed up
                 </Button>
-                <Button size="sm" variant="ghost" className="h-8" onClick={() => onHold(row)}>
+                <Button size="sm" variant="ghost" className="h-8" onClick={() => onAction(row, 'hold')}>
                   <PauseCircle className="mr-1.5 h-4 w-4" />Hold
                 </Button>
               </>
             )}
             {canEdit && row.hold && (
-              <Button size="sm" variant="outline" className="h-8" onClick={() => onClearHold(row)}>
+              <Button size="sm" variant="outline" className="h-8" onClick={() => onAction(row, 'clear_hold')}>
                 <PlayCircle className="mr-1.5 h-4 w-4" />Remove hold
               </Button>
             )}

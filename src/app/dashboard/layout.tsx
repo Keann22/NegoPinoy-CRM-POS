@@ -59,6 +59,7 @@ import { NotificationBell } from '@/components/dashboard/notification-bell';
 import { MessagesDrawer } from '@/components/dashboard/messages-drawer';
 import { StaffMessageFab } from '@/components/dashboard/staff-message-fab';
 import { EscalationModal } from '@/components/dashboard/escalation-modal';
+import { SendTodayReminder } from '@/components/dashboard/priority/send-today-reminder';
 import { InventoryGuardianAlertModal } from '@/components/dashboard/inventory/InventoryGuardianAlertModal';
 import { InventoryGuardianTrigger } from '@/components/dashboard/inventory/InventoryGuardianTrigger';
 import { InventoryGuardianProvider } from '@/hooks/useInventoryGuardian';
@@ -278,6 +279,7 @@ export default function DashboardLayout({
       <DueDateAlert />
       <StaffMessageFab />
       <EscalationModal />
+      <SendTodayReminder />
       <InventoryGuardianAlertModal />
       <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr] print:block">
         <div className="hidden border-r bg-sidebar md:block print:hidden">

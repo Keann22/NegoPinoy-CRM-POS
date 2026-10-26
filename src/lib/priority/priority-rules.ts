@@ -39,10 +39,37 @@ export const PRIORITY_RULES = {
   },
 };
 
-export type PriorityGroup = 'ready' | 'waiting' | 'prep' | 'stale' | 'hold';
+/**
+ * "Send today": sales and the jas accounts mark orders that must go out today.
+ * Courier pickup is at 2 PM, and "sent" means booked (the SPX Excel sync moves
+ * the order to For Pick-up), so the warehouse gets reminders through the late
+ * morning. Marks made after the cutoff go on tomorrow's list unless an admin or
+ * jas overrides.
+ */
+export const SEND_TODAY = {
+  cutoffHour: 11,
+  pickupHour: 14,
+  /** Reminder times (PHT, 24h) for the warehouse pop-up. */
+  reminders: ['11:30', '12:30', '13:15', '13:45'],
+  /** From this reminder on, the pop-up is the final warning. */
+  finalReminder: '13:45',
+};
+
+/** The jas accounts (same people who approve prices): can mark and override the cutoff. */
+export const JAS_EMAILS = ['jas@gmail.com', 'jas@usares.com'];
+
+export const BLOCK_REASONS = {
+  item_os: 'Item is OS',
+  customer_hold: 'Customer asked to hold',
+  payment_check: 'Payment needs checking',
+  other: 'Other',
+} as const;
+export type BlockReason = keyof typeof BLOCK_REASONS;
+
+export type PriorityGroup = 'send_today' | 'ready' | 'waiting' | 'prep' | 'stale' | 'hold';
 export type PriorityOwner = 'warehouse' | 'sales' | 'buyer' | 'none';
 export type MissingState = 'decide' | 'buy' | 'in_transit' | 'transit_late' | 'arrived';
-export type PriorityStep = 'pack' | 'book' | 'prep' | 'stale' | 'hold' | MissingState;
+export type PriorityStep = 'send_today' | 'send_upload' | 'pack' | 'book' | 'prep' | 'stale' | 'hold' | MissingState;
 
 export interface MissingItem {
   productId: string;
@@ -61,6 +88,21 @@ export interface PriorityHold {
   until: string;
   note: string | null;
   byName: string | null;
+}
+
+export interface SendTodayMark {
+  /** The day it must be booked (YYYY-MM-DD, PHT). */
+  date: string;
+  note: string | null;
+  byName: string | null;
+  at: string;
+}
+
+export interface SendTodayBlock {
+  reason: BlockReason;
+  note: string | null;
+  byName: string | null;
+  at: string;
 }
 
 export interface PriorityOrderInput {
@@ -83,6 +125,10 @@ export interface PriorityOrderInput {
   followUps: number;
   lastFollowUp: { note: string | null; byName: string | null; at: string } | null;
   hold: PriorityHold | null;
+  /** Active send-today mark (latest send_today* event is a mark). */
+  sendToday: SendTodayMark | null;
+  /** The warehouse said it can't send this today (latest send_today* event, today only). */
+  sendTodayBlock: SendTodayBlock | null;
 }
 
 export interface ScorePart {
@@ -103,6 +149,8 @@ export interface PriorityRow extends PriorityOrderInput {
 }
 
 export const STEP_LABELS: Record<PriorityStep, string> = {
+  send_today: 'Send today — pick, pack & book before 2 PM',
+  send_upload: 'Send today — packed, waiting for SPX upload',
   pack: 'Pick, pack & book',
   book: 'Packed — book with SPX',
   decide: 'OS — sales to decide (wait or remove)',
@@ -146,6 +194,33 @@ export function phtDate(d: Date | string): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila' }).format(new Date(d));
 }
 
+/** Hour of the day (0-23) in Philippine time. */
+export function phtHour(d: Date): number {
+  return Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Manila', hour: '2-digit', hour12: false }).format(d)) % 24;
+}
+
+/** "HH:MM" in Philippine time. */
+export function phtClock(d: Date): string {
+  return new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', hour12: false }).format(d);
+}
+
+/** Which day a new send-today mark lands on: today before the cutoff, else tomorrow (unless overridden). */
+export function sendDateFor(now: Date, override: boolean): string {
+  if (override || phtHour(now) < SEND_TODAY.cutoffHour) return phtDate(now);
+  return phtDate(new Date(now.getTime() + DAY));
+}
+
+/** Pickup time on a send day, as an ISO timestamp. */
+export function pickupAt(date: string): string {
+  return new Date(`${date}T${String(SEND_TODAY.pickupHour).padStart(2, '0')}:00:00+08:00`).toISOString();
+}
+
+/** The reminder period we're in ('start' before the first reminder). Each period pops the reminder once. */
+export function reminderSlot(now: Date): string {
+  const clock = phtClock(now);
+  return [...SEND_TODAY.reminders].reverse().find((r) => clock >= r) || 'start';
+}
+
 /** Bought-item state from its purchase line. */
 export function transitState(eta: string | null, now: Date): MissingState {
   if (!eta) return 'in_transit';
@@ -174,6 +249,11 @@ export function isHoldActive(hold: PriorityHold | null, now: Date): boolean {
 function classify(o: PriorityOrderInput, now: Date) {
   if (o.status === 'On-Hold' || isHoldActive(o.hold, now)) {
     return { group: 'hold' as const, owner: 'none' as const, step: 'hold' as const, stepSince: null, dueAt: null };
+  }
+
+  if (o.sendToday && o.sendToday.date <= phtDate(now)) {
+    const step = ['Packed', 'For Shipping'].includes(o.status) ? 'send_upload' as const : 'send_today' as const;
+    return { group: 'send_today' as const, owner: 'warehouse' as const, step, stepSince: o.sendToday.at, dueAt: pickupAt(o.sendToday.date) };
   }
 
   if (!o.paidAt) {
@@ -216,7 +296,7 @@ function scoreFor(o: PriorityOrderInput, daysLate: number, daysSincePaid: number
 
 /** Forgotten orders go to their own tab so they don't bury today's work. */
 function isStale(o: PriorityOrderInput, c: ReturnType<typeof classify>, now: Date): boolean {
-  if (c.group === 'hold' || c.group === 'prep' || c.owner === 'none') return false;
+  if (c.group === 'send_today' || c.group === 'hold' || c.group === 'prep' || c.owner === 'none') return false;
   const last = o.lastActivityAt || o.orderDate;
   return now.getTime() - new Date(last).getTime() > PRIORITY_RULES.staleDays * DAY;
 }

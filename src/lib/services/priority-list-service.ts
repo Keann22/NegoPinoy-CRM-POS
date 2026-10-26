@@ -2,8 +2,9 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { fetchAllPages } from './procurement-demand-service';
 import { findStage } from '@/lib/online-order-tracking';
 import {
-  PRIORITY_RULES, rankOrder, compareRows, transitState,
+  PRIORITY_RULES, rankOrder, compareRows, transitState, phtDate,
   type MissingItem, type PriorityOrderInput, type PriorityRow, type PriorityHold,
+  type SendTodayMark, type SendTodayBlock, type BlockReason,
 } from '@/lib/priority/priority-rules';
 
 /**
@@ -19,11 +20,15 @@ const PRIORITY_STATUSES = [
 ];
 
 const CHUNK = 150;
+const ORDER_COLUMNS = 'id, status, payment_method, total_amount, amount_paid, balance_due, order_date, created_at, packed_at, sales_person_name, customers(full_name)';
 const DAY = 24 * 60 * 60 * 1000;
 /** A buy request linked this long before the OS scan still belongs to that scan. */
 const SOURCE_MATCH_SLACK_MS = 10 * 60 * 1000;
 
 export const PRIORITY_EVENTS_TABLE = 'order_priority_events';
+const SEND_KINDS = ['send_today', 'send_today_blocked', 'send_today_cancelled'];
+/** Send-today marks older than this are ignored (an order marked and never booked shows as late until then). */
+const SEND_LOOKBACK_DAYS = 30;
 
 export interface PriorityListResult {
   rows: PriorityRow[];
@@ -53,22 +58,40 @@ function productLabel(p: any): string {
   return p.variant_name && !String(p.name).includes(p.variant_name) ? `${p.name} [${p.variant_name}]` : p.name;
 }
 
-export async function getPriorityList(supabase: SupabaseClient, now = new Date()): Promise<PriorityListResult> {
+/** Orders with a recent send-today event (mark, block or cancel). */
+async function sendTodayOrderIds(supabase: SupabaseClient, now: Date): Promise<Set<string>> {
+  try {
+    const since = new Date(now.getTime() - SEND_LOOKBACK_DAYS * DAY).toISOString();
+    const rows = await fetchAllPages<any>((f, t) =>
+      supabase.from(PRIORITY_EVENTS_TABLE).select('order_id').in('kind', SEND_KINDS).gte('created_at', since).order('id').range(f, t));
+    return new Set(rows.map((r) => r.order_id));
+  } catch (error) {
+    if (isMissingTable(error)) return new Set();
+    throw error;
+  }
+}
+
+export async function getPriorityList(
+  supabase: SupabaseClient,
+  now = new Date(),
+  opts: { onlyOrderIds?: string[] } = {}
+): Promise<PriorityListResult> {
   // 1. Open orders, paginated past the 1000-row cap.
-  const orders = await fetchAllPages<any>((from, to) =>
-    supabase
-      .from('orders')
-      .select('id, status, payment_method, total_amount, amount_paid, balance_due, order_date, created_at, packed_at, sales_person_name, customers(full_name)')
-      .in('status', PRIORITY_STATUSES)
-      .order('id')
-      .range(from, to)
-  );
+  const [orders, markedIds] = await Promise.all([
+    opts.onlyOrderIds
+      ? inChunks(opts.onlyOrderIds, (c) => fetchAllPages<any>((from, to) =>
+          supabase.from('orders').select(ORDER_COLUMNS).in('status', PRIORITY_STATUSES).in('id', c).order('id').range(from, to)))
+      : fetchAllPages<any>((from, to) =>
+          supabase.from('orders').select(ORDER_COLUMNS).in('status', PRIORITY_STATUSES).order('id').range(from, to)),
+    sendTodayOrderIds(supabase, now),
+  ]);
 
   const isFullyPaid = (o: any) => Number(o.balance_due || 0) < 1;
   const isPrep = (o: any) =>
     o.payment_method === 'Lay-away' && !isFullyPaid(o) &&
     Number(o.total_amount) > 0 && Number(o.amount_paid || 0) / Number(o.total_amount) >= PRIORITY_RULES.prepPaidRatio;
-  const eligible = orders.filter((o) => isFullyPaid(o) || o.payment_method === 'COD' || isPrep(o));
+  // Anything sales marked "send today" is on the list even if it still owes.
+  const eligible = orders.filter((o) => isFullyPaid(o) || o.payment_method === 'COD' || isPrep(o) || markedIds.has(o.id));
   const ids = eligible.map((o) => o.id);
 
   // 2. Everything else, keyed by order.
@@ -131,7 +154,7 @@ export async function getPriorityList(supabase: SupabaseClient, now = new Date()
     const orderIssues = issuesByOrder.get(o.id) || [];
     const missing = missingItems(orderIssues, sourcesByOrder.get(o.id) || [], poiById, receivedAt, productById, now);
     const osRounds = new Set(orderIssues.map((i) => String(i.created_at).slice(0, 16))).size;
-    const { followUps, lastFollowUp, hold } = summarizeEvents(eventsByOrder.get(o.id) || []);
+    const { followUps, lastFollowUp, hold, sendToday, sendTodayBlock } = summarizeEvents(eventsByOrder.get(o.id) || [], now);
 
     const input: PriorityOrderInput = {
       id: o.id,
@@ -151,6 +174,8 @@ export async function getPriorityList(supabase: SupabaseClient, now = new Date()
       followUps,
       lastFollowUp,
       hold,
+      sendToday,
+      sendTodayBlock,
     };
     return rankOrder(input, now);
   });
@@ -228,7 +253,7 @@ function isFullyReceived(poi: any): boolean {
   return poi.status === 'received' || Number(poi.received_qty || 0) >= Number(poi.expected_qty || 0);
 }
 
-function summarizeEvents(events: any[]) {
+function summarizeEvents(events: any[], now: Date) {
   const sorted = [...events].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
   const followUpRows = sorted.filter((e) => e.kind === 'followup');
   const last = followUpRows[followUpRows.length - 1];
@@ -236,7 +261,16 @@ function summarizeEvents(events: any[]) {
   const hold: PriorityHold | null = holdRow?.kind === 'hold' && holdRow.hold_until
     ? { until: holdRow.hold_until, note: holdRow.note, byName: holdRow.created_by_name }
     : null;
+  const sendRow = [...sorted].reverse().find((e) => SEND_KINDS.includes(e.kind));
+  const sendToday: SendTodayMark | null = sendRow?.kind === 'send_today' && sendRow.send_date
+    ? { date: sendRow.send_date, note: sendRow.note, byName: sendRow.created_by_name, at: sendRow.created_at }
+    : null;
+  const sendTodayBlock: SendTodayBlock | null = sendRow?.kind === 'send_today_blocked' && phtDate(sendRow.created_at) === phtDate(now)
+    ? { reason: (sendRow.reason_code || 'other') as BlockReason, note: sendRow.note, byName: sendRow.created_by_name, at: sendRow.created_at }
+    : null;
   return {
+    sendToday,
+    sendTodayBlock,
     followUps: followUpRows.length,
     lastFollowUp: last ? { note: last.note, byName: last.created_by_name, at: last.created_at } : null,
     hold,
@@ -246,7 +280,7 @@ function summarizeEvents(events: any[]) {
 async function loadEvents(supabase: SupabaseClient, ids: string[]): Promise<{ rows: any[]; ready: boolean }> {
   try {
     const rows = await inChunks(ids, (c) => fetchAllPages<any>((f, t) =>
-      supabase.from(PRIORITY_EVENTS_TABLE).select('order_id, kind, note, hold_until, created_by_name, created_at').in('order_id', c).order('id').range(f, t)));
+      supabase.from(PRIORITY_EVENTS_TABLE).select('*').in('order_id', c).order('id').range(f, t)));
     return { rows, ready: true };
   } catch (error) {
     if (isMissingTable(error)) return { rows: [], ready: false };
@@ -267,6 +301,16 @@ function groupBy<T>(items: T[], key: (item: T) => string): Map<string, T[]> {
 
 // ---- Writes (follow-ups and holds) ----
 
+export type PriorityEventKind = 'followup' | 'hold' | 'hold_cleared' | 'send_today' | 'send_today_blocked' | 'send_today_cancelled';
+
+/** Just the orders due to go out today (for the warehouse reminder pop-up). */
+export async function getSendTodayList(supabase: SupabaseClient, now = new Date()): Promise<PriorityRow[]> {
+  const ids = Array.from(await sendTodayOrderIds(supabase, now));
+  if (ids.length === 0) return [];
+  const { rows } = await getPriorityList(supabase, now, { onlyOrderIds: ids });
+  return rows.filter((r) => r.group === 'send_today');
+}
+
 export interface PriorityEditor {
   id: string;
   name: string;
@@ -274,7 +318,14 @@ export interface PriorityEditor {
 
 export async function addPriorityEvent(
   supabase: SupabaseClient,
-  input: { orderId: string; kind: 'followup' | 'hold' | 'hold_cleared'; note?: string | null; holdUntil?: string | null },
+  input: {
+    orderId: string;
+    kind: PriorityEventKind;
+    note?: string | null;
+    holdUntil?: string | null;
+    sendDate?: string | null;
+    reasonCode?: BlockReason | null;
+  },
   editor: PriorityEditor
 ): Promise<void> {
   const { error } = await supabase.from(PRIORITY_EVENTS_TABLE).insert({
@@ -282,11 +333,16 @@ export async function addPriorityEvent(
     kind: input.kind,
     note: input.note?.trim() || null,
     hold_until: input.kind === 'hold' ? input.holdUntil : null,
+    ...(input.kind === 'send_today' ? { send_date: input.sendDate } : {}),
+    ...(input.kind === 'send_today_blocked' ? { reason_code: input.reasonCode } : {}),
     created_by_id: editor.id,
     created_by_name: editor.name,
   });
   if (error) {
     if (isMissingTable(error)) throw new Error('Priority list is not set up yet - run the order_priority_events migration.');
+    if (['23514', '42703', 'PGRST204'].includes(error.code)) {
+      throw new Error('Send today is not set up yet - run scripts/migrations/add_send_today_to_priority_events.sql.');
+    }
     throw error;
   }
 }
