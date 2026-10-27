@@ -139,7 +139,7 @@ export interface PriorityOrderInput {
   lastActivityAt: string | null;
   salesPersonName: string | null;
   customerName: string | null;
-  /** When the order became fully paid (COD: when ordered). Null if still owing. */
+  /** When the order became fully paid (COD, or an installment still owing: when ordered). Null if still owing. */
   paidAt: string | null;
   missing: MissingItem[];
   osRounds: number;
@@ -323,7 +323,7 @@ function scoreFor(o: PriorityOrderInput, daysLate: number, daysSincePaid: number
   const followUps = Math.min(o.followUps, p.maxFollowUps);
   if (followUps > 0) parts.push({ label: `Customer followed up ${o.followUps}×`, points: followUps * p.perFollowUp });
   if (daysSincePaid && daysSincePaid > 0) {
-    const label = o.paymentMethod === 'COD' ? 'ordered' : 'fully paid';
+    const label = isFullyPaid(o) ? 'fully paid' : 'ordered';
     parts.push({ label: `${daysSincePaid} day${daysSincePaid === 1 ? '' : 's'} since ${label}`, points: daysSincePaid * p.perDayPaid });
   }
   if (o.urgent) parts.push({ label: 'Customer is in a hurry (nagmamadali)', points: p.urgent });
@@ -338,9 +338,15 @@ function scoreFor(o: PriorityOrderInput, daysLate: number, daysSincePaid: number
   return parts;
 }
 
+/** Payment types we send before the customer has paid in full (COD on delivery, installments over time). */
+export const SHIPS_BEFORE_PAID = ['COD', 'Installment'];
+export function shipsBeforePaid(paymentMethod: string | null | undefined): boolean {
+  return SHIPS_BEFORE_PAID.includes(paymentMethod || '');
+}
+
 /** Paid in full by the customer (COD pays on delivery, so it doesn't count). */
-export function isFullyPaid(o: Pick<PriorityOrderInput, 'paidAt' | 'paymentMethod'>): boolean {
-  return !!o.paidAt && o.paymentMethod !== 'COD';
+export function isFullyPaid(o: Pick<PriorityOrderInput, 'paidAt' | 'paymentMethod' | 'balanceDue'>): boolean {
+  return !!o.paidAt && o.paymentMethod !== 'COD' && Number(o.balanceDue || 0) < 1;
 }
 
 /** Forgotten orders go to their own tab so they don't bury today's work. */
@@ -371,10 +377,10 @@ export type PriorityLayer = 0 | 1 | 2;
 export const LAYER_LABELS: Record<PriorityLayer, string> = {
   0: 'Nagmamadali',
   1: 'Fully paid',
-  2: 'Others (COD and not yet fully paid)',
+  2: 'Others (COD, installment and not yet fully paid)',
 };
 
-export function layerOf(row: Pick<PriorityRow, 'urgent' | 'paidAt' | 'paymentMethod'>): PriorityLayer {
+export function layerOf(row: Pick<PriorityRow, 'urgent' | 'paidAt' | 'paymentMethod' | 'balanceDue'>): PriorityLayer {
   if (row.urgent) return 0;
   return isFullyPaid(row) ? 1 : 2;
 }

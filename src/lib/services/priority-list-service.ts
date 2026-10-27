@@ -3,14 +3,15 @@ import { fetchAllPages } from './procurement-demand-service';
 import { findStage } from '@/lib/online-order-tracking';
 import { staffNotes } from './order-trail-service';
 import {
-  PRIORITY_RULES, rankOrder, compareRows, transitState, phtDate,
+  PRIORITY_RULES, rankOrder, compareRows, transitState, phtDate, shipsBeforePaid,
   type MissingItem, type PriorityOrderInput, type PriorityRow, type PriorityHold,
   type SendTodayMark, type SendTodayBlock, type BlockReason, type OsDecision,
 } from '@/lib/priority/priority-rules';
 
 /**
  * Builds the order priority list: every open order the shop owes the customer
- * (fully paid, COD, or a nearly-paid lay-away), with what is blocking it,
+ * (fully paid, COD, installment, a nearly-paid lay-away, or a lay-away with
+ * an OS item), with what is blocking it,
  * who owns the next step, and its rank. See priority-rules.ts for the rules.
  */
 
@@ -74,6 +75,15 @@ async function sendTodayOrderIds(supabase: SupabaseClient, now: Date): Promise<S
   }
 }
 
+/** Which of these orders have an open OS item (a picker issue tied to a product). */
+async function openOsOrderIds(supabase: SupabaseClient, orderIds: string[]): Promise<Set<string>> {
+  const rows = await inChunks(orderIds, (c) => fetchAllPages<any>((f, t) =>
+    supabase.from('order_issues').select('order_id')
+      .eq('issue_type', 'order').eq('status', 'open').not('product_id', 'is', null)
+      .in('order_id', c).order('id').range(f, t)));
+  return new Set(rows.map((r) => r.order_id));
+}
+
 /** Orders whose customer is currently marked nagmamadali (latest urgent* event is 'urgent'). */
 async function urgentOrderIds(supabase: SupabaseClient): Promise<Set<string>> {
   try {
@@ -109,8 +119,13 @@ export async function getPriorityList(
     o.payment_method === 'Lay-away' && !isFullyPaid(o) &&
     Number(o.total_amount) > 0 && Number(o.amount_paid || 0) / Number(o.total_amount) >= PRIORITY_RULES.prepPaidRatio;
   // Anything sales marked "send today" or "nagmamadali" is on the list even if it still owes.
-  const eligible = orders.filter((o) =>
-    isFullyPaid(o) || o.payment_method === 'COD' || isPrep(o) || markedIds.has(o.id) || urgentIds.has(o.id));
+  const listed = (o: any) =>
+    isFullyPaid(o) || shipsBeforePaid(o.payment_method) || isPrep(o) || markedIds.has(o.id) || urgentIds.has(o.id);
+  // Lay-aways still being paid off join the list while they have an OS item, so
+  // sales decides (wait or remove) early instead of when the last payment lands.
+  const osLayawayIds = await openOsOrderIds(supabase,
+    orders.filter((o) => o.payment_method === 'Lay-away' && !listed(o)).map((o) => o.id));
+  const eligible = orders.filter((o) => listed(o) || osLayawayIds.has(o.id));
   const ids = eligible.map((o) => o.id);
 
   // 2. Everything else, keyed by order.
@@ -172,7 +187,8 @@ export async function getPriorityList(
   const borrowsByOrder = groupBy(borrows, (b) => b.from_order_id);
 
   const rows = eligible.map((o) => {
-    const paidAt = o.payment_method === 'COD'
+    // COD and installments still owing are due from the day they were ordered.
+    const paidAt = o.payment_method === 'COD' || (shipsBeforePaid(o.payment_method) && !isFullyPaid(o))
       ? o.order_date || o.created_at
       : isFullyPaid(o) ? maxIso(lastPayment.get(o.id) || null, o.order_date || o.created_at) : null;
 

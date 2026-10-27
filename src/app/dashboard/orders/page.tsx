@@ -27,7 +27,6 @@ import { ProcessReturnDialog } from '@/components/dashboard/process-return-dialo
 
 import { OrdersFilterBar } from '@/components/dashboard/orders/OrdersFilterBar';
 import { OrdersTable } from '@/components/dashboard/orders/OrdersTable';
-import { OverdueOrders } from '@/components/dashboard/orders/OverdueOrders';
 import { handleStockStatusTransition } from '@/lib/services/orders/order-update';
 import { resolveOpenOrderIssues, STATUSES_THAT_CLEAR_ORDER_ISSUES } from '@/lib/services/order-issues-service';
 
@@ -71,7 +70,6 @@ export default function OrdersPage() {
   const [searchQuery, setSearchQuery] = useState(searchParams?.get('search') || '');
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [showOnlyOverdue, setShowOnlyOverdue] = useState(false);
 
   // ── Derived: filtered + formatted orders ───────────────────────────────────
   const formattedOrders: FormattedOrder[] = useMemo(() => {
@@ -85,11 +83,6 @@ export default function OrdersPage() {
         (o.id || '').toLowerCase().includes(query) ||
         (customerMap.get(o.customerId) || '').toLowerCase().replace(/\s+/g, ' ').includes(query)
       );
-    }
-    if (showOnlyOverdue) {
-      const tenDaysAgo = new Date();
-      tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
-      filtered = filtered.filter(o => o.orderStatus === 'Processing' && o.paymentType !== 'Lay-away' && o.orderDate && new Date(o.orderDate) < tenDaysAgo);
     }
     if (date?.from) {
       const fromTime = date.from.getTime();
@@ -116,7 +109,7 @@ export default function OrdersPage() {
         formattedTotal: `₱${(Number(order.totalAmount) || 0).toFixed(2)}`,
       };
     });
-  }, [orders, customerMap, date, statusFilter, typeFilter, searchQuery, showOnlyOverdue]);
+  }, [orders, customerMap, date, statusFilter, typeFilter, searchQuery]);
 
   const totalPages = Math.ceil((formattedOrders?.length || 0) / rowsPerPage) || 1;
   const paginatedOrders = useMemo(() => {
@@ -212,81 +205,64 @@ export default function OrdersPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {orders && (
-             <OverdueOrders 
-                orders={orders} 
-                customerMap={customerMap}
-                isExpanded={showOnlyOverdue}
-                onToggleExpand={() => {
-                  setShowOnlyOverdue(!showOnlyOverdue);
-                  setCurrentPage(1);
-                }} 
-                onOrderUpdated={refetch}
-             />
-          )}
-
-          {!showOnlyOverdue && (
-            <>
-              <OrdersFilterBar
-                searchQuery={searchQuery} onSearchChange={(q) => { setSearchQuery(q); setCurrentPage(1); }}
-                statusFilter={statusFilter} onStatusChange={(s) => { setStatusFilter(s); setCurrentPage(1); }}
-                typeFilter={typeFilter} onTypeChange={(t) => { setTypeFilter(t); setCurrentPage(1); }}
-                date={date} onDateChange={(d) => { setDate(d); setCurrentPage(1); }}
-                selectedOrderIds={selectedOrderIds} onBulkStatusChange={handleBulkStatusChange}
-              />
-              <OrdersTable
-                orders={paginatedOrders}
-                isLoading={isLoading}
-                selectedOrderIds={selectedOrderIds}
-                onSelectAll={(checked) => {
-                  if (checked) {
-                    const newSel = new Set([...selectedOrderIds, ...paginatedOrders.map(o => o.id)]);
-                    setSelectedOrderIds(Array.from(newSel));
-                  } else {
-                    const visible = new Set(paginatedOrders.map(o => o.id));
-                    setSelectedOrderIds(selectedOrderIds.filter(id => !visible.has(id)));
-                  }
-                }}
-                onSelectOne={(id, checked) =>
-                  setSelectedOrderIds(prev => checked ? [...prev, id] : prev.filter(x => x !== id))
-                }
-                onViewDetails={(order) => router.push(`/dashboard/orders/${order.id}`)}
-                onLogPayment={setLogPaymentOrder}
-                onEditPaymentTerms={setEditPaymentOrder}
-                onEarlySettlement={setEarlySettlementOrder}
-                onMarkShipped={setMarkShippedOrder}
-                onViewWaybill={setViewWaybillOrder}
-                onCodPayment={setCodPaymentOrder}
-                onDueDate={setDueDateOrder}
-                onStatusChange={(id, newStatus) => {
-                  if (newStatus === 'On-Hold') {
-                    const order = orders?.find(o => o.id === id);
-                    if (order) setOnHoldOrder(order);
-                  } else if (newStatus === 'Returned') {
-                    const order = orders?.find(o => o.id === id);
-                    if (order) setProcessReturnOrder(order);
-                  } else {
-                    handleStatusChange(id, newStatus);
-                  }
-                }}
-                onProcessReturn={setProcessReturnOrder}
-                isInventoryOnly={isInventoryOnly}
-                canCreateOrder={canCreateOrder}
-                isAdminOrOwner={isAdminOrOwner}
-                userRoles={userProfile?.roles ?? []}
-              />
-              {!isLoading && (!formattedOrders || formattedOrders.length === 0) && (
-                <div className="flex flex-col items-center justify-center text-center border-2 border-dashed rounded-lg p-12 mt-4">
-                  <p className="text-lg font-semibold">No orders found</p>
-                  <p className="text-muted-foreground mt-2">
-                    {canCreateOrder ? 'Click "New Order" to get started.' : 'No orders matched your criteria.'}
-                  </p>
-                </div>
-              )}
-            </>
+          <OrdersFilterBar
+            searchQuery={searchQuery} onSearchChange={(q) => { setSearchQuery(q); setCurrentPage(1); }}
+            statusFilter={statusFilter} onStatusChange={(s) => { setStatusFilter(s); setCurrentPage(1); }}
+            typeFilter={typeFilter} onTypeChange={(t) => { setTypeFilter(t); setCurrentPage(1); }}
+            date={date} onDateChange={(d) => { setDate(d); setCurrentPage(1); }}
+            selectedOrderIds={selectedOrderIds} onBulkStatusChange={handleBulkStatusChange}
+          />
+          <OrdersTable
+            orders={paginatedOrders}
+            isLoading={isLoading}
+            selectedOrderIds={selectedOrderIds}
+            onSelectAll={(checked) => {
+              if (checked) {
+                const newSel = new Set([...selectedOrderIds, ...paginatedOrders.map(o => o.id)]);
+                setSelectedOrderIds(Array.from(newSel));
+              } else {
+                const visible = new Set(paginatedOrders.map(o => o.id));
+                setSelectedOrderIds(selectedOrderIds.filter(id => !visible.has(id)));
+              }
+            }}
+            onSelectOne={(id, checked) =>
+              setSelectedOrderIds(prev => checked ? [...prev, id] : prev.filter(x => x !== id))
+            }
+            onViewDetails={(order) => router.push(`/dashboard/orders/${order.id}`)}
+            onLogPayment={setLogPaymentOrder}
+            onEditPaymentTerms={setEditPaymentOrder}
+            onEarlySettlement={setEarlySettlementOrder}
+            onMarkShipped={setMarkShippedOrder}
+            onViewWaybill={setViewWaybillOrder}
+            onCodPayment={setCodPaymentOrder}
+            onDueDate={setDueDateOrder}
+            onStatusChange={(id, newStatus) => {
+              if (newStatus === 'On-Hold') {
+                const order = orders?.find(o => o.id === id);
+                if (order) setOnHoldOrder(order);
+              } else if (newStatus === 'Returned') {
+                const order = orders?.find(o => o.id === id);
+                if (order) setProcessReturnOrder(order);
+              } else {
+                handleStatusChange(id, newStatus);
+              }
+            }}
+            onProcessReturn={setProcessReturnOrder}
+            isInventoryOnly={isInventoryOnly}
+            canCreateOrder={canCreateOrder}
+            isAdminOrOwner={isAdminOrOwner}
+            userRoles={userProfile?.roles ?? []}
+          />
+          {!isLoading && (!formattedOrders || formattedOrders.length === 0) && (
+            <div className="flex flex-col items-center justify-center text-center border-2 border-dashed rounded-lg p-12 mt-4">
+              <p className="text-lg font-semibold">No orders found</p>
+              <p className="text-muted-foreground mt-2">
+                {canCreateOrder ? 'Click "New Order" to get started.' : 'No orders matched your criteria.'}
+              </p>
+            </div>
           )}
         </CardContent>
-        {formattedOrders && formattedOrders.length > 0 && !showOnlyOverdue && (
+        {formattedOrders && formattedOrders.length > 0 && (
           <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-2">
             <div className="text-sm text-muted-foreground">
               Showing <strong>{(currentPage - 1) * rowsPerPage + 1}-{Math.min(currentPage * rowsPerPage, formattedOrders.length)}</strong> of <strong>{formattedOrders.length}</strong> orders

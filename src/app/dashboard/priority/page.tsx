@@ -25,7 +25,7 @@ const TO_FOLLOW_HINT = 'Items customers are still owed from an earlier order. Ad
 
 const GROUPS: { key: PriorityGroup; label: string; hint: string }[] = [
   { key: 'send_today', label: 'Send today', hint: "Must be booked for the 2 PM pickup (done = moved to For Pick-up by the SPX upload). If one can't go, tap \"Can't send today\" so sales knows why." },
-  { key: 'ready', label: 'Ready to pack', hint: 'Paid (or COD) and every item is in stock — pick, pack and book.' },
+  { key: 'ready', label: 'Ready to pack', hint: 'Paid (or COD / installment) and every item is in stock — pick, pack and book.' },
   { key: 'waiting', label: 'Waiting for items', hint: 'Something is OS. The owner shows who has to move next: sales decides, the buyer buys, or it is on the way.' },
   { key: 'prep', label: 'Prep now', hint: 'Lay-aways 80%+ paid. Check stock now so nothing is missing when the last payment comes in.' },
   { key: 'stale', label: 'No activity 30d+', hint: 'Nobody has touched these in 30+ days. Sales: confirm with the customer if we still send it, or cancel the order.' },

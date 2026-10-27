@@ -105,8 +105,8 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
           </div>
           <div className="text-xs text-muted-foreground">
             {row.salesPersonName || 'No sales person'} · Status: {row.status}
-            {row.paidAt && <> · {row.paymentMethod === 'COD' ? 'Ordered' : 'Fully paid'} {shortDate(row.paidAt)}</>}
-            {!row.paidAt && row.totalAmount > 0 && <> · {Math.round((row.amountPaid / row.totalAmount) * 100)}% paid</>}
+            {row.paidAt && <> · {isFullyPaid(row) ? 'Fully paid' : 'Ordered'} {shortDate(row.paidAt)}</>}
+            {!isFullyPaid(row) && row.paymentMethod !== 'COD' && row.totalAmount > 0 && <> · {Math.round((row.amountPaid / row.totalAmount) * 100)}% paid</>}
             {row.itemCount > 1 && <> · <span className={cn(row.readyCount < row.itemCount && 'font-medium text-foreground')}>{row.readyCount} of {row.itemCount} items ready</span></>}
           </div>
 
