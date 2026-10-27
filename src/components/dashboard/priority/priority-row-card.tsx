@@ -158,6 +158,11 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
             </ul>
           )}
 
+          {row.mayBeOs.length > 0 && (
+            <div className="rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+              ⚠️ May be OS — check these first: {row.mayBeOs.map((m) => `${m.name} (stock ${m.stock})`).join(', ')}
+            </div>
+          )}
           {row.urgent && (
             <div className="text-xs text-red-700 dark:text-red-300">Nagmamadali: “{row.urgent.note}” — {row.urgent.byName}, {shortDate(row.urgent.at)}</div>
           )}

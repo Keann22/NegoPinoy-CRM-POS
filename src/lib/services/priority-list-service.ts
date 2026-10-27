@@ -22,6 +22,26 @@ const PRIORITY_STATUSES = [
 ];
 
 const CHUNK = 150;
+/** Items aren't off the shelf yet in these statuses, so negative stock may mean this order comes up short. */
+const NOT_PICKED_STATUSES = ['Processing', 'Pending Payment', 'Waiting for Stock', 'On-Hold'];
+
+/**
+ * Lines whose product has negative stock (more promised than on the shelf).
+ * Sets are skipped: they hold no stock of their own (their parts do).
+ */
+function negativeStockLines(orderLines: any[], alreadyMissing: Set<string>): { name: string; stock: number }[] {
+  const seen = new Set<string>();
+  return orderLines
+    .filter((l) => {
+      const p = l.products;
+      const isSet = Array.isArray(p?.assembly_recipe) && p.assembly_recipe.length > 0;
+      if (!p || isSet || Number(p.stock_level) >= 0 || alreadyMissing.has(l.product_id) || seen.has(l.product_id)) return false;
+      seen.add(l.product_id);
+      return true;
+    })
+    .map((l) => ({ name: l.product_name, stock: Number(l.products.stock_level) }));
+}
+
 /** How many of an order's latest notes the list shows. */
 const RECENT_NOTES = 3;
 const ORDER_COLUMNS = 'id, status, payment_method, total_amount, amount_paid, balance_due, order_date, created_at, packed_at, sales_person_name, notes, customers(full_name)';
@@ -142,10 +162,11 @@ export async function getPriorityList(
     inChunks(ids, (c) => fetchAllPages<any>((f, t) =>
       supabase.from('order_logs').select('order_id, created_at').in('order_id', c).order('id').range(f, t))),
     inChunks(ids, (c) => fetchAllPages<any>((f, t) =>
-      supabase.from('order_items').select('order_id').in('order_id', c).order('id').range(f, t))),
+      supabase.from('order_items').select('order_id, product_id, product_name, products(stock_level, assembly_recipe)').in('order_id', c).order('id').range(f, t))),
   ]);
   const lineCount = new Map<string, number>();
   lines.forEach((l) => lineCount.set(l.order_id, (lineCount.get(l.order_id) || 0) + 1));
+  const linesByOrder = groupBy(lines, (l) => l.order_id);
 
   const poiIds = Array.from(new Set(sources.map((s) => s.purchase_order_item_id).filter(Boolean)));
   const openProductIds = Array.from(new Set(issues.filter((i) => i.status === 'open' && i.product_id).map((i) => i.product_id)));
@@ -197,6 +218,9 @@ export async function getPriorityList(
     const osRounds = new Set(orderIssues.map((i) => String(i.created_at).slice(0, 16))).size;
     const { followUps, lastFollowUp, hold, sendToday, sendTodayBlock, urgent } = summarizeEvents(eventsByOrder.get(o.id) || [], now);
     const itemCount = lineCount.get(o.id) || 0;
+    const mayBeOs = NOT_PICKED_STATUSES.includes(o.status)
+      ? negativeStockLines(linesByOrder.get(o.id) || [], new Set(missing.map((m) => m.productId)))
+      : [];
     const notes = staffNotes(o.notes);
 
     const input: PriorityOrderInput = {
@@ -223,6 +247,7 @@ export async function getPriorityList(
       recentNotes: notes.slice(-RECENT_NOTES).reverse(),
       noteCount: notes.length,
       itemCount,
+      mayBeOs,
       readyCount: Math.max(0, itemCount - missing.length),
     };
     return rankOrder(input, now);

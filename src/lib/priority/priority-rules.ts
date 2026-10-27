@@ -86,7 +86,7 @@ export const OS_DECISIONS = {
   remove: 'Remove the item (customer cancelled it)',
 } as const;
 export type OsDecision = keyof typeof OS_DECISIONS;
-export type PriorityStep = 'send_today' | 'send_upload' | 'pack' | 'book' | 'prep' | 'stale' | 'hold' | MissingState;
+export type PriorityStep = 'send_today' | 'send_upload' | 'pack' | 'book' | 'prep' | 'stale' | 'hold' | 'recheck' | MissingState;
 
 export interface MissingItem {
   productId: string;
@@ -151,6 +151,12 @@ export interface PriorityOrderInput {
   noteCount: number;
   /** Order lines, and how many of them aren't short (for "18 of 22 items ready"). */
   itemCount: number;
+  /**
+   * Not picked yet, and these items have negative stock (more promised than on
+   * the shelf), so this order may be the one that comes up short. A warning,
+   * not a report: the picker should check these first.
+   */
+  mayBeOs: { name: string; stock: number }[];
   readyCount: number;
   /** Customer is in a hurry (latest urgent/urgent_cleared event is urgent). */
   urgent: { note: string | null; byName: string | null; at: string } | null;
@@ -189,6 +195,7 @@ export const STEP_LABELS: Record<PriorityStep, string> = {
   transit_late: 'Bought — delivery is late',
   arrived: 'Item arrived — re-pick & book',
   prep: 'Prep now — check stock before final payment',
+  recheck: 'Status says OS but nothing is reported — re-pick to check',
   stale: 'No activity 30+ days — confirm with customer or cancel',
   hold: 'On hold',
 };
@@ -290,6 +297,13 @@ function classify(o: PriorityOrderInput, now: Date) {
 
   // Missing items need someone to act (sales decides, buyer buys) even while the
   // customer is still paying, so they go to Waiting before "Prep now".
+  // The status still says OS, but every report was closed (an edit, a re-pick).
+  // Nobody knows if the item is there, so the warehouse re-picks to check.
+  if (o.status === 'Picked (with issue)' && o.missing.length === 0) {
+    const stepSince = o.lastActivityAt || o.paidAt || o.orderDate;
+    return { group: 'waiting' as const, owner: 'warehouse' as const, step: 'recheck' as const, stepSince, dueAt: addDays(stepSince, PRIORITY_RULES.arrivedDays) };
+  }
+
   if (!o.paidAt && o.missing.length === 0) {
     return { group: 'prep' as const, owner: 'warehouse' as const, step: 'prep' as const, stepSince: null, dueAt: null };
   }
