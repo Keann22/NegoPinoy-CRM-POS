@@ -21,7 +21,6 @@ import { RecentSales } from '@/components/dashboard/recent-sales';
 import { TopCustomers } from '@/components/dashboard/top-customers';
 import { TopProducts } from '@/components/dashboard/top-products';
 import { CollectionsDueSoon } from '@/components/dashboard/collections-due-soon';
-import { ProcurementIssues } from '@/components/dashboard/procurement-issues';
 import { InventoryDashboard } from '@/components/dashboard/inventory-dashboard';
 import { ComplianceWidget } from '@/components/dashboard/compliance-widget';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -210,7 +209,6 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
-        {(isSales || isManagement) && <ProcurementIssues isAdmin={isManagement} />}
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

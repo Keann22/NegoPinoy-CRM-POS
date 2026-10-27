@@ -19,10 +19,9 @@ export async function POST(req: Request) {
 
     const resolvedSenderName = senderName || 'Inventory';
 
-    // 1. Create the issue in the same procurement_issues table the dashboard's
-    // "Procurement Issues" widget already reads from (GET /api/inventory/procurement-issues),
-    // so this shows up there with its existing Affected Orders / reply / resolve UI,
-    // instead of a separate order_issues thread nothing else displays.
+    // 1. Record the issue in procurement_issues (auto-resolved when the item is
+    // bought or received). The dashboard widget for it was removed 2026-10-28;
+    // the Bell notification below is how people hear about it.
     const { data: issue, error: issueErr } = await supabase
       .from('procurement_issues')
       .insert({ product_id: productId, status: 'open' })
