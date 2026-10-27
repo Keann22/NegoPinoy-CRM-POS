@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2 } from "lucide-react";
+import { Camera, Loader2 } from "lucide-react";
 import type { SupplierOption } from "@/types";
 import type { ReceivedRow, ReceivedKind } from "@/lib/services/purchase-summary-service";
+import { receiptFileToDataUri } from "@/lib/receipt-image";
 
 const peso = (n: number) => `₱${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -14,6 +15,18 @@ const NO_SUPPLIER = "No Supplier";
 const NEEDS_CHECK: ReceivedKind[] = ["auto", "unexpected", "draft"];
 
 type Draft = { bought: string; unitCost: string; supplierId: string };
+
+// One line read off the receipt, as /api/inventory/scan-receipt returns it.
+type ScannedLine = {
+  rawText: string;
+  qty: number;
+  unitCost: number;
+  match: { productId: string; productName: string } | null;
+};
+
+// What the receipt said that the Bought/Received rows can't show by themselves.
+type ReceiptNote = { tone: "red" | "amber"; text: string };
+type ScanResult = { lineCount: number; filledKeys: string[]; notes: ReceiptNote[] };
 
 const diffOf = (r: ReceivedRow) => (r.bought === null ? 0 : r.received - r.bought);
 
@@ -24,6 +37,10 @@ const rank = (r: ReceivedRow) => {
   return diffOf(r) !== 0 ? 1 : 3;
 };
 const byRank = (a: ReceivedRow, b: ReceivedRow) => rank(a) - rank(b) || a.productName.localeCompare(b.productName);
+
+// Same rule as the Confirm/Record button.
+const canSave = (row: ReceivedRow, d: Draft | undefined) =>
+  !!d && Number(d.bought) >= 1 && (row.kind === "auto" || Number(d.unitCost) > 0);
 
 function ResultBadge({ diff, unchecked }: { diff: number; unchecked: boolean }) {
   if (diff > 0) return <Badge className="bg-red-100 text-red-800 hover:bg-red-100 whitespace-nowrap">+{diff} over</Badge>;
@@ -47,6 +64,9 @@ export function ReceivedComparison({
   // What the admin is typing from the supplier's receipt, keyed by row.
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  // Receipt scans, keyed by supplier group name.
+  const [scans, setScans] = useState<Record<string, ScanResult>>({});
+  const [scanningGroup, setScanningGroup] = useState<string | null>(null);
 
   useEffect(() => {
     // Keep whatever is already typed; only seed rows not seen before.
@@ -56,6 +76,8 @@ export function ReceivedComparison({
       supplierId: r.supplierId || "",
     }])));
   }, [rows]);
+
+  const fromReceipt = useMemo(() => new Set(Object.values(scans).flatMap(s => s.filledKeys)), [scans]);
 
   const counts = useMemo(() => ({
     toCheck: rows.filter(r => NEEDS_CHECK.includes(r.kind)).length,
@@ -87,34 +109,138 @@ export function ReceivedComparison({
     });
   }, [rows, isManagement]);
 
+  const postRow = async (row: ReceivedRow, draft: Draft) => {
+    const res = row.kind !== "auto"
+      ? await fetch("/api/inventory/procurement/day-purchases", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ movementId: row.movementId, supplierId: draft.supplierId || null, unitCost: draft.unitCost, boughtQty: draft.bought }),
+        })
+      : await fetch("/api/inventory/procurement/day-purchases", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            itemId: row.itemId,
+            qty: draft.bought,
+            unitCost: draft.unitCost === "" ? 0 : draft.unitCost,
+            supplierId: draft.supplierId || null,
+            confirmMovementId: row.movementId,
+          }),
+        });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Failed to save");
+  };
+
   const save = async (row: ReceivedRow) => {
     const draft = drafts[row.key];
     if (!draft) return;
     setSavingKey(row.key);
     try {
-      const res = row.kind !== "auto"
-        ? await fetch("/api/inventory/procurement/day-purchases", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ movementId: row.movementId, supplierId: draft.supplierId || null, unitCost: draft.unitCost, boughtQty: draft.bought }),
-          })
-        : await fetch("/api/inventory/procurement/day-purchases", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              itemId: row.itemId,
-              qty: draft.bought,
-              unitCost: draft.unitCost === "" ? 0 : draft.unitCost,
-              supplierId: draft.supplierId || null,
-              confirmMovementId: row.movementId,
-            }),
-          });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to save");
+      await postRow(row, draft);
       await onSaved();
     } catch (e: any) {
       alert("Could not save: " + e.message);
     } finally {
+      setSavingKey(null);
+    }
+  };
+
+  // Read the supplier's receipt photo(s) and fill the unchecked Bought boxes
+  // from it. Nothing is saved until the admin confirms.
+  const scanReceipt = async (group: { supplierName: string; items: ReceivedRow[] }, files: File[]) => {
+    if (files.length === 0) return;
+    setScanningGroup(group.supplierName);
+    try {
+      const supplierId = group.items.find(r => r.supplierId)?.supplierId || null;
+      const tableItems = Array.from(new Map(group.items.map(r => [r.productId, { productId: r.productId, productName: r.productName }])).values());
+
+      const lines: ScannedLine[] = [];
+      for (const file of files) {
+        const res = await fetch("/api/inventory/scan-receipt", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageBase64: await receiptFileToDataUri(file), supplierId, tableItems }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Scan failed");
+        lines.push(...(data.lines || []));
+      }
+      if (lines.length === 0) {
+        alert("Couldn't read any items on that receipt. Try a clearer, straight-on photo.");
+        return;
+      }
+
+      // The same product can sit on several lines or photos; add them up.
+      const byProduct = new Map<string, { name: string; qty: number; cost: number }>();
+      const notes: ReceiptNote[] = [];
+      for (const line of lines) {
+        const qty = Number(line.qty) || 1;
+        const cost = Number(line.unitCost) || 0;
+        if (!line.match?.productId) {
+          notes.push({ tone: "amber", text: `Couldn't match "${line.rawText}" (${qty} × ${peso(cost)})` });
+          continue;
+        }
+        const agg = byProduct.get(line.match.productId) || { name: line.match.productName, qty: 0, cost: 0 };
+        agg.qty += qty;
+        if (cost > 0) agg.cost = cost;
+        byProduct.set(line.match.productId, agg);
+      }
+
+      const patches: Record<string, Draft> = {};
+      byProduct.forEach((agg, productId) => {
+        const productRows = group.items.filter(r => r.productId === productId);
+        const target = productRows.find(r => NEEDS_CHECK.includes(r.kind));
+        if (target) {
+          const current = drafts[target.key];
+          patches[target.key] = {
+            bought: String(agg.qty),
+            unitCost: agg.cost > 0 ? String(agg.cost) : current?.unitCost || "",
+            supplierId: current?.supplierId || supplierId || "",
+          };
+          return;
+        }
+        if (productRows.length === 0) {
+          notes.push({ tone: "red", text: `${agg.name}: on the receipt (${agg.qty}) but not received today` });
+          return;
+        }
+        const recorded = productRows.reduce((acc, r) => acc + (r.bought ?? 0), 0);
+        if (recorded !== agg.qty) {
+          notes.push({ tone: "red", text: `${agg.name}: receipt says ${agg.qty}, recorded as ${recorded}` });
+        }
+      });
+
+      // Received here but the receipt never mentions it.
+      group.items
+        .filter(r => NEEDS_CHECK.includes(r.kind) && !byProduct.has(r.productId))
+        .forEach(r => notes.push({ tone: "amber", text: `${r.productName}: received (${r.received}) but not found on the receipt` }));
+
+      setDrafts(prev => ({ ...prev, ...patches }));
+      setScans(prev => ({
+        ...prev,
+        [group.supplierName]: { lineCount: lines.length, filledKeys: Object.keys(patches), notes },
+      }));
+    } catch (e: any) {
+      alert("Could not scan the receipt: " + e.message);
+    } finally {
+      setScanningGroup(null);
+    }
+  };
+
+  // Save every row the receipt filled in, then reload once.
+  const confirmFromReceipt = async (group: { supplierName: string; items: ReceivedRow[] }) => {
+    const ready = group.items.filter(r => NEEDS_CHECK.includes(r.kind) && fromReceipt.has(r.key) && canSave(r, drafts[r.key]));
+    if (ready.length === 0) return;
+    setSavingKey(`group:${group.supplierName}`);
+    let saved = 0;
+    try {
+      for (const row of ready) {
+        await postRow(row, drafts[row.key]);
+        saved += 1;
+      }
+    } catch (e: any) {
+      alert(`Saved ${saved} of ${ready.length}. Could not save the rest: ${e.message}`);
+    } finally {
+      await onSaved();
       setSavingKey(null);
     }
   };
@@ -133,6 +259,7 @@ export function ReceivedComparison({
     // Staff have no inputs, so an unchecked row shows them the same quantity the
     // admin's box starts with (the staff count). It still reads "Not checked".
     const shownBought = row.bought ?? (isManagement ? null : row.received);
+    const filledFromReceipt = fromReceipt.has(row.key);
 
     return (
       <div key={row.key} className={`grid grid-cols-2 divide-x border-t ${unchecked ? "bg-amber-50/40" : ""}`}>
@@ -140,9 +267,13 @@ export function ReceivedComparison({
         <div className="p-3 min-w-0">
           {editable ? (
             <div className="space-y-2">
-              <p className="text-xs text-amber-800">
-                {row.kind === "auto" ? "Nothing entered — filled from the staff count and the last price" : "Nothing entered"}
-              </p>
+              {filledFromReceipt ? (
+                <p className="text-xs text-emerald-700">Filled from the receipt. Check it, then Confirm.</p>
+              ) : (
+                <p className="text-xs text-amber-800">
+                  {row.kind === "auto" ? "Nothing entered — filled from the staff count and the last price" : "Nothing entered"}
+                </p>
+              )}
               <div className="flex flex-wrap items-center gap-2">
                 <input
                   type="number"
@@ -180,7 +311,7 @@ export function ReceivedComparison({
                   size="sm"
                   className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
                   onClick={() => save(row)}
-                  disabled={busy || savingKey !== null || !(Number(draft.bought) >= 1) || (row.kind !== "auto" && !(Number(draft.unitCost) > 0))}
+                  disabled={busy || savingKey !== null || !canSave(row, draft)}
                 >
                   {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : row.kind === "auto" ? "Confirm" : "Record"}
                 </Button>
@@ -239,7 +370,7 @@ export function ReceivedComparison({
         <p className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-md p-3">
           Highlighted items were received without a purchase being entered first, so nothing has been checked against the supplier&apos;s receipt.
           {isManagement
-            ? " On the Bought side, type the quantity and unit price from the receipt, then Confirm. Each supplier's total updates as you type, so you can match it to the receipt total first."
+            ? " Tap Scan receipt on a supplier to fill them in from a photo of the receipt, or type the quantity and unit price yourself, then Confirm."
             : " An admin needs to check them."}
         </p>
       )}
@@ -252,12 +383,61 @@ export function ReceivedComparison({
           return NEEDS_CHECK.includes(r.kind) && d ? acc + (Number(d.bought) || 0) * (Number(d.unitCost) || 0) : acc;
         }, 0);
         const receivedItems = group.items.filter(r => r.kind !== "pending");
+        const scan = scans[group.supplierName];
+        const scanning = scanningGroup === group.supplierName;
+        const readyCount = group.items.filter(r => NEEDS_CHECK.includes(r.kind) && fromReceipt.has(r.key) && canSave(r, drafts[r.key])).length;
+        const confirmingAll = savingKey === `group:${group.supplierName}`;
         return (
           <div key={group.supplierName || "all"} className="border rounded-md overflow-hidden">
             {isManagement && (
-              <div className="flex flex-wrap items-center gap-2 px-4 py-3 bg-slate-50">
-                <p className="font-semibold text-slate-800">{group.supplierName}</p>
-                {group.toCheck > 0 && <span className="text-xs font-medium text-amber-700">{group.toCheck} to check</span>}
+              <div className="px-4 py-3 bg-slate-50 space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-semibold text-slate-800">{group.supplierName}</p>
+                  {group.toCheck > 0 && <span className="text-xs font-medium text-amber-700">{group.toCheck} to check</span>}
+                  <label
+                    className={`ml-auto inline-flex items-center gap-1.5 rounded-md border border-indigo-200 bg-white px-3 py-1.5 text-sm font-medium text-indigo-700 ${scanning || savingKey !== null ? "opacity-60 pointer-events-none" : "cursor-pointer hover:bg-indigo-50"}`}
+                    title="Take or pick a photo of this supplier's receipt"
+                  >
+                    {scanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                    {scanning ? "Reading receipt..." : scan ? "Scan again" : "Scan receipt"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      disabled={scanning || savingKey !== null}
+                      onChange={e => {
+                        const files = Array.from(e.target.files || []);
+                        e.target.value = "";
+                        scanReceipt(group, files);
+                      }}
+                    />
+                  </label>
+                </div>
+                {scan && (
+                  <div className="rounded-md border bg-white p-3 text-xs space-y-1.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-slate-700">
+                        Read {scan.lineCount} {scan.lineCount === 1 ? "line" : "lines"} · filled in{" "}
+                        <span className="font-semibold">{scan.filledKeys.length}</span> below
+                        {scan.notes.length === 0 && scan.filledKeys.length > 0 && <span className="text-emerald-700"> · everything matched</span>}
+                      </p>
+                      {readyCount > 0 && (
+                        <Button
+                          size="sm"
+                          className="ml-auto h-7 bg-emerald-600 hover:bg-emerald-700 text-white"
+                          onClick={() => confirmFromReceipt(group)}
+                          disabled={savingKey !== null}
+                        >
+                          {confirmingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : `Confirm all ${readyCount}`}
+                        </Button>
+                      )}
+                    </div>
+                    {scan.notes.map((n, i) => (
+                      <p key={i} className={n.tone === "red" ? "text-red-700" : "text-amber-800"}>• {n.text}</p>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
             <div className="overflow-x-auto">
