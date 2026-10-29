@@ -70,6 +70,11 @@ Receipts:
 - Staff procurement requests (STAFF_DRAFT) are the shopping list, not
   deliveries. They live on the Procurement Sheet and Priority List, not on
   Receiving. Never delete them as "backlog".
+- **Snap receipt** (owners, on the phone at the store): pick the supplier if
+  known, photograph the receipt, done. Lines the system is sure about are
+  recorded as bought immediately. Unsure lines appear on Receiving as
+  "From receipts: match these" showing only the item text; staff match them
+  while unpacking (no prices or supplier shown), and each match is remembered.
 - The receipt still gets checked on **Purchases & Receipts** (admin only):
   scan each supplier's receipt against what was received.
 

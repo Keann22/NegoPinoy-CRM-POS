@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ClipboardList, Receipt } from 'lucide-react';
+import { Camera, ClipboardList, Receipt } from 'lucide-react';
 import { useRoleCheck } from '@/hooks/useRoleCheck';
 import { PendingPurchases } from '@/components/dashboard/pending-purchases';
 import { TodaysPurchasesDialog } from '@/components/dashboard/procurement/todays-purchases-dialog';
 import { ReceivedToday } from '@/components/dashboard/inventory/received-today';
+import { ReceiptLinesToMatch } from '@/components/dashboard/inventory/receipt-lines-to-match';
 
 // Where staff count and record what arrived. Stock only comes in against a
 // recorded purchase (Pending Incoming Items); the old free-form Bulk Receive
@@ -25,12 +26,20 @@ export default function ReceivingPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold font-headline">Receiving</h1>
         {isManagement ? (
-          <Button asChild variant="outline" className="font-bold flex items-center gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50">
-            <Link href="/dashboard/inventory/purchases-receipts">
-              <Receipt className="w-4 h-4 text-emerald-600" />
-              Purchases &amp; Receipts
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild className="font-bold flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700">
+              <Link href="/dashboard/inventory/snap-receipt">
+                <Camera className="w-4 h-4" />
+                Snap receipt
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="font-bold flex items-center gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50">
+              <Link href="/dashboard/inventory/purchases-receipts">
+                <Receipt className="w-4 h-4 text-emerald-600" />
+                Purchases &amp; Receipts
+              </Link>
+            </Button>
+          </div>
         ) : (
           // Staff get the same summary without suppliers or costs.
           <Button
@@ -49,6 +58,9 @@ export default function ReceivingPage() {
         onOpenChange={setTodaysPurchasesOpen}
         onChanged={() => {}}
       />
+
+      {/* Snapped receipt lines the system wasn't sure about; matching one records it. */}
+      <ReceiptLinesToMatch onMatched={() => setPendingTick(t => t + 1)} refreshKey={pendingTick} />
 
       <PendingPurchases onReceiveComplete={() => setReceivedTick(t => t + 1)} refreshKey={pendingTick} />
 

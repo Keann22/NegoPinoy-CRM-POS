@@ -36,6 +36,7 @@ import {
   Printer,
   Mail,
   Receipt,
+  Camera,
 } from 'lucide-react';
 import { useAuth, useUser } from '@/lib/supabase/hooks';
 import { usePathname, useRouter } from 'next/navigation';
@@ -143,6 +144,7 @@ export default function DashboardLayout({
         inventorySubItems.unshift(
           { href: '/dashboard/reports/procurement', label: 'Procurement Sheet', icon: ListChecks },
           { href: '/dashboard/inventory/alert-review', label: 'Alerted Items Review', icon: ShieldAlert },
+          { href: '/dashboard/inventory/snap-receipt', label: 'Snap Receipt', icon: Camera },
           { href: '/dashboard/inventory/purchases-receipts', label: 'Purchases & Receipts', icon: Receipt }
         );
         inventorySubItems.push({ href: '/dashboard/inventory/pending-costs', label: 'Encode Costs', icon: PhilippinePeso });

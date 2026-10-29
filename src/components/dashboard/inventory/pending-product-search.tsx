@@ -5,7 +5,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Plus } from "lucide-react";
 import { useSupabase } from "@/lib/supabase/hooks";
 
-export function PendingProductSearch({ onProductSelect }: { onProductSelect: (product: any) => void }) {
+export function PendingProductSearch({ onProductSelect, label = "Arrived but not on the list?" }: { onProductSelect: (product: any) => void; label?: string }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const supabase = useSupabase();
@@ -41,7 +41,7 @@ export function PendingProductSearch({ onProductSelect }: { onProductSelect: (pr
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm" className="w-full justify-start font-normal text-left">
-          <Plus className="mr-2 h-4 w-4" /> Arrived but not on the list?
+          <Plus className="mr-2 h-4 w-4" /> {label}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[300px] p-0" align="start">
