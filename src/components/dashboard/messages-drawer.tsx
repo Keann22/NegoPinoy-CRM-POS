@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { avatarColor, initials, threadTitle } from '@/lib/utils/messages';
+import { showSystemNotification } from '@/lib/utils/system-notification';
 import { cn } from '@/lib/utils';
 import type { Thread } from '@/types';
 
@@ -98,9 +99,7 @@ export function MessagesDrawer() {
             duration: isUrgent ? 15000 : 4000,
           });
 
-          if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification(`New message from ${msg.sender_name}`, { body: msg.message });
-          }
+          showSystemNotification(`New message from ${msg.sender_name}`, { body: msg.message });
         }
       )
       .subscribe();

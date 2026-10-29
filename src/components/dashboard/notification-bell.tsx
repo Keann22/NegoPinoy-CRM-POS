@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { requestNotificationPermission, showSystemNotification } from '@/lib/utils/system-notification';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,9 +59,7 @@ export function NotificationBell() {
 
   useEffect(() => {
     // Request Desktop Notification Permission
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
+    requestNotificationPermission();
   }, []);
 
   useEffect(() => {
@@ -98,12 +97,11 @@ export function NotificationBell() {
           });
 
           // Desktop System Notification
-          if ('Notification' in window && Notification.permission === 'granted') {
-            const sysNotif = new Notification(newNotif.title, {
-              body: newNotif.message,
-              icon: '/icon.png', // Add your app icon path if you have one
-            });
-            
+          const sysNotif = showSystemNotification(newNotif.title, {
+            body: newNotif.message,
+            icon: '/icon.png', // Add your app icon path if you have one
+          });
+          if (sysNotif) {
             sysNotif.onclick = () => {
               window.focus();
               sysNotif.close();

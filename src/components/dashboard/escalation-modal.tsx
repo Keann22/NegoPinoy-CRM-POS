@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { parseShortDelivery } from '@/lib/utils/messages';
+import { showSystemNotification } from '@/lib/utils/system-notification';
 
 type Escalation = {
   messageId: string;
@@ -151,12 +152,10 @@ export function EscalationModal() {
       } catch {
         /* autoplay may be blocked until a user gesture — the modal still shows */
       }
-      if ('Notification' in window && Notification.permission === 'granted') {
-        const first = items[0];
-        new Notification('Action needed — you were tagged', {
-          body: `${first.senderName}: ${first.message}`,
-        });
-      }
+      const first = items[0];
+      showSystemNotification('Action needed — you were tagged', {
+        body: `${first.senderName}: ${first.message}`,
+      });
     }
     wasOpen.current = open;
   }, [open, items]);
