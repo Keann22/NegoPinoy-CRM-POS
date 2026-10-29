@@ -71,6 +71,8 @@ export function NotificationDetailsDialog({
   onOpenOrder,
 }: NotificationDetailsDialogProps) {
   const { userProfile } = useUserProfile();
+  // Suppliers are Owner/Admin only.
+  const isManagement = !!userProfile?.roles.some((r: string) => ['Admin', 'Owner'].includes(r));
   const [context, setContext] = useState<NotificationContext | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -154,7 +156,7 @@ export function NotificationDetailsDialog({
               <div className="font-medium">{product.name}</div>
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                 {product.sku && <span>SKU: {product.sku}</span>}
-                {product.supplierName && <span>Supplier: {product.supplierName}</span>}
+                {isManagement && product.supplierName && <span>Supplier: {product.supplierName}</span>}
                 {product.sellingPrice != null && <span>Price: {peso(product.sellingPrice)}</span>}
               </div>
               {product.stockLevel != null && (

@@ -4,6 +4,7 @@ import type { FormattedProduct } from '@/types';
 import { ZoomableImage } from "@/components/ui/zoomable-image";
 import { useSupabase } from "@/lib/supabase/hooks";
 import { useState, useEffect } from "react";
+import { useRoleCheck } from "@/hooks/useRoleCheck";
 
 interface ViewProductDetailsDialogProps {
   product: FormattedProduct | null;
@@ -13,6 +14,7 @@ interface ViewProductDetailsDialogProps {
 
 export function ViewProductDetailsDialog({ product, open, onOpenChange }: ViewProductDetailsDialogProps) {
   const supabase = useSupabase();
+  const { isManagement } = useRoleCheck();
   const [warehouseStock, setWarehouseStock] = useState<any[]>([]);
 
   useEffect(() => {
@@ -137,8 +139,8 @@ export function ViewProductDetailsDialog({ product, open, onOpenChange }: ViewPr
               </div>
           </div>
 
-          {/* Supplier Pricing section if available */}
-          {product.supplierPricing && product.supplierPricing.length > 0 && (
+          {/* Suppliers and costs are Owner/Admin only. */}
+          {isManagement && product.supplierPricing && product.supplierPricing.length > 0 && (
               <div>
                   <h4 className="text-sm font-medium text-muted-foreground mb-2">Supplier Pricing</h4>
                   <div className="border rounded-md overflow-hidden">

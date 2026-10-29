@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, History, ShieldAlert, ShoppingBag, Package, Calendar, User, ArrowDown, ArrowUp } from 'lucide-react';
 import { format } from 'date-fns';
+import { useRoleCheck } from '@/hooks/useRoleCheck';
 
 interface AlertReviewTrailDialogProps {
   productId: string | null;
@@ -15,6 +16,8 @@ interface AlertReviewTrailDialogProps {
 }
 
 export function AlertReviewTrailDialog({ productId, open, onOpenChange }: AlertReviewTrailDialogProps) {
+  // Suppliers and costs are Owner/Admin only.
+  const { isManagement } = useRoleCheck();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<{
     product: any;
@@ -159,7 +162,7 @@ export function AlertReviewTrailDialog({ productId, open, onOpenChange }: AlertR
                               {m.reason || 'No description provided'}
                             </p>
 
-                            {m.supplier_name && (
+                            {isManagement && m.supplier_name && (
                               <p className="text-[11px] text-muted-foreground mt-1">
                                 Supplier: <strong>{m.supplier_name}</strong> {m.unit_cost ? `(₱${Number(m.unit_cost).toFixed(2)})` : ''}
                               </p>

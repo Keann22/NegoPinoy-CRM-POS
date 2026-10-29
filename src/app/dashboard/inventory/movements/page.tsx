@@ -12,6 +12,7 @@ import { format, startOfDay, endOfDay, subDays } from 'date-fns';
 import { Calendar as CalendarIcon, Edit2, History, FilterX } from 'lucide-react';
 import { EditMovementDialog } from '@/components/dashboard/inventory/edit-movement-dialog';
 import { MovementHistoryDialog } from '@/components/dashboard/inventory/movement-history-dialog';
+import { useRoleCheck } from '@/hooks/useRoleCheck';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -37,6 +38,8 @@ type Product = {
 
 export default function InventoryHistoryPage() {
   const supabase = useSupabase();
+  // Suppliers are Owner/Admin only.
+  const { isManagement } = useRoleCheck();
 
   const [dateFilter, setDateFilter] = useState<'today' | 'yesterday' | 'custom' | 'all'>('today');
   const [date, setDate] = useState<DateRange | undefined>(undefined);
@@ -186,7 +189,7 @@ export default function InventoryHistoryPage() {
                 <TableHead>Product</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Quantity</TableHead>
-                <TableHead>Supplier</TableHead>
+                {isManagement && <TableHead>Supplier</TableHead>}
                 <TableHead>Reason</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -199,7 +202,7 @@ export default function InventoryHistoryPage() {
                     <TableCell><Skeleton className="h-4 w-40" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                    {isManagement && <TableCell><Skeleton className="h-4 w-32" /></TableCell>}
                     <TableCell><Skeleton className="h-4 w-48" /></TableCell>
                     <TableCell><Skeleton className="h-8 w-16 ml-auto" /></TableCell>
                   </TableRow>
@@ -223,7 +226,7 @@ export default function InventoryHistoryPage() {
                           {isPositive ? '+' : ''}{movement.quantity_change}
                         </Badge>
                       </TableCell>
-                      <TableCell>{movement.supplier_name || '-'}</TableCell>
+                      {isManagement && <TableCell>{movement.supplier_name || '-'}</TableCell>}
                       <TableCell className="text-muted-foreground">{movement.reason || '-'}</TableCell>
                       <TableCell className="text-right whitespace-nowrap">
                         <Button variant="ghost" size="icon" onClick={() => handleHistory(movement)} title="View Edit History">
@@ -238,7 +241,7 @@ export default function InventoryHistoryPage() {
                 })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center">
+                  <TableCell colSpan={isManagement ? 7 : 6} className="h-24 text-center">
                     No inventory history found.
                   </TableCell>
                 </TableRow>

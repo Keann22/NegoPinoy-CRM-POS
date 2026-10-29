@@ -151,7 +151,7 @@ export default function BatchesPage() {
               <TableHead>Product Name</TableHead>
               <TableHead className="hidden sm:table-cell">SKU</TableHead>
               <TableHead>Batch Date</TableHead>
-              <TableHead>Supplier</TableHead>
+              {canSeeUnitCost && <TableHead>Supplier</TableHead>}
               {canSeeUnitCost && <TableHead className="text-right">Unit Cost</TableHead>}
               <TableHead className="text-right">Remaining Qty</TableHead>
             </TableRow>
@@ -169,9 +169,11 @@ export default function BatchesPage() {
                   <TableCell>
                     <Skeleton className="h-4 w-32" />
                   </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-24" />
-                  </TableCell>
+                  {canSeeUnitCost && (
+                    <TableCell>
+                      <Skeleton className="h-4 w-24" />
+                    </TableCell>
+                  )}
                   {canSeeUnitCost && (
                       <TableCell className="text-right">
                         <Skeleton className="h-4 w-16 ml-auto" />
@@ -187,7 +189,7 @@ export default function BatchesPage() {
                 <TableCell className="font-medium">{batch.productName}</TableCell>
                 <TableCell className="hidden sm:table-cell text-muted-foreground">{batch.productSku}</TableCell>
                 <TableCell>{format(new Date(batch.purchaseDate), 'MMM d, yyyy')}</TableCell>
-                <TableCell>{batch.supplierName}</TableCell>
+                {canSeeUnitCost && <TableCell>{batch.supplierName}</TableCell>}
                 {canSeeUnitCost && <TableCell className="text-right">₱{batch.unitCost.toFixed(2)}</TableCell>}
                 <TableCell className="text-right font-bold">{batch.remainingQty}</TableCell>
               </TableRow>

@@ -35,6 +35,7 @@ import {
   Undo2,
   Printer,
   Mail,
+  Receipt,
 } from 'lucide-react';
 import { useAuth, useUser } from '@/lib/supabase/hooks';
 import { usePathname, useRouter } from 'next/navigation';
@@ -131,7 +132,7 @@ export default function DashboardLayout({
         { href: '/dashboard/inventory/print-list', label: 'Inventory List', icon: Printer },
         { href: '/dashboard/inventory/audit', label: 'Out of Stock Audit', icon: ListChecks },
         { href: '/dashboard/inventory/transfers', label: 'Unit 1 ⇄ Unit 2 Transfers', icon: ArrowRightLeft },
-        { href: '/dashboard/inventory/receive', label: 'Bulk Receive', icon: Truck },
+        { href: '/dashboard/inventory/receive', label: 'Receiving', icon: Truck },
         { href: '/dashboard/inventory/restock', label: 'Restock / Purchase', icon: ArrowDownUp },
         { href: '/dashboard/inventory/batches', label: 'Stock Batch List', icon: ListChecks },
         { href: '/dashboard/inventory/movements', label: 'Inventory History', icon: History },
@@ -141,7 +142,8 @@ export default function DashboardLayout({
       if (isManagement) {
         inventorySubItems.unshift(
           { href: '/dashboard/reports/procurement', label: 'Procurement Sheet', icon: ListChecks },
-          { href: '/dashboard/inventory/alert-review', label: 'Alerted Items Review', icon: ShieldAlert }
+          { href: '/dashboard/inventory/alert-review', label: 'Alerted Items Review', icon: ShieldAlert },
+          { href: '/dashboard/inventory/purchases-receipts', label: 'Purchases & Receipts', icon: Receipt }
         );
         inventorySubItems.push({ href: '/dashboard/inventory/pending-costs', label: 'Encode Costs', icon: PhilippinePeso });
       }

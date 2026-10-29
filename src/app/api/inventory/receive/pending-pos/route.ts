@@ -7,6 +7,7 @@ import { formatShortDelivery } from '@/lib/utils/messages';
 import { findStage, PHASE_LABELS, transitStatus } from '@/lib/online-order-tracking';
 import { createClient as createSessionClient } from '@/lib/supabase/server';
 import { insertLinkedMovement, editorFromUser } from '@/lib/services/receipt-correction-service';
+import { checkReceiptGate, logReceiptOverrides } from '@/lib/services/receipt-gate-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,7 +33,7 @@ export async function GET() {
     const { data: items, error } = await supabase
       .from('purchase_order_items')
       .select(`
-        id, expected_qty, received_qty,
+        id, product_id, expected_qty, received_qty,
         products (name, variant_name),
         purchase_orders!inner(notes, created_at, tracking_route, tracking_stage, expected_arrival)
       `)
@@ -41,10 +42,13 @@ export async function GET() {
 
     if (error) throw error;
 
-    // Do not filter out STAFF_DRAFT so that inventory can receive them
-    // even if management hasn't finalized the amount/qty.
-    // Also, filter out any items that are already fully received but somehow stuck in pending_receipt status.
-    const filteredItems = items.filter((i: any) => Math.max(0, i.expected_qty - (i.received_qty || 0)) > 0);
+    // Only what the owners recorded as bought. STAFF_DRAFT lines are staff
+    // procurement requests - the shopping list, not deliveries - so they stay on
+    // the Procurement Sheet / Priority List. Receiving them here used to let
+    // stock in with no purchase recorded (receipt-first receiving).
+    // Also skip lines already fully received but stuck in pending_receipt.
+    const filteredItems = items.filter((i: any) =>
+      i.purchase_orders?.notes !== 'STAFF_DRAFT' && Math.max(0, i.expected_qty - (i.received_qty || 0)) > 0);
 
     // Buying days are the unit staff actually receive against: management taps
     // Buy item by item, so each purchase gets its own PO with no notes. Grouping
@@ -63,10 +67,7 @@ export async function GET() {
 
       let batchName: string;
       let batchSortKey: string;
-      if (notes === 'STAFF_DRAFT') {
-        batchName = 'Pending Staff Requests';
-        batchSortKey = STAFF_REQUEST_SORT_KEY;
-      } else if (notes) {
+      if (notes) {
         batchName = notes;
         batchSortKey = boughtAt ? phtDay.format(boughtAt) : STAFF_REQUEST_SORT_KEY;
       } else if (boughtAt) {
@@ -79,6 +80,7 @@ export async function GET() {
 
       return {
         id: i.id,
+        productId: i.product_id,
         productName: (i.products.variant_name && !i.products.name.includes(i.products.variant_name)) ? `${i.products.name} [${i.products.variant_name}]` : i.products.name,
         expectedQty: i.expected_qty,
         alreadyReceivedQty: i.received_qty || 0,
@@ -89,8 +91,7 @@ export async function GET() {
       };
     });
 
-    // Most recent buying day first, then alphabetical within it. Staff requests
-    // sort last - they are the not-yet-bought backlog, not a delivery.
+    // Most recent buying day first, then alphabetical within it.
     mapped.sort((a, b) =>
       b.batchSortKey.localeCompare(a.batchSortKey) || a.productName.localeCompare(b.productName));
 
@@ -103,7 +104,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const { receives, unexpectedItems, reportedByName, targetWarehouseId: reqTargetWarehouseId } = await req.json();
+    const { receives, unexpectedItems, reportedByName, targetWarehouseId: reqTargetWarehouseId, overrideReason } = await req.json();
 
     if ((!receives || receives.length === 0) && (!unexpectedItems || unexpectedItems.length === 0)) {
       return NextResponse.json({ error: 'No items provided' }, { status: 400 });
@@ -121,6 +122,16 @@ export async function POST(req: Request) {
     const sessionClient = await createSessionClient();
     const { data: { user: sessionUser } } = await sessionClient.auth.getUser();
     const editor = editorFromUser(sessionUser);
+    // Receipt-first: staff requests and unexpected items need a recorded
+    // purchase, or an admin override with a reason. Checked before any write.
+    const gate = await checkReceiptGate(supabase, {
+      receives: receives || [],
+      unexpectedItems: unexpectedItems || [],
+      editor,
+      overrideReason,
+    });
+    if ('error' in gate) return NextResponse.json({ error: gate.error }, { status: gate.status });
+
     const receiptLinks = {
       warehouse_id: targetWarehouseId || null,
       performed_by_id: editor?.id || null,
@@ -381,6 +392,14 @@ export async function POST(req: Request) {
           }
         }
       }
+    }
+
+    if (editor && overrideReason) {
+      await logReceiptOverrides(supabase, editor, overrideReason, [
+        ...(receives || []).filter((r: any) => gate.draftIds.has(r.itemId))
+          .map((r: any) => ({ table: 'purchase_order_items' as const, id: r.itemId, qty: r.receivedQty })),
+        ...(unexpectedItems || []).map((u: any) => ({ table: 'products' as const, id: u.productId, qty: u.receivedQty })),
+      ]);
     }
 
     return NextResponse.json({ success: true });

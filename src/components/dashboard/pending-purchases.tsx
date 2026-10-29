@@ -4,7 +4,8 @@ import { Fragment } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Trash2, CheckSquare, Truck } from "lucide-react";
+import Link from "next/link";
+import { Loader2, Trash2, CheckSquare, Truck, Receipt } from "lucide-react";
 import { usePendingPurchases } from "@/hooks/usePendingPurchases";
 import { PendingProductSearch } from "@/components/dashboard/inventory/pending-product-search";
 import { STATUS_STYLES } from "@/components/dashboard/procurement/in-transit-chip";
@@ -13,6 +14,15 @@ import type { TransitStatus } from "@/lib/online-order-tracking";
 // "2026-11-13" -> "Nov 13"
 const formatShortDate = (ymd: string) =>
   new Date(`${ymd}T00:00:00+08:00`).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric" });
+
+function WaitingNote() {
+  return (
+    <div className="mt-1 inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+      <Receipt className="w-3 h-3" />
+      No receipt yet
+    </div>
+  );
+}
 
 export function PendingPurchases({ onReceiveComplete, refreshKey = 0 }: { onReceiveComplete: () => void; refreshKey?: number }) {
   const {
@@ -32,8 +42,12 @@ export function PendingPurchases({ onReceiveComplete, refreshKey = 0 }: { onRece
     handleCancel,
     handleCloseShort,
     handleReceive,
-    closeBatch
+    closeBatch,
+    isManagement
   } = usePendingPurchases(onReceiveComplete, refreshKey);
+
+  // Receipt-first: goods that arrived with no recorded purchase wait for the owners.
+  const waitingCount = unexpectedItems.length;
 
   if (loading) return <div>Loading pending purchases...</div>;
   
@@ -55,7 +69,7 @@ export function PendingPurchases({ onReceiveComplete, refreshKey = 0 }: { onRece
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div>
             <CardTitle className="text-xl text-indigo-900">Pending Incoming Items</CardTitle>
-            <CardDescription>Items recently purchased by Management or requested by Staff that are waiting to be received into inventory.</CardDescription>
+            <CardDescription>What the owners recorded as bought, waiting to be counted in. Something arrived that isn&apos;t listed? Add it at the bottom and ask for the receipt.</CardDescription>
           </div>
           {warehouses && warehouses.length > 0 && (
             <div className="flex items-center gap-2 self-start sm:self-auto bg-white/90 border border-indigo-200 rounded-lg px-2.5 py-1 text-xs shadow-sm">
@@ -76,6 +90,23 @@ export function PendingPurchases({ onReceiveComplete, refreshKey = 0 }: { onRece
         </div>
       </CardHeader>
       <CardContent className="p-0">
+        {waitingCount > 0 && (
+          <div className="m-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            {isManagement ? (
+              <>
+                <span className="font-semibold">{waitingCount} {waitingCount === 1 ? "item arrived that isn't" : "items arrived that aren't"} recorded as bought.</span>{" "}
+                Record the purchase on the{" "}
+                <Link href="/dashboard/reports/procurement" className="font-semibold underline">Procurement Sheet</Link>{" "}
+                (Buy or Scan receipt) and it moves up to the list. Urgent? Save it here and give a reason.
+              </>
+            ) : (
+              <>
+                <span className="font-semibold">You can&apos;t receive these yet: the owners haven&apos;t uploaded the receipt or encoded the purchase.</span>{" "}
+                Message them on Facebook to ask for it, and keep the items aside. Once they record it, the items move up to the list above and you can count them in.
+              </>
+            )}
+          </div>
+        )}
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 text-slate-600 border-b">
             <tr>
@@ -198,7 +229,7 @@ export function PendingPurchases({ onReceiveComplete, refreshKey = 0 }: { onRece
             {unexpectedItems.length > 0 && (
                 <tr className="bg-amber-50/50">
                     <td colSpan={3} className="p-2 text-xs font-semibold text-amber-800 uppercase tracking-wider bg-amber-100/50">
-                        Unexpected Items (Not in Purchase Order)
+                        Arrived but not recorded as bought
                     </td>
                 </tr>
             )}
@@ -206,10 +237,11 @@ export function PendingPurchases({ onReceiveComplete, refreshKey = 0 }: { onRece
                 <tr key={`unexpected-${item.id}`} className="hover:bg-amber-50">
                   <td className="p-4 font-medium text-slate-900">
                       {item.name}
-                      <div className="text-xs text-amber-600 mt-1">Added manually to delivery</div>
+                      <div><WaitingNote /></div>
                   </td>
                   <td className="p-4 text-center font-bold text-slate-400">-</td>
                   <td className="p-4 flex gap-2">
+                    {isManagement && (<>
                     <Input 
                       type="number" 
                       placeholder={`Qty`}
@@ -228,6 +260,8 @@ export function PendingPurchases({ onReceiveComplete, refreshKey = 0 }: { onRece
                     >
                         {submittingId === item.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
                     </Button>
+                    </>)}
+                    {!isManagement && <span className="flex-1 text-xs text-amber-700 self-center">Ask the owners on Facebook</span>}
                     <Button variant="ghost" size="icon" onClick={() => setUnexpectedItems(unexpectedItems.filter(i => i.id !== item.id))}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
@@ -245,7 +279,7 @@ export function PendingPurchases({ onReceiveComplete, refreshKey = 0 }: { onRece
                   }
               }} />
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
             <Button 
                 type="button" 
                 variant="outline" 

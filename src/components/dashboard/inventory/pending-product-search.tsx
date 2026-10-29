@@ -41,7 +41,7 @@ export function PendingProductSearch({ onProductSelect }: { onProductSelect: (pr
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm" className="w-full justify-start font-normal text-left">
-          <Plus className="mr-2 h-4 w-4" /> Add Unexpected Item
+          <Plus className="mr-2 h-4 w-4" /> Arrived but not on the list?
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[300px] p-0" align="start">

@@ -117,8 +117,8 @@ export function InventoryDashboard() {
             <Card className="hover:bg-muted/50 transition-colors h-full">
               <CardContent className="flex flex-col items-center justify-center p-6 text-center h-full">
                 <ArrowDownToLine className="h-8 w-8 mb-4 text-primary" />
-                <h3 className="font-medium">Bulk Receive</h3>
-                <p className="text-xs text-muted-foreground mt-1">Receive incoming shipments & POs</p>
+                <h3 className="font-medium">Receiving</h3>
+                <p className="text-xs text-muted-foreground mt-1">Count and record incoming purchases</p>
               </CardContent>
             </Card>
           </Link>

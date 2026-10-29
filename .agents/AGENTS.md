@@ -1,5 +1,8 @@
 # NegoPinoy CRM POS — Agent Rules
 
+**Before designing any feature, read `docs/BUSINESS_WORKFLOW.md`** — how the team
+actually buys, receives, and counts, and what must stay confidential.
+
 ## Code Quality Rules
 
 ### File Size Limit

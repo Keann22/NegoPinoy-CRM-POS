@@ -1,8 +1,22 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { useRoleCheck } from '@/hooks/useRoleCheck';
 import { useSupabase } from '@/lib/supabase/hooks';
 import type { Warehouse } from '@/types';
+
+// Items staff added because they arrived but aren't on the list. Kept on this
+// device so a reload doesn't lose them while waiting for the receipt.
+const ADDED_KEY = 'receivingAddedItems';
+const readAdded = (): any[] => {
+  try { return JSON.parse(localStorage.getItem(ADDED_KEY) || '[]'); } catch { return []; }
+};
+
+// Admin override for goods with no recorded purchase (receipt-first receiving).
+const askOverrideReason = (): string | null => {
+  const reason = window.prompt('No receipt recorded for this yet. Receive anyway? Type the reason (e.g. urgent order for Maria):');
+  return reason && reason.trim() ? reason.trim() : null;
+};
 
 export function usePendingPurchases(onReceiveComplete: () => void, refreshKey = 0) {
   const supabase = useSupabase();
@@ -16,12 +30,28 @@ export function usePendingPurchases(onReceiveComplete: () => void, refreshKey = 
   const { toast } = useToast();
   const { userProfile } = useUserProfile();
   const reportedByName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : undefined;
+  const { isManagement } = useRoleCheck();
+  const [addedLoaded, setAddedLoaded] = useState(false);
+
+  useEffect(() => {
+    setUnexpectedItems(readAdded());
+    setAddedLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!addedLoaded) return;
+    try { localStorage.setItem(ADDED_KEY, JSON.stringify(unexpectedItems)); } catch { /* private mode */ }
+  }, [unexpectedItems, addedLoaded]);
 
   const fetchPending = async () => {
     try {
       const res = await fetch("/api/inventory/receive/pending-pos");
       const data = await res.json();
-      setItems(data.pendingItems || []);
+      const pending = data.pendingItems || [];
+      setItems(pending);
+      // An added item whose purchase has since been recorded is now on the list.
+      const listed = new Set(pending.map((p: any) => p.productId));
+      setUnexpectedItems(prev => prev.filter(u => !listed.has(u.id)));
     } catch (e) {
       console.error(e);
     } finally {
@@ -71,6 +101,10 @@ export function usePendingPurchases(onReceiveComplete: () => void, refreshKey = 
     const toReceive = [];
     const toReceiveUnexpected = [];
 
+    if (isUnexpected && !isManagement) {
+      return toast({ variant: 'destructive', title: 'Not recorded as bought yet', description: 'Message the owners on Facebook to scan the receipt or encode the purchase. Keep it aside.' });
+    }
+
     if (isUnexpected) {
         if (!item.receivedQty || Number(item.receivedQty) <= 0) {
             return toast({ variant: 'destructive', title: 'Invalid Quantity', description: 'Please enter a valid received quantity.' });
@@ -94,15 +128,23 @@ export function usePendingPurchases(onReceiveComplete: () => void, refreshKey = 
         });
     }
 
+    // Admins can receive unrecorded goods (urgent orders) with a reason.
+    let overrideReason: string | undefined;
+    if (isUnexpected) {
+      const reason = askOverrideReason();
+      if (!reason) return;
+      overrideReason = reason;
+    }
+
     setSubmittingId(item.id);
     try {
       const res = await fetch("/api/inventory/receive/pending-pos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ receives: toReceive, unexpectedItems: toReceiveUnexpected, reportedByName, targetWarehouseId })
+        body: JSON.stringify({ receives: toReceive, unexpectedItems: toReceiveUnexpected, reportedByName, targetWarehouseId, overrideReason })
       });
 
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Failed to receive');
 
       toast({ title: 'Item Saved!', description: `Successfully received ${item.productName || item.name}.` });
       
@@ -164,19 +206,24 @@ export function usePendingPurchases(onReceiveComplete: () => void, refreshKey = 
   };
 
   const handleReceive = async () => {
-    const toReceive = items.filter(i => i.receivedQty && Number(i.receivedQty) > 0).map(i => ({
+    // Items not on the list have no recorded purchase: staff wait for the
+    // receipt; admins can receive them with a reason.
+    const allowed = items;
+    const allowedUnexpected = isManagement ? unexpectedItems : [];
+
+    const toReceive = allowed.filter(i => i.receivedQty && Number(i.receivedQty) > 0).map(i => ({
       itemId: i.id,
       receivedQty: Number(i.receivedQty),
       discrepancyReason: Number(i.receivedQty) < Number(i.remainingQty) ? i.discrepancyReason : undefined
     }));
 
-    const toReceiveUnexpected = unexpectedItems.filter(i => i.receivedQty && Number(i.receivedQty) > 0).map(i => ({
+    const toReceiveUnexpected = allowedUnexpected.filter(i => i.receivedQty && Number(i.receivedQty) > 0).map(i => ({
       productId: i.id,
       receivedQty: Number(i.receivedQty),
       unitCost: i.sellingPrice ? i.sellingPrice * 0.8 : 0 
     }));
 
-    const invalidDiscrepancies = items.filter(i => i.receivedQty && Number(i.receivedQty) > 0 && Number(i.receivedQty) < Number(i.remainingQty) && (!i.discrepancyReason || i.discrepancyReason.trim() === ''));
+    const invalidDiscrepancies = allowed.filter(i => i.receivedQty && Number(i.receivedQty) > 0 && Number(i.receivedQty) < Number(i.remainingQty) && (!i.discrepancyReason || i.discrepancyReason.trim() === ''));
     if (invalidDiscrepancies.length > 0) {
         return toast({ variant: 'destructive', title: 'Reason Required', description: `Please provide a discrepancy reason for: ${invalidDiscrepancies.map(i => i.productName).join(', ')}` });
     }
@@ -185,18 +232,25 @@ export function usePendingPurchases(onReceiveComplete: () => void, refreshKey = 
       return toast({ variant: 'destructive', title: 'No Items', description: "Please enter the received quantity for at least one item." });
     }
 
+    let overrideReason: string | undefined;
+    if (toReceiveUnexpected.length > 0) {
+      const reason = askOverrideReason();
+      if (!reason) return;
+      overrideReason = reason;
+    }
+
     setIsSubmitting(true);
     try {
       const res = await fetch("/api/inventory/receive/pending-pos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ receives: toReceive, unexpectedItems: toReceiveUnexpected, reportedByName, targetWarehouseId })
+        body: JSON.stringify({ receives: toReceive, unexpectedItems: toReceiveUnexpected, reportedByName, targetWarehouseId, overrideReason })
       });
 
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Failed to receive');
 
       toast({ title: 'Success', description: "Successfully received purchases!" });
-      setUnexpectedItems([]);
+      setUnexpectedItems(isManagement ? [] : unexpectedItems);
       fetchPending();
       onReceiveComplete();
     } catch (e: any) {
@@ -239,6 +293,7 @@ export function usePendingPurchases(onReceiveComplete: () => void, refreshKey = 
     handleCancel,
     handleCloseShort,
     handleReceive,
-    closeBatch
+    closeBatch,
+    isManagement
   };
 }

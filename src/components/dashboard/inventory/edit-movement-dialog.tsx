@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { useRoleCheck } from '@/hooks/useRoleCheck';
 
 const editMovementSchema = z.object({
   quantity_change: z.coerce.number(),
@@ -44,6 +45,8 @@ export function EditMovementDialog({ open, onOpenChange, movement, onSuccess }: 
   const supabase = useSupabase();
   const { user } = useUser();
   const { toast } = useToast();
+  // Cost and supplier are Owner/Admin only; staff edit the quantity and reason.
+  const { isManagement } = useRoleCheck();
 
   const form = useForm<EditMovementFormValues>({
     resolver: zodResolver(editMovementSchema),
@@ -194,6 +197,7 @@ export function EditMovementDialog({ open, onOpenChange, movement, onSuccess }: 
                   </FormItem>
                 )}
               />
+              {isManagement && (
               <FormField
                 control={form.control}
                 name="unit_cost"
@@ -207,7 +211,9 @@ export function EditMovementDialog({ open, onOpenChange, movement, onSuccess }: 
                   </FormItem>
                 )}
               />
+              )}
             </div>
+            {isManagement && (
             <FormField
               control={form.control}
               name="supplier_name"
@@ -221,6 +227,7 @@ export function EditMovementDialog({ open, onOpenChange, movement, onSuccess }: 
                 </FormItem>
               )}
             />
+            )}
             <FormField
               control={form.control}
               name="reason"
