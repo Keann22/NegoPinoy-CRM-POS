@@ -78,6 +78,18 @@ export default function DashboardLayout({
   const [openInventory, setOpenInventory] = useState(false);
   const [openAccounting, setOpenAccounting] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  // The 🔔 / 💬 / shield icons live in the sidebar on desktop and in the top bar on
+  // phones. Mount only the visible copy — the hidden one still fetched data and
+  // fought the visible one over the same live-update channel.
+  const [isDesktop, setIsDesktop] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const mql = window.matchMedia('(min-width: 768px)');
+    const update = () => setIsDesktop(mql.matches);
+    update();
+    mql.addEventListener?.('change', update);
+    return () => mql.removeEventListener?.('change', update);
+  }, []);
 
   const roles = useMemo(() => userProfile?.roles || [], [userProfile]);
   
@@ -289,11 +301,13 @@ export default function DashboardLayout({
                 <Logo className="h-6 w-6" />
                 <span className="font-headline">NegosyantengPinoy.Ph</span>
               </Link>
-              <div className="ml-auto flex items-center gap-1">
-                <InventoryGuardianTrigger />
-                <MessagesDrawer />
-                <NotificationBell />
-              </div>
+              {isDesktop === true && (
+                <div className="ml-auto flex items-center gap-1">
+                  <InventoryGuardianTrigger />
+                  <MessagesDrawer />
+                  <NotificationBell />
+                </div>
+              )}
           </div>
           <div className="flex-1 overflow-y-auto">
             <nav className="grid items-start px-2 text-sm font-medium lg:px-4 pb-4">
@@ -332,11 +346,13 @@ export default function DashboardLayout({
           </Sheet>
           <div className="w-full flex-1">
           </div>
-          <div className="flex items-center gap-1 md:hidden mr-2">
-            <InventoryGuardianTrigger />
-            <MessagesDrawer />
-            <NotificationBell />
-          </div>
+          {isDesktop === false && (
+            <div className="flex items-center gap-1 md:hidden mr-2">
+              <InventoryGuardianTrigger />
+              <MessagesDrawer />
+              <NotificationBell />
+            </div>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="secondary" size="icon" className="rounded-full">

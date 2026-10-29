@@ -4,9 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/lib/supabase/client";
-import addressDataRaw from '@/lib/philippine-address-data.json';
-
-const addressData = addressDataRaw as Record<string, any>;
+import { useAddressData } from '@/lib/address-data';
 
 export const customerSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -39,6 +37,7 @@ export function useAddCustomerDialog(props: UseAddCustomerDialogProps) {
   const isControlled = props.open !== undefined && props.onOpenChange !== undefined;
   const open = isControlled ? props.open : internalOpen;
   const setOpen = isControlled ? props.onOpenChange : setInternalOpen;
+  const { addressData, isLoaded: isAddressLoaded } = useAddressData(!!open);
 
   const form = useForm<CustomerFormValues>({
     resolver: zodResolver(customerSchema),
@@ -67,7 +66,8 @@ export function useAddCustomerDialog(props: UseAddCustomerDialogProps) {
   const barangayOptions = selectedRegion && selectedProvince && selectedCity && addressData[selectedRegion]?.province_list?.[selectedProvince]?.municipality_list?.[selectedCity]?.barangay_list ? addressData[selectedRegion].province_list[selectedProvince].municipality_list[selectedCity].barangay_list.map((name: string) => ({ value: name, label: name })) : [];
 
   useEffect(() => {
-      if (open) {
+      // Wait for the address list so saved region/province/city can be matched.
+      if (open && isAddressLoaded) {
           let firstName = "";
           let lastName = "";
           if (props.initialName) {
@@ -148,7 +148,7 @@ export function useAddCustomerDialog(props: UseAddCustomerDialogProps) {
               });
           }
       }
-  }, [open, props.initialName, props.customerToEdit, form]);
+  }, [open, isAddressLoaded, addressData, props.initialName, props.customerToEdit, form]);
 
   async function onSubmit(values: CustomerFormValues) {
     setOpen?.(false);

@@ -8,15 +8,18 @@ import type { Order, OrderStatus } from '@/types';
 /**
  * useOrders
  * Fetches all orders (role-filtered) and resolves customer names.
- * Extracted from orders/page.tsx (lines 126–196).
  *
- * Pages through with .range() in a loop rather than a single unfiltered
- * .select() — a single select silently caps at Supabase's 1000-row default
- * (see ARCHITECTURE.md, "The 1000-row query cap"), which previously made
- * orders older than the 1000 most recent company-wide invisible to
- * Admin/Owner accounts (Sales accounts, scoped to their own orders, weren't
- * affected until their own order count passed 1000).
+ * Pages through with .range() rather than a single unfiltered .select() — a
+ * single select silently caps at Supabase's 1000-row default (see
+ * ARCHITECTURE.md, "The 1000-row query cap").
+ *
+ * Speed (phones on mobile data): the first page also returns the total count,
+ * so the remaining pages are fetched in parallel instead of one after another,
+ * and customer names come embedded in the same rows instead of 20+ separate
+ * sequential lookups.
  */
+const PAGE_SIZE = 1000;
+
 export function useOrders() {
   const supabase = useSupabase();
   const { user } = useUser();
@@ -25,36 +28,57 @@ export function useOrders() {
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [customerMap, setCustomerMap] = useState<Map<string, string>>(new Map());
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
-  const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
   const [refetchTrigger, setRefetchTrigger] = useState(0);
 
   const refetch = useCallback(() => setRefetchTrigger(n => n + 1), []);
 
-  // Fetch orders
   useEffect(() => {
     if (!supabase || !user || !userProfile) return;
+    let cancelled = false;
+
     const fetchOrders = async () => {
       setIsLoadingOrders(true);
       try {
         const isSalesOnly = !userProfile.roles.some((r: string) =>
           ['Admin', 'Owner', 'Inventory'].includes(r)
         );
-        const allRows: any[] = [];
-        for (let from = 0; ; from += 1000) {
+        const pageQuery = (from: number, withCount = false) => {
           let q = supabase
             .from('orders')
-            .select('*')
+            .select('*, customer:customers(full_name)', withCount ? { count: 'exact' } : undefined)
             .order('order_date', { ascending: false })
-            .range(from, from + 999);
+            .order('id', { ascending: true }) // stable order so pages never overlap
+            .range(from, from + PAGE_SIZE - 1);
           if (isSalesOnly) q = q.eq('sales_person_id', userProfile.id);
-          const { data, error } = await q;
-          if (error) throw error;
-          allRows.push(...(data || []));
-          if (!data || data.length < 1000) break;
+          return q;
+        };
+
+        const first = await pageQuery(0, true);
+        if (first.error) throw first.error;
+        const allRows: any[] = [...(first.data || [])];
+
+        const total = first.count ?? allRows.length;
+        if (allRows.length === PAGE_SIZE && total > PAGE_SIZE) {
+          const offsets: number[] = [];
+          for (let from = PAGE_SIZE; from < total; from += PAGE_SIZE) offsets.push(from);
+          const pages = await Promise.all(offsets.map(from => pageQuery(from)));
+          for (const page of pages) {
+            if (page.error) throw page.error;
+            allRows.push(...(page.data || []));
+          }
         }
 
-        setOrders(
-          allRows.map((o: any) => ({
+        if (cancelled) return;
+
+        const seen = new Set<string>();
+        const map = new Map<string, string>();
+        const mapped: Order[] = [];
+        for (const row of allRows) {
+          if (seen.has(row.id)) continue;
+          seen.add(row.id);
+          const { customer, ...o } = row;
+          if (o.customer_id && customer) map.set(o.customer_id, customer.full_name || 'Unknown Customer');
+          mapped.push({
             ...o,
             customerId: o.customer_id,
             orderDate: o.order_date,
@@ -67,58 +91,28 @@ export function useOrders() {
             monthlyPayment: o.monthly_payment,
             salesPersonName: o.sales_person_name,
             totalDiscount: o.total_discount,
-          }))
-        );
+          });
+        }
+
+        setCustomerMap(map);
+        setOrders(mapped);
       } catch (err) {
         console.error('Error fetching orders:', err);
       } finally {
-        setIsLoadingOrders(false);
+        if (!cancelled) setIsLoadingOrders(false);
       }
     };
+
     fetchOrders();
-  }, [supabase, user, userProfile, refetchTrigger]);
-
-  // Resolve customer names
-  useEffect(() => {
-    if (!orders || orders.length === 0 || !supabase) return;
-    const fetchCustomers = async () => {
-      setIsLoadingCustomers(true);
-      try {
-        const customerIds = Array.from(new Set(orders.map(o => o.customerId))).filter(Boolean);
-        
-        if (customerIds.length === 0) {
-          setCustomerMap(new Map());
-          return;
-        }
-
-        const map = new Map<string, string>();
-        const chunkSize = 150;
-        
-        for (let i = 0; i < customerIds.length; i += chunkSize) {
-          const chunk = customerIds.slice(i, i + chunkSize);
-          const { data, error } = await supabase
-            .from('customers')
-            .select('id, full_name')
-            .in('id', chunk);
-            
-          if (error) throw error;
-          (data || []).forEach(c => map.set(c.id, c.full_name || 'Unknown Customer'));
-        }
-        
-        setCustomerMap(map);
-      } catch (err) {
-        console.error('Error fetching customers for orders:', err);
-      } finally {
-        setIsLoadingCustomers(false);
-      }
+    return () => {
+      cancelled = true;
     };
-    fetchCustomers();
-  }, [orders, supabase]);
+  }, [supabase, user, userProfile, refetchTrigger]);
 
   return {
     orders,
     customerMap,
-    isLoading: isLoadingOrders || isLoadingCustomers,
+    isLoading: isLoadingOrders,
     refetch,
   };
 }

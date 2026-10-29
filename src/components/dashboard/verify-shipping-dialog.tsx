@@ -9,10 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useSupabase } from '@/lib/supabase/hooks';
 import { useToast } from '@/hooks/use-toast';
 import { Order } from '@/app/dashboard/orders/page';
-import addressDataRaw from '@/lib/philippine-address-data.json';
+import { useAddressData } from '@/lib/address-data';
 import { Checkbox } from '@/components/ui/checkbox';
-
-const addressData = addressDataRaw as Record<string, any>;
 
 interface VerifyShippingDialogProps {
   order: Order | null;
@@ -25,6 +23,7 @@ export function VerifyShippingDialog({ order, open, onOpenChange, onSuccess }: V
   const [isSubmitting, setIsSubmitting] = useState(false);
   const supabase = useSupabase();
   const { toast } = useToast();
+  const { addressData, isLoaded: isAddressLoaded } = useAddressData(open);
 
   const [shippingName, setShippingName] = useState('');
   const [shippingPhone, setShippingPhone] = useState('');
@@ -51,7 +50,8 @@ export function VerifyShippingDialog({ order, open, onOpenChange, onSuccess }: V
   const barangayOptions = region && province && city && addressData[region]?.province_list?.[province]?.municipality_list?.[city]?.barangay_list ? addressData[region].province_list[province].municipality_list[city].barangay_list.map((name: string) => ({ value: name, label: name })) : [];
 
   useEffect(() => {
-    if (open && order && supabase) {
+    // Wait for the address list so the customer's saved address can be matched.
+    if (open && order && supabase && isAddressLoaded) {
       // Fetch customer details
       supabase.from('customers').select('*').eq('id', order.customerId).single().then(({ data }) => {
         if (data) {
@@ -121,7 +121,7 @@ export function VerifyShippingDialog({ order, open, onOpenChange, onSuccess }: V
       setSaveAsSecondary(false);
       setDeliveryInstructions('Kuya wag nyo po sabihin na galing Shopee! Sabihin nyo po galing ng Negosyanteng Pinoy. Thankyou po! :)');
     }
-  }, [open, order, supabase]);
+  }, [open, order, supabase, isAddressLoaded, addressData]);
 
   const handleSubmit = async () => {
     if (!order || !supabase) return;
