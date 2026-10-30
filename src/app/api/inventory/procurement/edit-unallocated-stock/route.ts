@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { recordGuardianMemory } from '@/lib/services/inventory/inventory-guardian-memory-service';
 import { getUnpickedQtyForProduct, stockLevelForUnallocated } from '@/lib/services/inventory/shelf-stock-service';
+import { setShelfStock } from '@/lib/services/inventory/shelf-stock-ledger';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -60,6 +61,13 @@ export async function POST(req: Request) {
 
     if (movErr) {
       console.error('Failed to log inventory movement:', movErr);
+    }
+
+    // The typed number is what is on the shelf: set the stored shelf stock to it.
+    try {
+      await setShelfStock(supabase, productId, desiredUnallocated, { reason: fullReason, actorName });
+    } catch (e) {
+      console.error('Failed to set shelf stock from Edit Unallocated Stock:', e);
     }
 
     // 5. Alert AI Inventory Guardian & Record Memory

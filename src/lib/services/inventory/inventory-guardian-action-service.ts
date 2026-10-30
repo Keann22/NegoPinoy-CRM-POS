@@ -6,6 +6,7 @@ import type {
 } from '@/types';
 import { recordGuardianMemory } from './inventory-guardian-memory-service';
 import { getUnpickedQtyForProduct, stockLevelForUnallocated } from './shelf-stock-service';
+import { setShelfStock } from './shelf-stock-ledger';
 
 /**
  * Corrects physical shelf stock using an audited physical count.
@@ -57,6 +58,16 @@ export async function applyPhysicalShelfCount(
     supplier_name: 'Physical Shelf Audit',
     unit_cost: product.initial_unit_cost || 0
   });
+
+  // 5b. The count is what is on the shelf: set the stored shelf stock to it.
+  try {
+    await setShelfStock(supabase, productId, physicalShelfCount, {
+      reason: `Guardian shelf count: ${physicalShelfCount}. ${notes || ''}`.trim(),
+      actorName,
+    });
+  } catch (e) {
+    console.error('Failed to set shelf stock from Guardian count:', e);
+  }
 
   // 6. Stock found on the shelf does NOT close open "not picked" issues: the item is
   // still on the shelf until a picker takes it and taps Found (LOCKED unallocated rule,
