@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { recordGuardianMemory } from '@/lib/services/inventory/inventory-guardian-memory-service';
-import { getSingleProductProcurementDemand } from '@/lib/services/procurement-demand-service';
+import { getUnpickedQtyForProduct, stockLevelForUnallocated } from '@/lib/services/inventory/shelf-stock-service';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -27,14 +27,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 });
     }
 
-    // 2. Fetch layaway and need-to-buy demand for this product
-    const { unscannedLayawayQty, needToBuyQty } = await getSingleProductProcurementDemand(supabase, productId);
+    // 2. Units on orders no picker has taken yet (still on the shelf).
+    const unpicked = await getUnpickedQtyForProduct(supabase, productId);
 
-    // Formula: unallocatedStock = (stock_level + unscannedLayawayQty) - needToBuyQty
-    // Therefore, targetStockLevel = targetUnallocatedStock - unscannedLayawayQty + needToBuyQty
+    // LOCKED formula (shelf-stock-service.ts): unallocated = stock_level + unpicked,
+    // so the stock_level for the typed shelf count is shelf − unpicked.
     const currentStock = product.stock_level ?? 0;
     const desiredUnallocated = Number(newUnallocatedStock);
-    const targetStockLevel = Math.round(desiredUnallocated - unscannedLayawayQty + needToBuyQty);
+    const targetStockLevel = stockLevelForUnallocated(desiredUnallocated, unpicked.qty);
     const discrepancy = targetStockLevel - currentStock;
 
     // 3. Update product stock_level in DB
@@ -71,7 +71,7 @@ export async function POST(req: Request) {
       systemStockAfter: targetStockLevel,
       discrepancy,
       actorName,
-      notes: `[Procurement Direct Edit] Target Unallocated: ${desiredUnallocated} (Layaway: ${unscannedLayawayQty}, Demand: ${needToBuyQty}). Reason: ${reasonCode}. Notes: ${notes || 'None'}`
+      notes: `[Procurement Direct Edit] Target Unallocated: ${desiredUnallocated} (Waiting to be picked: ${unpicked.qty} pcs on ${unpicked.orderCount} orders). Reason: ${reasonCode}. Notes: ${notes || 'None'}`
     });
 
     // 6. Create Owner / Guardian Alert

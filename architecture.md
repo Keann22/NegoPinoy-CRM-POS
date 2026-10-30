@@ -287,7 +287,7 @@ When warehouse staff conduct a physical shelf audit, they count the items *physi
 Subtracting those already-picked orders from an empty shelf count (e.g. `0 - 23 = -23`) caused a **double-deduction**, forcing products into artificial negative stock (e.g. `Serving spoon 6pcs` dropping to `-25` even though active unfulfilled orders were only 14).
 
 **The Rule & Fix:**
-When converting an audited physical shelf count into `stock_level`:
+When converting an audited physical shelf count into `stock_level` (since 2026-10-30 this logic lives in `shelf-stock-service.ts` and is shared with every unallocated number, see "Unallocated Stock = What Is on the Shelf (LOCKED)"):
 1. Only count orders that **genuinely still need to be pulled from the shelf**: `Pending Payment`, `Processing`, `Waiting for Stock`, and `On-Hold` (where `is_packed = false`).
 2. For orders in `Picked (with issue)`, only count line items that have an **open** shortage issue in `order_issues` (`status = 'open'`). If an issue was already resolved or belongs to a different item, the unit was already successfully picked.
 3. Completely exclude orders in `Picked`, `Photo`, `Packed`, `For Shipping`, `For Pick-up`, and any item where `is_packed = true` — they are already physically off the shelf and must never be subtracted again.
@@ -309,6 +309,44 @@ To guarantee 100% backward compatibility with POS orders, P&L reports, and the s
 - **Internal Transfers** (`/dashboard/inventory/transfers`): Screen for the daily runner. Features a **Runner Sheet** suggesting items to transfer from Unit 2 Reserve to Unit 1 Active (where Unit 1 stock $\le$ reorder threshold and Unit 2 has stock), plus Quick Transfer and Transfer History. Executed atomically via `execute_stock_transfer` RPC.
 - **Inbound Receiving** (`/dashboard/inventory/receive`): Defaults receiving destination to **Unit 2 (Reserve & Inbound)** with a dropdown to select Unit 1 for urgent direct-to-shelf restocks.
 - **Picker Alert** (`/dashboard/pick`): If an item on Unit 1 shelf is empty, the picker UI displays Unit 2 reserve stock so pickers can request replenishment rather than reporting false out-of-stock issues.
+
+### Unallocated Stock = What Is on the Shelf (LOCKED, 2026-10-30)
+
+> **⛔ This formula is fixed by the owner. Do not change it**, "simplify" it, or bring back the old version. If a screen shows a number that looks wrong, fix the data or the screen, not the formula. Any change needs the owner's explicit approval first.
+
+**Meaning (owner's words):** unallocated stock is what is **physically on the shelf, ready to pick**. A sales order does not lower it. It goes down **only when a picker marks the item Found**, because only then has the item left the shelf.
+
+**Formula** (`src/lib/services/inventory/shelf-stock-service.ts`, the only place it lives):
+
+```
+unallocated = max(0, stock_level + unpicked)
+stock_level for a shelf count = shelf count − unpicked     (the same formula backwards)
+```
+
+`stock_level` already has every open order taken off (stock is deducted when the order is **created**, see "Order Stock Deduction" below), so adding back the units no picker has taken yet gives the shelf.
+
+**Unpicked** =
+1. Lines on orders in `Pending Payment`, `Processing`, `Waiting for Stock`, `On-Hold`, **all payment types** (lay-away included). Lines with `is_packed = true` are skipped.
+2. On `Picked (with issue)` orders: the qty the picker marked OS (`order_issues.out_of_stock_qty`, status `open`), counted once per order and product. Those units were never taken.
+3. Bundle lines count as `quantity × recipe qty` of each component. Bundles hold no stock, so a bundle has no unallocated number of its own.
+
+Orders in `Picked`, `Photo`, `Packed`, `For Shipping`, `For Pick-up` are off the shelf and never added back.
+
+**Example:** 5 on the shelf, 7 unpicked orders → `stock_level = −2` → unallocated = −2 + 7 = **5**. After the picker picks 2, unallocated = **3**.
+
+**Who uses it (all must go through `shelf-stock-service.ts`):**
+
+| Use | Function |
+|---|---|
+| Procurement Sheet `unallocatedStock` / `physicalStock` (`procurement-dashboard-service.ts`) | `getUnpickedQtyMap` + `unallocatedFromStockLevel` |
+| Inventory List and Products page Adjust Stock (`inventory-list-service.ts`, `GET /api/inventory/unallocated-stock`) | `getUnpickedQtyMap` / `getUnpickedQtyForProduct` + `unallocatedFromStockLevel` |
+| Edit Unallocated Stock save (`POST /api/inventory/procurement/edit-unallocated-stock`) | `getUnpickedQtyForProduct` + `stockLevelForUnallocated` |
+| Inventory Guardian shelf count (`applyPhysicalShelfCount`) | `getUnpickedQtyForProduct` + `stockLevelForUnallocated` |
+| Inventory Guardian anomaly scan | `UNPICKED_STATUSES` |
+
+**What it replaced:** before 2026-10-30 the screens showed `max(0, max(0, stock_level + unscannedLayaway) − needToBuy)`. That added back only lay-away orders and then subtracted unpicked shortages a second time, so items still on the shelf often showed **0**, and pickers "found" stock the system said wasn't there. The Edit box used the inverse of that formula, so a typed shelf count didn't round-trip under the new meaning.
+
+**Not changed by this:** order creation, Need to Buy, Total Open Demand, and the "+N lay-away" badge (still shown for information; those units are already inside the unallocated number).
 
 ### Order Stock Deduction: at Creation Only (corrected 2026-10-14)
 
@@ -343,7 +381,7 @@ Above the Guardian timeline, the dialog embeds `ReceiveHistoryTimeline` (`receiv
 
 #### Inventory List: unallocated stock for every product (added 2026-10-09)
 `/dashboard/inventory/print-list` is now labelled **Inventory List** (formerly "Print Inventory List"; the URL is unchanged). Besides the printable count sheet, it shows an **Unallocated** column for every product and lets inventory/management staff edit it.
-- **One formula, two pages**: `getInventoryListStockInfo` (`src/lib/services/inventory-list-service.ts`) reuses `calculateProcurementDemand` and the same formula as `getProcurementDashboardData`: `unallocated = max(0, max(0, stock_level + unscannedLayaway) - needToBuy)`. If the Procurement Sheet formula changes, change it here too — the two pages must always show the same number for the same product.
+- **One formula, every page**: `getInventoryListStockInfo` (`src/lib/services/inventory-list-service.ts`) uses the LOCKED shelf formula from `shelf-stock-service.ts`, the same as the Procurement Sheet (see "Unallocated Stock = What Is on the Shelf"). The pages must always show the same number for the same product.
 - **Why it is a server route**: the number needs live open-order demand, so the page fetches `GET /api/inventory/unallocated-stock` separately from the product rows (`useAllProductsForPrint`). It computes all ~2,500 products in one call and takes several seconds; the column shows a skeleton until it arrives.
 - **Editing**: the cell opens the shared `EditUnallocatedStockDialog`, which posts to `/api/inventory/procurement/edit-unallocated-stock` — same movement log, Guardian memory entry and owner alert as an edit from the Procurement Sheet. The edit button is gated on `canManageProducts`.
 - **Bundles**: shown as "-" and not editable, because bundles hold no stock of their own (see "Bundle Products & Assembly Recipes").

@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { calculateProcurementDemand, fetchAllPages, getSingleProductProcurementDemand } from './procurement-demand-service';
+import { getUnpickedQtyForProduct, getUnpickedQtyMap, unallocatedFromStockLevel } from './inventory/shelf-stock-service';
 
 export interface InventoryListStockInfo {
   unallocatedStock: number;
@@ -11,10 +12,9 @@ export interface InventoryListStockInfo {
 }
 
 /**
- * Unallocated stock for every product, using the exact same formula as the Procurement
- * Sheet (procurement-dashboard-service.ts) so the two pages always agree and the shared
- * Edit Unallocated Stock dialog round-trips to the number shown here:
- *   unallocated = max(0, max(0, stock_level + unscannedLayaway) - needToBuy)
+ * Unallocated stock (what is on the shelf) for every product. Uses the LOCKED formula in
+ * inventory/shelf-stock-service.ts, the same one the Procurement Sheet and the Edit
+ * Unallocated Stock dialog use.
  */
 export async function getInventoryListStockInfo(
   supabase: SupabaseClient
@@ -39,11 +39,11 @@ export async function getInventoryListStockInfo(
       .range(from, to)
   );
 
-  const { needToBuyMap, unscannedLayawayMap } = await calculateProcurementDemand(
-    supabase,
-    new Set(products.map((p: any) => p.id)),
-    purchased
-  );
+  // Lay-away is only needed for the "+N lay-away" badge; the number itself comes from unpicked.
+  const [{ unscannedLayawayMap }, unpickedMap] = await Promise.all([
+    calculateProcurementDemand(supabase, new Set(products.map((p: any) => p.id)), purchased),
+    getUnpickedQtyMap(supabase),
+  ]);
 
   // Same source as the Procurement Sheet's "last edited" stamp: a person typed a new
   // stock number. A count that matched the system (discrepancy 0) is not an adjustment.
@@ -72,7 +72,7 @@ export async function getInventoryListStockInfo(
     result[p.id] = buildStockInfo(
       p,
       unscannedLayawayMap.get(p.id) || 0,
-      needToBuyMap.get(p.id) || 0,
+      unpickedMap.get(p.id) || 0,
       lastEditMap.get(p.id)
     );
   }
@@ -84,9 +84,10 @@ export async function getSingleProductStockInfo(
   supabase: SupabaseClient,
   productId: string
 ): Promise<InventoryListStockInfo | null> {
-  const [{ data: product }, demand, { data: memories, count }] = await Promise.all([
+  const [{ data: product }, demand, unpicked, { data: memories, count }] = await Promise.all([
     supabase.from('products').select('id, stock_level, assembly_recipe').eq('id', productId).single(),
     getSingleProductProcurementDemand(supabase, productId),
+    getUnpickedQtyForProduct(supabase, productId),
     supabase
       .from('inventory_guardian_memory')
       .select('actor_name, created_at', { count: 'exact' })
@@ -102,18 +103,17 @@ export async function getSingleProductStockInfo(
   const lastEdit = latest
     ? { editedAt: latest.created_at, editedBy: latest.actor_name || 'Staff', count: count ?? 1 }
     : undefined;
-  return buildStockInfo(product, demand.unscannedLayawayQty, demand.needToBuyQty, lastEdit);
+  return buildStockInfo(product, demand.unscannedLayawayQty, unpicked.qty, lastEdit);
 }
 
 function buildStockInfo(
   p: { stock_level: number | null; assembly_recipe: any },
   unscannedLayawayQty: number,
-  needToBuyQty: number,
+  unpickedQty: number,
   lastEdit: { editedAt: string; editedBy: string; count: number } | undefined
 ): InventoryListStockInfo {
-  const physicalStock = Math.max(0, (p.stock_level ?? 0) + unscannedLayawayQty);
   return {
-    unallocatedStock: Math.max(0, physicalStock - needToBuyQty),
+    unallocatedStock: unallocatedFromStockLevel(p.stock_level, unpickedQty),
     unscannedLayawayQty,
     isBundle: Array.isArray(p.assembly_recipe) && p.assembly_recipe.length > 0,
     lastEditedAt: lastEdit ? lastEdit.editedAt : null,

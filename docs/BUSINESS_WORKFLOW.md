@@ -52,6 +52,14 @@ Receipts:
 - If staff can see the expected (bought) quantity, they tend to copy it, so the
   count stops being a real check.
 
+## Unallocated stock (owner rule, 2026-10-30, do not change)
+
+- **Unallocated stock = what is physically on the shelf, ready to pick.**
+- A sales order does **not** lower it. Only a picker marking the item Found does,
+  because only then has it left the shelf.
+- Formula and details: architecture.md, "Unallocated Stock = What Is on the Shelf
+  (LOCKED)".
+
 ## Devices
 
 - Owners use **iPhone and Huawei** phones. Anything mobile must work on both,

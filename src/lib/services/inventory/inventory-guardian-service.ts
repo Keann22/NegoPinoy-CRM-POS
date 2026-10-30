@@ -17,15 +17,8 @@ export { getProductGuardianMemory };
 
 import { fetchAllPages } from '../procurement-demand-service';
 
-// Orders in these statuses claim physical inventory still waiting to be picked from the warehouse shelf.
-// Statuses where picking has already succeeded ('Picked', 'Photo', 'Packed', 'For Shipping',
-// 'For Pick-up') or items where is_packed = true have already been physically pulled from shelf.
-const UNPICKED_STATUSES = [
-  'Pending Payment',
-  'Processing',
-  'Waiting for Stock',
-  'On-Hold'
-];
+// Statuses still waiting to be picked: one shared list (shelf-stock-service.ts).
+import { UNPICKED_STATUSES } from './shelf-stock-service';
 
 /**
  * Scans the database for stock anomalies and unrecorded movements.

@@ -20,6 +20,12 @@ actually buys, receives, and counts, and what must stay confidential.
 - All Supabase data fetching should go through hooks in `src/hooks/`, not inline inside page components.
 - All shared types must be defined in `src/types/`, not inline inside component files.
 
+### Locked business formulas
+- **Unallocated stock** (what is on the shelf, ready to pick) is fixed by the owner:
+  `max(0, stock_level + unpicked)`, in `src/lib/services/inventory/shelf-stock-service.ts`.
+  Do not change it or compute it anywhere else. See architecture.md, "Unallocated Stock =
+  What Is on the Shelf (LOCKED)".
+
 ### Architecture
 - Read `ARCHITECTURE.md` before making structural changes to the codebase.
 - Do not add new top-level directories to `src/` without updating `ARCHITECTURE.md`.

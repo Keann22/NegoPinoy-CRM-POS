@@ -2,6 +2,7 @@ import { getItemPriorities, priorityRank } from './procurement-priority-service'
 import { SupabaseClient } from '@supabase/supabase-js';
 import { migrateLeakedBundleDrafts, autoCleanupStaffDrafts } from './procurement-service';
 import { calculateProcurementDemand } from './procurement-demand-service';
+import { getUnpickedQtyMap, unallocatedFromStockLevel } from './inventory/shelf-stock-service';
 import { getNegativeStockReconciliationItems } from './procurement-reconciliation-service';
 
 export async function getProcurementDashboardData(supabase: SupabaseClient) {
@@ -79,10 +80,13 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
   }
 
   // 5. Fetch live product data for items needing procurement / purchased
-  const { data: liveOS, error: lErr } = await supabase
-    .from('products')
-    .select('id, name, variant_name, stock_level, supplier_id, initial_unit_cost, supplier_pricing, parent_id')
-    .in('id', Array.from(productIdsToFetch));
+  const [{ data: liveOS, error: lErr }, unpickedMap] = await Promise.all([
+    supabase
+      .from('products')
+      .select('id, name, variant_name, stock_level, supplier_id, initial_unit_cost, supplier_pricing, parent_id')
+      .in('id', Array.from(productIdsToFetch)),
+    getUnpickedQtyMap(supabase),
+  ]);
   if (lErr) throw lErr;
 
   const draftItemIds = (drafts || []).map((d: any) => d.id);
@@ -239,12 +243,13 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
     }
 
     const unscannedLayawayQty = unscannedLayawayMap.get(p.id) || 0;
-    const physicalStock = Math.max(0, (p.stock_level ?? 0) + unscannedLayawayQty);
+    // LOCKED formula (shelf-stock-service.ts): what is on the shelf, ready to pick.
+    const physicalStock = unallocatedFromStockLevel(p.stock_level, unpickedMap.get(p.id) || 0);
     const totalOpenDemandQty = totalOpenDemandMap.get(p.id) || 0;
     const needToBuyQty = needToBuyMap.get(p.id) || 0;
     const openUnscannedQty = openUnscannedMap.get(p.id) || 0;
     const allocatedPickedQty = Math.max(0, totalOpenDemandQty - openUnscannedQty);
-    const unallocatedStock = Math.max(0, physicalStock - needToBuyQty);
+    const unallocatedStock = physicalStock;
     const lastEdit = lastEditMap.get(p.id);
 
     osMap.set(p.id, {

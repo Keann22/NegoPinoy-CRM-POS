@@ -5,18 +5,7 @@ import type {
   BorrowStockPayload
 } from '@/types';
 import { recordGuardianMemory } from './inventory-guardian-memory-service';
-
-// Statuses that claim physical inventory still waiting to be picked from the warehouse shelf.
-// Statuses where picking has already succeeded ('Picked', 'Photo', 'Packed', 'For Shipping',
-// 'For Pick-up', etc.) or items where is_packed = true have already been physically removed
-// from the shelf and secured into parcels/bins. Subtracting them from a physical shelf count
-// causes a severe double-deduction.
-const UNPICKED_STATUSES = [
-  'Pending Payment',
-  'Processing',
-  'Waiting for Stock',
-  'On-Hold'
-];
+import { getUnpickedQtyForProduct, stockLevelForUnallocated } from './shelf-stock-service';
 
 /**
  * Corrects physical shelf stock using an audited physical count.
@@ -39,76 +28,12 @@ export async function applyPhysicalShelfCount(
     throw new Error('Product not found for physical count correction');
   }
 
-  // 2. Fetch active unpicked orders claiming this product from the shelf. Bundles hold no
-  // stock of their own (sales explode into components), so a bundle order line claims
-  // qtyPerBundle of this product too — without them a component sold only through a
-  // bundle would always show 0 reservations.
-  const qtyPerUnit = new Map<string, number>([[productId, 1]]);
-  for (const key of ['productId', 'component_id']) {
-    const { data: bundles } = await supabase
-      .from('products')
-      .select('id, assembly_recipe')
-      // jsonb containment needs a JSON string; supabase-js turns a JS array into a Postgres array literal
-      .contains('assembly_recipe', JSON.stringify([{ [key]: productId }]));
-    for (const b of bundles || []) {
-      const recipe = Array.isArray(b.assembly_recipe) ? b.assembly_recipe : [];
-      const comp = recipe.find((c: any) => (c.productId || c.component_id) === productId);
-      if (comp) qtyPerUnit.set(b.id, Number(comp.quantity) || 1);
-    }
-  }
-
-  const { data: activeItems, error: aErr } = await supabase
-    .from('order_items')
-    .select('order_id, product_id, quantity, is_packed, orders!inner(id, status)')
-    .in('product_id', Array.from(qtyPerUnit.keys()))
-    .in('orders.status', [...UNPICKED_STATUSES, 'Picked (with issue)']);
-
-  if (aErr) {
-    console.error('Error fetching active orders during physical count:', aErr);
-  }
-
-  // Check open shortage issues for 'Picked (with issue)' orders
-  const { data: openIssues } = await supabase
-    .from('order_issues')
-    .select('order_id, out_of_stock_qty')
-    .eq('product_id', productId)
-    .eq('status', 'open');
-
-  const openIssueMap = new Map<string, number>();
-  (openIssues || []).forEach((i: any) => {
-    openIssueMap.set(i.order_id, Number(i.out_of_stock_qty) || 1);
-  });
-
-  let activeReservations = 0;
-  let activeOrdersCount = 0;
-  // A shortage issue is logged once per order against this product (bundle shortages are
-  // logged on the component), so count it once even if the order has several lines for it.
-  const countedIssueOrders = new Set<string>();
-
-  for (const item of (activeItems || [])) {
-    const order = Array.isArray(item.orders) ? item.orders[0] : item.orders;
-    if (!order || typeof order !== 'object') continue;
-    const orderStatus = 'status' in order ? String(order.status) : '';
-    const orderId = 'id' in order ? String(order.id) : '';
-
-    if (orderStatus === 'Picked (with issue)') {
-      // Only count if this specific product has an open out-of-stock issue
-      if (openIssueMap.has(orderId) && !countedIssueOrders.has(orderId)) {
-        countedIssueOrders.add(orderId);
-        const shortQty = openIssueMap.get(orderId)!;
-        activeReservations += shortQty;
-        activeOrdersCount++;
-      }
-    } else if (item.is_packed) {
-      continue; // Already physically pulled from shelf and packed
-    } else if (UNPICKED_STATUSES.includes(orderStatus)) {
-      activeReservations += (Number(item.quantity) || 1) * (qtyPerUnit.get(item.product_id) || 1);
-      activeOrdersCount++;
-    }
-  }
-
-  // 3. In NegoPinoy, stock_level represents: Available (Unreserved) Stock = Physical Count - Active Unpicked Reservations
-  const targetStockLevel = physicalShelfCount - activeReservations;
+  // 2. Units on orders no picker has taken yet, then the LOCKED formula
+  // (shelf-stock-service.ts): stock_level = shelf count − unpicked.
+  const unpicked = await getUnpickedQtyForProduct(supabase, productId);
+  const activeReservations = unpicked.qty;
+  const activeOrdersCount = unpicked.orderCount;
+  const targetStockLevel = stockLevelForUnallocated(physicalShelfCount, activeReservations);
   const currentStockLevel = product.stock_level ?? 0;
   const discrepancy = targetStockLevel - currentStockLevel;
 

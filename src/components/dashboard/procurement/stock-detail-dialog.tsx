@@ -54,7 +54,7 @@ export function ProcurementStockDetailDialog({ item, isOpen, onClose }: Procurem
     0,
     (item?.allocatedPickedQty ?? Math.max(0, (item?.totalOpenDemandQty || 0) - openUnscanned)) - layawayQty
   );
-  const unallocated = item?.unallocatedStock ?? Math.max(0, physicalStock - (item?.needToBuyQty || 0));
+  const unallocated = item?.unallocatedStock ?? physicalStock;
 
   useEffect(() => {
     let cancelled = false;
