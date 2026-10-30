@@ -22,6 +22,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const UNPAID_STATUSES = ['Shipped', 'Completed'];
 const OVERDUE_DAYS_THRESHOLD = 14;
@@ -51,6 +53,9 @@ export default function UnpaidShippedOrdersPage() {
 
   const [orders, setOrders] = useState<UnpaidShippedOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'cod' | 'installment' | 'all'>('cod');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
 
   useEffect(() => {
     if (!supabase || !user || !isManagement) {
@@ -122,9 +127,31 @@ export default function UnpaidShippedOrdersPage() {
     return orders.filter(o => differenceInDays(new Date(), new Date(o.shippedAt)) >= OVERDUE_DAYS_THRESHOLD);
   }, [orders]);
 
-  const totalOutstanding = useMemo(
-    () => overdueUnpaidOrders.reduce((sum, o) => sum + o.balanceDue, 0),
+  const codOrders = useMemo(
+    () => overdueUnpaidOrders.filter(o => o.paymentType === 'COD' || (!['Installment', 'Lay-away'].includes(o.paymentType))),
     [overdueUnpaidOrders]
+  );
+
+  const installmentOrders = useMemo(
+    () => overdueUnpaidOrders.filter(o => o.paymentType === 'Installment' || o.paymentType === 'Lay-away'),
+    [overdueUnpaidOrders]
+  );
+
+  const activeOrders = useMemo(() => {
+    if (activeTab === 'cod') return codOrders;
+    if (activeTab === 'installment') return installmentOrders;
+    return overdueUnpaidOrders;
+  }, [activeTab, codOrders, installmentOrders, overdueUnpaidOrders]);
+
+  const activeTotalOutstanding = useMemo(
+    () => activeOrders.reduce((sum, o) => sum + o.balanceDue, 0),
+    [activeOrders]
+  );
+
+  const totalPages = Math.max(1, Math.ceil(activeOrders.length / itemsPerPage));
+  const paginatedOrders = useMemo(
+    () => activeOrders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage),
+    [activeOrders, currentPage, itemsPerPage]
   );
 
   if (userProfile && !isManagement) {
@@ -144,19 +171,44 @@ export default function UnpaidShippedOrdersPage() {
         <CardHeader>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <CardTitle className="font-headline">Unpaid Shipped Orders</CardTitle>
+              <CardTitle className="font-headline text-2xl">Unpaid Shipped Orders</CardTitle>
               <CardDescription>
-                Orders that have already shipped but still have a balance due {OVERDUE_DAYS_THRESHOLD}+ days after shipping.
+                Orders shipped {OVERDUE_DAYS_THRESHOLD}+ days ago that still have an outstanding balance.
               </CardDescription>
             </div>
             <div className="text-right">
-              <p className="text-sm font-medium text-muted-foreground">Total Outstanding</p>
+              <p className="text-sm font-medium text-muted-foreground">
+                {activeTab === 'cod' ? 'Unpaid COD Outstanding' : activeTab === 'installment' ? 'Installment Receivables' : 'Total Outstanding'}
+              </p>
               {isLoading ? (
                 <Skeleton className="h-8 w-32 mt-1" />
               ) : (
-                <p className="text-2xl font-bold">₱{totalOutstanding.toFixed(2)}</p>
+                <p className="text-2xl font-bold">₱{activeTotalOutstanding.toFixed(2)}</p>
               )}
             </div>
+          </div>
+
+          <div className="pt-4">
+            <Tabs 
+              value={activeTab} 
+              onValueChange={(val) => { 
+                setActiveTab(val as 'cod' | 'installment' | 'all'); 
+                setCurrentPage(1); 
+              }} 
+              className="w-full"
+            >
+              <TabsList className="grid w-full grid-cols-3 max-w-lg">
+                <TabsTrigger value="cod">
+                  COD Orders ({codOrders.length})
+                </TabsTrigger>
+                <TabsTrigger value="installment">
+                  Installment / Lay-away ({installmentOrders.length})
+                </TabsTrigger>
+                <TabsTrigger value="all">
+                  All ({overdueUnpaidOrders.length})
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
         </CardHeader>
         <CardContent>
@@ -186,7 +238,7 @@ export default function UnpaidShippedOrdersPage() {
                   <TableCell className="text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
                 </TableRow>
               ))}
-              {overdueUnpaidOrders.map((order) => {
+              {paginatedOrders.map((order) => {
                 const daysSinceShipped = differenceInDays(new Date(), new Date(order.shippedAt));
                 return (
                   <TableRow key={order.id}>
@@ -203,7 +255,12 @@ export default function UnpaidShippedOrdersPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="font-normal">{order.paymentType || 'Unknown'}</Badge>
+                      <Badge 
+                        variant={order.paymentType === 'Installment' || order.paymentType === 'Lay-away' ? 'secondary' : 'outline'} 
+                        className="font-normal"
+                      >
+                        {order.paymentType || 'Unknown'}
+                      </Badge>
                     </TableCell>
                     <TableCell>{format(new Date(order.shippedAt), 'PPP')}</TableCell>
                     <TableCell>
@@ -218,12 +275,48 @@ export default function UnpaidShippedOrdersPage() {
               })}
             </TableBody>
           </Table>
-          {!isLoading && overdueUnpaidOrders.length === 0 && (
+
+          {!isLoading && activeOrders.length === 0 && (
             <div className="flex flex-col items-center justify-center text-center border-2 border-dashed rounded-lg p-12 mt-4">
-              <p className="text-lg font-semibold">No Overdue Unpaid Shipments</p>
-              <p className="text-muted-foreground mt-2">
-                All shipped orders have been paid, or none are overdue by {OVERDUE_DAYS_THRESHOLD}+ days.
+              <p className="text-lg font-semibold">
+                {activeTab === 'cod' ? 'No Overdue Unpaid COD Shipments' : activeTab === 'installment' ? 'No Overdue Installment Shipments' : 'No Overdue Unpaid Shipments'}
               </p>
+              <p className="text-muted-foreground mt-2">
+                {activeTab === 'cod'
+                  ? 'All COD shipped orders have been reconciled with courier remittances.'
+                  : activeTab === 'installment'
+                  ? 'No installment accounts are currently overdue.'
+                  : `All shipped orders have been paid, or none are overdue by ${OVERDUE_DAYS_THRESHOLD}+ days.`}
+              </p>
+            </div>
+          )}
+
+          {!isLoading && activeOrders.length > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between border-t p-4 mt-4 gap-4">
+              <div className="text-sm text-muted-foreground">
+                Showing {(currentPage - 1) * itemsPerPage + 1}–{Math.min(currentPage * itemsPerPage, activeOrders.length)} of {activeOrders.length} records
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage <= 1}
+                >
+                  Previous
+                </Button>
+                <div className="text-sm font-medium mx-2">
+                  Page {currentPage} of {totalPages}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage >= totalPages}
+                >
+                  Next
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>
