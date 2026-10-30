@@ -3,6 +3,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useSupabase } from '@/lib/supabase/hooks';
 import ExcelJS from 'exceljs';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { openCasesForCourierReturns } from '@/hooks/useCustomerReturns';
 
 export type SyncCategory = 'success' | 'already_updated' | 'partial_match' | 'not_found' | 'error';
 
@@ -133,6 +134,8 @@ export function useCourierSync() {
 
       const syncResults: SyncResult[] = [];
       const updatePromises: PromiseLike<any>[] = [];
+      // Orders the courier just sent back: each gets a customer return case.
+      const newlyReturnedIds: string[] = [];
 
       worksheet.eachRow((row, rowNumber) => {
         if (rowNumber <= headerRowNumber) return;
@@ -266,6 +269,7 @@ export function useCourierSync() {
                         message: error.message
                     });
                 } else {
+                    if (systemStatus === 'Returned' && matchedOrder.status !== 'Returned') newlyReturnedIds.push(matchedOrder.id);
                     syncResults.push({
                         orderId: matchedOrder.id.substring(0,7).toUpperCase(),
                         trackingNumber: newTracking,
@@ -281,6 +285,13 @@ export function useCourierSync() {
       });
 
       await Promise.all(updatePromises);
+
+      let casesOpened = 0;
+      try {
+        casesOpened = await openCasesForCourierReturns(newlyReturnedIds);
+      } catch (e) {
+        console.error('Could not open return cases for courier returns:', e);
+      }
       
       setResults(syncResults);
       
@@ -289,7 +300,7 @@ export function useCourierSync() {
       
       toast({
         title: 'Courier Sync Complete',
-        description: `Successfully updated ${successes} records. ${alreadyUpdated} were already up to date.`,
+        description: `Successfully updated ${successes} records. ${alreadyUpdated} were already up to date.${casesOpened ? ` ${casesOpened} return case(s) opened for parcels coming back.` : ''}`,
       });
 
     } catch (err: any) {

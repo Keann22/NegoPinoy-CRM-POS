@@ -23,7 +23,8 @@ import { SetDueDateDialog } from '@/components/dashboard/set-due-date-dialog';
 import { MarkShippedDialog } from '@/components/dashboard/mark-shipped-dialog';
 import { WaybillSummaryDialog } from '@/components/dashboard/waybill-summary-dialog';
 import { OnHoldReasonDialog } from '@/components/dashboard/on-hold-reason-dialog';
-import { ProcessReturnDialog } from '@/components/dashboard/process-return-dialog';
+import { OpenReturnDialog } from '@/components/dashboard/customer-returns/open-return-dialog';
+import type { CustomerReturnSource } from '@/types/customer-returns.types';
 
 import { OrdersFilterBar } from '@/components/dashboard/orders/OrdersFilterBar';
 import { OrdersTable } from '@/components/dashboard/orders/OrdersTable';
@@ -60,7 +61,7 @@ export default function OrdersPage() {
   const [markShippedOrder, setMarkShippedOrder] = useState<Order | null>(null);
   const [viewWaybillOrder, setViewWaybillOrder] = useState<Order | null>(null);
   const [onHoldOrder, setOnHoldOrder] = useState<Order | null>(null);
-  const [processReturnOrder, setProcessReturnOrder] = useState<Order | null>(null);
+  const [processReturnOrder, setProcessReturnOrder] = useState<{ order: Order; source: CustomerReturnSource } | null>(null);
 
   // ── Filter/selection state ─────────────────────────────────────────────────
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
@@ -182,11 +183,12 @@ export default function OrdersPage() {
         onSuccess={() => refetch()}
       />
 
-      <ProcessReturnDialog
+      <OpenReturnDialog
         open={!!processReturnOrder}
         onOpenChange={(open) => !open && setProcessReturnOrder(null)}
-        order={processReturnOrder}
-        onSuccess={() => refetch()}
+        order={processReturnOrder?.order ?? null}
+        defaultSource={processReturnOrder?.source}
+        onOpened={() => refetch()}
       />
 
       <Card>
@@ -242,12 +244,12 @@ export default function OrdersPage() {
                 if (order) setOnHoldOrder(order);
               } else if (newStatus === 'Returned') {
                 const order = orders?.find(o => o.id === id);
-                if (order) setProcessReturnOrder(order);
+                if (order) setProcessReturnOrder({ order, source: 'rts' });
               } else {
                 handleStatusChange(id, newStatus);
               }
             }}
-            onProcessReturn={setProcessReturnOrder}
+            onProcessReturn={(order) => setProcessReturnOrder({ order, source: 'damage_report' })}
             isInventoryOnly={isInventoryOnly}
             canCreateOrder={canCreateOrder}
             isAdminOrOwner={isAdminOrOwner}

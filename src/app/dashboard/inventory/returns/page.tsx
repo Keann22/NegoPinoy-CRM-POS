@@ -1,112 +1,102 @@
 'use client';
 
-import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
-import { format } from 'date-fns';
+import { useMemo, useState } from 'react';
+import { Loader2, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useCustomerReturns } from '@/hooks/useCustomerReturns';
+import { CustomerReturnCard, type CustomerReturnDialogKind } from '@/components/dashboard/customer-returns/customer-return-card';
+import { DecideReturnDialog } from '@/components/dashboard/customer-returns/decide-return-dialog';
+import { CheckReturnDialog } from '@/components/dashboard/customer-returns/check-return-dialog';
+import { OutcomeDoneDialog } from '@/components/dashboard/customer-returns/outcome-done-dialog';
+import { OldReturnsLog } from '@/components/dashboard/customer-returns/old-returns-log';
+import { CR_STAGE_LABELS, type CustomerReturn, type CustomerReturnStage } from '@/types/customer-returns.types';
 
-type ReturnRecord = {
-  id: string;
-  order_id: string;
-  product_name: string | null;
-  quantity: number;
-  return_type: 'restock' | 'exchange' | 'writeoff';
-  reason_code: string | null;
-  notes: string | null;
-  processed_by: string | null;
-  created_at: string;
+const TABS: CustomerReturnStage[] = ['needs_owner', 'to_check', 'to_do', 'waiting_parcel', 'done'];
+
+const EMPTY: Record<CustomerReturnStage, string> = {
+  needs_owner: 'Nothing waiting on the owners.',
+  to_check: 'No returned parcels to check.',
+  to_do: 'Nothing to re-ship, send or refund.',
+  waiting_parcel: 'No parcels on the way back.',
+  done: 'No cases closed in the last 60 days.',
 };
 
-const TYPE_LABEL: Record<ReturnRecord['return_type'], string> = {
-  restock: 'Restock',
-  exchange: 'Exchange',
-  writeoff: 'Write-off',
-};
+// Customer returns: RTS parcels, damage reports and items shipped back. Cases
+// are opened from an order (Orders → Process Return) or automatically by
+// courier sync. See architecture.md "Planned: Customer Returns".
+export default function CustomerReturnsPage() {
+  const { data, isLoading, error, refresh, act } = useCustomerReturns();
+  const [dialog, setDialog] = useState<{ kind: CustomerReturnDialogKind; ret: CustomerReturn } | null>(null);
+  const isManagement = !!data?.isManagement;
 
-const TYPE_VARIANT: Record<ReturnRecord['return_type'], 'default' | 'secondary' | 'destructive'> = {
-  restock: 'default',
-  exchange: 'secondary',
-  writeoff: 'destructive',
-};
+  const groups = useMemo(() => {
+    const all = data?.returns || [];
+    const out = Object.fromEntries(TABS.map((t) => [t, [] as CustomerReturn[]])) as Record<CustomerReturnStage, CustomerReturn[]>;
+    all.forEach((r) => out[r.stage].push(r));
+    TABS.filter((t) => t !== 'done').forEach((t) =>
+      out[t].sort((a, b) => Number(b.isOverdue) - Number(a.isOverdue) || b.daysOpen - a.daysOpen));
+    return out;
+  }, [data]);
 
-export default function ReturnsPage() {
-  const [returns, setReturns] = useState<ReturnRecord[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const firstBusy = TABS.find((t) => t !== 'done' && groups[t].length > 0) || 'needs_owner';
+  const [tab, setTab] = useState<CustomerReturnStage | null>(null);
 
-  useEffect(() => {
-    fetch('/api/inventory/returns')
-      .then(res => res.json())
-      .then(data => setReturns(data.returns || []))
-      .catch(err => console.error('Error fetching returns:', err))
-      .finally(() => setIsLoading(false));
-  }, []);
+  const dialogFor = (kind: CustomerReturnDialogKind) => (dialog?.kind === kind ? dialog.ret : null);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="font-headline">Returns</CardTitle>
-        <CardDescription>
-          Every processed return, including exchanges and write-offs that don&apos;t appear in Inventory History since they don&apos;t change stock.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="border rounded-lg">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Order</TableHead>
-                <TableHead>Product</TableHead>
-                <TableHead>Quantity</TableHead>
-                <TableHead>Disposition</TableHead>
-                <TableHead>Reason</TableHead>
-                <TableHead>Notes</TableHead>
-                <TableHead>Processed By</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-10" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  </TableRow>
-                ))
-              ) : returns.length > 0 ? (
-                returns.map(r => (
-                  <TableRow key={r.id}>
-                    <TableCell className="whitespace-nowrap">{format(new Date(r.created_at), 'MMM d, yyyy h:mm a')}</TableCell>
-                    <TableCell className="font-mono text-xs">
-                      <Link href={`/dashboard/orders/${r.order_id}`} className="font-semibold text-primary hover:underline">
-                        #{r.order_id.slice(0, 7).toUpperCase()}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="font-medium">{r.product_name || 'Unknown Product'}</TableCell>
-                    <TableCell>{r.quantity}</TableCell>
-                    <TableCell><Badge variant={TYPE_VARIANT[r.return_type]}>{TYPE_LABEL[r.return_type]}</Badge></TableCell>
-                    <TableCell>{r.reason_code || '-'}</TableCell>
-                    <TableCell className="text-muted-foreground">{r.notes || '-'}</TableCell>
-                    <TableCell>{r.processed_by || '-'}</TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={8} className="h-24 text-center">No returns recorded yet.</TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+    <Card className="max-w-4xl mx-auto">
+      <CardContent className="space-y-4 pt-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold font-headline">Customer Returns</h1>
+            <p className="text-sm text-muted-foreground">
+              Parcels sent back, damage reports and items customers ship back. Open a case from the order (Process Return).
+            </p>
+          </div>
+          <Button variant="outline" size="icon" onClick={refresh} title="Refresh"><RefreshCw className="h-4 w-4" /></Button>
         </div>
+
+        {isLoading ? (
+          <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>
+        ) : error ? (
+          <p className="text-sm text-destructive">{error}</p>
+        ) : (
+          <Tabs value={tab || firstBusy} onValueChange={(v) => setTab(v as CustomerReturnStage)}>
+            <TabsList className="flex h-auto w-full flex-wrap justify-start">
+              {TABS.map((t) => {
+                const late = groups[t].filter((r) => r.isOverdue).length;
+                return (
+                  <TabsTrigger key={t} value={t} className={late ? 'text-red-600' : ''}>
+                    {CR_STAGE_LABELS[t]} ({groups[t].length}{late ? `, ${late} late` : ''})
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+            {TABS.map((t) => (
+              <TabsContent key={t} value={t} className="mt-3">
+                {groups[t].length === 0 ? (
+                  <p className="py-10 text-center text-sm text-muted-foreground">{EMPTY[t]}</p>
+                ) : (
+                  <div className="space-y-2">
+                    {groups[t].map((r) => (
+                      <CustomerReturnCard key={r.id} ret={r} isManagement={isManagement} onAct={act}
+                        onDialog={(kind, ret) => setDialog({ kind, ret })} />
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+            ))}
+          </Tabs>
+        )}
+
+        <OldReturnsLog />
       </CardContent>
+
+      <DecideReturnDialog ret={dialogFor('decide')} onClose={() => setDialog(null)} onSubmit={act} />
+      <CheckReturnDialog ret={dialogFor('check')} onClose={() => setDialog(null)} onSubmit={act} />
+      <OutcomeDoneDialog ret={dialogFor('done')} onClose={() => setDialog(null)} onSubmit={act} />
     </Card>
   );
 }

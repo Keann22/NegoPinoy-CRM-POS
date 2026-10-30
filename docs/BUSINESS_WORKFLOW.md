@@ -127,6 +127,53 @@ the Inventory List). Design and later phases: architecture.md, "Supplier Returns
 - Everyone should see what's waiting, but staff must not see supplier names or
   costs (see "Confidential" above).
 
+## Customer returns (owner, 2026-10-30; phase 1 built)
+
+Page: Inventory Management → **Returns**. Open a case from the order (Orders →
+Process Return, or set the status to Returned); courier sync opens one for every
+parcel it marks Returned. Design and later phases: architecture.md, "Customer Returns".
+
+How returns reach us:
+
+1. **Courier sends the parcel back (RTS):** failed delivery or rejected by the
+   recipient.
+2. **Customer reports damage** on Facebook, usually with a photo. The item may
+   or may not come back.
+3. **Customer ships the damaged item back** to the warehouse.
+
+(No walk-in returns.)
+
+What happens to an RTS parcel **depends**: staff open it and **check every
+item for damage**. Then either the order is **re-shipped**, or the customer
+cancels and the good pieces **go back on the shelf**.
+
+What the customer can get: a **replacement shipped**, a **full refund**, a
+**partial refund / discount** (they keep the item), or **store credit**. The
+**owners decide**; staff then do the work (check, re-ship, pack the
+replacement).
+
+The owners also decide **whether to ask for the damaged item back**. Often the
+customer reports damage and we **don't ask for it back**: we give a discount /
+partial refund, or just send a replacement. Sometimes we ask the customer to
+ship it back first. So a replacement can be with or without a return.
+
+The damaged piece: **thrown away** (our loss), **sold cheaper as 2nd-hand**, or
+it **never comes back** (customer keeps or throws it). Damaged items from
+customers are **never** returned to the supplier.
+
+When the courier damaged it, the owners **sometimes file a claim** with the
+courier (e.g. SPX), so whether the courier paid needs tracking.
+
+Why nothing happened before return cases (2026-10-30):
+
+- Staff **put items back in stock even when they are no longer okay**, so
+  damaged pieces can end up on the shelf and be picked again.
+- Staff are **waiting on the owners** to say replace or refund, and nobody
+  tells them.
+- There is **no place in the app** listing open returns, so they are forgotten.
+  (The old "Process return" button only logs a row; 40 of 44 uses were
+  "exchange", which does nothing.)
+
 ## Being decided (not built yet)
 
 - Blind counting: staff see product names only, not bought quantities; the

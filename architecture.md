@@ -443,6 +443,39 @@ Original plan (all phases built):
 
 **Phases**: (1) records, Supplier Returns page, shelf "Report damaged", owner stages and outcomes, per-supplier days; (2) picker Damaged mark, Receiving replacements, Procurement incoming chip, Priority List; (3) owners' bring-back list, Shopee in-app return stage, Pinduoduo discount shortcut.
 
+### Customer Returns (owner, 2026-10-30; phase 1 BUILT, phases 2-3 planned)
+
+Owner rules: `docs/BUSINESS_WORKFLOW.md` → "Customer returns". Separate from Supplier Returns: customer-damaged pieces never go back to the supplier.
+
+**Phase 1 built 2026-10-30** (`scripts/migrations/2026-10-30_customer_returns.sql`): tables `customer_returns` (`status` open/closed; stage is computed, not stored), `customer_return_items` (`good_qty` / `damaged_qty` / `damaged_action`), `customer_return_events`; public storage bucket `customer-returns` for damage photos (uploaded via the API, not confidential). RLS on, no policies: server only. Services in `src/lib/services/customer-returns/` (`customer-return-service.ts`: stage, list, open, courier auto-open, owner/agent bell alerts; `customer-return-actions.ts`: decide, arrived, check, damaged action, outcome done, add photos, cancel case; `customer-return-caller.ts`: roles incl. sales). API `/api/inventory/customer-returns` (GET list or `?orderId=` lines, POST open or `{action:'courier_rts'}`, PATCH actions) and `/photo`. Hook `useCustomerReturns`, page `/dashboard/inventory/returns` (menu: Inventory Management → Returns), components in `src/components/dashboard/customer-returns/`. Orders page: status → Returned opens an RTS case, "Process Return" opens a damage report. Courier sync opens an RTS case for each order it newly sets to Returned. The old `ProcessReturnDialog` and the old returns POST (restock without a check) were removed; the old `returns` rows show read-only at the bottom of the page.
+- **Stage** (`computeStage`): to_check (arrived, not checked) → needs_owner (undecided, or checked damaged pieces without an action) → to_do (outcome step can run now) → waiting_parcel → done (auto-closes). Overdue: needs_owner/to_check > 1 day, to_do > 2, waiting_parcel > 14.
+- **Stock**: good pieces restock once (`restocked_at` claimed first) after BOTH check and decision, unless re-ship; `increment_stock` + movement `return` (mirrored to `shelf_stock`); bundles go back as parts. Order goes to Returned (RTS open, cancel_order, full refund done), For Shipping (re-ship done); never Cancelled.
+- Updates are guarded on `updated_at`, so a double tap applies once. The decision can change until something is carried out.
+
+**Before phase 1**: `returns` table + `ProcessReturnDialog` (Orders page) + `/dashboard/inventory/returns` log. `restock` added stock with no check, `exchange` and `writeoff` only logged a row (40 of 44 uses were "exchange"). `useCourierSync` set orders to `Returned` and nothing happened after that.
+
+Original plan:
+
+**One case per order problem** (`customer_returns` + `customer_return_items` + events timeline). Source: RTS / damage reported / customer shipping back. Photo(s), items and qty, what happened (damaged in transit, defective, wrong item, rejected, customer cancelled). Whether the item comes back is the owner's call (below), except RTS, which is always coming back.
+
+| Step | Who | What |
+|---|---|---|
+| **Opened** | Anyone (agent from the order, staff); auto when courier sync sets `Returned` | Case appears on the open list; owners get a bell alert |
+| **Owner decides** (one tap on the phone) | Owners | Re-ship / Send replacement / Full refund / Partial refund (amount) / Store credit (amount, via existing carry-over credit) / Cancel order, **plus "Ask for it back?" yes/no** (default no for damage reports; partial refund is always no, customer keeps it). Optional "Claim from courier" |
+| **Waiting for parcel** | — | Only when the owner asked for it back (or RTS); days counted. A replacement can ship now or wait until the item arrives (owner picks) |
+| **Check on arrival** (required) | Staff | Each piece: **Good** or **Damaged** (photo). No other way to put a returned piece back in stock |
+| **Do the outcome** | Staff / owners | Re-ship → order back to For Shipping, new tracking. Replacement → linked ₱0 order through normal pick/pack. Refund / credit → owner marks sent |
+| **Damaged piece** | Owners | Throw away (write-off, loss) or Sell as 2nd-hand. "Never came back" when the customer keeps it |
+| **Closed** | — | When the outcome is done and every damaged piece has a decision |
+
+**Stock**: Good piece → back on the shelf (`stock_level` and `shelf_stock` up, mirrored movement type e.g. `customer_return`, consistent with "a return arriving back raises unallocated"). Damaged piece → never on the shelf; held as "returned damaged" until the owner picks throw away / 2nd-hand. Re-ship of an unopened good parcel → no stock movement. Replacement → normal order deduction and pick.
+
+**Open list** (everyone): tabs Needs owner / Waiting for parcel / To check / To do / Done, days open, red when overdue. Owner-decision and to-check cases also go on the Priority List.
+
+**Phases**: (1) cases, owner decision, required Good/Damaged check, open list, auto case from courier `Returned`, owner bell; replace the old Process return dialog. (2) linked replacement orders, refund/credit tied to accounting, Priority List, overdue timers. (3) courier claim tracking (filed / paid amount), 2nd-hand selling, loss report.
+
+**Open questions**: how refunds are paid and recorded; how 2nd-hand items are sold (own SKU or sale price); who pays the return shipping.
+
 ### Order Stock Deduction: at Creation Only (corrected 2026-10-14)
 
 `products.stock_level` is **Available (Unreserved) Stock** = physical shelf − unpicked reservations (see "Physical Shelf Count Audits" above). The `process_order_transaction` RPC deducts stock **when the order is created**, and order edits (`editOrder`) reverse and re-deduct on that same assumption.
