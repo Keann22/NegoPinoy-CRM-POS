@@ -361,6 +361,50 @@ Real case: order #101D2B3A was `Picked (with issue)` with the GREEN hanger OS. O
 
 **Guardian no longer closes these (fixed 2026-10-30):** a shelf count above 0 used to resolve every open issue for the product, so unpicked pieces counted as picked. See rule 5 under "Physical Shelf Count Audits". These marks are also kept out of the Guardian's Floor Shortage alerts (they need picking, not counting) but still count as unpicked demand in its negative-stock check; they are recognised by the note text (`ADDED_AFTER_PICKING_NOTE` in `order-issues-service.ts`).
 
+### Planned: Stored Shelf Stock and Physical Stock (owner direction, 2026-10-30, NOT BUILT)
+
+Owner rules: `docs/BUSINESS_WORKFLOW.md` → "Planned: unallocated stock is kept and counted, not calculated". Nothing below exists in code yet; build only after the owner approves this plan.
+
+**Why:** `stock_level` moves on order creation, edits and cancellations while nothing physical moves, and every bug in those paths lands in it (hanger case, Oct 8 double deduction). Staff count the shelf (Guardian: 3 staff × 5 products a day), so the shelf count should be the number the system keeps. Each count then fixes that product for good, with no formula in between.
+
+**The model**
+
+| Event | Unallocated (shelf, stored) | Physical (computed) |
+|---|---|---|
+| Purchase received (Bulk Receive, Snap receipt, online order) | + qty | + |
+| Return arrives back at the warehouse (staff confirm) | + qty | + |
+| Picker taps Found and submits | − picked qty | no change (shelf → packing area) |
+| Picked order cancelled, or picked items removed by an edit (no returns area; pieces go straight back on the shelf) | + qty | no change |
+| Order leaves (Shipped, Completed, Payment Received (COD), Delivered) | no change | − |
+| Guardian count / Edit Unallocated Stock | set to the count | follows |
+| Order created, edited or cancelled while **unpicked** | no change | no change |
+
+Calculated from it:
+- **Physical** = unallocated + pieces on orders in `Picked`, `Photo`, `Packed`, `For Shipping`, `For Pick-up`, plus the found (non-OS) lines on `Picked (with issue)`.
+- **Need to buy** = qty on unpicked orders (incl. open OS qty) − unallocated, when positive.
+- **Free to sell** = unallocated − qty on unpicked orders. This equals today's `stock_level`, so the website shop and reports can read it as a computed value during and after the move.
+
+**Cases that must be handled or the number drifts**
+1. **Status jumps past picking** (Orders page moves an order from Processing straight to Packed/Shipped, or any path that skips the picker): treat as picked and deduct then.
+2. **Picked, then cancelled, or a picked line removed/reduced by `editOrder`**: add back to unallocated (pieces return to the shelf). OS lines were never picked: no change.
+3. **Packed order reverted to pending** (existing "revert packed order" action): the pieces go back on the shelf, so add back; the order is unpicked again.
+4. **Bundles**: picking a bundle line deducts its components (`qty × recipe qty`).
+5. **Picker marks OS**: no deduction; when they later tap Found on a `Picked (with issue)` re-pick, deduct then.
+6. **Items added after picking** (`flagItemsAddedAfterPicking`): unpicked, so no change until a picker finds them.
+7. **Receipt corrections / undo** (Bulk Receive "Received today"): reverse the + they made.
+8. **Borrowed stock** (Guardian `markStockAsBorrowed`): its own − and + when returned.
+9. **Returns**: `useCourierSync` sets `Returned` automatically when the courier reports RTS, but the parcel is not back yet. Add to unallocated only when staff confirm it arrived (new "received back" step); today returns never come back into stock.
+10. **Walk-in / POS sale handed over on the spot** (if any): counts as picked.
+11. **Double-submits**: every + / − must be idempotent per order line (the picker submit and edit save can run twice; see the duplicate-mark fix 514ff7a).
+
+**Rollout (parallel run, because of the Oct 8 lesson)**
+1. Add a stored column (e.g. `products.shelf_stock`) and a movement log for it. Start it at today's locked-formula unallocated value. Products whose formula value is negative-clamped start at 0 and go on a count list.
+2. Write the events in the table above to `shelf_stock` only. `stock_level`, `process_order_transaction` and every screen keep working exactly as today.
+3. Run both for about two weeks. A daily check compares `shelf_stock` with `max(0, stock_level + unpicked)` per product; any difference is a missed event or a bad count, and the cause gets fixed.
+4. Switch screens (Procurement Sheet, Inventory List, Guardian, Stock Breakdown pop-up) to `shelf_stock`; the pop-up shows **On the shelf → Picked → Packed → Physical (total)** and drops the duplicate "Physical Shelf Count" card.
+5. Update the LOCKED section: the meaning ("on the shelf, ready to pick") stays; how it is kept changes from calculated to stored and counted. The owner set this direction on 2026-10-30, but the switch still needs the owner's explicit OK, as does each build step.
+6. Later: blind counting (staff don't see `shelf_stock`; the Guardian asks for a recount on a big difference).
+
 ### Order Stock Deduction: at Creation Only (corrected 2026-10-14)
 
 `products.stock_level` is **Available (Unreserved) Stock** = physical shelf − unpicked reservations (see "Physical Shelf Count Audits" above). The `process_order_transaction` RPC deducts stock **when the order is created**, and order edits (`editOrder`) reverse and re-deduct on that same assumption.

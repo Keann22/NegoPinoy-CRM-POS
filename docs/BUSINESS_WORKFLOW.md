@@ -86,6 +86,27 @@ Receipts:
 - The receipt still gets checked on **Purchases & Receipts** (admin only):
   scan each supplier's receipt against what was received.
 
+## Planned: unallocated stock is kept and counted, not calculated (owner, 2026-10-30)
+
+Not built yet. Owner's direction; design and rollout in architecture.md,
+"Planned: Stored Shelf Stock and Physical Stock".
+
+- **What staff count is unallocated stock** (the Guardian asks three staff to
+  count 5 products a day). So unallocated stock is the number the system keeps,
+  and a count simply corrects it, one product at a time.
+- It goes **up** when goods are received (purchases) or a return arrives back.
+- It goes **down only when a picker picks the item** (taps Found).
+- Sales orders, edits and cancellations of **unpicked** items do not change it.
+- **No returns area:** when a picked order is cancelled, or picked items are
+  removed from an order, the pieces go straight back on the shelf, so they are
+  added back to unallocated stock.
+- **Physical stock = unallocated stock + everything else still in the
+  warehouse** (picked, photo check, packed, waiting for the courier or for
+  pick-up). It drops when the courier or customer takes the order.
+- System stock (today's `stock_level`) is unstable because orders move it while
+  nothing physical moves. It stays only as a calculated "free to sell" number
+  (unallocated − orders not picked yet).
+
 ## Being decided (not built yet)
 
 - Blind counting: staff see product names only, not bought quantities; the
