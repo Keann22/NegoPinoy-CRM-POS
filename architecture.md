@@ -348,6 +348,16 @@ Orders in `Picked`, `Photo`, `Packed`, `For Shipping`, `For Pick-up` are off the
 
 **Not changed by this:** order creation, Need to Buy, Total Open Demand, and the "+N lay-away" badge (still shown for information; those units are already inside the unallocated number).
 
+#### Items added to an already-picked order (fixed 2026-10-30)
+
+On an order in `Picked`, `Picked (with issue)`, `Photo`, `Packed`, `For Shipping` or `For Pick-up`, every line **without an open issue** is treated as picked. Sales often adds items to an order after it was picked (accumulating / lay-away style orders). Those added pieces were never picked, but had no issue, so the shelf formula, Need to Buy and Guardian shelf counts all treated them as already off the shelf.
+
+Real case: order #101D2B3A was `Picked (with issue)` with the GREEN hanger OS. On Oct 20 sales swapped it for 2 VIOLET hangers. On Oct 21 Jas counted 0 on the shelf, and because the violet hangers looked "picked", stock was saved as 0 instead of −2. When the picker marked them OS on Oct 30, unallocated showed 2 phantom pieces. Stock was corrected to −2 on 2026-10-30 (Guardian memory, actor "System fix (Claude)").
+
+**Fix** (`flagItemsAddedAfterPicking` in `order-issues-service.ts`, called at the end of `editOrder`): when an edit raises a product's qty on an order in one of those statuses, an open `order_issue` is created for the added qty (bundles on their components; added onto an existing open issue for the same product). If the order was not already `Picked (with issue)`, it is moved there so the warehouse picks the new pieces. It runs **after** the status-based auto-resolve, which would otherwise close these issues straight away. The picker pre-fills open issues as OS, so the picker switches the line to Found once they pick it.
+
+**Not backfilled yet:** a scan on 2026-10-30 found 73 lines on 25 orders added after their last pick with no open issue (e.g. #0735DFF5: picked with 7 items, now 22). Until those are flagged, their pieces are missing from unallocated and Need to Buy.
+
 ### Order Stock Deduction: at Creation Only (corrected 2026-10-14)
 
 `products.stock_level` is **Available (Unreserved) Stock** = physical shelf − unpicked reservations (see "Physical Shelf Count Audits" above). The `process_order_transaction` RPC deducts stock **when the order is created**, and order edits (`editOrder`) reverse and re-deduct on that same assumption.

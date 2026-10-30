@@ -147,3 +147,108 @@ export async function createOnHoldIssue(
     }
   }
 }
+
+/**
+ * Statuses where a picker has already gone through the order. Lines on these
+ * orders without an open issue are treated as picked everywhere (unallocated
+ * stock, Need to Buy, Guardian shelf counts).
+ */
+export const STATUSES_AFTER_PICKING: string[] = [
+  'Picked', 'Picked (with issue)', 'Photo', 'Packed', 'For Shipping', 'For Pick-up',
+];
+
+type QtyLine = { productId: string; quantity: number };
+
+/**
+ * When an edit adds items (or raises a quantity) on an order that was already
+ * picked, the added pieces were never picked. Without an open issue the system
+ * would treat them as picked (real case 2026-10-20: a hanger swapped onto a
+ * Picked (with issue) order, then a shelf count saved its stock 2 too high).
+ *
+ * Opens an issue for each added piece so they count as "not picked yet", and
+ * returns true if anything was flagged (the caller moves the order to
+ * Picked (with issue) so the warehouse picks them). Bundles are flagged on their
+ * components, the same way the picker reports bundle shortages.
+ */
+export async function flagItemsAddedAfterPicking(
+  supabase: SupabaseClient,
+  orderId: string,
+  originalItems: QtyLine[],
+  newItems: QtyLine[],
+  actorName: string
+): Promise<boolean> {
+  const sumByProduct = (items: QtyLine[]) => {
+    const m = new Map<string, number>();
+    items.forEach((i) => m.set(i.productId, (m.get(i.productId) || 0) + (Number(i.quantity) || 0)));
+    return m;
+  };
+  const before = sumByProduct(originalItems);
+  const added = new Map<string, number>();
+  sumByProduct(newItems).forEach((qty, productId) => {
+    const extra = qty - (before.get(productId) || 0);
+    if (extra > 0) added.set(productId, extra);
+  });
+  if (added.size === 0) return false;
+
+  // Explode bundles onto their components.
+  const { data: prods, error: prodErr } = await supabase
+    .from('products')
+    .select('id, name, assembly_recipe')
+    .in('id', Array.from(added.keys()));
+  if (prodErr) throw prodErr;
+  const perProduct = new Map<string, number>();
+  const addQty = (id: string, q: number) => perProduct.set(id, (perProduct.get(id) || 0) + q);
+  added.forEach((qty, productId) => {
+    const p = (prods || []).find((x: any) => x.id === productId);
+    const recipe = Array.isArray(p?.assembly_recipe) ? p.assembly_recipe : [];
+    if (recipe.length === 0) return addQty(productId, qty);
+    recipe.forEach((c: any) => {
+      const cId = c.productId || c.component_id;
+      if (cId) addQty(cId, qty * (Number(c.quantity) || 1));
+    });
+  });
+
+  // Add onto an issue that is already open for the same product, instead of a second one.
+  const { data: openIssues } = await supabase
+    .from('order_issues')
+    .select('id, product_id, out_of_stock_qty')
+    .eq('order_id', orderId)
+    .eq('status', 'open')
+    .in('product_id', Array.from(perProduct.keys()));
+
+  for (const [productId, qty] of Array.from(perProduct.entries())) {
+    const existing = (openIssues || []).find((i: any) => i.product_id === productId);
+    let issueId: string | null = null;
+    if (existing) {
+      const { error } = await supabase
+        .from('order_issues')
+        .update({ out_of_stock_qty: (Number(existing.out_of_stock_qty) || 0) + qty })
+        .eq('id', existing.id);
+      if (error) throw error;
+      issueId = existing.id;
+    } else {
+      const { data, error } = await supabase
+        .from('order_issues')
+        .insert({
+          order_id: orderId,
+          product_id: productId,
+          status: 'open',
+          reported_by_name: actorName,
+          out_of_stock_qty: qty,
+        })
+        .select('id')
+        .single();
+      if (error) throw error;
+      issueId = data?.id ?? null;
+    }
+    if (issueId) {
+      await supabase.from('order_issue_messages').insert({
+        issue_id: issueId,
+        sender_role: 'sales',
+        sender_name: actorName,
+        message: `${qty} pc(s) added to the order after it was picked. Not picked yet; please pick.`,
+      });
+    }
+  }
+  return true;
+}

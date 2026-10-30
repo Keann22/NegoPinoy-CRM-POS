@@ -4,7 +4,9 @@ import {
   STATUSES_THAT_CLEAR_ORDER_ISSUES,
   resolveOpenOrderIssues,
   resolveOrderIssuesForRemovedProducts,
-  createOnHoldIssue
+  createOnHoldIssue,
+  STATUSES_AFTER_PICKING,
+  flagItemsAddedAfterPicking
 } from '../order-issues-service';
 import { computeOrderTotals, saveOrderItemPriceTypes } from './order-utils';
 
@@ -300,6 +302,31 @@ export async function editOrder(
       await resolveOpenOrderIssues(supabase, context.orderId);
     } catch(e) {
       console.error("Failed to resolve open issues on edit:", e);
+    }
+  }
+
+  // -- Items added after picking were never picked: mark them so they get picked --
+  // Runs after the auto-resolve above, which would otherwise close these new issues.
+  if (STATUSES_AFTER_PICKING.includes(finalOrderStatus)) {
+    try {
+      const flagged = await flagItemsAddedAfterPicking(
+        supabase,
+        context.orderId,
+        context.originalOrderItems,
+        values.orderItems,
+        context.userProfileName
+      );
+      if (flagged && finalOrderStatus !== 'Picked (with issue)') {
+        await supabase.from('orders').update({ status: 'Picked (with issue)' }).eq('id', context.orderId);
+        await supabase.from('order_logs').insert({
+          order_id: context.orderId,
+          status: 'Picked (with issue)',
+          user_name: context.userProfileName,
+          snapshot_data: { reason: 'Items added after picking' },
+        });
+      }
+    } catch (e) {
+      console.error('Failed to flag items added after picking:', e);
     }
   }
 
