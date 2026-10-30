@@ -10,7 +10,7 @@ import { RemittanceResultsTabs } from '@/components/dashboard/accounting/remitta
 
 export default function SPXRemittancesPage() {
   const { userProfile } = useUserProfile();
-  const { loading, results, fileInputRef, handleRemittanceUpload } = useSPXRemittance();
+  const { loading, statusText, results, fileInputRef, handleRemittanceUpload } = useSPXRemittance();
 
   const isManagement = useMemo(() => {
     return userProfile?.roles?.some(r => ['Admin', 'Owner'].includes(r));
@@ -57,6 +57,11 @@ export default function SPXRemittancesPage() {
                 <Upload className="mr-2 h-4 w-4" />
                 {loading ? 'Processing...' : 'Upload Remittance File'}
               </Button>
+              {loading && statusText && (
+                <p className="text-xs text-muted-foreground mt-1.5 text-right font-medium animate-pulse">
+                  {statusText}
+                </p>
+              )}
             </div>
           </div>
         </CardHeader>

@@ -61,28 +61,41 @@ export default function UnpaidShippedOrdersPage() {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const { data: ordersData, error } = await supabase
-          .from('orders')
-          .select('id, total_amount, balance_due, order_date, created_at, shipped_at, customer_id, payment_method, status, tracking_number')
-          .gt('balance_due', 0)
-          .in('status', UNPAID_STATUSES)
-          .order('shipped_at', { ascending: true, nullsFirst: true });
+        const allOrdersData: any[] = [];
+        let page = 0;
+        const pageSize = 1000;
 
-        if (error) throw error;
+        while (true) {
+          const { data: chunk, error } = await supabase
+            .from('orders')
+            .select('id, total_amount, balance_due, order_date, created_at, shipped_at, customer_id, payment_method, status, tracking_number')
+            .gt('balance_due', 0)
+            .in('status', UNPAID_STATUSES)
+            .order('shipped_at', { ascending: true, nullsFirst: true })
+            .range(page * pageSize, (page + 1) * pageSize - 1);
 
-        const mapped = ordersData || [];
-        if (mapped.length === 0) { setOrders([]); return; }
+          if (error) throw error;
+          if (!chunk || chunk.length === 0) break;
+          allOrdersData.push(...chunk);
+          if (chunk.length < pageSize) break;
+          page++;
+        }
 
-        const customerIds = Array.from(new Set(mapped.map((o: any) => o.customer_id)));
-        const { data: customersData } = await supabase
-          .from('customers')
-          .select('id, full_name')
-          .in('id', customerIds);
+        if (allOrdersData.length === 0) { setOrders([]); return; }
 
+        const customerIds = Array.from(new Set(allOrdersData.map((o: any) => o.customer_id).filter(Boolean)));
         const customerMap = new Map<string, string>();
-        (customersData || []).forEach((c: any) => customerMap.set(c.id, c.full_name || 'Unknown Customer'));
 
-        setOrders(mapped
+        for (let i = 0; i < customerIds.length; i += 200) {
+          const batch = customerIds.slice(i, i + 200);
+          const { data: customersData } = await supabase
+            .from('customers')
+            .select('id, full_name')
+            .in('id', batch);
+          (customersData || []).forEach((c: any) => customerMap.set(c.id, c.full_name || 'Unknown Customer'));
+        }
+
+        setOrders(allOrdersData
           .filter((o: any) => o.shipped_at)
           .map((o: any) => ({
             id: o.id,
@@ -151,6 +164,7 @@ export default function UnpaidShippedOrdersPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Customer</TableHead>
+                <TableHead>Payment Method</TableHead>
                 <TableHead>Shipped Date</TableHead>
                 <TableHead>Days Since Shipped</TableHead>
                 <TableHead>Status</TableHead>
@@ -163,6 +177,7 @@ export default function UnpaidShippedOrdersPage() {
               {isLoading && Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i}>
                   <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-16" /></TableCell>
@@ -186,6 +201,9 @@ export default function UnpaidShippedOrdersPage() {
                           #{order.id.split('-')[0].toUpperCase()}
                         </Link>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="font-normal">{order.paymentType || 'Unknown'}</Badge>
                     </TableCell>
                     <TableCell>{format(new Date(order.shippedAt), 'PPP')}</TableCell>
                     <TableCell>

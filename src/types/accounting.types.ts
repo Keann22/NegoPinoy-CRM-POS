@@ -58,6 +58,17 @@ export type SpxRemittanceOrder = {
   codAmount: number;
 };
 
+export type RemittanceCategory = 'success' | 'already_paid' | 'not_found' | 'error';
+
+export type RemittanceResult = {
+  trackingNumber: string;
+  orderId?: string;
+  codAmount: number;
+  shippingFee: number;
+  category: RemittanceCategory;
+  message: string;
+};
+
 export type FinancialSummary = {
   totalRevenue: number;
   totalCost: number;
