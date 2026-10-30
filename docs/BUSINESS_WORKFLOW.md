@@ -107,6 +107,25 @@ Not built yet. Owner's direction; design and rollout in architecture.md,
   nothing physical moves. It stays only as a calculated "free to sell" number
   (unallocated − orders not picked yet).
 
+## Returns to suppliers (owner, 2026-10-30; being decided, not built)
+
+Design: architecture.md, "Planned: Supplier Returns".
+
+- Bad items are returned to suppliers often, and **suppliers are slow to
+  replace them**. Today nothing tracks what a supplier still owes.
+- **Most bad items are found by a picker or on the shelf**, less often while
+  unpacking or from customer returns.
+- **The owners take items back** to the supplier, mostly on buying trips.
+- **What the supplier gives back:** usually the **same item**. Sometimes a
+  **refund**. Sometimes a **partial refund**, when the item still works but
+  can't be sold, so we keep it. No vouchers or next-purchase discounts yet, but
+  they could happen.
+- **Shopee:** returned through the Shopee app. **Pinduoduo:** returns aren't
+  possible, so we only get a discount (we keep the item).
+- **"Waiting too long" is different per supplier.**
+- Everyone should see what's waiting, but staff must not see supplier names or
+  costs (see "Confidential" above).
+
 ## Being decided (not built yet)
 
 - Blind counting: staff see product names only, not bought quantities; the

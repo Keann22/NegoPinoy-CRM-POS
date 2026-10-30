@@ -405,6 +405,36 @@ Calculated from it:
 5. Update the LOCKED section: the meaning ("on the shelf, ready to pick") stays; how it is kept changes from calculated to stored and counted. The owner set this direction on 2026-10-30, but the switch still needs the owner's explicit OK, as does each build step.
 6. Later: blind counting (staff don't see `shelf_stock`; the Guardian asks for a recount on a big difference).
 
+### Planned: Supplier Returns (owner, 2026-10-30, NOT BUILT)
+
+Owner rules: `docs/BUSINESS_WORKFLOW.md` → "Returns to suppliers". Nothing below exists yet; nothing in the app tracks supplier returns today (damaged pieces can only be counted out with reason "Damaged Stock" in Edit Unallocated Stock, with no follow-up).
+
+**One record per bad batch** (product, qty, reason, photo, who found it, where: picker / shelf / unpacking / customer return), moving through stages:
+
+| Stage | Who | Stock effect |
+|---|---|---|
+| **To return** (set aside) | Anyone | Off the shelf (not pickable); still in the warehouse |
+| **With supplier** (handed back; waiting clock starts) | Owners | Leaves the warehouse |
+| **Return requested in app** (Shopee only) | Owners | Leaves when shipped back |
+| **Closed: replaced** (full or partial qty; the rest stays open) | Staff receive it on Receiving | Replacement goes on the shelf |
+| **Closed: refunded** | Owners | None (item already gone) |
+| **Closed: partial refund / discount, we keep the item** (usable, not sellable; Pinduoduo always ends here) | Owners | Item stays out of sellable stock (written off) |
+| **Closed: voucher / credit** (not seen yet, allowed) | Owners | None |
+
+**Screens**
+1. **Supplier Returns page** for everyone: tabs To return / Waiting / Done, days waiting, overdue in red, "customer waiting" flag. **Staff see product, qty, reason, days and "Purchase #" only**; owners also see supplier, cost, amount owed per supplier and per-supplier totals ("3 returns, ₱4,200, oldest 18 days").
+2. **Picker: a third mark "Damaged"** next to Found / OS (`usePickMarks`): the piece is set aside and logged To return; the order line stays unpicked (like OS) so a good piece gets picked or bought.
+3. **Shelf: "Report damaged"** on the Inventory List / Guardian count (most bad items are found by pickers or on the shelf).
+4. **Owners' phone "bring back" list per supplier**: what to take on the next buying trip; tick "handed back" in seconds.
+5. **Receiving**: open replacements appear as "Replacement for return #N" so staff can receive them (receipt-first rule).
+6. **Procurement Sheet**: replacements still owed show as incoming (like the online in-transit chip) so nobody buys twice; still buyable when a customer can't wait. Customer-blocking returns go on the Priority List.
+
+**Supplier link**: Divisoria receipts often have no supplier name, so the record suggests a supplier from the product's purchases (`supplier_pricing`, purchase receipts) and the owner confirms or picks it when handing back. Per-supplier waiting limit: new admin-only setting on `suppliers` (e.g. `replacement_days`, default 7).
+
+**Stock**: set aside → `stock_level` and `shelf_stock` both drop via a new mirrored `inventory_movements` type (e.g. `supplier_return`), keeping the parallel run aligned; the physical breakdown gets a "Set aside to return" bucket until handed back. Replacements come in as normal receipts (`RESTOCK`, already mirrored).
+
+**Phases**: (1) records, Supplier Returns page, shelf "Report damaged", owner stages and outcomes, per-supplier days; (2) picker Damaged mark, Receiving replacements, Procurement incoming chip, Priority List; (3) owners' bring-back list, Shopee in-app return stage, Pinduoduo discount shortcut.
+
 ### Order Stock Deduction: at Creation Only (corrected 2026-10-14)
 
 `products.stock_level` is **Available (Unreserved) Stock** = physical shelf − unpicked reservations (see "Physical Shelf Count Audits" above). The `process_order_transaction` RPC deducts stock **when the order is created**, and order edits (`editOrder`) reverse and re-deduct on that same assumption.
