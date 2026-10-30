@@ -373,6 +373,22 @@ async function recordUnexpectedReceipt(
     return recordDraftReceipt(supabase, movement, supplierId, unitCost, boughtQty);
   }
 
+  await createPurchaseForReceipt(supabase, movement, supplierId, unitCost, boughtQty, RECORDED_REASON);
+}
+
+/**
+ * Put a received line on a new PO dated to the receipt, and push the cost and
+ * supplier everywhere a normal buy puts them. Stock is not touched.
+ */
+async function createPurchaseForReceipt(
+  supabase: SupabaseClient,
+  movement: { id: string; product_id: string; quantity_change: number; timestamp: string },
+  supplierId: string | null,
+  unitCost: number,
+  boughtQty: number | null,
+  newReason: string,
+) {
+  const movementId = movement.id;
   const qty = Number(movement.quantity_change) || 0;
   if (!(qty > 0)) throw new Error('This receipt has no quantity to record.');
   const expected = boughtQty ?? qty;
@@ -396,7 +412,7 @@ async function recordUnexpectedReceipt(
 
   await supabase
     .from('inventory_movements')
-    .update({ unit_cost: unitCost, supplier_name: supplierName, reason: RECORDED_REASON })
+    .update({ unit_cost: unitCost, supplier_name: supplierName, reason: newReason })
     .eq('id', movementId);
   // Separate, best-effort: lets an admin's later receipt correction keep this
   // line's received qty in step. Kept apart so a missing column can't block the
@@ -425,7 +441,7 @@ export const recordReceiptAsPurchase = recordUnexpectedReceipt;
  */
 async function recordDraftReceipt(
   supabase: SupabaseClient,
-  movement: { id: string; product_id: string; timestamp: string; reason: string | null },
+  movement: { id: string; product_id: string; quantity_change: number; timestamp: string; reason: string | null },
   supplierId: string | null,
   unitCost: number,
   boughtQty: number | null,
@@ -444,7 +460,13 @@ async function recordDraftReceipt(
     .limit(1);
   if (error) throw error;
   if (!drafts || drafts.length === 0) {
-    throw new Error('Could not find the staff request this was received against. Record it from Reports → Purchases instead.');
+    // The line it was received against is gone (removed after receiving), so
+    // record a fresh purchase for it. Keep the receipt's own note.
+    await createPurchaseForReceipt(
+      supabase, movement, supplierId, unitCost, boughtQty,
+      `${movement.reason || 'Received from PO'}${CONFIRMED_SUFFIX}`,
+    );
+    return;
   }
 
   await repairFromPurchaseItem(supabase, drafts[0].id, supplierId, unitCost, null, movement.timestamp);
