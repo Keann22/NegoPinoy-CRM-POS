@@ -19,11 +19,13 @@ interface Props {
   /** Pre-filled product (e.g. from the Inventory List). Omit to pick one. */
   product?: { id: string; name: string } | null;
   defaultFoundAt?: SupplierReturnFoundAt;
+  /** Extra next-step line shown in the form and the saved message (e.g. for pickers). */
+  hint?: string;
   onReported?: () => void;
 }
 
 /** Set damaged pieces aside to return to the supplier. Takes them off the shelf count. */
-export function ReportDamagedDialog({ open, onClose, product, defaultFoundAt = 'shelf', onReported }: Props) {
+export function ReportDamagedDialog({ open, onClose, product, defaultFoundAt = 'shelf', hint, onReported }: Props) {
   const { toast } = useToast();
   const [picked, setPicked] = useState<{ id: string; name: string } | null>(null);
   const [qty, setQty] = useState('1');
@@ -51,7 +53,7 @@ export function ReportDamagedDialog({ open, onClose, product, defaultFoundAt = '
       const out = await reportDamagedItem({ productId: picked.id, qty: qtyNum, reason, foundAt, notes });
       toast({
         title: `Return #${out.returnNo} recorded`,
-        description: `${qtyNum} × ${picked.name} set aside. Keep it in the returns pile for the owners.`,
+        description: `${qtyNum} × ${picked.name} set aside. Keep it in the returns pile for the owners.${hint ? ' ' + hint : ''}`,
       });
       onReported?.();
       onClose();
@@ -69,6 +71,7 @@ export function ReportDamagedDialog({ open, onClose, product, defaultFoundAt = '
           <DialogTitle>Report damaged item</DialogTitle>
           <DialogDescription>
             Set it aside to return to the supplier. It comes off the shelf count so nobody picks it.
+            {hint ? ` ${hint}` : ''}
           </DialogDescription>
         </DialogHeader>
 

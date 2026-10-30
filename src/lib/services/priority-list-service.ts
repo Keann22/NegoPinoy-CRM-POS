@@ -2,6 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { fetchAllPages } from './procurement-demand-service';
 import { findStage } from '@/lib/online-order-tracking';
 import { staffNotes } from './order-trail-service';
+import { getOwedReplacements } from './supplier-return-service';
+import { applyOwedReplacements } from '@/lib/priority/owed-replacements';
 import {
   PRIORITY_RULES, rankOrder, compareRows, transitState, phtDate, shipsBeforePaid,
   type MissingItem, type PriorityOrderInput, type PriorityRow, type PriorityHold,
@@ -171,7 +173,7 @@ export async function getPriorityList(
   const poiIds = Array.from(new Set(sources.map((s) => s.purchase_order_item_id).filter(Boolean)));
   const openProductIds = Array.from(new Set(issues.filter((i) => i.status === 'open' && i.product_id).map((i) => i.product_id)));
 
-  const [pois, receipts, products] = await Promise.all([
+  const [pois, receipts, products, owed] = await Promise.all([
     inChunks(poiIds, (c) => fetchAllPages<any>((f, t) =>
       supabase.from('purchase_order_items')
         .select('id, product_id, expected_qty, received_qty, status, created_at, purchase_orders(notes, created_at, tracking_route, tracking_stage, expected_arrival)')
@@ -180,6 +182,7 @@ export async function getPriorityList(
       supabase.from('inventory_movements').select('po_item_id, timestamp').eq('movement_type', 'RESTOCK').in('po_item_id', c).order('id').range(f, t))),
     inChunks(openProductIds, (c) => fetchAllPages<any>((f, t) =>
       supabase.from('products').select('id, name, variant_name').in('id', c).order('id').range(f, t))),
+    getOwedReplacements(supabase, openProductIds),
   ]);
 
   const poiById = new Map(pois.map((p) => [p.id, p]));
@@ -214,7 +217,7 @@ export async function getPriorityList(
       : isFullyPaid(o) ? maxIso(lastPayment.get(o.id) || null, o.order_date || o.created_at) : null;
 
     const orderIssues = issuesByOrder.get(o.id) || [];
-    const missing = missingItems(orderIssues, sourcesByOrder.get(o.id) || [], poiById, receivedAt, productById, eventsByOrder.get(o.id) || [], borrowsByOrder.get(o.id) || [], now);
+    const missing = applyOwedReplacements(missingItems(orderIssues, sourcesByOrder.get(o.id) || [], poiById, receivedAt, productById, eventsByOrder.get(o.id) || [], borrowsByOrder.get(o.id) || [], now), owed);
     const osRounds = new Set(orderIssues.map((i) => String(i.created_at).slice(0, 16))).size;
     const { followUps, lastFollowUp, hold, sendToday, sendTodayBlock, urgent } = summarizeEvents(eventsByOrder.get(o.id) || [], now);
     const itemCount = lineCount.get(o.id) || 0;

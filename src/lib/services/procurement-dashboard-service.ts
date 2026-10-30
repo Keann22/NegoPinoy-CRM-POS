@@ -4,6 +4,7 @@ import { migrateLeakedBundleDrafts, autoCleanupStaffDrafts } from './procurement
 import { calculateProcurementDemand } from './procurement-demand-service';
 import { getUnpickedQtyMap, unallocatedFromStockLevel } from './inventory/shelf-stock-service';
 import { getNegativeStockReconciliationItems } from './procurement-reconciliation-service';
+import { getOwedReplacements } from './supplier-return-service';
 
 export async function getProcurementDashboardData(supabase: SupabaseClient) {
   await migrateLeakedBundleDrafts(supabase);
@@ -80,12 +81,14 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
   }
 
   // 5. Fetch live product data for items needing procurement / purchased
-  const [{ data: liveOS, error: lErr }, unpickedMap] = await Promise.all([
+  const [{ data: liveOS, error: lErr }, unpickedMap, owedMap] = await Promise.all([
     supabase
       .from('products')
       .select('id, name, variant_name, stock_level, supplier_id, initial_unit_cost, supplier_pricing, parent_id')
       .in('id', Array.from(productIdsToFetch)),
     getUnpickedQtyMap(supabase),
+    // Replacements suppliers still owe (Supplier Returns): shown so nobody buys twice.
+    getOwedReplacements(supabase, Array.from(productIdsToFetch)),
   ]);
   if (lErr) throw lErr;
 
@@ -277,6 +280,7 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
       supplierId: resolvedSupplierId,
       unitCost: matchedCost,
       inTransit: inTransitByProduct.get(p.id) || [],
+      owedBySupplier: owedMap.get(p.id) || null,
     });
   }
 

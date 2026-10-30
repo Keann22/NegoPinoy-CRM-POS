@@ -5,11 +5,12 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ClipboardList, ScanLine, X, Check, AlertCircle, AlertTriangle, CameraOff, ArrowLeftRight } from 'lucide-react';
+import { Loader2, ClipboardList, ScanLine, X, Check, AlertCircle, AlertTriangle, CameraOff, ArrowLeftRight, PackageX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePicker } from '@/hooks/usePicker';
 import { ProductPhotoDialog } from '@/components/dashboard/product-photo-dialog';
 import { BorrowDialog, type BorrowTarget } from '@/components/dashboard/picker/borrow-dialog';
+import { ReportDamagedDialog } from '@/components/dashboard/supplier-returns/report-damaged-dialog';
 
 function formatMemoryAge(dateStr?: string): string {
   if (!dateStr) return '';
@@ -57,6 +58,8 @@ export default function PickerApp() {
   // Borrowing an item already picked for another order (see borrow-dialog).
   const [borrowTarget, setBorrowTarget] = React.useState<BorrowTarget | null>(null);
   const [borrowedFrom, setBorrowedFrom] = React.useState<Map<string, string>>(new Map());
+  // A bad piece found while picking: set it aside for the supplier (Supplier Returns).
+  const [damaged, setDamaged] = React.useState<{ id: string; name: string } | null>(null);
   React.useEffect(() => { setBorrowedFrom(new Map()); }, [scannedOrderId]);
 
   const openBorrow = (key: string) => {
@@ -204,12 +207,19 @@ export default function PickerApp() {
                                       </Badge>
                                     )}
                                   </div>
-                                  {isFlagged && (
-                                    <button type="button" onClick={() => openBorrow(key)}
-                                      className="mt-1.5 inline-flex items-center gap-1 rounded-md border border-violet-300 px-2 py-1 text-[11px] font-semibold text-violet-700 hover:bg-violet-50">
-                                      <ArrowLeftRight className="h-3 w-3" />Borrow from another order
+                                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                    {isFlagged && (
+                                      <button type="button" onClick={() => openBorrow(key)}
+                                        className="inline-flex items-center gap-1 rounded-md border border-violet-300 px-2 py-1 text-[11px] font-semibold text-violet-700 hover:bg-violet-50">
+                                        <ArrowLeftRight className="h-3 w-3" />Borrow from another order
+                                      </button>
+                                    )}
+                                    <button type="button"
+                                      onClick={() => setDamaged({ id: productId, name: allRows.find((r) => r.key === key)?.productName || 'Item' })}
+                                      className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-500 hover:border-red-300 hover:bg-red-50 hover:text-red-700">
+                                      <PackageX className="h-3 w-3" />Damaged?
                                     </button>
-                                  )}
+                                  </div>
                                 </td>
                                 <td className="p-3 text-center">
                                   <span className="font-bold">{qty}</span>
@@ -357,6 +367,13 @@ export default function PickerApp() {
       )}
 
       <BorrowDialog target={borrowTarget} toOrderId={scannedOrderId} onClose={() => setBorrowTarget(null)} onBorrowed={onBorrowed} />
+      <ReportDamagedDialog
+        open={!!damaged}
+        product={damaged}
+        defaultFoundAt="picker"
+        hint="Then pick a good one and tap Found, or tap OS if there's none left."
+        onClose={() => setDamaged(null)}
+      />
 
       <ProductPhotoDialog
         product={viewingPhotoItem}

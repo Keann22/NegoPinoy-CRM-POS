@@ -9,6 +9,7 @@ import { PendingPurchases } from '@/components/dashboard/pending-purchases';
 import { TodaysPurchasesDialog } from '@/components/dashboard/procurement/todays-purchases-dialog';
 import { ReceivedToday } from '@/components/dashboard/inventory/received-today';
 import { ReceiptLinesToMatch } from '@/components/dashboard/inventory/receipt-lines-to-match';
+import { ReplacementsToReceive } from '@/components/dashboard/inventory/replacements-to-receive';
 
 // Where staff count and record what arrived. Stock only comes in against a
 // recorded purchase (Pending Incoming Items); the old free-form Bulk Receive
@@ -61,6 +62,9 @@ export default function ReceivingPage() {
 
       {/* Snapped receipt lines the system wasn't sure about; matching one records it. */}
       <ReceiptLinesToMatch onMatched={() => setPendingTick(t => t + 1)} refreshKey={pendingTick} />
+
+      {/* Supplier replacements for damaged items the owners handed back (Supplier Returns). */}
+      <ReplacementsToReceive />
 
       <PendingPurchases onReceiveComplete={() => setReceivedTick(t => t + 1)} refreshKey={pendingTick} />
 

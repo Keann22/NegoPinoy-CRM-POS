@@ -271,3 +271,39 @@ export async function setSupplierReplacementDays(supabase: SupabaseClient, suppl
   const { error } = await supabase.from('suppliers').update({ replacement_days: d }).eq('id', supplierId);
   if (error) throw error;
 }
+
+export interface OwedReplacement {
+  qty: number; // pieces suppliers still owe for this product (open returns)
+  returnNos: number[];
+  /** Earliest date a replacement is due (handed back + supplier's limit; reported date while not yet handed back). */
+  dueAt: string | null;
+}
+
+/** Pieces suppliers still owe, per product, from open returns. Safe for staff (no supplier or cost). */
+export async function getOwedReplacements(supabase: SupabaseClient, productIds?: string[]): Promise<Map<string, OwedReplacement>> {
+  const owed = new Map<string, OwedReplacement>();
+  if (productIds && productIds.length === 0) return owed;
+  let query = supabase
+    .from('supplier_returns')
+    .select('product_id, qty, replaced_qty, return_no, created_at, handed_back_at, suppliers(replacement_days)')
+    .neq('status', 'closed');
+  if (productIds) query = query.in('product_id', productIds);
+  const { data, error } = await query;
+  if (error) {
+    console.error('getOwedReplacements:', error.message);
+    return owed;
+  }
+  for (const r of data || []) {
+    const open = Math.max(0, Number(r.qty) - Number(r.replaced_qty));
+    if (open <= 0) continue;
+    const supplier: any = Array.isArray(r.suppliers) ? r.suppliers[0] : r.suppliers;
+    const limit = Number(supplier?.replacement_days) || DEFAULT_LIMIT_DAYS;
+    const due = new Date(new Date(r.handed_back_at || r.created_at).getTime() + limit * DAY_MS).toISOString();
+    const cur = owed.get(r.product_id) || { qty: 0, returnNos: [], dueAt: null };
+    cur.qty += open;
+    cur.returnNos.push(Number(r.return_no));
+    if (!cur.dueAt || due < cur.dueAt) cur.dueAt = due;
+    owed.set(r.product_id, cur);
+  }
+  return owed;
+}

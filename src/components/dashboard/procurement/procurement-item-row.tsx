@@ -7,6 +7,7 @@ import { StaffRequestDialog } from "./staff-request-dialog";
 import { ProcurementStockDetailDialog } from "./stock-detail-dialog";
 import { EditUnallocatedStockDialog } from "./edit-unallocated-stock-dialog";
 import { InTransitChip } from "./in-transit-chip";
+import { SupplierOwedChip } from "./supplier-owed-chip";
 import { ProcurementPriorityChips } from "./procurement-priority-chips";
 
 export function ProcurementItemRow({
@@ -357,6 +358,7 @@ export function ProcurementItemRow({
             />
           </div>
         )}
+        <SupplierOwedChip owed={item.owedBySupplier} />
       </td>
       <td className="p-3 text-center">
         <div className="relative flex items-center justify-center">
