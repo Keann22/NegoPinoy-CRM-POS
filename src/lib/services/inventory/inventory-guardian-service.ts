@@ -19,6 +19,7 @@ import { fetchAllPages } from '../procurement-demand-service';
 
 // Statuses still waiting to be picked: one shared list (shelf-stock-service.ts).
 import { UNPICKED_STATUSES } from './shelf-stock-service';
+import { ADDED_AFTER_PICKING_NOTE } from '../order-issues-service';
 
 /**
  * Scans the database for stock anomalies and unrecorded movements.
@@ -37,22 +38,29 @@ export async function detectInventoryAnomalies(supabase: SupabaseClient): Promis
 
   // 2. Fetch open order issues (picker shortages).
   // Scope strictly to issue_type 'order' and status 'open'
-  const openIssues = await fetchAllPages<any>((from, to) =>
+  const allOpenIssues = await fetchAllPages<any>((from, to) =>
     supabase
       .from('order_issues')
-      .select('id, order_id, product_id, out_of_stock_qty, reported_by_name, created_at, products(name, sku, stock_level)')
+      .select('id, order_id, product_id, out_of_stock_qty, reported_by_name, created_at, products(name, sku, stock_level), order_issue_messages(message)')
       .eq('status', 'open')
       .eq('issue_type', 'order')
       .order('created_at', { ascending: false })
       .range(from, to)
   );
 
-  const openIssueProductIds = (openIssues || [])
+  // Items sales added after picking are "not picked yet", not a shortage someone
+  // saw on the shelf; the picker handles them, so they get no Floor Shortage alert.
+  // They still count as unpicked demand in the negative-stock check below.
+  const openIssues = (allOpenIssues || []).filter(
+    (i: any) => !(i.order_issue_messages || []).some((m: any) => ADDED_AFTER_PICKING_NOTE.test(m?.message || ''))
+  );
+
+  const openIssueProductIds = (allOpenIssues || [])
     .map((i: any) => i.product_id)
     .filter(Boolean);
 
   const openIssueKeySet = new Set(
-    (openIssues || []).map((i: any) => `${i.order_id}-${i.product_id}`)
+    (allOpenIssues || []).map((i: any) => `${i.order_id}-${i.product_id}`)
   );
 
   // 3. Fetch bundle products with assembly recipes
@@ -244,6 +252,19 @@ export async function detectInventoryAnomalies(supabase: SupabaseClient): Promis
 
       const pMemories = memoryByProduct.get(issue.product_id) || [];
       const lastAudit = pMemories.find(m => m.actionType === 'physical_count_audit');
+
+      // A shelf count after this report already found stock: nothing left to count.
+      // The issue stays open until a picker picks it (the count posted a "please pick" note).
+      if (
+        lastAudit &&
+        typeof lastAudit.physicalCount === 'number' &&
+        lastAudit.physicalCount > 0 &&
+        issue.created_at &&
+        lastAudit.createdAt > issue.created_at
+      ) {
+        continue;
+      }
+
       let title = `Floor Shortage Reported: ${pName}`;
       let description = `Picker ${issue.reported_by_name || 'Staff'} reported ${issue.out_of_stock_qty || 1} unit(s) missing for Order #${(issue.order_id || '').slice(0, 8).toUpperCase()}. System ledger currently shows ${stock}.`;
       let recommendation = `Verify if the shelf is truly empty, if it was misplaced, or if stock was borrowed from another room.`;

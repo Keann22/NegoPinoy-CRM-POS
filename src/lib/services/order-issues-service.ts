@@ -170,6 +170,9 @@ type QtyLine = { productId: string; quantity: number };
  * Picked (with issue) so the warehouse picks them). Bundles are flagged on their
  * components, the same way the picker reports bundle shortages.
  */
+/** Matches the note flagItemsAddedAfterPicking posts (also used to tell these marks apart from picker shortages). */
+export const ADDED_AFTER_PICKING_NOTE = /added to the order after it was picked/i;
+
 export async function flagItemsAddedAfterPicking(
   supabase: SupabaseClient,
   orderId: string,

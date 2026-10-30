@@ -58,20 +58,27 @@ export async function applyPhysicalShelfCount(
     unit_cost: product.initial_unit_cost || 0
   });
 
-  // 6. If physical stock is now confirmed > 0 and covers open picker issues, auto-resolve them
+  // 6. Stock found on the shelf does NOT close open "not picked" issues: the item is
+  // still on the shelf until a picker takes it and taps Found (LOCKED unallocated rule,
+  // shelf-stock-service.ts). Closing them here made unpicked pieces count as picked.
+  // Instead, tell the picker the stock is there.
   if (physicalShelfCount > 0) {
     const { data: openIssues } = await supabase
       .from('order_issues')
-      .select('id, order_id')
+      .select('id')
       .eq('product_id', productId)
+      .eq('issue_type', 'order')
       .eq('status', 'open');
 
     if (openIssues && openIssues.length > 0) {
-      await supabase
-        .from('order_issues')
-        .update({ status: 'resolved' })
-        .eq('product_id', productId)
-        .eq('status', 'open');
+      await supabase.from('order_issue_messages').insert(
+        openIssues.map((i: { id: string }) => ({
+          issue_id: i.id,
+          sender_role: 'inventory',
+          sender_name: actorName,
+          message: `Shelf count found ${physicalShelfCount} pc(s) of ${product.name} on the shelf. Not picked yet; please pick and tap Found.`,
+        }))
+      );
     }
   }
 
