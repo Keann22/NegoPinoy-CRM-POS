@@ -30,7 +30,8 @@ export function SupplierReturnCard({ ret, isManagement, onAction }: Props) {
 
   const waitingText =
     ret.status === 'to_return' ? `Set aside ${ret.daysWaiting} day(s) ago`
-    : ret.status === 'with_supplier' ? `With supplier ${ret.daysWaiting} of ${ret.limitDays} day(s)`
+    : ret.status === 'with_supplier'
+      ? `${ret.channel === 'shopee' ? 'Shopee app return' : 'With supplier'} ${ret.daysWaiting} of ${ret.limitDays} day(s)`
     : ret.outcome ? OUTCOME_LABELS[ret.outcome] : 'Closed';
 
   return (
@@ -63,8 +64,13 @@ export function SupplierReturnCard({ ret, isManagement, onAction }: Props) {
       {ret.notes && <p className="text-xs text-muted-foreground italic">“{ret.notes}”</p>}
 
       <div className="flex flex-wrap items-center gap-2">
-        {open && isManagement && ret.status === 'to_return' && (
-          <Button size="sm" onClick={() => onAction('hand_back', ret)}>Handed back</Button>
+        {open && isManagement && ret.status === 'to_return' && ret.channel !== 'pinduoduo' && (
+          <Button size="sm" onClick={() => onAction('hand_back', ret)}>
+            {ret.channel === 'shopee' ? 'Return requested in app' : 'Handed back'}
+          </Button>
+        )}
+        {open && isManagement && ret.status === 'to_return' && ret.channel === 'pinduoduo' && (
+          <Button size="sm" onClick={() => onAction('pdd_discount', ret)}>Pinduoduo discount</Button>
         )}
         {open && (
           <Button size="sm" variant={ret.status === 'with_supplier' ? 'default' : 'outline'} onClick={() => onAction('replacement', ret)}>
@@ -87,7 +93,9 @@ export function SupplierReturnCard({ ret, isManagement, onAction }: Props) {
           {ret.events.map((e) => (
             <li key={e.id} className="flex flex-wrap gap-x-2">
               <span className="text-muted-foreground">{phDate(e.createdAt)}</span>
-              <span className="font-medium">{EVENT_LABELS[e.event] || e.event}</span>
+              <span className="font-medium">
+                {e.event === 'handed_back' && ret.channel === 'shopee' ? 'Return requested in Shopee app' : EVENT_LABELS[e.event] || e.event}
+              </span>
               {e.qty != null && <span>{e.qty} pc(s)</span>}
               {isManagement && !!e.amount && <span>{peso(e.amount)}</span>}
               {e.actorName && <span className="text-muted-foreground">by {e.actorName}</span>}

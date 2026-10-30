@@ -405,7 +405,7 @@ Calculated from it:
 5. Update the LOCKED section: the meaning ("on the shelf, ready to pick") stays; how it is kept changes from calculated to stored and counted. The owner set this direction on 2026-10-30, but the switch still needs the owner's explicit OK, as does each build step.
 6. Later: blind counting (staff don't see `shelf_stock`; the Guardian asks for a recount on a big difference).
 
-### Supplier Returns (owner, 2026-10-30; phases 1-2 BUILT, phase 3 planned)
+### Supplier Returns (owner, 2026-10-30; phases 1-3 BUILT)
 
 Owner rules: `docs/BUSINESS_WORKFLOW.md` → "Returns to suppliers".
 
@@ -413,7 +413,9 @@ Owner rules: `docs/BUSINESS_WORKFLOW.md` → "Returns to suppliers".
 
 **Phase 2 built 2026-10-30**: picker lines have a **Damaged?** button (`/dashboard/pick`) that opens the same Report damaged form (found = picker); the picker then marks Found or OS as usual, so picking/submit logic is unchanged. **Receiving** shows "Replacements from suppliers" (`components/dashboard/inventory/replacements-to-receive.tsx`) for returns handed back with pieces still owed; staff enter the qty and Receive (the `replacement` action). `getOwedReplacements(supabase, productIds?)` in `supplier-return-service.ts` gives pieces owed per product (open returns, earliest due = handed back or reported + supplier limit), used by: the **Procurement Sheet** (`owedBySupplier` on each item → `SupplierOwedChip` under Need to Buy, red when past the limit; numbers unchanged, still buyable) and the **Priority List** (`applyOwedReplacements` in `src/lib/priority/owed-replacements.ts`: an OS item in state `buy` whose product a supplier owes becomes `supplier_return`, owner buyer, due at the supplier limit).
 
-Original plan (phase 3 still to build):
+**Phase 3 built 2026-10-30**: each return has a `channel` from its set or suggested supplier (`returnChannelOf`: name contains Shopee → `shopee`, Pinduoduo/Pindoudou/PDD → `pinduoduo`, else `in_person`); safe for staff, the supplier name itself stays owner-only. Owners get **Bring back on your next trip** at the top of To return (`bring-back-list.tsx`): open returns grouped by supplier (set or suggested; "Supplier not known" asks which), ticked by default, one button hands back the group (`actMany` → `hand_back` per return). Shopee groups say "Return requested in Shopee app" and the card shows "Shopee app return N of M days". Pinduoduo takes no returns: "Record discount" / "Pinduoduo discount" closes it as `partial_refund_kept` with the amount and sets the supplier (close now accepts `supplierId`).
+
+Original plan (all phases built):
 
 **One record per bad batch** (product, qty, reason, photo, who found it, where: picker / shelf / unpacking / customer return), moving through stages:
 

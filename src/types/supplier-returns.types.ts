@@ -3,6 +3,9 @@
 
 export type SupplierReturnStatus = 'to_return' | 'with_supplier' | 'closed';
 
+/** How it goes back: in person on a buying trip, a Shopee in-app return, or Pinduoduo (no returns, discount only). */
+export type SupplierReturnChannel = 'in_person' | 'shopee' | 'pinduoduo';
+
 export type SupplierReturnFoundAt = 'picker' | 'shelf' | 'unpacking' | 'customer_return' | 'other';
 
 export type SupplierReturnOutcome =
@@ -66,6 +69,7 @@ export interface SupplierReturn {
   limitDays: number; // supplier's replacement days (default 7)
   isOverdue: boolean;
   customerWaiting: boolean; // an open order still needs this product
+  channel: SupplierReturnChannel; // from the set or suggested supplier; safe for staff
   // Owners only (null for staff):
   supplierId: string | null;
   supplierName: string | null;
@@ -91,7 +95,7 @@ export interface SupplierReturnsResponse {
 export type SupplierReturnAction =
   | { action: 'hand_back'; id: string; supplierId?: string | null; unitCost?: number | null }
   | { action: 'replacement'; id: string; qty: number }
-  | { action: 'close'; id: string; outcome: Exclude<SupplierReturnOutcome, 'replaced' | 'cancelled'>; amount?: number; note?: string }
+  | { action: 'close'; id: string; outcome: Exclude<SupplierReturnOutcome, 'replaced' | 'cancelled'>; amount?: number; note?: string; supplierId?: string | null }
   | { action: 'cancel'; id: string; note?: string }
   | { action: 'set_supplier'; id: string; supplierId: string | null; unitCost?: number | null };
 

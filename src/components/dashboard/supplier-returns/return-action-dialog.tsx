@@ -15,7 +15,7 @@ import {
   type SupplierReturnSupplier,
 } from '@/types/supplier-returns.types';
 
-export type ReturnDialogKind = 'hand_back' | 'replacement' | 'close' | 'cancel';
+export type ReturnDialogKind = 'hand_back' | 'replacement' | 'close' | 'cancel' | 'pdd_discount';
 
 type CloseOutcome = Extract<SupplierReturnAction, { action: 'close' }>['outcome'];
 const CLOSE_OUTCOMES: CloseOutcome[] = ['refunded', 'partial_refund_kept', 'voucher', 'written_off'];
@@ -34,6 +34,7 @@ const TITLES: Record<ReturnDialogKind, string> = {
   replacement: 'Replacement arrived',
   close: 'Close this return',
   cancel: 'Not returning it',
+  pdd_discount: 'Pinduoduo discount (no return)',
 };
 
 export function ReturnActionDialog({ kind, ret, suppliers, onClose, onSubmit }: Props) {
@@ -68,6 +69,11 @@ export function ReturnActionDialog({ kind, ret, suppliers, onClose, onSubmit }: 
         await onSubmit({ action: 'hand_back', id: ret.id, supplierId: supplierId === NO_SUPPLIER ? null : supplierId, unitCost: cost });
       } else if (kind === 'replacement') {
         await onSubmit({ action: 'replacement', id: ret.id, qty: Math.round(Number(qty)) });
+      } else if (kind === 'pdd_discount') {
+        await onSubmit({
+          action: 'close', id: ret.id, outcome: 'partial_refund_kept', amount: Number(amount) || 0,
+          note: note.trim() || 'Pinduoduo discount (no return)', supplierId: ret.supplierId || ret.suggestedSupplierId || null,
+        });
       } else if (kind === 'close') {
         await onSubmit({ action: 'close', id: ret.id, outcome, amount: Number(amount) || 0, note: note.trim() || undefined });
       } else {
@@ -139,6 +145,16 @@ export function ReturnActionDialog({ kind, ret, suppliers, onClose, onSubmit }: 
                 </div>
               )}
             </>
+          )}
+
+          {kind === 'pdd_discount' && (
+            <div className="space-y-1.5">
+              <p className="text-sm text-muted-foreground">
+                Pinduoduo doesn&apos;t take returns. Record the discount they gave; we keep the item and it stays out of stock.
+              </p>
+              <Label htmlFor="ra-pdd">Discount (₱)</Label>
+              <Input id="ra-pdd" type="number" inputMode="decimal" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} />
+            </div>
           )}
 
           {kind === 'cancel' && (

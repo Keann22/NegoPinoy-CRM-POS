@@ -10,13 +10,14 @@ import { ReportDamagedDialog } from '@/components/dashboard/supplier-returns/rep
 import { ReturnActionDialog, type ReturnDialogKind } from '@/components/dashboard/supplier-returns/return-action-dialog';
 import { SupplierReturnCard } from '@/components/dashboard/supplier-returns/supplier-return-card';
 import { SupplierOwedSummary } from '@/components/dashboard/supplier-returns/supplier-owed-summary';
+import { BringBackList } from '@/components/dashboard/supplier-returns/bring-back-list';
 import type { SupplierReturn } from '@/types/supplier-returns.types';
 
 // Bad items set aside to return to suppliers, what's with the supplier, and
 // what came back. Everyone in inventory sees it; supplier names and costs are
 // stripped by the API for anyone who isn't an owner.
 export default function SupplierReturnsPage() {
-  const { data, isLoading, error, refresh, act, setSupplierDays } = useSupplierReturns();
+  const { data, isLoading, error, refresh, act, actMany, setSupplierDays } = useSupplierReturns();
   const [reporting, setReporting] = useState(false);
   const [dialog, setDialog] = useState<{ kind: ReturnDialogKind; ret: SupplierReturn } | null>(null);
 
@@ -78,7 +79,15 @@ export default function SupplierReturnsPage() {
                 </TabsTrigger>
                 <TabsTrigger value="done">Done ({groups.done.length})</TabsTrigger>
               </TabsList>
-              <TabsContent value="to_return" className="mt-3">
+              <TabsContent value="to_return" className="mt-3 space-y-3">
+                {isManagement && data && (
+                  <BringBackList
+                    toReturn={groups.toReturn}
+                    suppliers={data.suppliers}
+                    onActMany={actMany}
+                    onAction={(kind, ret) => setDialog({ kind, ret })}
+                  />
+                )}
                 {list(groups.toReturn, 'Nothing set aside. Use "Report damaged" when you find a bad item.')}
               </TabsContent>
               <TabsContent value="waiting" className="mt-3">

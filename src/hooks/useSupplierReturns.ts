@@ -49,12 +49,21 @@ export function useSupplierReturns() {
     await refresh();
   }, [refresh]);
 
+  /** Several actions in a row (e.g. hand back a whole supplier's pile), one refresh at the end. Stops at the first error. */
+  const actMany = useCallback(async (actions: SupplierReturnAction[]) => {
+    try {
+      for (const a of actions) await send('PATCH', a);
+    } finally {
+      await refresh();
+    }
+  }, [refresh]);
+
   const setSupplierDays = useCallback(async (supplierId: string, days: number) => {
     await send('PATCH', { action: 'supplier_days', supplierId, days });
     await refresh();
   }, [refresh]);
 
-  return { data, isLoading, error, refresh, reportDamaged, act, setSupplierDays };
+  return { data, isLoading, error, refresh, reportDamaged, act, actMany, setSupplierDays };
 }
 
 /** Report damaged from anywhere (e.g. the Inventory List) without loading the list. */

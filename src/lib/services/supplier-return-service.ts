@@ -6,6 +6,7 @@ import type {
   SupplierReturnEvent,
   SupplierReturnsResponse,
   SupplierReturnStatus,
+  SupplierReturnChannel,
 } from '@/types/supplier-returns.types';
 import { UNPICKED_STATUSES, PICKED_WITH_ISSUE } from './inventory/shelf-stock-service';
 
@@ -29,6 +30,14 @@ const CLOSED_SHOWN_DAYS = 60;
 const DAY_MS = 24 * 3600 * 1000;
 
 export class SupplierReturnError extends Error {}
+
+/** How a return goes back, from the supplier's name: Shopee in the app, Pinduoduo can't take returns (discount only). */
+export function returnChannelOf(supplierName: string | null | undefined): SupplierReturnChannel {
+  const n = (supplierName || '').toLowerCase();
+  if (/shopee/.test(n)) return 'shopee';
+  if (/pin[dt]u?o?u?duo|pindoudou|\bpdd\b/.test(n)) return 'pinduoduo';
+  return 'in_person';
+}
 
 const daysBetween = (from: string, to: number) => Math.max(0, Math.floor((to - new Date(from).getTime()) / DAY_MS));
 
@@ -88,7 +97,11 @@ export async function listSupplierReturns(supabase: SupabaseClient, isManagement
   if (error) throw error;
 
   const now = Date.now();
-  const waiting = await productsCustomersWaitFor(supabase, Array.from(new Set((rows || []).map((r: any) => r.product_id))));
+  const [waiting, { data: supplierRows }] = await Promise.all([
+    productsCustomersWaitFor(supabase, Array.from(new Set((rows || []).map((r: any) => r.product_id)))),
+    supabase.from('suppliers').select('id, name, replacement_days').order('name'),
+  ]);
+  const supplierName = new Map<string, string>((supplierRows || []).map((s: any) => [s.id, s.name]));
 
   const returns: SupplierReturn[] = (rows || []).map((r: any) => {
     const status = r.status as SupplierReturnStatus;
@@ -99,6 +112,8 @@ export async function listSupplierReturns(supabase: SupabaseClient, isManagement
     const pricing: any[] = Array.isArray(r.products?.supplier_pricing) ? r.products.supplier_pricing : [];
     const suggestedSupplierId = r.products?.supplier_id || pricing.find((p) => p?.supplierId)?.supplierId || null;
     const unitCost = r.unit_cost != null ? Number(r.unit_cost) : null;
+    // Channel is safe for staff (it says how, not which supplier).
+    const channel = returnChannelOf(supplierName.get(r.supplier_id || suggestedSupplierId || '') || null);
     const events: SupplierReturnEvent[] = (r.supplier_return_events || [])
       .sort((a: any, b: any) => a.created_at.localeCompare(b.created_at))
       .map((e: any) => ({
@@ -134,6 +149,7 @@ export async function listSupplierReturns(supabase: SupabaseClient, isManagement
       limitDays,
       isOverdue: status === 'with_supplier' && daysWaiting > limitDays,
       customerWaiting: status !== 'closed' && waiting.has(r.product_id),
+      channel,
       supplierId: isManagement ? r.supplier_id : null,
       supplierName: isManagement ? r.suppliers?.name || null : null,
       suggestedSupplierId: isManagement ? suggestedSupplierId : null,
@@ -144,11 +160,9 @@ export async function listSupplierReturns(supabase: SupabaseClient, isManagement
     };
   });
 
-  let suppliers: SupplierReturnsResponse['suppliers'] = [];
-  if (isManagement) {
-    const { data } = await supabase.from('suppliers').select('id, name, replacement_days').order('name');
-    suppliers = (data || []).map((s: any) => ({ id: s.id, name: s.name, replacementDays: Number(s.replacement_days) || DEFAULT_LIMIT_DAYS }));
-  }
+  const suppliers: SupplierReturnsResponse['suppliers'] = isManagement
+    ? (supplierRows || []).map((s: any) => ({ id: s.id, name: s.name, replacementDays: Number(s.replacement_days) || DEFAULT_LIMIT_DAYS }))
+    : [];
   return { isManagement, returns, suppliers };
 }
 
@@ -249,6 +263,7 @@ export async function applySupplierReturnAction(
         status: 'closed',
         outcome: a.outcome,
         refund_amount: (Number(r.refund_amount) || 0) + amount,
+        ...(a.supplierId !== undefined ? { supplier_id: a.supplierId || null } : {}),
         closed_at: now,
         closed_by_name: actorName,
       });
