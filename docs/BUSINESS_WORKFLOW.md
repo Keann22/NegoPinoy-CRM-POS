@@ -107,9 +107,10 @@ Not built yet. Owner's direction; design and rollout in architecture.md,
   nothing physical moves. It stays only as a calculated "free to sell" number
   (unallocated − orders not picked yet).
 
-## Returns to suppliers (owner, 2026-10-30; being decided, not built)
+## Returns to suppliers (owner, 2026-10-30; phase 1 built)
 
-Design: architecture.md, "Planned: Supplier Returns".
+Page: Inventory Management → **Supplier Returns** (and a "Report damaged" icon on
+the Inventory List). Design and later phases: architecture.md, "Supplier Returns".
 
 - Bad items are returned to suppliers often, and **suppliers are slow to
   replace them**. Today nothing tracks what a supplier still owes.

@@ -23,3 +23,4 @@ export * from './inventory-guardian.types';
 export * from './warehouse.types';
 export * from './crm-email.types';
 export * from './procurement-search.types';
+export * from './supplier-returns.types';

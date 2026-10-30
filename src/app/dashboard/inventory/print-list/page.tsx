@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { Printer, Download, Pencil } from 'lucide-react';
+import { Printer, Download, Pencil, PackageX } from 'lucide-react';
 import * as xlsx from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAllProductsForPrint, type PrintableProduct, type PrintStockFilter } from '@/hooks/useAllProductsForPrint';
 import { ProductAllocationDialog } from '@/components/dashboard/inventory/product-allocation-dialog';
 import { EditUnallocatedStockDialog } from '@/components/dashboard/procurement/edit-unallocated-stock-dialog';
+import { ReportDamagedDialog } from '@/components/dashboard/supplier-returns/report-damaged-dialog';
 import { useRoleCheck } from '@/hooks/useRoleCheck';
 import type { InventoryListStockInfo } from '@/lib/services/inventory-list-service';
 
@@ -78,6 +79,7 @@ export default function PrintInventoryListPage() {
   const sortedProducts = useMemo(() => sortProducts(products, sortBy), [products, sortBy]);
   const [selectedProduct, setSelectedProduct] = useState<PrintableProduct | null>(null);
   const [editingProduct, setEditingProduct] = useState<PrintableProduct | null>(null);
+  const [damagedProduct, setDamagedProduct] = useState<PrintableProduct | null>(null);
 
   // Unallocated stock is computed server-side (it needs live order demand), with the
   // same formula as the Procurement Sheet. null = still loading.
@@ -200,7 +202,22 @@ export default function PrintInventoryListPage() {
                   const unallocated = unallocatedOf(p);
                   return (
                     <TableRow key={p.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedProduct(p)}>
-                      <TableCell className="font-medium">{displayName(p)}</TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex items-start justify-between gap-2">
+                          <span>{displayName(p)}</span>
+                          {canManageProducts && !info?.isBundle && (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setDamagedProduct(p); }}
+                              className="print:hidden shrink-0 rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                              title="Report damaged: set aside to return to the supplier"
+                              aria-label="Report damaged"
+                            >
+                              <PackageX className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>{p.sku || '-'}</TableCell>
                       <TableCell>{p.shelf_location || '-'}</TableCell>
                       <TableCell className="text-right">{p.stock_level ?? 0}</TableCell>
@@ -298,6 +315,12 @@ export default function PrintInventoryListPage() {
       isOpen={!!editingItem}
       onClose={() => setEditingProduct(null)}
       onSuccess={() => { refetch(); fetchStockInfo(); }}
+    />
+    <ReportDamagedDialog
+      open={!!damagedProduct}
+      product={damagedProduct ? { id: damagedProduct.id, name: displayName(damagedProduct) } : null}
+      onClose={() => setDamagedProduct(null)}
+      onReported={() => { refetch(); fetchStockInfo(); }}
     />
     </>
   );

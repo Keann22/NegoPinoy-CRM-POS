@@ -33,6 +33,7 @@ import {
   ShieldAlert,
   CalendarCheck2,
   Undo2,
+  PackageX,
   Printer,
   Mail,
   Receipt,
@@ -137,7 +138,8 @@ export default function DashboardLayout({
         { href: '/dashboard/inventory/restock', label: 'Restock / Purchase', icon: ArrowDownUp },
         { href: '/dashboard/inventory/batches', label: 'Stock Batch List', icon: ListChecks },
         { href: '/dashboard/inventory/movements', label: 'Inventory History', icon: History },
-        { href: '/dashboard/inventory/returns', label: 'Returns', icon: Undo2 }
+        { href: '/dashboard/inventory/returns', label: 'Returns', icon: Undo2 },
+        { href: '/dashboard/inventory/supplier-returns', label: 'Supplier Returns', icon: PackageX }
       ];
 
       if (isManagement) {

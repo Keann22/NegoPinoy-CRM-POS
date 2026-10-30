@@ -405,9 +405,13 @@ Calculated from it:
 5. Update the LOCKED section: the meaning ("on the shelf, ready to pick") stays; how it is kept changes from calculated to stored and counted. The owner set this direction on 2026-10-30, but the switch still needs the owner's explicit OK, as does each build step.
 6. Later: blind counting (staff don't see `shelf_stock`; the Guardian asks for a recount on a big difference).
 
-### Planned: Supplier Returns (owner, 2026-10-30, NOT BUILT)
+### Supplier Returns (owner, 2026-10-30; phase 1 BUILT, phases 2-3 planned)
 
-Owner rules: `docs/BUSINESS_WORKFLOW.md` → "Returns to suppliers". Nothing below exists yet; nothing in the app tracks supplier returns today (damaged pieces can only be counted out with reason "Damaged Stock" in Edit Unallocated Stock, with no follow-up).
+Owner rules: `docs/BUSINESS_WORKFLOW.md` → "Returns to suppliers".
+
+**Phase 1 built 2026-10-30** (`scripts/migrations/2026-10-30_supplier_returns.sql`): tables `supplier_returns` (status `to_return` / `with_supplier` / `closed`, `outcome`, `replaced_qty`, owner-only `supplier_id`, `unit_cost`, `refund_amount`) and `supplier_return_events` (timeline), `suppliers.replacement_days` (default 7). Service `src/lib/services/supplier-return-service.ts`, API `/api/inventory/supplier-returns` (GET list, POST report damaged, PATCH actions + `supplier_days`; caller and owner check from the session, supplier/cost blanked for non-owners), hook `useSupplierReturns`, page `/dashboard/inventory/supplier-returns` (menu: Inventory Management → Supplier Returns), components in `src/components/dashboard/supplier-returns/`, and a Report damaged icon per row on the Inventory List. Stock: reporting takes `stock_level` down with an `inventory_movements` row of type `supplier_return` (mirrored to `shelf_stock`); a replacement adds it back with the same type (not RESTOCK, so it doesn't appear on Encode Costs); "Not returning" puts the open qty back; handing back and refund/close don't move stock. Actions are guarded on status + `replaced_qty`, so a double-tap applies once. Owners: Handed back (supplier, cost), Refund / close, Not returning, per-supplier limit; anyone: Report damaged, Replacement arrived. Bundles are rejected (report the part).
+
+Original plan (phases 2-3 still to build):
 
 **One record per bad batch** (product, qty, reason, photo, who found it, where: picker / shelf / unpacking / customer return), moving through stages:
 
