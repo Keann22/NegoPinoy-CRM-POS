@@ -124,7 +124,14 @@ export default function UnpaidShippedOrdersPage() {
   }, [supabase, user, isManagement]);
 
   const overdueUnpaidOrders = useMemo(() => {
-    return orders.filter(o => differenceInDays(new Date(), new Date(o.shippedAt)) >= OVERDUE_DAYS_THRESHOLD);
+    return orders.filter(o => {
+      // Recent October SPX shipments are still in transit or awaiting the upcoming November SPX statement
+      const isSpx = o.trackingNumber && o.trackingNumber.toUpperCase().includes('SPEPH');
+      const isRecentOctoberSpx = isSpx && o.shippedAt && o.shippedAt >= '2026-10-01';
+      if (isRecentOctoberSpx) return false;
+
+      return differenceInDays(new Date(), new Date(o.shippedAt)) >= OVERDUE_DAYS_THRESHOLD;
+    });
   }, [orders]);
 
   const codOrders = useMemo(
@@ -173,7 +180,7 @@ export default function UnpaidShippedOrdersPage() {
             <div>
               <CardTitle className="font-headline text-2xl">Unpaid Shipped Orders</CardTitle>
               <CardDescription>
-                Orders shipped {OVERDUE_DAYS_THRESHOLD}+ days ago that still have an outstanding balance.
+                Orders shipped {OVERDUE_DAYS_THRESHOLD}+ days ago that still have an outstanding balance (recent SPX shipments awaiting next month&apos;s statement are excluded).
               </CardDescription>
             </div>
             <div className="text-right">
