@@ -240,6 +240,24 @@ export async function flagItemsAddedAfterPicking(
         .single();
       if (error) throw error;
       issueId = data?.id ?? null;
+
+      // A double-tapped Save runs this twice at once. Keep only the first mark.
+      const since = new Date(Date.now() - 30_000).toISOString();
+      const { data: twins } = await supabase
+        .from('order_issues')
+        .select('id')
+        .eq('order_id', orderId)
+        .eq('product_id', productId)
+        .eq('status', 'open')
+        .eq('reported_by_name', actorName)
+        .eq('out_of_stock_qty', qty)
+        .gte('created_at', since)
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true });
+      if (issueId && twins && twins.length > 1 && twins[0].id !== issueId) {
+        await supabase.from('order_issues').update({ status: 'resolved' }).eq('id', issueId);
+        issueId = null;
+      }
     }
     if (issueId) {
       await supabase.from('order_issue_messages').insert({
