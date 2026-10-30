@@ -552,11 +552,11 @@ They don't list identical sets — a row missing *only* a supplier (cost already
 
 ## Buying days on the Receive screen (added 2026-07-22)
 
-Management taps **Buy** item by item, so each purchase creates its own PO with `notes = null`. The receive screen groups by `notes`, which meant every buy fell through to a hardcoded `'Unknown Batch'` heading with no date. `GET /api/inventory/receive/pending-pos` now derives the heading instead: `STAFF_DRAFT` → "Pending Staff Requests", a named batch → its own name, otherwise **"Purchases — <PHT date of the PO>"**. Sorted newest buying day first, staff requests last (they're the not-yet-bought backlog, not a delivery).
+Management taps **Buy** item by item, so each purchase creates its own PO with `notes = null`. The receive screen groups by `notes`, which meant every buy fell through to a hardcoded `'Unknown Batch'` heading with no date. `GET /api/inventory/receive/pending-pos` now derives the heading instead: `STAFF_DRAFT` → "Pending Staff Requests", a named batch → its own name, otherwise **"Purchases — <PHT date of the PO>"**. Sorted newest buying day first, staff requests last (they're the not-yet-bought backlog, not a delivery). **Update 2026-10-29**: `STAFF_DRAFT` lines are no longer returned at all — see "Receipt-first receiving".
 
 This is display-level only — no change to PO structure, so the Purchases Report keeps a distinct timestamp per buy, and it fixed all existing rows retroactively.
 
-**⚠️ Supplier confidentiality**: staff must not learn who the business buys from. `pending-pos` returns only product name, quantities and `batchName` — **no supplier field**, and nothing on the staff-facing receive path exposes `purchase_order_items.supplier_id`. `procurement-batch`'s consolidation omitting `supplier_id` is deliberate for the same reason, not an oversight. (The manual "Record a new shipment" form's `supplierName` is unrelated — staff typing what they observed about a delivery in front of them, written to that new movement only.) **Never add a supplier column to a staff-facing inventory screen.**
+**⚠️ Supplier confidentiality**: staff must not learn who the business buys from. `pending-pos` returns only product name, quantities and `batchName` — **no supplier field**, and nothing on the staff-facing receive path exposes `purchase_order_items.supplier_id`. `procurement-batch`'s consolidation omitting `supplier_id` is deliberate for the same reason, not an oversight. (The manual "Record a new shipment" form that let staff type a supplier name was removed on 2026-10-29.) **Never add a supplier column to a staff-facing inventory screen** — see "Supplier / cost hiding for non-admins" for the screens gated so far.
 
 ---
 
@@ -597,18 +597,18 @@ The sidebar only ever listed the Procurement Sheet for management, but nothing s
 
 - **Pages**: `reports/procurement` and `reports/trial-procurement` render an "Admins only" notice for non-management and skip their data fetch.
 - **API** ([/api/inventory/procurement](src/app/api/inventory/procurement/route.ts)): `POST` / `PATCH` / `DELETE` return 403 for non-management. `GET` returns **only `reconciliationItems`** (product, stock, explaining order — no supplier or cost) with the other three arrays empty, because Reports → Stock Reconciliation ([to-order-report.tsx](src/components/dashboard/reports/to-order-report.tsx)) is open to Inventory and reads that list from this route. Don't turn the `GET` into a flat 403 without moving that report off it.
-- **Staff entry point for Today's Purchases**: since the sheet is closed to them, Inventory staff open the popup from the **Today's Purchases & Received** button on Bulk Receive (`inventory/receive`). It is the same component; the server decides what it shows.
+- **Staff entry point for Today's Purchases**: since the sheet is closed to them, Inventory staff open the popup from the **Today's Purchases & Received** button on Receiving (`inventory/receive`). It is the same component; the server decides what it shows. Admins see links to Snap Receipt and Purchases & Receipts there instead.
 - Reports → Purchases no longer shows staff the saved-receipt-scans banner (the scan carries the supplier name and a photo of the receipt).
 
 The role check is `isManagementUser()` in `purchase-summary-service.ts`, reading `roles` / `role` from the session user's `app_metadata` and `user_metadata` — the same metadata `useUserProfile` builds the client-side roles from, so the two can't disagree.
 
-**⚠️ Not closed by this**: several screens read Supabase directly from the browser (e.g. `useReceiptDrafts` on `procurement_receipt_scans`, and `products.supplier_pricing` in `to-order-report.tsx` / the product details dialog). Hiding UI does not stop a staff session from querying those tables; that needs row/column-level security in the database, which has not been done.
+**⚠️ Not closed by this**: several screens read Supabase directly from the browser (e.g. `useReceiptDrafts` on `procurement_receipt_scans`, and `products.supplier_pricing` in `to-order-report.tsx` / the product details dialog). Hiding UI does not stop a staff session from querying those tables; that needs row/column-level security in the database, which has not been done. (The product details dialog's Supplier Pricing table is hidden from non-admins since 2026-10-29, but the data is still fetched.)
 
 ---
 
 ## Today's Purchases summary on the Procurement Sheet (added 2026-10-09)
 
-**Location**: green **Today's Purchases** button in the Procurement Sheet header → [todays-purchases-dialog.tsx](src/components/dashboard/procurement/todays-purchases-dialog.tsx), backed by [/api/inventory/procurement/day-purchases](src/app/api/inventory/procurement/day-purchases/route.ts) and [purchase-summary-service.ts](src/lib/services/purchase-summary-service.ts).
+**Location**: green **Today's Purchases** button in the Procurement Sheet header → [todays-purchases-dialog.tsx](src/components/dashboard/procurement/todays-purchases-dialog.tsx) (since 2026-10-29 a wrapper around `todays-purchases-panel.tsx`, which also renders the full-page **Purchases & Receipts**), backed by [/api/inventory/procurement/day-purchases](src/app/api/inventory/procurement/day-purchases/route.ts) and [purchase-summary-service.ts](src/lib/services/purchase-summary-service.ts).
 
 **What it is**: the end-of-buying-day review — every recorded buy for one PHT day (defaults to today, date picker for earlier days), including lines already received, each with a Pending / Partial / Received status. This differs from the sheet's bottom "Purchased & Expected to Receive" table, which only lists lines still awaiting receipt.
 
@@ -640,11 +640,13 @@ The popup has two tabs. **Purchases** is the list above. **Received** lines up e
 
 The other kinds are `checked` (a buy was entered before the goods arrived — the only case where bought-vs-received is a real check), `confirmed` (one of the three above after an admin checked it) and `pending` (bought that day, nothing received yet).
 
-**How a receipt is linked to its purchase** — there is no FK from `inventory_movements` to `purchase_order_items`, so it is product + time: the latest non-draft line for the product whose PO was created at or before the receipt (30-day lookback). **A PO whose `created_at` equals the receipt's timestamp (±2s) was created BY that receipt** — `createBackfillPurchaseOrder` stamps the PO with the movement's timestamp — and that equality is the only thing that tells `auto` from `checked`. Don't change how backfill POs are dated without revisiting this.
+**How a receipt is linked to its purchase** — **since 2026-10-30 the movement's `po_item_id` wins when present** (receipts since 2026-10-21 carry it; a link to a `STAFF_DRAFT` line means no real purchase → `draft`). Before that fix, two open buys of the same product (e.g. two Pinduoduo orders) pinned a delivery on the *newest* order, showing an in-transit order as "50 short". For older receipts with no link it is still product + time: the latest non-draft line for the product whose PO was created at or before the receipt (30-day lookback). **A PO whose `created_at` equals the receipt's timestamp (±2s) was created BY that receipt** — `createBackfillPurchaseOrder` stamps the PO with the movement's timestamp — and that equality is the only thing that tells `auto` from `checked`. Don't change how backfill POs are dated without revisiting this.
 
 **"Checked" state lives in the movement's `reason`** (no schema change): recording an unexpected receipt rewrites it to `'Unexpected Delivery Item (recorded as purchase)'`; confirming an `auto`/`draft` one appends `' [purchase confirmed]'`. These strings are the only marker — don't reword the constants in `purchase-summary-service.ts` without migrating existing rows.
 
 **The admin flow** (Owner/Admin only; staff see product / bought / received / result, no inputs — on an unchecked row their Bought side shows the product and the staff count, the same quantity the admin's box is pre-filled with, never price or supplier): for each highlighted row, type the **bought quantity and unit price from the supplier's receipt** and press Confirm (`auto` → `PATCH` with `confirmMovementId`) or Record (`unexpected` / `draft` → `POST`, cost > 0 required). Supplier and price are pre-filled from `suggestSupplierAndCost()` but are history, not this receipt. Each supplier header shows the checked total and the total *with the values typed so far*, so it can be matched to the receipt total before saving. Bought may differ from received in either direction — the row then shows "+N over" / "N short" — which is why management edits may set `expected_qty` below `received_qty` (`allowBelowReceived`); staff edits still can't. **None of this moves stock**: a miscount is corrected with a stock adjustment, not here.
+
+**Scan receipt per supplier (added 2026-10-28)**: each supplier box on the Received tab (admin only) has a **Scan receipt** button. The photo goes to `POST /api/inventory/scan-receipt` with that supplier and the box's products as candidates; it is **read, never stored**. Matched lines fill the unchecked rows' Bought qty + price (marked "Filled from the receipt"); a notes panel lists receipt lines not received today, qty differences against already-recorded rows, unmatched lines, and received items missing from the receipt. **Confirm all N** saves the filled rows in sequence and reloads once. Photos are downscaled in the browser with `receiptFileToDataUri` ([receipt-image.ts](src/lib/receipt-image.ts), shared with `ScanReceiptDialog`).
 
 - `POST` for `unexpected`: creates a PO dated to the receipt with `expected_qty` = bought, `received_qty` = the movement quantity, stamps cost/supplier on the movement, applies product cost / price book / primary supplier, backfills order COGS.
 - `POST` for `draft`: runs `repairFromPurchaseItem` on the product's latest received `STAFF_DRAFT` line (same repair as the Purchases report banner), then applies the bought quantity.
@@ -663,7 +665,7 @@ The other kinds are `checked` (a buy was entered before the goods arrived — th
 
 ## Correcting a mis-counted receipt: "Received today" (added 2026-10-21)
 
-**Where**: Bulk Receive (`/dashboard/inventory/receive`), the **Received today** card under Pending Incoming Items ([received-today.tsx](src/components/dashboard/inventory/received-today.tsx)) → `GET/POST /api/inventory/receive/receipts` → [receipt-correction-service.ts](src/lib/services/receipt-correction-service.ts).
+**Where**: Receiving (`/dashboard/inventory/receive`, called Bulk Receive before 2026-10-29), the **Received today** card under Pending Incoming Items ([received-today.tsx](src/components/dashboard/inventory/received-today.tsx)) → `GET/POST /api/inventory/receive/receipts` → [receipt-correction-service.ts](src/lib/services/receipt-correction-service.ts).
 
 **Who can edit** (checked server-side from the session, not the request body):
 - The person who received it, **same PHT day**, until an admin has checked it on the Today's Purchases → Received tab (`isConfirmedReason(reason)`: `[purchase confirmed]` suffix or `recorded as purchase`). A `checked` line (buy entered before arrival) has no confirm step, so it stays editable all that day.
@@ -678,7 +680,69 @@ The other kinds are `checked` (a buy was entered before the goods arrived — th
 4. **Trail**: a zero-quantity `movement_type = 'receipt_correction'` note row ("Receipt corrected: 10 → 1 pcs by …", `corrects_movement_id` → the receipt, null when undone) + an `audit_logs` row with old/new qty.
 5. Staff corrections ping Admins/Inventory leads on the bell (`fanOutStaffNotifications`); admin corrections don't.
 
-**Not covered**: the Bulk Inventory Receiving form at the bottom of the page (client-side `useBulkReceive`, writes an expense; ~2 uses/month). Order COGS backfilled by an auto-record is not un-costed when the quantity drops (unit cost is still right). A wrong-product receipt is fixed as Undo + receive again on the right line.
+**Not covered**: Order COGS backfilled by an auto-record is not un-costed when the quantity drops (unit cost is still right). A wrong-product receipt is fixed as Undo + receive again on the right line. (The old Bulk Inventory Receiving form this section used to exclude was removed on 2026-10-29, see next section.)
+
+---
+
+## Receipt-first receiving, Snap receipt & supplier hiding (added 2026-10-29)
+
+Business context lives in `docs/BUSINESS_WORKFLOW.md` (loaded for every agent via `CLAUDE.md`). Short version: the owners buy in Divisoria themselves and historically skipped recording purchases; staff then "received" stock with nothing behind it, so costs were guesses and miscounts went unnoticed. Suppliers and costs are owner-only.
+
+### The three pages (Inventory Management)
+
+| Page | Route | Who | What |
+|---|---|---|---|
+| **Receiving** (was "Bulk Receive") | `/dashboard/inventory/receive` | Inventory + Admin | Count in what was recorded as bought; match snapped receipt lines; Received today |
+| **Purchases & Receipts** | `/dashboard/inventory/purchases-receipts` | Admin only | Same content as the Today's Purchases popup, full page, opens on the Received tab (bought vs received by supplier, per-supplier **Scan receipt**) |
+| **Snap Receipt** | `/dashboard/inventory/snap-receipt` | Admin only | Phone page: optional supplier tap → photo(s) → done |
+
+The Today's Purchases popup and the Purchases & Receipts page share one component, [todays-purchases-panel.tsx](src/components/dashboard/procurement/todays-purchases-panel.tsx); [todays-purchases-dialog.tsx](src/components/dashboard/procurement/todays-purchases-dialog.tsx) is a thin Dialog wrapper. Staff open the popup from Receiving; admins get links to the two admin pages instead.
+
+### Receipt-first rule
+
+**Staff can only receive what the owners recorded as bought** — a real (non-`STAFF_DRAFT`) `purchase_order_items` line from Buy / Scan Receipt on the Procurement Sheet, an online order, or Snap Receipt.
+
+- **`STAFF_DRAFT` lines are no longer listed on Receiving.** They are staff procurement requests tied to customer orders — the shopping list (the Priority List treats them as state `buy`), not deliveries. Listing them is what let staff receive goods nobody recorded. `GET /api/inventory/receive/pending-pos` filters them out; they stay on the Procurement Sheet / Priority List. **Never delete them as "backlog"** — a snapshot of the 85 open requests at the switch is in `scripts/reports/staff_requests_snapshot_2026-10-29.csv` (local, untracked).
+- **Server gate**: [receipt-gate-service.ts](src/lib/services/receipt-gate-service.ts) `checkReceiptGate()` runs in `POST /api/inventory/receive/pending-pos` **before any write**. A submission containing a `STAFF_DRAFT` line or any unexpected item → 403 for non-admins (even with an `overrideReason`); admins must send a non-empty `overrideReason`, logged per item to `audit_logs` (`logReceiptOverrides`, `new_values.override = 'received without receipt'`). Movement `reason` strings are untouched on purpose — `UNEXPECTED_REASON` is matched by equality in `purchase-summary-service.ts`.
+- **Something arrived that isn't listed**: staff add it at the bottom ("Arrived but not on the list?" → `PendingProductSearch`). For staff the row shows **"No receipt yet / Ask the owners on Facebook"**, no qty box, no Save; the team asks over Facebook (an in-app "Ask for receipt" bell was built and removed at the owner's request). The list is kept in `localStorage` (`receivingAddedItems`) and an entry drops off by itself once its product appears in the pending list (pending-pos now returns `productId`). Admins see Save, which prompts for the override reason.
+- The Bulk Inventory Receiving form (`useBulkReceive`, deleted) was removed: 2 uses in 90 days, and it let stock in with no purchase.
+
+### Snap Receipt pipeline
+
+Built so the owners' whole job is "take the photo". Files: [snap-receipt-view.tsx](src/components/dashboard/procurement/snap-receipt-view.tsx) + [useSnapReceipt.ts](src/hooks/useSnapReceipt.ts) (client), [purchase-receipt-service.ts](src/lib/services/purchase-receipt-service.ts) (server), routes `api/inventory/purchase-receipts` (`GET` recent receipts + suppliers, `POST` start a receipt), `api/inventory/purchase-receipts/photo` (`POST` one photo, `maxDuration` 60), `api/inventory/receipt-lines` (`GET` lines to match, `POST` resolve). Admin routes check `getRequestEditor().isManagement` ([request-editor.ts](src/lib/services/request-editor.ts), session-based).
+
+Per photo (`processReceiptPhoto`):
+1. Uploaded to the **private** `purchase-receipts` storage bucket as `<receiptId>/<photoId>.jpg`, row in `purchase_receipt_photos` (`reading` → `read` / `failed`).
+2. Read with `readReceiptImage()` from [receipt-matching.ts](src/lib/receipt-matching.ts) (Gemini first, Tesseract / Vision fallback — moved out of the Scan Receipt route so both scanners share it).
+3. Matched: a remembered staff match in `receipt_line_aliases` (keyed by supplier id or `''` + normalised `textKey(description)`), else exact supplier code, else name score ≥ **0.6** (`AUTO_NAME_THRESHOLD`, stricter than Scan Receipt's 0.34 shortlist threshold because nobody reviews these). Bundles never auto-match.
+4. Sure lines are aggregated by product and recorded through `processProcurementPurchases` — the same path as Buy — **passing each product's open `STAFF_DRAFT` line as `draftItemId`** so the purchase takes over the request (otherwise the item would stay on the shopping list and get bought twice). Supplier may be null ("Don't know"); cost comes from the receipt line.
+5. Every line is stored in `purchase_receipt_lines` (`recorded` / `unmatched` / `not_product` / `not_in_list`) with `po_id`, so the receipt can be audited later.
+
+Photos upload one at a time from a queue while the page stays open (photos added mid-upload join the queue; failures keep a Retry). On iPhone the page must stay open — no background upload.
+
+**Staff matching** — [receipt-lines-to-match.tsx](src/components/dashboard/inventory/receipt-lines-to-match.tsx) + [useReceiptLinesToMatch.ts](src/hooks/useReceiptLinesToMatch.ts), shown above Pending Incoming Items as "From receipts: match these". `GET receipt-lines` returns **only `id`, `description`, `createdAt`** (no qty, price or supplier). Actions: **Pick the product → Confirm** (records a purchase for that one line via the same `recordPurchases`, upserts the alias, then the item appears in the list below to count in), **Not a product** (bag / fee / discount), **Not in our list** (shows on the owner's Snap Receipt page with qty × price so they can add the product). A line already handled returns "Someone already handled this line".
+
+**Tables** — `scripts/migrations/2026-10-29_purchase_receipts.sql` (applied by the owner via the SQL editor): `purchase_receipts`, `purchase_receipt_photos`, `purchase_receipt_lines`, `receipt_line_aliases`. **RLS is on with no policies**: only the service role (API routes) can read them, so receipt prices never reach a staff browser. Verified: an anon-key read returns `[]`.
+
+### Supplier / cost hiding for non-admins
+
+Added an `isManagement` gate to every screen that showed supplier names or costs to Inventory accounts (Jas included):
+
+| Screen | Was showing | File |
+|---|---|---|
+| Products → View Details | Supplier Pricing table (supplier + unit cost) | `view-product-details-dialog.tsx` |
+| Stock Batch List | Supplier column (unit cost was already gated) | `app/dashboard/inventory/batches/page.tsx` |
+| Inventory History | Supplier column; Edit form's Unit Cost and Supplier fields | `inventory/movements/page.tsx`, `inventory/edit-movement-dialog.tsx` |
+| Notification details | "Supplier: …" | `notification-details-dialog.tsx` |
+| Alerted Items Review trail | Supplier + cost per movement | `inventory/alert-review-trail-dialog.tsx` |
+
+Checked live with an Inventory account on 2026-10-30. **UI-level only**: the browser still queries `products.supplier_pricing` / `inventory_movements.supplier_name` directly, so a determined user with dev tools could read them. Real protection needs RLS / column security (not done). Older movement `reason` text can still contain a supplier name (e.g. "Bulk receive from …").
+
+### Known gaps / next
+
+- **Blind counting is not built.** Staff still see Expected Qty, a "Matches N?" placeholder and Auto-Fill Expected, and a count that differs from the purchase **still goes through** (short requires a reason + notifies; over is silent). Planned: hide expected qty, block a mismatching count, ask for a blind recount, and send "same number twice" to the owners — the owner still has to choose whether that case receives the counted qty or waits for approval.
+- Jas's **Pick the product → Confirm** path was not exercised against live data before release (it would have recorded a real purchase); it reuses `processProcurementPurchases`.
+- The old Procurement Sheet **Scan Receipt** still saves draft photos to the **public** `proof_of_payment/receipts/` bucket (4 older photos from 2026-10-10..20 are still there). The 2026-10-30 Sissy draft was moved to `purchase-receipts/legacy-scans/` and marked `status = 'discarded'` (a new status value; `useReceiptDrafts` only lists `draft`). Owners should use Snap Receipt.
 
 ---
 
@@ -827,6 +891,8 @@ Furthermore, `products.stock_level` does **not** represent physical shelf count 
 3. **Header Trigger (`InventoryGuardianTrigger`)**: A 🛡️ icon in the dashboard header displays a badge with the count of active stock anomalies (e.g. `🛡️ 3`) and opens the modal on click.
 
 ### Scan Receipt (added 2026-08-19, updated 2026-09-08)
+
+> **2026-10-29**: for in-person buying, owners should use **Snap Receipt** instead (see "Receipt-first receiving, Snap receipt & supplier hiding"). Reading and matching now live in [receipt-matching.ts](src/lib/receipt-matching.ts), shared by both; this route is a thin wrapper. **Save as Draft below uploads the photo to a public bucket** — receipts carry supplier prices.
 
 Reads a **supplier's receipt photo**, matches each line to a product, learns the supplier's own
 product codes for next time, and hands the confirmed items to the existing bulk **Record Selected**
@@ -1210,7 +1276,19 @@ What happens across the system when inventory matches:
 | `src/lib/services/purchase-repair-service.ts` | Shared repair for stock received before its price was known — ledger row, product cost, COGS, and PO linking, see "Uncosted receipts" |
 | `src/app/api/reports/purchases/route.ts`, `record/route.ts` | Purchases Report data + the warning banner's inline "record missing supplier/cost" action — see "Uncosted receipts" |
 | `src/app/api/inventory/pending-costs/save/route.ts`, `src/hooks/usePendingCosts.ts` | Encode Pending Costs save path — replaced the old handler that wrote a `"Cost of Goods Sold"` expense row the P&L never read |
-| `src/app/api/inventory/receive/pending-pos/route.ts` | Pending-receipt list — allows receiving `STAFF_DRAFT` items at ₱0 (root cause of uncosted receipts) and groups by buying day, see "Buying days on the Receive screen" |
+| `src/app/api/inventory/receive/pending-pos/route.ts` | Pending-receipt list grouped by buying day; since 2026-10-29 excludes `STAFF_DRAFT` lines and runs the receipt-first gate on `POST`, see "Receipt-first receiving" |
+| `src/lib/services/receipt-gate-service.ts` | `checkReceiptGate()` / `logReceiptOverrides()` — staff can't receive unrecorded goods; admin override with reason → `audit_logs` |
+| `src/app/dashboard/inventory/receive/page.tsx` | Receiving page (was Bulk Receive): snapped lines to match, Pending Incoming Items, Received today |
+| `src/components/dashboard/pending-purchases.tsx`, `src/hooks/usePendingPurchases.ts` | Pending Incoming Items + "Arrived but not on the list?" (no Save for staff) |
+| `src/app/dashboard/inventory/purchases-receipts/page.tsx`, `src/components/dashboard/procurement/todays-purchases-panel.tsx` | Admin-only Purchases & Receipts page; the panel is shared with the Today's Purchases popup |
+| `src/components/dashboard/procurement/received-comparison.tsx` | Received tab: bought vs received by supplier + per-supplier Scan receipt |
+| `src/app/dashboard/inventory/snap-receipt/page.tsx`, `src/components/dashboard/procurement/snap-receipt-view.tsx`, `src/hooks/useSnapReceipt.ts` | Snap Receipt phone page (admin only) |
+| `src/lib/services/purchase-receipt-service.ts` | Snap Receipt server logic: store photo privately, read, auto-record sure lines, staff matching + aliases |
+| `src/app/api/inventory/purchase-receipts/route.ts`, `purchase-receipts/photo/route.ts`, `receipt-lines/route.ts` | Snap Receipt and staff-matching API routes |
+| `src/components/dashboard/inventory/receipt-lines-to-match.tsx`, `src/hooks/useReceiptLinesToMatch.ts` | "From receipts: match these" on Receiving (item text only) |
+| `src/lib/receipt-matching.ts`, `src/lib/receipt-image.ts` | Shared receipt reading/matching (server) and photo downscaling (browser) |
+| `scripts/migrations/2026-10-29_purchase_receipts.sql` | Snap Receipt tables, RLS on with no policies |
+| `docs/BUSINESS_WORKFLOW.md`, `CLAUDE.md` | How the business buys, receives and counts — read before designing features |
 | `src/components/dashboard/reports/to-order-report.tsx` | Reports → "Stock Reconciliation" tab — see "Stock Reconciliation report" |
 | `src/app/dashboard/reports/pnl-report.tsx` | P&L Statement report — see "Cost of Goods Sold" |
 | `update_order_func.sql` | `process_order_transaction` Postgres RPC — where `cost_price_at_sale` gets snapshotted |

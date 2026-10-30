@@ -160,7 +160,7 @@ export async function fetchReceivedComparison(
 ): Promise<ReceivedRow[]> {
   const { data: movementRows, error } = await supabase
     .from('inventory_movements')
-    .select('id, product_id, quantity_change, timestamp, reason, unit_cost, products(name, variant_name)')
+    .select('id, product_id, po_item_id, quantity_change, timestamp, reason, unit_cost, products(name, variant_name)')
     .ilike('movement_type', 'restock')
     .gte('timestamp', start)
     .lte('timestamp', end)
@@ -186,11 +186,37 @@ export async function fetchReceivedComparison(
     if (lineErr) throw lineErr;
     lines.push(...(page || []));
   }
+  // Receipts since 2026-10-21 carry po_item_id: the line they were actually
+  // received against. Fetch any linked line the lookback missed (older buy),
+  // and remember which links point at staff requests (no real purchase).
+  const draftLineIds = new Set<string>();
+  const missing = Array.from(new Set(
+    movements.map(m => m.po_item_id).filter((id: string | null) => id && !lines.some(l => l.id === id))
+  )) as string[];
+  for (let i = 0; i < missing.length; i += 100) {
+    const { data: page, error: linkErr } = await supabase
+      .from('purchase_order_items')
+      .select('id, product_id, expected_qty, received_qty, unit_cost, supplier_id, suppliers(name), purchase_orders!inner(notes, created_at)')
+      .in('id', missing.slice(i, i + 100));
+    if (linkErr) throw linkErr;
+    (page || []).forEach((l: any) => {
+      if (l.purchase_orders?.notes === 'STAFF_DRAFT') draftLineIds.add(l.id);
+      else lines.push(l);
+    });
+  }
   const poTime = (l: any) => new Date(l.purchase_orders.created_at).getTime();
 
   // Which purchase line (if any) each receipt belongs to.
   const lineFor = (m: any) => {
     const at = new Date(m.timestamp).getTime();
+    // The recorded link wins. Guessing by product + time picks the NEWEST buy,
+    // which pins today's delivery on an order still in transit (e.g. a second
+    // Pinduoduo order of the same item).
+    if (m.po_item_id) {
+      if (draftLineIds.has(m.po_item_id)) return { born: undefined, line: undefined };
+      const linked = lines.find(l => l.id === m.po_item_id);
+      if (linked) return { born: Math.abs(poTime(linked) - at) < 2000 ? linked : undefined, line: linked };
+    }
     const own = lines.filter(l => l.product_id === m.product_id);
     // Created in the same instant as this receipt = created BY this receipt.
     const born = own.find(l => Math.abs(poTime(l) - at) < 2000);
