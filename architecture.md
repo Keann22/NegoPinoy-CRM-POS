@@ -356,7 +356,9 @@ Real case: order #101D2B3A was `Picked (with issue)` with the GREEN hanger OS. O
 
 **Fix** (`flagItemsAddedAfterPicking` in `order-issues-service.ts`, called at the end of `editOrder`): when an edit raises a product's qty on an order in one of those statuses, an open `order_issue` is created for the added qty (bundles on their components; added onto an existing open issue for the same product). If the order was not already `Picked (with issue)`, it is moved there so the warehouse picks the new pieces. It runs **after** the status-based auto-resolve, which would otherwise close these issues straight away. The picker pre-fills open issues as OS, so the picker switches the line to Found once they pick it.
 
-**Not backfilled yet:** a scan on 2026-10-30 found 73 lines on 25 orders added after their last pick with no open issue (e.g. #0735DFF5: picked with 7 items, now 22). Until those are flagged, their pieces are missing from unallocated and Need to Buy.
+**Backfilled 2026-10-30 16:15 PHT:** 68 pieces on 23 orders that were added after their last pick (and not seen by a checker or packer since) got an open issue with the note "added to the order after it was picked (on <time>). Not picked yet; please pick." (reported_by_name `System fix (Claude)`); the 7 Picked/Photo orders moved to Picked (with issue). For 26 products whose last shelf count came after the add, stock_level was lowered by the added qty so unallocated still equals that count (inventory_movements reason "Keeps the last shelf count true..."). Double-tapped Save made duplicate marks; flagItemsAddedAfterPicking now keeps only the first (514ff7a).
+
+**Known gap:** a Guardian shelf count above 0 resolves every open issue for the product, including these marks, so unpicked pieces then count as picked.
 
 ### Order Stock Deduction: at Creation Only (corrected 2026-10-14)
 
