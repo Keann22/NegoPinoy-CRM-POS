@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createSessionClient } from '@/lib/supabase/server';
 import { getOrderPickedQty, getProductsWithPendingDelivery, getShelfForProducts, savePickerShelfCount } from '@/lib/services/inventory/picker-shelf-guard-service';
+import { staffRolesOf } from '@/lib/auth/staff-roles';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,9 +14,7 @@ async function getCaller() {
   const { data: { user } } = await sessionClient.auth.getUser();
   if (!user) return null;
   const meta: any = user.user_metadata || {};
-  const roles: string[] = Array.isArray(meta.roles)
-    ? meta.roles.map((r: string) => String(r).toLowerCase().trim())
-    : meta.role ? [String(meta.role).toLowerCase().trim()] : [];
+  const roles = staffRolesOf(user);
   if (!roles.some((r) => INVENTORY_ROLES.includes(r))) return null;
   return { name: `${meta.first_name || ''} ${meta.last_name || ''}`.trim() || user.email || 'Picker' };
 }

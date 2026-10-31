@@ -10,6 +10,7 @@ import {
   SupplierReturnError,
 } from '@/lib/services/supplier-return-service';
 import type { NewSupplierReturn, SupplierReturnAction } from '@/types/supplier-returns.types';
+import { staffRolesOf } from '@/lib/auth/staff-roles';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,9 +24,7 @@ async function getCaller() {
   const { data: { user } } = await sessionClient.auth.getUser();
   if (!user) return null;
   const meta: any = user.user_metadata || {};
-  const roles: string[] = Array.isArray(meta.roles)
-    ? meta.roles.map((r: string) => String(r).toLowerCase().trim())
-    : meta.role ? [String(meta.role).toLowerCase().trim()] : [];
+  const roles = staffRolesOf(user);
   const name = `${meta.first_name || ''} ${meta.last_name || ''}`.trim() || user.email || 'Staff';
   return {
     name,

@@ -9,87 +9,58 @@ import { Logo } from '@/components/logo';
 import { FormEvent, useEffect, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { createClient } from '@/lib/supabase/client';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { isStaffUser } from '@/lib/auth/staff-roles';
+
+// Staff log-in only. There is no public sign-up: owners create staff accounts in
+// User Management, and roles are set by the server (app_metadata).
+const NO_ACCESS = 'This account has no staff access. Ask the owner to add you in User Management.';
 
 export default function LoginPage() {
   const supabase = createClient();
   const router = useRouter();
   const { toast } = useToast();
 
-  const [isSignUp, setIsSignUp] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [noAccess, setNoAccess] = useState(false);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [role, setRole] = useState('Sales');
 
-  // Check if user is already logged in
+  // Already logged in: staff go to the dashboard; anyone else is signed out here
+  // (sending them to /dashboard would just bounce back).
   useEffect(() => {
     const checkSession = async () => {
       const { data } = await supabase.auth.getUser();
-      if (data.user) {
+      if (data.user && isStaffUser(data.user)) {
         router.push('/dashboard');
-      } else {
-        setIsCheckingSession(false);
+        return;
       }
+      if (data.user) {
+        await supabase.auth.signOut();
+        setNoAccess(true);
+      }
+      setIsCheckingSession(false);
     };
     checkSession();
   }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (!email || !password) {
+      toast({ variant: 'destructive', title: 'Email and password are required.' });
+      return;
+    }
     setIsLoading(true);
-
     try {
-      if (isSignUp) {
-        if (!email || !password || !firstName || !lastName || !role) {
-          toast({ variant: 'destructive', title: 'All fields are required.' });
-          return;
-        }
-
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { first_name: firstName, last_name: lastName, role }
-          }
-        });
-
-        if (error) throw error;
-
-        if (data.user && !data.session) {
-          // Email confirmation required
-          toast({
-            title: 'Check your email!',
-            description: 'We sent a confirmation link. Please verify your email before logging in.',
-          });
-        } else if (data.session) {
-          // Auto-confirmed (email confirmation disabled in Supabase)
-          toast({ title: 'Account created!', description: 'Welcome aboard.' });
-          router.push('/dashboard');
-        }
-
-      } else {
-        if (!email || !password) {
-          toast({ variant: 'destructive', title: 'Email and password are required.' });
-          return;
-        }
-
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-
-        if (error) throw error;
-
-        router.push('/dashboard');
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      if (!isStaffUser(data.user)) {
+        await supabase.auth.signOut();
+        setNoAccess(true);
+        return;
       }
+      router.push('/dashboard');
     } catch (err: any) {
       toast({
         variant: 'destructive',
@@ -129,43 +100,17 @@ export default function LoginPage() {
           <div className="flex justify-center mb-2">
             <Logo className="w-10 h-10" />
           </div>
-          <CardTitle className="text-2xl font-bold font-headline">
-            {isSignUp ? 'Create an Account' : 'Welcome to RetailFlow'}
-          </CardTitle>
-          <CardDescription>
-            {isSignUp ? 'Enter your details to get started.' : 'Enter your credentials to access your dashboard'}
-          </CardDescription>
+          <CardTitle className="text-2xl font-bold font-headline">Welcome to RetailFlow</CardTitle>
+          <CardDescription>Enter your credentials to access your dashboard</CardDescription>
         </CardHeader>
         <CardContent>
+          {noAccess && (
+            <p className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+              {NO_ACCESS}
+            </p>
+          )}
           <form onSubmit={handleSubmit}>
             <div className="space-y-4">
-              {isSignUp && (
-                <>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="firstName">First Name</Label>
-                      <Input id="firstName" placeholder="Keneth" required value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="lastName">Last Name</Label>
-                      <Input id="lastName" placeholder="Owner" required value={lastName} onChange={(e) => setLastName(e.target.value)} />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="role">Assign Your Role</Label>
-                    <Select value={role} onValueChange={setRole}>
-                      <SelectTrigger id="role">
-                        <SelectValue placeholder="Select a role" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Admin">Admin</SelectItem>
-                        <SelectItem value="Inventory">Inventory (Fulfillment)</SelectItem>
-                        <SelectItem value="Sales">Sales</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </>
-              )}
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input id="email" type="email" placeholder="m@example.com" required value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -173,33 +118,24 @@ export default function LoginPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password">Password</Label>
-                  {!isSignUp && (
-                    <button
-                      type="button"
-                      onClick={handlePasswordReset}
-                      className="text-sm font-medium text-primary hover:underline"
-                    >
-                      Forgot password?
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={handlePasswordReset}
+                    className="text-sm font-medium text-primary hover:underline"
+                  >
+                    Forgot password?
+                  </button>
                 </div>
                 <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
               </div>
               <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? 'Please wait...' : isSignUp ? 'Sign Up' : 'Login'}
+                {isLoading ? 'Please wait...' : 'Login'}
               </Button>
             </div>
           </form>
-          <div className="mt-4 text-center text-sm">
-            {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
-            <button
-              type="button"
-              onClick={() => setIsSignUp(!isSignUp)}
-              className="font-medium text-primary hover:underline"
-            >
-              {isSignUp ? 'Login' : 'Sign Up'}
-            </button>
-          </div>
+          <p className="mt-4 text-center text-sm text-muted-foreground">
+            New staff? Ask the owner to create your account.
+          </p>
         </CardContent>
       </Card>
     </div>

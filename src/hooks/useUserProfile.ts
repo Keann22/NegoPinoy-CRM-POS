@@ -10,7 +10,7 @@ export type UserProfile = {
     roles: ('Owner' | 'Admin' | 'Inventory' | 'Sales')[];
 }
 
-// Maps a single role string from Supabase user_metadata to the roles array
+// Maps the role(s) in Supabase app_metadata to the roles array
 // used by the dashboard layout.
 function buildRolesFromMetadata(metadata: any): ('Owner' | 'Admin' | 'Inventory' | 'Sales')[] {
     if (!metadata) return [];
@@ -57,7 +57,8 @@ export function useUserProfile() {
             firstName: meta.first_name ?? '',
             lastName: meta.last_name ?? '',
             email: user.email ?? '',
-            roles: buildRolesFromMetadata(meta),
+            // Roles only from app_metadata: user_metadata is editable by the user.
+            roles: buildRolesFromMetadata((user as any).appMetadata ?? {}),
         };
     }, [user]);
 

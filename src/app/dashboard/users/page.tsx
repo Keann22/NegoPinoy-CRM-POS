@@ -44,6 +44,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { createClient } from '@/lib/supabase/client';
 import { EditUserRolesDialog } from '@/components/dashboard/edit-user-roles-dialog';
+import { AddStaffDialog } from '@/components/dashboard/add-staff-dialog';
 
 export type UserProfile = {
   id: string;
@@ -58,6 +59,7 @@ export default function UsersPage() {
   const { userProfile: currentUserProfile } = useUserProfile();
   const [deletingUser, setDeletingUser] = useState<UserProfile | null>(null);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
+  const [addingStaff, setAddingStaff] = useState(false);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [refreshCount, setRefreshCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -78,40 +80,11 @@ export default function UsersPage() {
     const loadUsers = async () => {
       setIsLoading(true);
       try {
-        const { data, error } = await supabase.rpc('get_all_users');
-        if (error) throw error;
-        
-        if (data) {
-          const mapRole = (r: string): ('Owner' | 'Admin' | 'Inventory' | 'Sales')[] => {
-            switch (r) {
-              case 'Owner': return ['Owner', 'Admin', 'Sales', 'Inventory'];
-              case 'Admin': return ['Admin', 'Sales', 'Inventory'];
-              case 'Sales': return ['Sales'];
-              case 'Inventory': return ['Inventory'];
-              default: return [];
-            }
-          };
-
-          const parsedUsers = data.map((u: any) => {
-            const meta = u.raw_user_meta_data || {};
-            let userRoles: any[] = [];
-            
-            if (Array.isArray(meta.roles)) {
-              userRoles = meta.roles;
-            } else if (meta.role) {
-              userRoles = mapRole(meta.role);
-            }
-            
-            return {
-              id: u.id,
-              firstName: meta.first_name || '',
-              lastName: meta.last_name || '',
-              email: u.email || '',
-              roles: userRoles
-            };
-          });
-          setUsers(parsedUsers);
-        }
+        // Roles come from app_metadata via the server (owners/admins only).
+        const res = await fetch('/api/admin/users');
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Failed to load users');
+        setUsers(json.users as UserProfile[]);
       } catch (err) {
         console.error('Error loading users:', err);
       } finally {
@@ -170,6 +143,7 @@ export default function UsersPage() {
             <CardTitle className="font-headline">User Management</CardTitle>
             <CardDescription>Manage user roles and permissions.</CardDescription>
           </div>
+          <Button size="sm" onClick={() => setAddingStaff(true)}>Add staff</Button>
         </CardHeader>
         <CardContent>
           <Table>
@@ -276,6 +250,7 @@ export default function UsersPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <AddStaffDialog open={addingStaff} onOpenChange={setAddingStaff} onSuccess={() => setRefreshCount((c) => c + 1)} />
       <EditUserRolesDialog 
         user={editingUser} 
         open={!!editingUser} 

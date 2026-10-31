@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { VOID_ORDER_STATUSES, backfillOrderItemCosts } from './cost-backfill-service';
+import { staffRolesOf } from '@/lib/auth/staff-roles';
 import {
   resolveSupplierName,
   suggestSupplierAndCost,
@@ -10,16 +11,10 @@ import {
 
 // Supplier identities and costs are management-only. Roles live in the user's
 // metadata (same source the dashboard reads via useUserProfile). We check both
-// app_metadata (server-controlled, preferred) and user_metadata, and default to
+// app_metadata only (server-controlled; user_metadata is user-editable), and default to
 // deny — no session, or no recognised role, means staff-level access.
 export function isManagementUser(user: any): boolean {
-  const collect = (meta: any): string[] => {
-    if (!meta) return [];
-    if (Array.isArray(meta.roles)) return meta.roles.map((r: string) => String(r).toLowerCase().trim());
-    if (meta.role) return [String(meta.role).toLowerCase().trim()];
-    return [];
-  };
-  const roles = [...collect(user?.app_metadata), ...collect(user?.user_metadata)];
+  const roles = staffRolesOf(user);
   return roles.includes('owner') || roles.includes('admin');
 }
 

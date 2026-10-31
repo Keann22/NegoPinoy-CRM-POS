@@ -6,6 +6,14 @@ conflicts with something here, ask before building.
 
 Keep this file current: when the owner explains a workflow, add it here.
 
+## Our customers (owner confirmed, 2026-11-01)
+
+- **Nanay / misis** buying appliances and gamit for the home.
+- **Small negosyo**: sari-sari stores, eateries, home bakers.
+- **OFWs** buying for their family back home.
+- They order through **Facebook / Messenger**, often **COD**, and many pay by
+  **hulugan (lay-away)**.
+
 ## People and roles
 
 - **Owners (husband and wife, Admin accounts)** do the buying themselves and run
@@ -220,6 +228,22 @@ Why nothing happened before return cases (2026-10-30):
   "exchange", which does nothing.)
 
 ## Being decided (not built yet)
+
+- **Customer purchase planner (owner, 2026-11-01)**: a premium feature on the
+  website behind a customer log-in. Customers list what they plan to buy
+  (not a wishlist), ask "okay bang bilhin?" and get pros, cons and a better
+  suggestion for them, and later check if an appliance fits / looks good in
+  their house. Lightly gamified. **Not tied to hulugan.** Collect as much
+  customer information as is useful. Customer accounts must never be able to
+  open the staff dashboard.
+  - "Premium" means **free, but only for logged-in customers** (an extra mile
+    for them), not paid.
+  - If we don't sell a product that fits the customer better, the advisor
+    **says so honestly**.
+  - Still deciding if it's worth building (cost vs. use).
+  - The customer website (`website/`) is **not launched yet** (2026-11-01) and
+    the owner isn't happy with its look. Launch the website first; the planner
+    comes after we see how many customers use it.
 
 - Blind counting: staff see product names only, not bought quantities; the
   system compares their count with the receipt and asks for a recount on

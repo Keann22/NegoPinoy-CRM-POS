@@ -10,6 +10,8 @@ export type UserData = {
     email?: string;
     photoURL?: string;
     userMetadata?: Record<string, any>;
+    /** Server-controlled metadata. Staff roles are read from here only. */
+    appMetadata?: Record<string, any>;
 };
 
 type AuthState = {
@@ -23,6 +25,7 @@ function formatUserData(user: User): UserData {
         email: user.email,
         photoURL: user.user_metadata?.avatar_url,
         userMetadata: { ...user.app_metadata, ...user.user_metadata },
+        appMetadata: user.app_metadata ?? {},
     };
 }
 
@@ -75,9 +78,18 @@ function initAuth() {
     });
 
     // Resolve initial session / user
-    supabase.auth.getUser().then(({ data }: { data: { user: User | null } }) => {
+    supabase.auth.getUser().then(async ({ data }: { data: { user: User | null } }) => {
         if (data?.user) {
             setUser(data.user);
+            // The saved session keeps a copy of the user from log-in time. If the owner
+            // changed this person's roles since then, refresh it once so later auth
+            // events (e.g. on tab focus) don't bring back the old roles.
+            const { data: s } = await supabase.auth.getSession();
+            const saved = s?.session?.user?.app_metadata;
+            const sorted = (o: any) => JSON.stringify(o ?? {}, Object.keys(o ?? {}).sort());
+            if (s?.session && sorted(saved) !== sorted(data.user.app_metadata)) {
+                await supabase.auth.refreshSession().catch(() => {});
+            }
         } else {
             updateState({ user: null, isLoading: false });
         }

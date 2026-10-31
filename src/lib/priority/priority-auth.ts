@@ -1,6 +1,7 @@
 import { createClient as createSessionClient } from '@/lib/supabase/server';
 import { editorFromUser } from '@/lib/services/receipt-correction-service';
 import { JAS_EMAILS } from './priority-rules';
+import { staffRolesOf } from '@/lib/auth/staff-roles';
 
 /** Who is calling a priority-list route, and what they may do. Server only. */
 export interface PriorityCaller {
@@ -12,15 +13,7 @@ export interface PriorityCaller {
   canDecide: boolean;
 }
 
-function rolesOf(user: any): string[] {
-  const collect = (meta: any): string[] => {
-    if (!meta) return [];
-    if (Array.isArray(meta.roles)) return meta.roles.map((r: string) => String(r).toLowerCase().trim());
-    if (meta.role) return [String(meta.role).toLowerCase().trim()];
-    return [];
-  };
-  return [...collect(user?.app_metadata), ...collect(user?.user_metadata)];
-}
+const rolesOf = staffRolesOf;
 
 export async function getPriorityCaller(): Promise<PriorityCaller | null> {
   const session = await createSessionClient();

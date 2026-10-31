@@ -52,16 +52,18 @@ export function EditUserRolesDialog({ user, open, onOpenChange, onSuccess }: Edi
       description: `Updating roles for ${user.firstName} ${user.lastName}.`,
     });
     
-    const { error } = await supabase.rpc('set_user_roles', {
-      target_user_id: user.id,
-      new_roles: data.roles
+    const res = await fetch('/api/admin/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user.id, roles: data.roles }),
     });
+    const json = await res.json().catch(() => ({}));
 
-    if (error) {
+    if (!res.ok) {
       toast({
         variant: 'destructive',
         title: "Error Updating Roles",
-        description: error.message,
+        description: json.error || 'Failed to update roles',
       });
       return;
     }

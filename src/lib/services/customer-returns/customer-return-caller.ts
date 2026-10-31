@@ -1,5 +1,6 @@
 import { createClient as createSessionClient } from '@/lib/supabase/server';
 import { isManagementUser } from '@/lib/services/purchase-summary-service';
+import { staffRolesOf } from '@/lib/auth/staff-roles';
 
 // Inventory, warehouse staff and sales agents can open and work on customer
 // return cases; owners/admins also make the decisions.
@@ -11,9 +12,7 @@ export async function getReturnsCaller() {
   const { data: { user } } = await sessionClient.auth.getUser();
   if (!user) return null;
   const meta: any = user.user_metadata || {};
-  const roles: string[] = Array.isArray(meta.roles)
-    ? meta.roles.map((r: string) => String(r).toLowerCase().trim())
-    : meta.role ? [String(meta.role).toLowerCase().trim()] : [];
+  const roles = staffRolesOf(user);
   const isManagement = isManagementUser(user);
   return {
     name: `${meta.first_name || ''} ${meta.last_name || ''}`.trim() || user.email || 'Staff',
