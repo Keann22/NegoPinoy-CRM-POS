@@ -11,6 +11,8 @@ import { usePicker } from '@/hooks/usePicker';
 import { ProductPhotoDialog } from '@/components/dashboard/product-photo-dialog';
 import { BorrowDialog, type BorrowTarget } from '@/components/dashboard/picker/borrow-dialog';
 import { ReportDamagedDialog } from '@/components/dashboard/supplier-returns/report-damaged-dialog';
+import { ShelfGuardDialog } from '@/components/dashboard/picker/shelf-guard-dialog';
+import { useShelfGuard } from '@/hooks/picker/useShelfGuard';
 
 function formatMemoryAge(dateStr?: string): string {
   if (!dateStr) return '';
@@ -54,6 +56,8 @@ export default function PickerApp() {
   const allRows = pickGroups.flatMap((g) => g.rows);
   const unmarkedCount = unmarkedRows(allRows).length;
   const checkedCount = allRows.length - unmarkedCount;
+  // Found / Borrow when the shelf says there isn't enough (owner rule 2026-10-31).
+  const guard = useShelfGuard(scannedOrderId, allRows, { markFound, markOutOfStock, setMissingQty: handleQtyDraftChange });
 
   // Borrowing an item already picked for another order (see borrow-dialog).
   const [borrowTarget, setBorrowTarget] = React.useState<BorrowTarget | null>(null);
@@ -64,7 +68,12 @@ export default function PickerApp() {
 
   const openBorrow = (key: string) => {
     const row = allRows.find((r) => r.key === key);
-    if (row) setBorrowTarget({ rowKey: key, productId: row.productId, productName: row.productName, missingQty: outOfStockQty.get(key) || row.quantity });
+    if (row) guard.beforeBorrow(row, () =>
+      setBorrowTarget({ rowKey: key, productId: row.productId, productName: row.productName, missingQty: outOfStockQty.get(key) || row.quantity }));
+  };
+  const onFoundClick = (key: string) => {
+    const row = allRows.find((r) => r.key === key);
+    if (row) guard.onFound(row); else markFound(key);
   };
 
   const onBorrowed = (target: BorrowTarget, qty: number, fromShortId: string) => {
@@ -228,7 +237,7 @@ export default function PickerApp() {
                                   <div className="inline-flex gap-1">
                                     <button
                                       type="button"
-                                      onClick={() => markFound(key)}
+                                      onClick={() => onFoundClick(key)}
                                       aria-pressed={isFound}
                                       className={cn('h-9 min-w-[3.5rem] rounded-md border px-2 text-xs font-semibold',
                                         isFound ? 'border-green-600 bg-green-600 text-white' : 'border-green-300 text-green-700 hover:bg-green-50')}
@@ -367,6 +376,13 @@ export default function PickerApp() {
       )}
 
       <BorrowDialog target={borrowTarget} toOrderId={scannedOrderId} onClose={() => setBorrowTarget(null)} onBorrowed={onBorrowed} />
+      <ShelfGuardDialog
+        prompt={guard.prompt}
+        onCount={guard.submitCount}
+        onNotReceived={guard.notReceivedYet}
+        onBothEmpty={guard.confirmBothEmpty}
+        onClose={guard.closePrompt}
+      />
       <ReportDamagedDialog
         open={!!damaged}
         product={damaged}

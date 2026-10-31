@@ -110,3 +110,9 @@ export interface GuardianDailyProgress {
 }
 
 
+
+/** Picker shelf guard: unallocated stock (both units) and Unit 2 reserve for one product. */
+export interface PickerShelfInfo {
+  unallocated: number;
+  unit2: number;
+}

@@ -60,6 +60,23 @@ Receipts:
 - Formula and details: architecture.md, "Unallocated Stock = What Is on the Shelf
   (LOCKED)".
 
+## Picking when the shelf says there's not enough (owner, 2026-10-31)
+
+- If unallocated stock is **less than what the picker needs**, the picker can't
+  just tap Found. They must either:
+  - **Count the Unit 1 shelf** (including the pieces in their hand) without
+    seeing the system's number. The count is saved like a Guardian count, and
+    Found goes through for what the count covers (the rest is OS). Unit 2 is
+    left as recorded.
+  - Or say it came from a **delivery that isn't recorded yet**: blocked, mark OS,
+    note it on Receiving and message the owners (receipt-first).
+  - Or **check again**: it may be the wrong variant.
+- A count higher than the system expected usually means a purchase wasn't
+  recorded: the owners get a bell notification to check Purchases & Receipts.
+- **Unit 2 reserve is free stock, not borrowing.** If unallocated stock is above
+  zero, the picker can't borrow from another order until they confirm **both
+  Unit 1 and Unit 2 are empty**; that confirmation is saved as a count of 0.
+
 ## Devices
 
 - Owners use **iPhone and Huawei** phones. Anything mobile must work on both,

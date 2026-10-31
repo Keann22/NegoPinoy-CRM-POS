@@ -361,6 +361,14 @@ Real case: order #101D2B3A was `Picked (with issue)` with the GREEN hanger OS. O
 
 **Guardian no longer closes these (fixed 2026-10-30):** a shelf count above 0 used to resolve every open issue for the product, so unpicked pieces counted as picked. See rule 5 under "Physical Shelf Count Audits". These marks are also kept out of the Guardian's Floor Shortage alerts (they need picking, not counting) but still count as unpicked demand in its negative-stock check; they are recognised by the note text (`ADDED_AFTER_PICKING_NOTE` in `order-issues-service.ts`).
 
+### Picker Shelf Guard (owner rule, 2026-10-31)
+
+Owner rules: `docs/BUSINESS_WORKFLOW.md` → "Picking when the shelf says there's not enough".
+
+- **Found**: `useShelfGuard` (`src/hooks/picker/useShelfGuard.ts`) loads `GET /api/picker/shelf?orderId&productIds` once per scanned order: unallocated stock per product (LOCKED formula, both units), Unit 2 reserve stock, and what the order already picked (`shelf_order_targets`, so a Picked (with issue) re-pick only needs its OS pieces). If unallocated < pieces still needed, Found opens `ShelfGuardDialog` instead: **count the Unit 1 shelf** (blind; incl. pieces in hand) → `POST /api/picker/shelf` → `savePickerShelfCount` saves total = Unit 1 count + Unit 2 recorded stock through `applyPhysicalShelfCount` (so `stock_level`, `shelf_stock` and Guardian memory all update); Found for what it covers, OS for the rest; or **new delivery not received** → OS + tell the owners; or **check again** (wrong variant). A count above the expected number sends owners/admins a bell notification linking Purchases & Receipts (purchase probably not recorded).
+- **Borrow**: while unallocated > 0 the picker must confirm Unit 1 and Unit 2 are empty first; that zeroes the Unit 2 row (logged `adjustment` movement) and saves a count of 0, then the Borrow dialog opens.
+- If the shelf numbers fail to load, nothing is blocked.
+
 ### Planned: Stored Shelf Stock and Physical Stock (owner direction, 2026-10-30, NOT BUILT)
 
 Owner rules: `docs/BUSINESS_WORKFLOW.md` → "Planned: unallocated stock is kept and counted, not calculated". Nothing below exists in code yet; build only after the owner approves this plan.
