@@ -1,6 +1,8 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { applyPhysicalShelfCount } from './inventory-guardian-action-service';
 import type { RecountRequest } from '@/types/inventory-guardian.types';
+import { getShelfForProducts } from './picker-shelf-guard-service';
+import { sendTelegramMessage } from './inventory-guardian-telegram-service';
 
 /*
  * Recount requests: an owner asks Jas to count specific products. Every Jas
@@ -64,10 +66,12 @@ export async function completeRecount(
   if (error || !req) throw new RecountError('Request not found.');
   if (req.status !== 'open') throw new RecountError('Nabilang na ito.');
 
+  const systemBefore = (await getShelfForProducts(supabase, [req.product_id]))[req.product_id]?.unallocated ?? null;
+
   // Claim it first so two Jas accounts can't save the same item twice.
   const { data: claimed } = await supabase
     .from('recount_requests')
-    .update({ status: 'done', counted_unit1: unit1, counted_unit2: unit2, done_by_name: input.actorName, done_at: new Date().toISOString() })
+    .update({ status: 'done', counted_unit1: unit1, counted_unit2: unit2, system_before: systemBefore, done_by_name: input.actorName, done_at: new Date().toISOString() })
     .eq('id', req.id).eq('status', 'open').select('id');
   if (!claimed || claimed.length === 0) throw new RecountError('Nabilang na ito.');
 
@@ -106,4 +110,105 @@ export async function completeRecount(
     await supabase.from('recount_requests').update({ status: 'open', done_by_name: null, done_at: null }).eq('id', req.id);
     throw e;
   }
+
+  try {
+    await notifyIfBatchDone(supabase, req.batch_id);
+  } catch (e) {
+    console.error('Recount: Telegram finished message failed', e);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Telegram to the owner: when Jas finishes a batch, and at noon if she hasn't
+// ---------------------------------------------------------------------------
+
+const PH_TZ = 'Asia/Manila';
+const phDate = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: PH_TZ }).format(d); // YYYY-MM-DD
+const phTime = (iso: string) => new Date(iso).toLocaleString('en-PH', { timeZone: PH_TZ, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+async function batchRows(supabase: SupabaseClient, batchId: string) {
+  const { data, error } = await supabase
+    .from('recount_requests')
+    .select('id, status, message, requested_by_name, counted_unit1, counted_unit2, system_before, done_by_name, done_at, products(name)')
+    .eq('batch_id', batchId)
+    .order('created_at');
+  if (error) throw error;
+  return (data || []).map((r: any) => ({ ...r, productName: (Array.isArray(r.products) ? r.products[0] : r.products)?.name || 'Item' }));
+}
+
+/** After a save: if the whole batch is counted, send the results once. */
+export async function notifyIfBatchDone(supabase: SupabaseClient, batchId: string) {
+  const rows = await batchRows(supabase, batchId);
+  if (rows.length === 0 || rows.some((r) => r.status === 'open')) return;
+  const { data: claimed } = await supabase
+    .from('recount_requests').update({ done_notified_at: new Date().toISOString() })
+    .eq('batch_id', batchId).is('done_notified_at', null).select('id');
+  if (!claimed || claimed.length === 0) return; // already sent
+
+  const lines = rows.filter((r) => r.status === 'done').map((r) => {
+    const total = (r.counted_unit1 || 0) + (r.counted_unit2 || 0);
+    const before = r.system_before;
+    const diff = before == null ? null : before - total;
+    const verdict = diff == null ? '' : diff > 0 ? `, sobra ng ${diff} ang system` : diff < 0 ? `, kulang ng ${-diff} ang system` : ', tama ang system';
+    return `✅ ${esc(r.productName)}: <b>${total}</b> (Unit 1 ${r.counted_unit1}, Unit 2 ${r.counted_unit2})` +
+      `${before != null ? `, dati ${before}` : ''}${verdict} — ${esc(r.done_by_name || 'Jas')}, ${phTime(r.done_at)}`;
+  });
+  const text = [
+    `<b>Tapos na ang pabilang ni Jas</b>`,
+    `"${esc(rows[0].message)}"`,
+    '',
+    ...lines,
+    '',
+    'Na-update na ang stocks sa bilang niya.',
+  ].join('\n');
+  const sent = await sendTelegramMessage(text);
+  if (!sent.success) {
+    await supabase.from('recount_requests').update({ done_notified_at: null }).eq('batch_id', batchId);
+    throw new Error(sent.error);
+  }
+}
+
+/**
+ * Noon check (Vercel cron, 12:00 PM PH): batches still open on or after their
+ * due date get one reminder per day. Skips Sundays. `dryRun` reports without sending.
+ */
+export async function remindUnfinishedRecounts(supabase: SupabaseClient, now = new Date(), dryRun = false) {
+  const today = phDate(now);
+  const weekday = new Intl.DateTimeFormat('en-US', { timeZone: PH_TZ, weekday: 'short' }).format(now);
+  if (weekday === 'Sun' && !dryRun) return { sent: 0, skipped: 'Sunday' };
+
+  const { data, error } = await supabase
+    .from('recount_requests').select('batch_id, due_date, created_at, last_reminded_on').eq('status', 'open');
+  if (error) throw error;
+  const due = new Set<string>();
+  (data || []).forEach((r: any) => {
+    const dueDate = r.due_date || phDate(new Date(r.created_at));
+    if (dueDate <= today && (!r.last_reminded_on || r.last_reminded_on < today)) due.add(r.batch_id);
+  });
+  if (dryRun) return { sent: 0, wouldRemind: due.size };
+
+  let sent = 0;
+  for (const batchId of Array.from(due)) {
+    // Claim today's reminder for this batch first (cron retries or repeat calls send it once).
+    const { data: claimed } = await supabase
+      .from('recount_requests').update({ last_reminded_on: today })
+      .eq('batch_id', batchId).eq('status', 'open').or(`last_reminded_on.is.null,last_reminded_on.lt.${today}`).select('id');
+    if (!claimed || claimed.length === 0) continue;
+    const rows = await batchRows(supabase, batchId);
+    const open = rows.filter((r) => r.status === 'open');
+    const text = [
+      `<b>⏰ Hindi pa tapos ni Jas ang pabilang</b> (12 PM)`,
+      `"${esc(rows[0].message)}"`,
+      '',
+      `${open.length} sa ${rows.length} ang hindi pa nabibilang:`,
+      ...open.map((r) => `• ${esc(r.productName)}`),
+      '',
+      'Naka-pop-up pa rin sa kanya hanggang mabilang lahat.',
+    ].join('\n');
+    const res = await sendTelegramMessage(text);
+    if (res.success) sent += 1;
+    else await supabase.from('recount_requests').update({ last_reminded_on: null }).eq('batch_id', batchId).eq('status', 'open');
+  }
+  return { sent };
 }

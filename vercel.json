@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/cron/recount-reminder", "schedule": "0 4 * * *" }
+  ]
+}

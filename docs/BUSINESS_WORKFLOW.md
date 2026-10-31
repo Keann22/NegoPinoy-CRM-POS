@@ -90,6 +90,10 @@ Receipts:
   the products. She counts Unit 1 (shelf) and Unit 2 (reserve) without seeing
   the system's numbers. It can be minimized while she counts but comes back
   every 30 minutes and on every page load until each product is saved.
+- The owner gets a **Telegram message as soon as Jas finishes** (her counts vs
+  the old numbers), and a **reminder at 12 noon** if she hasn't finished by the
+  due date (not on Sundays). No work Nov 1, holiday Nov 2 (2026): the first
+  batch is due Tuesday, Nov 3.
 
 ## Devices
 
