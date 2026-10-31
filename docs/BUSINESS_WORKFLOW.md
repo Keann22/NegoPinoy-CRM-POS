@@ -73,6 +73,12 @@ Receipts:
   - Or **check again**: it may be the wrong variant.
 - A count higher than the system expected usually means a purchase wasn't
   recorded: the owners get a bell notification to check Purchases & Receipts.
+- **Don't count a delivery twice** (found 2026-10-31: 4 of the first 5 picker
+  counts included goods from that day's buying trip, which Receiving then added
+  again). The count asks pickers to leave out anything not received yet, and
+  warns when a delivery of the item is waiting on Receiving. Receiving warns on
+  any item a picker counted in the last 2 days: receive only the pieces that
+  weren't already on the shelf.
 - **Unit 2 reserve is free stock, not borrowing.** If unallocated stock is above
   zero, the picker can't borrow from another order until they confirm **both
   Unit 1 and Unit 2 are empty**; that confirmation is saved as a count of 0.

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createSessionClient } from '@/lib/supabase/server';
-import { getOrderPickedQty, getShelfForProducts, savePickerShelfCount } from '@/lib/services/inventory/picker-shelf-guard-service';
+import { getOrderPickedQty, getProductsWithPendingDelivery, getShelfForProducts, savePickerShelfCount } from '@/lib/services/inventory/picker-shelf-guard-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,11 +28,13 @@ export async function GET(req: Request) {
     const params = new URL(req.url).searchParams;
     const ids = (params.get('productIds') || '').split(',').filter(Boolean);
     const orderId = params.get('orderId');
-    const [shelf, picked] = await Promise.all([
+    const [shelf, picked, pending] = await Promise.all([
       getShelfForProducts(supabase, ids),
       orderId ? getOrderPickedQty(supabase, orderId) : Promise.resolve({}),
+      getProductsWithPendingDelivery(supabase, ids),
     ]);
-    return NextResponse.json({ shelf, picked });
+    // pendingDelivery: a recorded purchase of it is still waiting on Receiving (no qty: the count stays blind).
+    return NextResponse.json({ shelf, picked, pendingDelivery: Array.from(pending) });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }

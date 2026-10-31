@@ -62,10 +62,17 @@ export function ShelfGuardDialog({ prompt, onCount, onNotReceived, onBothEmpty, 
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
+              {prompt.deliveryWaiting && (
+                <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                  <strong>A delivery of this item is waiting on Receiving</strong> (not counted in yet). If what you&apos;re
+                  holding came from that delivery, choose &quot;From a new delivery&quot; below. Count only pieces that were
+                  already on the shelf, or they&apos;ll be counted twice when it&apos;s received.
+                </div>
+              )}
               <div className="space-y-2 rounded-md border p-3">
                 <Label htmlFor="sg-count" className="font-semibold">It&apos;s on the shelf: count it</Label>
                 <p className="text-xs text-muted-foreground">
-                  How many are on the Unit 1 shelf now, including the ones in your hand?
+                  How many are on the Unit 1 shelf now, including the ones in your hand? Leave out anything from a delivery that isn&apos;t received yet.
                   {prompt.unit2 > 0 && ` Unit 2 reserve is recorded with ${prompt.unit2}: check there too, but leave those out of this count.`}
                 </p>
                 <div className="flex gap-2">

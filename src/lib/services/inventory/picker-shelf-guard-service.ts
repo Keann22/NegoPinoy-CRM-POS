@@ -58,6 +58,50 @@ export async function getOrderPickedQty(supabase: SupabaseClient, orderId: strin
   return out;
 }
 
+/** Products with a recorded purchase still waiting on Receiving (not counted in yet). */
+export async function getProductsWithPendingDelivery(supabase: SupabaseClient, productIds: string[]): Promise<Set<string>> {
+  const out = new Set<string>();
+  if (productIds.length === 0) return out;
+  const { data } = await supabase
+    .from('purchase_order_items')
+    .select('product_id, expected_qty, received_qty, purchase_orders!inner(notes)')
+    .eq('status', 'pending_receipt')
+    .in('product_id', productIds);
+  (data || []).forEach((r: any) => {
+    const po = Array.isArray(r.purchase_orders) ? r.purchase_orders[0] : r.purchase_orders;
+    if (po?.notes !== 'STAFF_DRAFT' && Number(r.expected_qty) - Number(r.received_qty || 0) > 0) out.add(r.product_id);
+  });
+  return out;
+}
+
+export interface RecentPickerCount { at: string; unit1: number | null; byName: string | null }
+
+/**
+ * The latest count a picker saved for each product in the last `hours` hours.
+ * Receiving warns about these: if the counted pieces came from the delivery
+ * being received, receiving them again would count them twice.
+ */
+export async function getRecentPickerCounts(supabase: SupabaseClient, productIds: string[], hours = 48): Promise<Map<string, RecentPickerCount>> {
+  const out = new Map<string, RecentPickerCount>();
+  if (productIds.length === 0) return out;
+  const since = new Date(Date.now() - hours * 3600 * 1000).toISOString();
+  const { data } = await supabase
+    .from('inventory_movements')
+    .select('product_id, timestamp, reason')
+    .in('product_id', productIds)
+    .gte('timestamp', since)
+    .ilike('reason', '%Counted by picker%')
+    .order('timestamp', { ascending: false });
+  (data || []).forEach((m: any) => {
+    if (out.has(m.product_id)) return;
+    const reason = String(m.reason || '');
+    const unit1 = reason.match(/Unit 1 (\d+)/);
+    const by = reason.match(/Counted by picker (.+?) while picking/);
+    out.set(m.product_id, { at: m.timestamp, unit1: unit1 ? Number(unit1[1]) : null, byName: by ? by[1] : null });
+  });
+  return out;
+}
+
 async function notifyOwners(supabase: SupabaseClient, title: string, message: string) {
   const { data, error } = await supabase.rpc('get_all_users');
   if (error) return;
@@ -123,7 +167,7 @@ export async function savePickerShelfCount(
 
   const note = input.bothEmpty
     ? `Picker checked Unit 1 and Unit 2 before borrowing${orderTag}: both empty.`
-    : `Counted by picker while picking${orderTag}: Unit 1 ${total - before.unit2}${before.unit2 ? ` + Unit 2 ${before.unit2} (kept)` : ''}.`;
+    : `Counted by picker ${actorName} while picking${orderTag}: Unit 1 ${total - before.unit2}${before.unit2 ? ` + Unit 2 ${before.unit2} (kept)` : ''}.`;
   await applyPhysicalShelfCount(supabase, { productId, physicalShelfCount: total, notes: note, actorName });
 
   if (total > before.unallocated) {

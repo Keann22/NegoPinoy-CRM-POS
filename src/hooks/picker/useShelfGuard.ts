@@ -13,7 +13,7 @@ import type { PickerShelfInfo } from '@/types/inventory-guardian.types';
  */
 
 export type ShelfPrompt =
-  | { kind: 'count'; rowKey: string; productId: string; productName: string; needed: number; unit2: number }
+  | { kind: 'count'; rowKey: string; productId: string; productName: string; needed: number; unit2: number; deliveryWaiting: boolean }
   | { kind: 'borrow'; rowKey: string; productId: string; productName: string; available: number; unit2: number };
 
 interface Marks {
@@ -25,6 +25,7 @@ interface Marks {
 export function useShelfGuard(orderId: string | null, rows: PickRow[], marks: Marks) {
   const [shelf, setShelf] = useState<Record<string, PickerShelfInfo> | null>(null);
   const [picked, setPicked] = useState<Record<string, number>>({});
+  const [pendingDelivery, setPendingDelivery] = useState<Set<string>>(new Set());
   const [prompt, setPrompt] = useState<ShelfPrompt | null>(null);
   const [pendingBorrow, setPendingBorrow] = useState<(() => void) | null>(null);
 
@@ -38,6 +39,7 @@ export function useShelfGuard(orderId: string | null, rows: PickRow[], marks: Ma
       if (!res.ok) throw new Error(json.error);
       setShelf(json.shelf || {});
       setPicked(json.picked || {});
+      setPendingDelivery(new Set(json.pendingDelivery || []));
     } catch (e) {
       console.error('Shelf guard: could not load shelf numbers', e);
       setShelf(null);
@@ -61,8 +63,8 @@ export function useShelfGuard(orderId: string | null, rows: PickRow[], marks: Ma
     const info = shelf?.[row.productId];
     const needed = neededFor(row.productId);
     if (!info || needed === 0 || info.unallocated >= needed) return marks.markFound(row.key);
-    setPrompt({ kind: 'count', rowKey: row.key, productId: row.productId, productName: row.productName, needed, unit2: info.unit2 });
-  }, [shelf, neededFor, marks]);
+    setPrompt({ kind: 'count', rowKey: row.key, productId: row.productId, productName: row.productName, needed, unit2: info.unit2, deliveryWaiting: pendingDelivery.has(row.productId) });
+  }, [shelf, neededFor, marks, pendingDelivery]);
 
   const beforeBorrow = useCallback((row: PickRow, openBorrow: () => void) => {
     const info = shelf?.[row.productId];

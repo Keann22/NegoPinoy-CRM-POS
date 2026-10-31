@@ -162,6 +162,13 @@ export function PendingPurchases({ onReceiveComplete, refreshKey = 0 }: { onRece
                                       {item.shipping.status === 'overdue' && ' · overdue'}
                                   </div>
                               )}
+                              {item.pickerCount && (
+                                  <div className="mt-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-900">
+                                      {item.pickerCount.byName || 'A picker'} counted {item.pickerCount.unit1 != null ? `${item.pickerCount.unit1} on the shelf ` : 'this '}
+                                      while picking ({new Date(item.pickerCount.at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}).
+                                      If pieces from this delivery were already on the shelf then, receive only the rest.
+                                  </div>
+                              )}
                               {isDiscrepancy && (
                                   <div className="mt-2">
                                       <Input 
