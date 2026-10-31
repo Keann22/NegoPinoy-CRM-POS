@@ -83,6 +83,14 @@ Receipts:
   zero, the picker can't borrow from another order until they confirm **both
   Unit 1 and Unit 2 are empty**; that confirmation is saved as a count of 0.
 
+## Recount requests (owner, 2026-10-31)
+
+- When the owners suspect a stock number is wrong, they ask Jas to count it.
+  Jas gets a **sticky pop-up** on all her accounts with the owner's message and
+  the products. She counts Unit 1 (shelf) and Unit 2 (reserve) without seeing
+  the system's numbers. It can be minimized while she counts but comes back
+  every 30 minutes and on every page load until each product is saved.
+
 ## Devices
 
 - Owners use **iPhone and Huawei** phones. Anything mobile must work on both,

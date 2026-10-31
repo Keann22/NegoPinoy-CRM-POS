@@ -116,3 +116,15 @@ export interface PickerShelfInfo {
   unallocated: number;
   unit2: number;
 }
+
+/** An owner's request for Jas to count a product (sticky pop-up until counted). */
+export interface RecountRequest {
+  id: string;
+  batchId: string;
+  productId: string;
+  productName: string;
+  sku: string | null;
+  message: string;
+  requestedByName: string | null;
+  createdAt: string;
+}

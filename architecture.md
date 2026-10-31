@@ -370,6 +370,10 @@ Owner rules: `docs/BUSINESS_WORKFLOW.md` → "Picking when the shelf says there'
 - If the shelf numbers fail to load, nothing is blocked.
 - **Double-count warnings (2026-10-31)**: the shelf GET also returns `pendingDelivery` (products with a non-STAFF_DRAFT `pending_receipt` purchase line still owed, `getProductsWithPendingDelivery`, no qty so the count stays blind); the count form then warns to leave those pieces out. Receiving (`GET /api/inventory/receive/pending-pos` → `pickerCount` per line from `getRecentPickerCounts`, last 48 h, parsed from the "Counted by picker <name> while picking ... Unit 1 N" movement reason) shows an amber note on the line. Counts before this change have no name ("A picker").
 
+### Recount Requests (2026-10-31)
+
+Table `recount_requests` (`scripts/migrations/2026-10-31_recount_requests.sql`; one `batch_id` per pop-up with the owner's `message`). Service `src/lib/services/inventory/recount-request-service.ts` (`RECOUNT_ASSIGNEE_EMAILS` = Jas's 3 accounts), API `/api/inventory/recount-requests` (GET open list only for those accounts; POST `{id, unit1, unit2}` by them or admins), hook `useRecountRequests` (polls 5 min + on focus), `RecountRequestPopup` mounted in the dashboard layout. Saving claims the row first (no double save from two Jas accounts), sets the Unit 2 `product_warehouse_stock` row to the Unit 2 count (logged `adjustment`), then `applyPhysicalShelfCount(unit1 + unit2)`; on failure the row reopens. No create UI yet: batches are added with `createRecountBatch` (first batch 2026-10-31: the 4 items double-counted after picker counts).
+
 ### Planned: Stored Shelf Stock and Physical Stock (owner direction, 2026-10-30, NOT BUILT)
 
 Owner rules: `docs/BUSINESS_WORKFLOW.md` → "Planned: unallocated stock is kept and counted, not calculated". Nothing below exists in code yet; build only after the owner approves this plan.
