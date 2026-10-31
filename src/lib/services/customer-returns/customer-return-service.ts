@@ -185,6 +185,11 @@ function mapCase(r: any, now: number): CustomerReturn {
     outcomeDoneAt: r.outcome_done_at,
     outcomeDoneNote: r.outcome_done_note,
     closedAt: r.closed_at,
+    shippingPayer: r.shipping_payer ?? null,
+    replacementOrderId: r.replacement_order_id ?? null,
+    refundMethod: r.refund_method ?? null,
+    refundReference: r.refund_reference ?? null,
+    creditGiven: Number(r.credit_given) || 0,
     daysOpen,
     isOverdue: stage !== 'done' && inStage > STAGE_LIMIT_DAYS[stage],
     damagedPending: !!r.checked_at && rawItems.some((i) => i.damaged_qty > 0 && !i.damaged_action),
@@ -197,7 +202,7 @@ export async function listCustomerReturns(supabase: SupabaseClient, isManagement
   const closedSince = new Date(Date.now() - CLOSED_SHOWN_DAYS * DAY_MS).toISOString();
   const { data, error } = await supabase
     .from('customer_returns')
-    .select('*, customer_return_items(*), customer_return_events(*), orders(status, sales_person_name, customers(full_name))')
+    .select('*, customer_return_items(*), customer_return_events(*), orders!customer_returns_order_id_fkey(status, sales_person_name, customers(full_name))')
     .or(`status.eq.open,closed_at.gte.${closedSince}`)
     .order('created_at', { ascending: false });
   if (error) throw error;
@@ -209,7 +214,7 @@ export async function listCustomerReturns(supabase: SupabaseClient, isManagement
 export async function getCustomerReturn(supabase: SupabaseClient, id: string): Promise<CustomerReturn> {
   const { data, error } = await supabase
     .from('customer_returns')
-    .select('*, customer_return_items(*), customer_return_events(*), orders(status, sales_person_name, customers(full_name))')
+    .select('*, customer_return_items(*), customer_return_events(*), orders!customer_returns_order_id_fkey(status, sales_person_name, customers(full_name))')
     .eq('id', id)
     .single();
   if (error || !data) throw new CustomerReturnError('Return case not found.');
