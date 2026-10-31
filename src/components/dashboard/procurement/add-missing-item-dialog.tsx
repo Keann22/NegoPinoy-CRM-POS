@@ -16,11 +16,15 @@ export function AddMissingItemDialog({
   onOpenChange,
   groupedItems,
   onSuccess,
+  onBuy,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   groupedItems: any[];
   onSuccess: () => void;
+  // Owners: picking a product opens the Buy form straight away instead of
+  // adding a staff request they then have to Buy. `existing` is its sheet row.
+  onBuy?: (product: any, existing: { item: any; groupId: string | null } | null) => void;
 }) {
   const [productSearch, setProductSearch] = useState('');
   const [productResults, setProductResults] = useState<any[]>([]);
@@ -51,6 +55,18 @@ export function AddMissingItemDialog({
   }, [productSearch]);
 
   const handleAddAdhocProduct = async (product: any) => {
+    if (onBuy) {
+      let existing: { item: any; groupId: string | null } | null = null;
+      for (const group of groupedItems) {
+        const item = group.items.find((i: any) => i.productId === product.id);
+        if (item) { existing = { item, groupId: group.id ?? null }; break; }
+      }
+      onOpenChange(false);
+      setProductSearch("");
+      onBuy(product, existing);
+      return;
+    }
+
     // Check if it's already in the list
     for (const group of groupedItems) {
       if (group.items.some((i: any) => i.productId === product.id)) {
@@ -97,6 +113,9 @@ export function AddMissingItemDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Add Missing Item</DialogTitle>
+          {onBuy && (
+            <p className="text-sm text-slate-500">Pick what you bought. Next you enter the quantity, price and supplier, and it goes to Receiving.</p>
+          )}
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="relative">

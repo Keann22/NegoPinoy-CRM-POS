@@ -128,6 +128,25 @@ export default function ProcurementSheet() {
     setBuyDialogOpen(true);
   };
 
+  // Add Missing Item: owners pick a product and go straight to Buy, so the
+  // purchase reaches Receiving in one step (no staff request in between).
+  const openBuyForProduct = (product: any, existing: { item: any; groupId: string | null } | null) => {
+    if (existing) {
+      openBuyDialog(existing.item, existing.groupId);
+      return;
+    }
+    const name = product.variant_name && !product.name.includes(product.variant_name)
+      ? `${product.name} [${product.variant_name}]`
+      : product.name;
+    setBuyDialogData({
+      item: { productId: product.id, productName: name },
+      qty: '',
+      cost: Number(product.initial_unit_cost) > 0 ? String(product.initial_unit_cost) : '',
+      supplierId: product.supplier_id || ''
+    });
+    setBuyDialogOpen(true);
+  };
+
   const openBulkBuyDialog = (groupId: string | null, groupItems: any[], groupName: string) => {
     const selectedInGroup = groupItems.filter((i: any) => selectedItems[i.productId]);
     if (selectedInGroup.length === 0) {
@@ -384,6 +403,7 @@ export default function ProcurementSheet() {
         setSelectedProduct={setSelectedProduct}
         isAddDialogOpen={isAddDialogOpen}
         setIsAddDialogOpen={setIsAddDialogOpen}
+        onBuyMissingItem={openBuyForProduct}
         issueDialogOpen={issueDialogOpen}
         setIssueDialogOpen={setIssueDialogOpen}
         issueProduct={issueProduct}

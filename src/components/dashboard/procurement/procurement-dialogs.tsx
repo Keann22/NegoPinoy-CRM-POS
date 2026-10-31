@@ -40,6 +40,7 @@ interface ProcurementDialogsProps {
   // Add missing item
   isAddDialogOpen: boolean;
   setIsAddDialogOpen: (open: boolean) => void;
+  onBuyMissingItem?: (product: any, existing: { item: any; groupId: string | null } | null) => void;
 
   // Report issue
   issueDialogOpen: boolean;
@@ -110,6 +111,7 @@ export function ProcurementDialogs({
   setSelectedProduct,
   isAddDialogOpen,
   setIsAddDialogOpen,
+  onBuyMissingItem,
   issueDialogOpen,
   setIssueDialogOpen,
   issueProduct,
@@ -182,6 +184,7 @@ export function ProcurementDialogs({
         onSuccess={() => {
           onRefreshData();
         }}
+        onBuy={onBuyMissingItem}
       />
 
       <ReportIssueDialog
