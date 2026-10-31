@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { CustomerReturnAction } from '@/types/customer-returns.types';
-import { CR_OUTCOME_LABELS, CR_OUTCOME_TODO, CR_SHIPPING_PAYER_LABELS } from '@/types/customer-returns.types';
+import { CR_OUTCOME_LABELS, CR_OUTCOME_TODO } from '@/types/customer-returns.types';
 import {
   computeStage,
   CustomerReturnError,
@@ -11,7 +11,6 @@ import {
   setOrderStatus,
   shortOrder,
 } from './customer-return-service';
-import { createReplacementOrder, giveStoreCredit, recordRefund } from './customer-return-money';
 
 /*
  * Moving a customer return case along. See customer-return-service.ts for the
@@ -19,7 +18,7 @@ import { createReplacementOrder, giveStoreCredit, recordRefund } from './custome
  * double-tap (or two people at once) applies once.
  */
 
-const OWNER_ACTIONS = new Set(['decide', 'damaged_action', 'cancel_case', 'refund_sent', 'credit_given']);
+const OWNER_ACTIONS = new Set(['decide', 'damaged_action', 'cancel_case']);
 
 async function loadCase(supabase: SupabaseClient, id: string) {
   const { data, error } = await supabase
@@ -115,22 +114,19 @@ export async function applyCustomerReturnAction(
 
   switch (a.action) {
     case 'decide': {
-      if (r.outcome_done_at || r.restocked_at || r.replacement_order_id) throw new CustomerReturnError('This case is already being carried out; the decision can no longer change.');
+      if (r.outcome_done_at || r.restocked_at) throw new CustomerReturnError('This case is already being carried out; the decision can no longer change.');
       if (!CR_OUTCOME_LABELS[a.outcome]) throw new CustomerReturnError('Pick what the customer gets.');
       // RTS parcels and shipped-back items come back anyway; a partial refund means the customer keeps it.
       const askBack = r.source !== 'damage_report' ? true : a.outcome === 'partial_refund' ? false : !!a.askBack;
       if (a.outcome === 'reship' && !askBack) throw new CustomerReturnError('Re-ship needs the parcel back first.');
       const amount = Math.max(0, Number(a.amount) || 0);
       if (['partial_refund', 'store_credit'].includes(a.outcome) && !(amount > 0)) throw new CustomerReturnError('Enter the amount.');
-      const shippingPayer = a.outcome === 'replacement' || a.outcome === 'reship' ? a.shippingPayer || null : null;
-      if (a.outcome === 'replacement' && !shippingPayer) throw new CustomerReturnError('Pick who pays shipping on the replacement.');
       await guardedUpdate(supabase, r, {
         outcome: a.outcome,
         ask_back: askBack,
         replacement_timing: askBack && a.outcome !== 'reship' && CR_OUTCOME_TODO[a.outcome] ? (a.replacementTiming || 'after_arrival') : null,
         amount,
         courier_claim: !!a.courierClaim,
-        shipping_payer: shippingPayer,
         decision_note: a.note?.trim() || null,
         decided_at: now,
         decided_by_name: actorName,
@@ -143,7 +139,7 @@ export async function applyCustomerReturnAction(
         }
       }
       if (a.outcome === 'cancel_order' && r.orders?.status !== 'Returned') await setOrderStatus(supabase, r.order_id, 'Returned', actorName);
-      const summary = `${CR_OUTCOME_LABELS[a.outcome]}${amount ? ` ₱${amount.toLocaleString('en-PH')}` : ''}${askBack ? '' : ', not asking for it back'}${shippingPayer && a.outcome === 'replacement' ? `, ${CR_SHIPPING_PAYER_LABELS[shippingPayer].toLowerCase()}` : ''}`;
+      const summary = `${CR_OUTCOME_LABELS[a.outcome]}${amount ? ` ₱${amount.toLocaleString('en-PH')}` : ''}${askBack ? '' : ', not asking for it back'}`;
       await logEvent(supabase, r.id, 'decided', actorName, [summary, a.courierClaim ? 'claim from courier' : '', a.note?.trim()].filter(Boolean).join(' · '));
       const agent = r.orders?.sales_person_name;
       if (agent && agent.trim().toLowerCase() !== actorName.trim().toLowerCase()) {
@@ -204,26 +200,13 @@ export async function applyCustomerReturnAction(
     case 'outcome_done': {
       const todo = r.outcome ? CR_OUTCOME_TODO[r.outcome as keyof typeof CR_OUTCOME_TODO] : null;
       if (!r.decided_at || !todo) throw new CustomerReturnError('Nothing to carry out on this case.');
-      // Replacements, refunds and credit have their own steps (they make an order or a money entry).
-      if (r.outcome !== 'reship') throw new CustomerReturnError('Use the button for this step on the case.');
       if (todo.ownerOnly && !isManagement) throw new CustomerReturnError('Only the owners can do this.');
       if (r.outcome_done_at) throw new CustomerReturnError('Already done.');
       if (!outcomeCanRunNow(r)) throw new CustomerReturnError('Wait for the item to arrive and be checked first.');
       await guardedUpdate(supabase, r, { outcome_done_at: now, outcome_done_by_name: actorName, outcome_done_note: a.note?.trim() || null });
       if (r.outcome === 'reship') await setOrderStatus(supabase, r.order_id, 'For Shipping', actorName);
+      if (r.outcome === 'full_refund' && r.orders?.status !== 'Returned') await setOrderStatus(supabase, r.order_id, 'Returned', actorName);
       await logEvent(supabase, r.id, 'outcome_done', actorName, [todo.label, a.note?.trim()].filter(Boolean).join(' · '));
-      break;
-    }
-    case 'replacement_order': {
-      await createReplacementOrder(supabase, r, a.items || [], actorName, a.note);
-      break;
-    }
-    case 'refund_sent': {
-      await recordRefund(supabase, r, a, actorName);
-      break;
-    }
-    case 'credit_given': {
-      await giveStoreCredit(supabase, r, a, actorName);
       break;
     }
     case 'add_photos': {
@@ -234,7 +217,7 @@ export async function applyCustomerReturnAction(
       return;
     }
     case 'cancel_case': {
-      if (r.restocked_at || r.outcome_done_at || r.replacement_order_id) throw new CustomerReturnError('Already carried out; it can no longer be cancelled.');
+      if (r.restocked_at || r.outcome_done_at) throw new CustomerReturnError('Already carried out; it can no longer be cancelled.');
       await guardedUpdate(supabase, r, { status: 'closed', closed_at: now });
       await logEvent(supabase, r.id, 'cancelled', actorName, a.note?.trim());
       return;
