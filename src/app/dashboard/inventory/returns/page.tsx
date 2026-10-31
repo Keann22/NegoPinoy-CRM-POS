@@ -11,6 +11,8 @@ import { DecideReturnDialog } from '@/components/dashboard/customer-returns/deci
 import { CheckReturnDialog } from '@/components/dashboard/customer-returns/check-return-dialog';
 import { OutcomeDoneDialog } from '@/components/dashboard/customer-returns/outcome-done-dialog';
 import { OldReturnsLog } from '@/components/dashboard/customer-returns/old-returns-log';
+import { ReplacementOrderDialog } from '@/components/dashboard/customer-returns/replacement-order-dialog';
+import { RefundCreditDialog } from '@/components/dashboard/customer-returns/refund-credit-dialog';
 import { CR_STAGE_LABELS, type CustomerReturn, type CustomerReturnStage } from '@/types/customer-returns.types';
 
 const TABS: CustomerReturnStage[] = ['needs_owner', 'to_check', 'to_do', 'waiting_parcel', 'done'];
@@ -97,6 +99,8 @@ export default function CustomerReturnsPage() {
       <DecideReturnDialog ret={dialogFor('decide')} onClose={() => setDialog(null)} onSubmit={act} />
       <CheckReturnDialog ret={dialogFor('check')} onClose={() => setDialog(null)} onSubmit={act} />
       <OutcomeDoneDialog ret={dialogFor('done')} onClose={() => setDialog(null)} onSubmit={act} />
+      <ReplacementOrderDialog ret={dialogFor('replacement')} onClose={() => setDialog(null)} onSubmit={act} />
+      <RefundCreditDialog ret={dialogFor('money')} onClose={() => setDialog(null)} onSubmit={act} />
     </Card>
   );
 }

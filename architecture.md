@@ -452,7 +452,7 @@ Original plan (all phases built):
 
 **Phases**: (1) records, Supplier Returns page, shelf "Report damaged", owner stages and outcomes, per-supplier days; (2) picker Damaged mark, Receiving replacements, Procurement incoming chip, Priority List; (3) owners' bring-back list, Shopee in-app return stage, Pinduoduo discount shortcut.
 
-### Customer Returns (owner, 2026-10-30; phase 1 BUILT, phases 2-3 planned)
+### Customer Returns (owner, 2026-10-30; phases 1-2 BUILT, phase 3 planned)
 
 Owner rules: `docs/BUSINESS_WORKFLOW.md` → "Customer returns". Separate from Supplier Returns: customer-damaged pieces never go back to the supplier.
 
@@ -460,6 +460,14 @@ Owner rules: `docs/BUSINESS_WORKFLOW.md` → "Customer returns". Separate from S
 - **Stage** (`computeStage`): to_check (arrived, not checked) → needs_owner (undecided, or checked damaged pieces without an action) → to_do (outcome step can run now) → waiting_parcel → done (auto-closes). Overdue: needs_owner/to_check > 1 day, to_do > 2, waiting_parcel > 14.
 - **Stock**: good pieces restock once (`restocked_at` claimed first) after BOTH check and decision, unless re-ship; `increment_stock` + movement `return` (mirrored to `shelf_stock`); bundles go back as parts. Order goes to Returned (RTS open, cancel_order, full refund done), For Shipping (re-ship done); never Cancelled.
 - Updates are guarded on `updated_at`, so a double tap applies once. The decision can change until something is carried out.
+
+**Phase 2 built 2026-10-31** (`scripts/migrations/2026-10-31_customer_returns_phase2.sql`: `shipping_payer`, `replacement_order_id`, `refund_expense_id`, `refund_method`, `refund_reference`, `credit_given`). Code in `customer-return-money.ts`; dialogs `replacement-order-dialog.tsx`, `refund-credit-dialog.tsx`.
+- **Two links to orders**: `customer_returns` now has `order_id` and `replacement_order_id`, so every embed must name the link: `orders!customer_returns_order_id_fkey(...)`. A plain `orders(...)` fails with PGRST201 (it broke the live page for a few minutes on 2026-10-31).
+- **Replacement order** (`replacement_order` action, anyone): owners pick who pays shipping when deciding (`us` → `shipping_payment_type` 'free shipping', `customer` → 'sf only'; the shipping dialog on Packed Orders now starts from the order's value). Makes a ₱0 'Full Payment' order in Processing with `process_order_transaction` (same as New Order: stock deducted at creation, picker, Priority List), same customer/agent/address, lines `price_type` 'custom' with reason "Replacement for return #N". For `replacement` it completes the outcome; on a re-ship with damaged pieces it is an extra button for the damaged pieces. Agent gets a bell alert.
+- **Refund sent** (`refund_sent`, owners): amount, method (GCash / Bank Transfer / Cash / Maya), reference → `expenses` row. Partial refund: category `Customer Refund` (Cash Flow and P&L). Full refund: `Customer Refund (returned order)`, which `pnl-report.tsx` skips because the Returned order's amount is already subtracted there as Sales Returns; the order is set to Returned.
+- **Store credit** (`credit_given`, owners): adds to `customers.store_credit`, which New Order offers as "Apply store credit". No expense row: the credit lowers the next order's total when used.
+- The generic `outcome_done` is now re-ship only, so refunds and credit always leave an accounting entry.
+- **Priority List → Returns tab** (`returns-to-act-list.tsx`): open cases waiting on someone (owners decide / damaged pieces, warehouse check, to-do step, parcels overdue), with who and what; taps open the Returns page.
 
 **Before phase 1**: `returns` table + `ProcessReturnDialog` (Orders page) + `/dashboard/inventory/returns` log. `restock` added stock with no check, `exchange` and `writeoff` only logged a row (40 of 44 uses were "exchange"). `useCourierSync` set orders to `Returned` and nothing happened after that.
 
@@ -483,7 +491,7 @@ Original plan:
 
 **Phases**: (1) cases, owner decision, required Good/Damaged check, open list, auto case from courier `Returned`, owner bell; replace the old Process return dialog. (2) linked replacement orders, refund/credit tied to accounting, Priority List, overdue timers. (3) courier claim tracking (filed / paid amount), 2nd-hand selling, loss report.
 
-**Open questions**: how refunds are paid and recorded; how 2nd-hand items are sold (own SKU or sale price); who pays the return shipping.
+**Open questions**: how 2nd-hand items are sold (own SKU or sale price); who pays the shipping when a customer ships an item back. (Answered 2026-10-31: refunds go to Expenses; replacements are one-tap ₱0 orders; who pays replacement shipping is decided per case.)
 
 ### Order Stock Deduction: at Creation Only (corrected 2026-10-14)
 

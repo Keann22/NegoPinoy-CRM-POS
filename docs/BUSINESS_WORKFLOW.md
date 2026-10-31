@@ -150,11 +150,21 @@ the Inventory List). Design and later phases: architecture.md, "Supplier Returns
 - Everyone should see what's waiting, but staff must not see supplier names or
   costs (see "Confidential" above).
 
-## Customer returns (owner, 2026-10-30; phase 1 built)
+## Customer returns (owner, 2026-10-30; phases 1-2 built)
 
-Page: Inventory Management → **Returns**. Open a case from the order (Orders →
-Process Return, or set the status to Returned); courier sync opens one for every
-parcel it marks Returned. Design and later phases: architecture.md, "Customer Returns".
+Page: Inventory Management → **Returns**, and the **Returns** tab on the
+Priority List. Open a case from the order (Orders → Process Return, or set the
+status to Returned); courier sync opens one for every parcel it marks Returned.
+Design and later phases: architecture.md, "Customer Returns".
+
+Money and replacements (owner, 2026-10-31):
+
+- A **replacement** is a one-tap **₱0 order** for the same customer and address;
+  it goes through picking and packing like any order.
+- **Who pays shipping on a replacement is decided each time** (we pay = free
+  shipping, or the customer pays the shipping fee).
+- A **refund** is recorded in **Expenses** (Customer Refund) with how it was paid.
+- **Store credit** goes on the customer's balance and is used on their next order.
 
 How returns reach us:
 

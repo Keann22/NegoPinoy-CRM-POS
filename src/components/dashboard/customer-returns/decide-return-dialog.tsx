@@ -11,9 +11,11 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   CR_OUTCOME_LABELS,
   CR_OUTCOME_TODO,
+  CR_SHIPPING_PAYER_LABELS,
   type CustomerReturn,
   type CustomerReturnAction,
   type CustomerReturnOutcome,
+  type ShippingPayer,
 } from '@/types/customer-returns.types';
 
 interface Props {
@@ -37,6 +39,7 @@ export function DecideReturnDialog({ ret, onClose, onSubmit }: Props) {
   const [timing, setTiming] = useState<'now' | 'after_arrival'>('now');
   const [amount, setAmount] = useState('');
   const [courierClaim, setCourierClaim] = useState(false);
+  const [shippingPayer, setShippingPayer] = useState<ShippingPayer | null>(null);
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +51,7 @@ export function DecideReturnDialog({ ret, onClose, onSubmit }: Props) {
     setTiming(ret.replacementTiming || 'now');
     setAmount(ret.amount ? String(ret.amount) : '');
     setCourierClaim(ret.courierClaim);
+    setShippingPayer(ret.shippingPayer);
     setNote(ret.decisionNote || '');
     setError(null);
   }, [ret]);
@@ -60,6 +64,7 @@ export function DecideReturnDialog({ ret, onClose, onSubmit }: Props) {
 
   const submit = async () => {
     if (!outcome) return setError('Pick what the customer gets.');
+    if (outcome === 'replacement' && !shippingPayer) return setError('Pick who pays shipping on the replacement.');
     setSaving(true);
     setError(null);
     try {
@@ -68,6 +73,7 @@ export function DecideReturnDialog({ ret, onClose, onSubmit }: Props) {
         replacementTiming: showTiming ? timing : undefined,
         amount: AMOUNT_OUTCOMES.includes(outcome) ? Number(amount) || 0 : 0,
         courierClaim, note,
+        shippingPayer: outcome === 'replacement' ? shippingPayer ?? undefined : undefined,
       });
       onClose();
     } catch (e) {
@@ -103,6 +109,19 @@ export function DecideReturnDialog({ ret, onClose, onSubmit }: Props) {
             <div className="space-y-1.5">
               <Label htmlFor="dr-amount">Amount (₱){outcome === 'full_refund' ? ' (optional)' : ''}</Label>
               <Input id="dr-amount" type="number" inputMode="decimal" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} />
+            </div>
+          )}
+
+          {outcome === 'replacement' && (
+            <div className="space-y-1.5">
+              <Label>Who pays shipping on the replacement?</Label>
+              <div className="grid gap-1.5">
+                {(Object.keys(CR_SHIPPING_PAYER_LABELS) as ShippingPayer[]).map((p) => (
+                  <Button key={p} type="button" variant={shippingPayer === p ? 'default' : 'outline'} className="h-auto justify-start whitespace-normal py-2 text-left" onClick={() => setShippingPayer(p)}>
+                    {CR_SHIPPING_PAYER_LABELS[p]}
+                  </Button>
+                ))}
+              </div>
             </div>
           )}
 

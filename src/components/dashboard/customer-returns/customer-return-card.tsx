@@ -15,7 +15,7 @@ import {
   type CustomerReturnAction,
 } from '@/types/customer-returns.types';
 
-export type CustomerReturnDialogKind = 'decide' | 'check' | 'done';
+export type CustomerReturnDialogKind = 'decide' | 'check' | 'done' | 'replacement' | 'money';
 
 const EVENT_LABELS: Record<string, string> = {
   opened: 'Opened',
@@ -26,6 +26,9 @@ const EVENT_LABELS: Record<string, string> = {
   throw_away: 'Damaged: thrown away',
   second_hand: 'Damaged: keep for 2nd-hand',
   outcome_done: 'Done',
+  replacement_order: 'Replacement order made',
+  refund_sent: 'Refund sent',
+  credit_given: 'Store credit given',
   photos: 'Photos added',
   closed: 'Closed',
   cancelled: 'Case cancelled',
@@ -47,8 +50,11 @@ export function CustomerReturnCard({ ret, isManagement, onDialog, onAct }: Props
   const [busy, setBusy] = useState(false);
   const open = ret.status === 'open';
   const todo = ret.outcome ? CR_OUTCOME_TODO[ret.outcome] : null;
-  const canChangeDecision = open && !ret.outcomeDoneAt && !ret.restockedAt;
   const damagedTotal = ret.items.reduce((s, i) => s + i.damagedQty, 0);
+  const canChangeDecision = open && !ret.outcomeDoneAt && !ret.restockedAt && !ret.replacementOrderId;
+  // Which dialog carries out the decided outcome.
+  const todoDialog: CustomerReturnDialogKind = ret.outcome === 'replacement' ? 'replacement' : ret.outcome === 'reship' ? 'done' : 'money';
+  const canReplaceDamaged = open && ret.outcome === 'reship' && !!ret.checkedAt && damagedTotal > 0 && !ret.replacementOrderId;
 
   const run = async (action: CustomerReturnAction) => {
     setBusy(true);
@@ -99,12 +105,28 @@ export function CustomerReturnCard({ ret, isManagement, onDialog, onAct }: Props
           {ret.amount > 0 && ` · ${peso(ret.amount)}`}
           {ret.source === 'damage_report' && (ret.askBack ? ' · asked to ship it back' : ' · not asking for it back')}
           {ret.courierClaim && ' · claim from courier'}
+          {ret.outcome === 'replacement' && ret.shippingPayer && (ret.shippingPayer === 'us' ? ' · free shipping' : ' · customer pays shipping')}
           {ret.decisionNote && <span className="italic text-muted-foreground"> · “{ret.decisionNote}”</span>}
+        </p>
+      )}
+      {(ret.replacementOrderId || ret.refundMethod || ret.creditGiven > 0) && (
+        <p className="text-xs text-emerald-700">
+          {ret.replacementOrderId && (
+            <>Replacement order{' '}
+              <Link href={`/dashboard/orders/${ret.replacementOrderId}`} className="font-mono underline">
+                #{ret.replacementOrderId.slice(0, 7).toUpperCase()}
+              </Link>
+            </>
+          )}
+          {ret.refundMethod && `Refunded ${peso(ret.amount)} by ${ret.refundMethod}${ret.refundReference ? ` (ref ${ret.refundReference})` : ''}`}
+          {ret.creditGiven > 0 && `${peso(ret.creditGiven)} store credit given`}
         </p>
       )}
       {ret.notes && <p className="text-xs text-muted-foreground italic">“{ret.notes}”</p>}
       {open && ret.outcome === 'reship' && damagedTotal > 0 && (
-        <p className="text-xs text-red-700">{damagedTotal} damaged piece(s) can&apos;t be re-shipped. Tell the agent so a replacement is sent.</p>
+        <p className="text-xs text-red-700">
+          {damagedTotal} damaged piece(s) can&apos;t be re-shipped.{ret.replacementOrderId ? ' A replacement order was made for them.' : ' Make a replacement order for them.'}
+        </p>
       )}
 
       {ret.photoUrls.length > 0 && (
@@ -133,7 +155,10 @@ export function CustomerReturnCard({ ret, isManagement, onDialog, onAct }: Props
         )}
         {open && ret.stage === 'to_do' && todo && (todo.ownerOnly && !isManagement
           ? <span className="text-xs text-muted-foreground">Waiting for the owners: {todo.label.toLowerCase()}.</span>
-          : <Button size="sm" onClick={() => onDialog('done', ret)}>{todo.label}</Button>)}
+          : <Button size="sm" onClick={() => onDialog(todoDialog, ret)}>{todo.label}</Button>)}
+        {canReplaceDamaged && (
+          <Button size="sm" variant="outline" onClick={() => onDialog('replacement', ret)}>Replacement order for damaged</Button>
+        )}
         {open && isManagement && canChangeDecision && (
           <Button size="sm" variant="ghost" className="text-xs text-muted-foreground" disabled={busy}
             onClick={() => { if (confirm('Cancel this case? Use this only if it was opened by mistake.')) run({ action: 'cancel_case', id: ret.id }); }}>

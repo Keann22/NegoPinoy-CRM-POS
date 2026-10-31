@@ -86,6 +86,8 @@ export default function PackedOrdersPage() {
           salesPersonName: o.sales_person_name,
           not_for_shipping_reason: o.not_for_shipping_reason,
           boxes_config: o.boxes_config,
+          // Set ahead of time on replacement orders from Customer Returns (free shipping / SF only).
+          shipping_payment_type: o.shipping_payment_type,
           packedDate: o.packed_at || o.order_date,
         })));
       } catch (err) { console.error('Packed orders fetch error:', err); }

@@ -69,6 +69,8 @@ export type Order = {
   updatedAt?: string;
   spx_sync_data?: any;
   boxes_config?: any;
+  /** 'sf only' | 'paid items, sf only' | 'cod' | 'free shipping'; preset on replacement orders. */
+  shipping_payment_type?: string | null;
 };
 
 /** Order with resolved customer name and formatted display fields — used by the orders list. */

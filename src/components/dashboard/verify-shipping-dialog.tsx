@@ -92,7 +92,8 @@ export function VerifyShippingDialog({ order, open, onOpenChange, onSuccess }: V
           setStreetAddress(data.street_address || '');
         }
       });
-      setPaymentType('sf only');
+      // Replacement orders from Customer Returns come with the owner's choice already set.
+      setPaymentType(order.shipping_payment_type || 'sf only');
       setShippingAmount('0');
       
       let expectedCod = order.balanceDue || 0;

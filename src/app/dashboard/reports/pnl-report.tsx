@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
 import { fetchOrdersInRange, fetchAllPages, fetchOrderItemsForOrders } from '@/lib/services/report-orders-service';
+import { REFUND_VOIDED_SALE_EXPENSE_CATEGORY } from '@/types/customer-returns.types';
 
 type ReportData = {
     grossSales: number;
@@ -128,8 +129,10 @@ export function PnlReport({ date: externalDate, setDate: externalSetDate }: PnlR
                     amount: Number(e.amount) || 0,
                     category: (e.category as string) || 'Uncategorized',
                 }));
+                // A full refund's order is Returned, so its amount is already in "Sales Returns" below;
+                // its expense row (for Cash Flow) is skipped here so it isn't counted twice.
                 const opBreakdown = expenses.reduce((acc: Record<string, number>, e: { amount: number; category: string }) => {
-                    if (e.category.toLowerCase() !== 'cost of goods sold') {
+                    if (e.category.toLowerCase() !== 'cost of goods sold' && e.category !== REFUND_VOIDED_SALE_EXPENSE_CATEGORY) {
                         acc[e.category] = (acc[e.category] || 0) + e.amount;
                     }
                     return acc;

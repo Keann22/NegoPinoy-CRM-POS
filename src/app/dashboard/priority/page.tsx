@@ -19,8 +19,10 @@ import { PriorityActionDialog, type PriorityAction } from '@/components/dashboar
 import { OsDecisionDialog } from '@/components/dashboard/priority/os-decision-dialog';
 import { PriorityNoteDialog } from '@/components/dashboard/priority/priority-note-dialog';
 import { CarryOverList } from '@/components/dashboard/priority/carryover-list';
+import { ReturnsToActList } from '@/components/dashboard/priority/returns-to-act-list';
 
-type Tab = PriorityGroup | 'to_follow';
+type Tab = PriorityGroup | 'to_follow' | 'returns';
+const RETURNS_HINT = 'Customer returns waiting on someone: owners decide, the warehouse checks parcels, replacements and refunds get done. Tap one to open the Returns page.';
 const TO_FOLLOW_HINT = 'Items customers are still owed from an earlier order. Add them when the customer orders again (the New Order form reminds you).';
 
 const GROUPS: { key: PriorityGroup; label: string; hint: string }[] = [
@@ -46,6 +48,8 @@ export default function PriorityListPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [group, setGroup] = useState<Tab>('ready');
   const [toFollowCount, setToFollowCount] = useState<number | null>(null);
+  const [returnsCount, setReturnsCount] = useState<{ total: number; late: number } | null>(null);
+  const onReturnsCount = useCallback((total: number, late: number) => setReturnsCount({ total, late }), []);
   const [decide, setDecide] = useState<{ row: PriorityRow; item: MissingItem } | null>(null);
   const [noteRow, setNoteRow] = useState<PriorityRow | null>(null);
   const [owner, setOwner] = useState<'all' | PriorityOwner>('all');
@@ -117,7 +121,7 @@ export default function PriorityListPage() {
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase().replace(/^#/, '');
-    if (group === 'to_follow') return [];
+    if (group === 'to_follow' || group === 'returns') return [];
     return (ranked.get(group) || []).filter(({ row }) =>
       (owner === 'all' || row.owner === owner) &&
       (salesPerson === 'all' || row.salesPersonName === salesPerson) &&
@@ -128,7 +132,8 @@ export default function PriorityListPage() {
   }, [ranked, group, owner, salesPerson, lateOnly, urgentOnly, search]);
 
   const lateCount = (g: PriorityGroup) => (ranked.get(g) || []).filter(({ row }) => row.daysLate > 0).length;
-  const hint = group === 'to_follow' ? TO_FOLLOW_HINT : GROUPS.find((g) => g.key === group)!.hint;
+  const hint = group === 'to_follow' ? TO_FOLLOW_HINT : group === 'returns' ? RETURNS_HINT : GROUPS.find((g) => g.key === group)!.hint;
+  const isSideTab = group === 'to_follow' || group === 'returns';
 
   return (
     <div className="space-y-4">
@@ -169,6 +174,10 @@ export default function PriorityListPage() {
           <TabsTrigger value="to_follow" className="gap-1.5">
             To follow {toFollowCount != null && <span className="tabular-nums text-muted-foreground">{toFollowCount}</span>}
           </TabsTrigger>
+          <TabsTrigger value="returns" className="gap-1.5">
+            Returns {returnsCount != null && <span className="tabular-nums text-muted-foreground">{returnsCount.total}</span>}
+            {!!returnsCount?.late && <span className="rounded bg-red-600 px-1.5 text-[11px] font-semibold text-white tabular-nums">{returnsCount.late} late</span>}
+          </TabsTrigger>
         </TabsList>
       </Tabs>
       <p className="text-sm text-muted-foreground">{hint}</p>
@@ -176,9 +185,9 @@ export default function PriorityListPage() {
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative w-full sm:w-64">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-8" placeholder={group === 'to_follow' ? 'Customer or item' : 'Order # or customer'} value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input className="pl-8" placeholder={isSideTab ? 'Customer or item' : 'Order # or customer'} value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        {group !== 'to_follow' && (<>
+        {!isSideTab && (<>
         <Select value={owner} onValueChange={(v) => setOwner(v as any)}>
           <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -204,7 +213,11 @@ export default function PriorityListPage() {
         </>)}
       </div>
 
-      {group === 'to_follow' ? (
+      {/* Always mounted (hidden) so the Returns tab shows its count before it is opened. */}
+      <div className={group === 'returns' ? '' : 'hidden'}>
+        <ReturnsToActList search={group === 'returns' ? search : ''} onCount={onReturnsCount} />
+      </div>
+      {group === 'returns' ? null : group === 'to_follow' ? (
         <CarryOverList canCancel={canMark} search={search} onCount={setToFollowCount} />
       ) : isLoading && rows.length === 0 ? (
         <div className="space-y-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-32 w-full" />)}</div>

@@ -42,13 +42,26 @@ export const CR_OUTCOME_LABELS: Record<CustomerReturnOutcome, string> = {
 /** The step someone still has to carry out after the decision (null = nothing). */
 export const CR_OUTCOME_TODO: Record<CustomerReturnOutcome, { label: string; ownerOnly: boolean } | null> = {
   reship: { label: 'Send back to For Shipping', ownerOnly: false },
-  replacement: { label: 'Replacement sent', ownerOnly: false },
+  replacement: { label: 'Create replacement order', ownerOnly: false },
   full_refund: { label: 'Refund sent', ownerOnly: true },
   partial_refund: { label: 'Refund / discount sent', ownerOnly: true },
-  store_credit: { label: 'Credit given', ownerOnly: true },
+  store_credit: { label: 'Give store credit', ownerOnly: true },
   cancel_order: null,
   no_action: null,
 };
+
+export type ShippingPayer = 'us' | 'customer';
+
+export const CR_SHIPPING_PAYER_LABELS: Record<ShippingPayer, string> = {
+  us: 'We pay shipping (free shipping)',
+  customer: 'Customer pays shipping (SF only)',
+};
+
+export const CR_REFUND_METHODS = ['GCash', 'Bank Transfer', 'Cash', 'Maya'] as const;
+
+/** Expense categories for refunds. A full refund's sale is already removed from P&L (order is Returned), so P&L skips that one. */
+export const REFUND_EXPENSE_CATEGORY = 'Customer Refund';
+export const REFUND_VOIDED_SALE_EXPENSE_CATEGORY = 'Customer Refund (returned order)';
 
 export const CR_DAMAGED_ACTION_LABELS: Record<DamagedAction, string> = {
   throw_away: 'Thrown away',
@@ -113,6 +126,11 @@ export interface CustomerReturn {
   outcomeDoneAt: string | null;
   outcomeDoneNote: string | null;
   closedAt: string | null;
+  shippingPayer: ShippingPayer | null;
+  replacementOrderId: string | null;
+  refundMethod: string | null;
+  refundReference: string | null;
+  creditGiven: number;
   daysOpen: number;
   isOverdue: boolean;
   /** Checked, has damaged pieces, and the owners haven't said what to do with them. */
@@ -155,11 +173,18 @@ export type CustomerReturnAction =
       replacementTiming?: 'now' | 'after_arrival';
       amount?: number;
       courierClaim?: boolean;
+      shippingPayer?: ShippingPayer;
       note?: string;
     }
   | { action: 'arrived'; id: string }
   | { action: 'check'; id: string; items: { id: string; goodQty: number; damagedQty: number }[]; note?: string }
   | { action: 'damaged_action'; id: string; itemId: string; damagedAction: Exclude<DamagedAction, 'never_came_back'> }
   | { action: 'outcome_done'; id: string; note?: string }
+  /** Makes the ₱0 replacement order (qty per case item; 0 = leave out). */
+  | { action: 'replacement_order'; id: string; items: { id: string; qty: number }[]; note?: string }
+  /** Owners: refund paid; logged as an expense. */
+  | { action: 'refund_sent'; id: string; amount: number; method: string; reference?: string; note?: string }
+  /** Owners: amount added to the customer's store credit. */
+  | { action: 'credit_given'; id: string; amount: number; note?: string }
   | { action: 'add_photos'; id: string; photoUrls: string[] }
   | { action: 'cancel_case'; id: string; note?: string };
