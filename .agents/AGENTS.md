@@ -26,6 +26,18 @@ actually buys, receives, and counts, and what must stay confidential.
   Do not change it or compute it anywhere else. See architecture.md, "Unallocated Stock =
   What Is on the Shelf (LOCKED)".
 
+### Security (2026-11-01)
+- **Staff roles come only from `app_metadata`**, via `src/lib/auth/staff-roles.ts`
+  (`staffRolesOf`, `isStaffUser`). Never read roles from `user_metadata`: users can edit it.
+  Roles are set only through `/api/admin/users` (owners/admins).
+- `src/middleware.ts` makes every `/api/*` route and dashboard page staff-only. A route
+  called from outside (cron, webhook) must check its own secret and be listed in `OPEN_PATHS`.
+- **The public (anon) key has no database access** except categories, address lists and
+  the product columns in `website/src/lib/publicProductColumns.ts`
+  (`scripts/migrations/2026-11-01_lock_public_access.sql`). Browser code must use the
+  session client from `@/lib/supabase/client`, never `createClient(url, ANON_KEY)`.
+- New tables and functions are not public by default; grant to `authenticated` as needed.
+
 ### Architecture
 - Read `ARCHITECTURE.md` before making structural changes to the codebase.
 - Do not add new top-level directories to `src/` without updating `ARCHITECTURE.md`.
