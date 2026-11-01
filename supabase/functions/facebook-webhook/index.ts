@@ -10,6 +10,30 @@ const GEMINI_API_KEY = () => Deno.env.get("GEMINI_API_KEY")!;
 const PAGE_TOKEN = () => Deno.env.get("META_PAGE_ACCESS_TOKEN")!;
 const VERIFY_TOKEN = () => Deno.env.get("META_VERIFY_TOKEN")!;
 const OWNER_PSID = () => Deno.env.get("OWNER_PSID") ?? "";
+const APP_SECRET = () => Deno.env.get("META_APP_SECRET") ?? "";
+
+// Facebook signs every webhook POST with the app secret (X-Hub-Signature-256).
+// Without this check anyone could post fake messages here, and this function writes to
+// the database with the service-role key. Added 2026-11-01. Until the META_APP_SECRET
+// secret is set, messages are accepted as before (with a warning in the logs).
+async function hasValidSignature(rawBody: Uint8Array, header: string | null): Promise<boolean> {
+  const secret = APP_SECRET();
+  if (!secret) {
+    console.warn("META_APP_SECRET is not set: webhook signature NOT checked.");
+    return true;
+  }
+  if (!header || !header.startsWith("sha256=")) return false;
+  const key = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
+  );
+  const mac = new Uint8Array(await crypto.subtle.sign("HMAC", key, rawBody));
+  const expected = Array.from(mac, (b) => b.toString(16).padStart(2, "0")).join("");
+  const given = header.slice("sha256=".length).toLowerCase();
+  if (given.length !== expected.length) return false;
+  let diff = 0;
+  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ given.charCodeAt(i);
+  return diff === 0;
+}
 
 Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
@@ -27,7 +51,13 @@ Deno.serve(async (req: Request) => {
 
   if (req.method === "POST") {
     try {
-      const body = await req.json();
+      // Read the exact bytes Facebook signed, check the signature, then parse.
+      const rawBody = new Uint8Array(await req.arrayBuffer());
+      if (!(await hasValidSignature(rawBody, req.headers.get("x-hub-signature-256")))) {
+        console.warn("Rejected webhook POST with a missing or wrong signature.");
+        return new Response("Forbidden", { status: 403 });
+      }
+      const body = JSON.parse(new TextDecoder().decode(rawBody));
       console.log("Incoming Webhook Payload:", JSON.stringify(body, null, 2));
       
       if (body.object !== "page") {
