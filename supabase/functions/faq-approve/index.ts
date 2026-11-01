@@ -6,7 +6,21 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
 
+// Locked 2026-11-01: this function runs with full database power, so it only answers
+// callers that send the x-negopinoy-key header matching the INTERNAL_FUNCTION_KEY
+// secret. While that secret is not set, every call is refused (the function is off).
+// To switch it back on: set the secret in Supabase and send the header from the caller.
+function isAllowedCaller(req: Request): boolean {
+  const key = Deno.env.get("INTERNAL_FUNCTION_KEY");
+  return !!key && req.headers.get("x-negopinoy-key") === key;
+}
+
 Deno.serve(async (req: Request) => {
+  if (!isAllowedCaller(req)) {
+    return new Response(JSON.stringify({ error: "Not allowed" }), {
+      status: 401, headers: { "Content-Type": "application/json" },
+    });
+  }
   if (req.method === "OPTIONS") {
     return new Response(null, {
       headers: {
