@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/client";
 import { PurchasedItemsTable } from "@/components/dashboard/procurement/purchased-items-table";
 import { SupplierGroupCard } from "@/components/dashboard/procurement/supplier-group-card";
 import { ProcurementHeaderActions } from "@/components/dashboard/procurement/procurement-header-actions";
@@ -10,9 +10,8 @@ import { useReceiptDrafts } from "@/hooks/useReceiptDrafts";
 import type { ReceiptScanDraft } from "@/types";
 import { useRoleCheck } from "@/hooks/useRoleCheck";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Logged-in session client: the public key alone has no database access.
+const supabase = createClient();
 
 export default function ProcurementSheet() {
   const { isManagement, isLoading: roleLoading } = useRoleCheck();

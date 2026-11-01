@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ViewProductDetailsDialog } from "@/components/dashboard/view-product-details-dialog";
 import { PlusCircle, RefreshCw } from "lucide-react";
@@ -14,9 +14,8 @@ import { ReservedStockDialog } from "@/components/dashboard/reserved-stock-dialo
 import { PurchasedItemsTable } from "@/components/dashboard/procurement/purchased-items-table";
 import { SupplierGroupCard } from "@/components/dashboard/procurement/supplier-group-card";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Logged-in session client: the public key alone has no database access.
+const supabase = createClient();
 import { useRoleCheck } from "@/hooks/useRoleCheck";
 
 export default function TrialProcurementSheet() {
