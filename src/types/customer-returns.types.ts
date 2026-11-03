@@ -15,7 +15,7 @@ export type CustomerReturnOutcome =
 export type DamagedAction = 'throw_away' | 'second_hand' | 'never_came_back';
 
 /** Where the case is now; one per case, in the order the work happens. */
-export type CustomerReturnStage = 'needs_owner' | 'to_check' | 'to_do' | 'waiting_parcel' | 'done';
+export type CustomerReturnStage = 'needs_sales' | 'needs_owner' | 'to_check' | 'to_do' | 'waiting_parcel' | 'done';
 
 export const CR_SOURCE_LABELS: Record<CustomerReturnSource, string> = {
   rts: 'Courier sent it back (RTS)',
@@ -70,6 +70,7 @@ export const CR_DAMAGED_ACTION_LABELS: Record<DamagedAction, string> = {
 };
 
 export const CR_STAGE_LABELS: Record<CustomerReturnStage, string> = {
+  needs_sales: 'Needs sales',
   needs_owner: 'Needs owner',
   to_check: 'To check',
   to_do: 'To do',
@@ -131,6 +132,15 @@ export interface CustomerReturn {
   refundMethod: string | null;
   refundReference: string | null;
   creditGiven: number;
+  /** Courier return: sales said they asked the customer and are waiting for a reply. */
+  waitingCustomerAt: string | null;
+  waitingCustomerByName: string | null;
+  /** When the resend/cancel pop-up asks again (null = now). */
+  askAgainAt: string | null;
+  /** Courier return still undecided after 3 days: the owners decide now. */
+  escalated: boolean;
+  /** Checked and decided, OK pieces still to be put back on the shelf. */
+  needsShelving: boolean;
   daysOpen: number;
   isOverdue: boolean;
   /** Checked, has damaged pieces, and the owners haven't said what to do with them. */
@@ -141,6 +151,8 @@ export interface CustomerReturn {
 
 export interface CustomerReturnsResponse {
   isManagement: boolean;
+  /** Sales agents answer resend / cancel on courier returns. */
+  isSales: boolean;
   returns: CustomerReturn[];
 }
 
@@ -187,4 +199,35 @@ export type CustomerReturnAction =
   /** Owners: amount added to the customer's store credit. */
   | { action: 'credit_given'; id: string; amount: number; note?: string }
   | { action: 'add_photos'; id: string; photoUrls: string[] }
-  | { action: 'cancel_case'; id: string; note?: string };
+  | { action: 'cancel_case'; id: string; note?: string }
+  /** Courier return: sales (or owners) choose resend or cancel. */
+  | { action: 'rts_decide'; id: string; choice: 'resend' | 'cancel'; note?: string }
+  /** Courier return: sales asked the customer; ask again in 4 hours. */
+  | { action: 'waiting_customer'; id: string; note?: string }
+  /** Staff put the OK pieces back on the shelf (stock goes up now). */
+  | { action: 'shelved'; id: string };
+
+/** An order found when logging a returned parcel. */
+export interface ParcelOrderMatch {
+  orderId: string;
+  shortId: string;
+  customerName: string;
+  status: string;
+  orderDate: string;
+  trackingNumber: string | null;
+  items: string;
+  openCaseNo: number | null;
+}
+
+/** A courier return waiting on this person's resend / cancel answer (the pop-up). */
+export interface RtsDecisionPrompt {
+  id: string;
+  caseNo: number;
+  orderId: string;
+  customerName: string;
+  salesPersonName: string | null;
+  items: string;
+  loggedAt: string;
+  waitingCustomerAt: string | null;
+  escalated: boolean;
+}

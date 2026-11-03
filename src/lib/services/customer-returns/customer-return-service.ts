@@ -32,6 +32,7 @@ const DAY_MS = 24 * 3600 * 1000;
 const CLOSED_SHOWN_DAYS = 60;
 /** Days a case may sit in a stage before it turns red. */
 const STAGE_LIMIT_DAYS: Record<CustomerReturnStage, number> = {
+  needs_sales: 1,
   needs_owner: 1,
   to_check: 1,
   to_do: 2,
@@ -47,6 +48,9 @@ export const shortOrder = (id: string) => id.slice(0, 7).toUpperCase();
 
 export interface StageInput {
   status: string;
+  source?: string;
+  created_at?: string;
+  restocked_at?: string | null;
   outcome: CustomerReturnOutcome | null;
   ask_back: boolean;
   replacement_timing: string | null;
@@ -64,13 +68,35 @@ export function outcomeCanRunNow(r: StageInput): boolean {
   return !!r.checked_at;
 }
 
-export function computeStage(r: StageInput, items: { damaged_qty: number; damaged_action: string | null }[]): CustomerReturnStage {
+/** Courier returns: sales decides resend / cancel; after this many days the owners do. */
+export const RTS_ESCALATE_DAYS = 3;
+
+/** A courier return nobody decided within RTS_ESCALATE_DAYS of sales first being asked (the case opening). */
+export function isEscalated(r: StageInput, now = Date.now()): boolean {
+  if (r.source !== 'rts' || r.decided_at) return false;
+  const since = r.created_at || r.arrived_at;
+  return !!since && now - new Date(since).getTime() > RTS_ESCALATE_DAYS * DAY_MS;
+}
+
+/** Checked and decided, not re-shipped, OK pieces not put back on the shelf yet. */
+export function needsShelving(r: StageInput, items: { good_qty?: number }[]): boolean {
+  return !!r.checked_at && !!r.decided_at && r.outcome !== 'reship' && !r.restocked_at
+    && items.some((i) => (Number(i.good_qty) || 0) > 0);
+}
+
+export function computeStage(
+  r: StageInput,
+  items: { damaged_qty: number; damaged_action: string | null; good_qty?: number }[],
+  now = Date.now()
+): CustomerReturnStage {
   if (r.status === 'closed') return 'done';
   if (r.ask_back && r.arrived_at && !r.checked_at) return 'to_check';
-  if (!r.decided_at) return 'needs_owner';
+  // Courier returns: sales says resend or cancel (owners after 3 days). Others: owners.
+  if (!r.decided_at) return r.source === 'rts' && !isEscalated(r, now) ? 'needs_sales' : 'needs_owner';
   if (r.checked_at && items.some((i) => i.damaged_qty > 0 && !i.damaged_action)) return 'needs_owner';
   const todo = r.outcome ? CR_OUTCOME_TODO[r.outcome] : null;
   if (todo && !r.outcome_done_at && outcomeCanRunNow(r)) return 'to_do';
+  if (needsShelving(r, items)) return 'to_do';
   if (r.ask_back && !r.arrived_at) return 'waiting_parcel';
   return 'done';
 }
@@ -130,6 +156,7 @@ const daysSince = (iso: string, until: number) => Math.max(0, Math.floor((until 
 /** When the case entered its current stage (for days and overdue). */
 function stageSince(r: any, stage: CustomerReturnStage): string {
   if (stage === 'to_check') return r.arrived_at || r.created_at;
+  if (stage === 'needs_sales') return r.created_at;
   if (stage === 'to_do' || stage === 'waiting_parcel') return r.decided_at || r.created_at;
   if (stage === 'needs_owner' && r.checked_at) return r.checked_at;
   return r.created_at;
@@ -137,7 +164,7 @@ function stageSince(r: any, stage: CustomerReturnStage): string {
 
 function mapCase(r: any, now: number): CustomerReturn {
   const rawItems: any[] = r.customer_return_items || [];
-  const stage = computeStage(r, rawItems);
+  const stage = computeStage(r, rawItems, now);
   const items: CustomerReturnItem[] = rawItems
     .sort((a, b) => a.created_at.localeCompare(b.created_at))
     .map((i) => ({
@@ -190,6 +217,11 @@ function mapCase(r: any, now: number): CustomerReturn {
     refundMethod: r.refund_method ?? null,
     refundReference: r.refund_reference ?? null,
     creditGiven: Number(r.credit_given) || 0,
+    waitingCustomerAt: r.waiting_customer_at ?? null,
+    waitingCustomerByName: r.waiting_customer_by_name ?? null,
+    askAgainAt: r.ask_again_at ?? null,
+    escalated: isEscalated(r, now),
+    needsShelving: r.status === 'open' && needsShelving(r, rawItems),
     daysOpen,
     isOverdue: stage !== 'done' && inStage > STAGE_LIMIT_DAYS[stage],
     damagedPending: !!r.checked_at && rawItems.some((i) => i.damaged_qty > 0 && !i.damaged_action),
@@ -198,7 +230,7 @@ function mapCase(r: any, now: number): CustomerReturn {
   };
 }
 
-export async function listCustomerReturns(supabase: SupabaseClient, isManagement: boolean): Promise<CustomerReturnsResponse> {
+export async function listCustomerReturns(supabase: SupabaseClient, isManagement: boolean, isSales = false): Promise<CustomerReturnsResponse> {
   const closedSince = new Date(Date.now() - CLOSED_SHOWN_DAYS * DAY_MS).toISOString();
   const { data, error } = await supabase
     .from('customer_returns')
@@ -207,7 +239,7 @@ export async function listCustomerReturns(supabase: SupabaseClient, isManagement
     .order('created_at', { ascending: false });
   if (error) throw error;
   const now = Date.now();
-  return { isManagement, returns: (data || []).map((r) => mapCase(r, now)) };
+  return { isManagement, isSales, returns: (data || []).map((r) => mapCase(r, now)) };
 }
 
 /** Loads one case in the same shape the list uses. */
@@ -247,7 +279,7 @@ export async function getReturnableLines(supabase: SupabaseClient, orderId: stri
 
 export async function createCustomerReturn(supabase: SupabaseClient, input: NewCustomerReturn, actorName: string) {
   if (!input.orderId || !input.source || !input.reason) throw new CustomerReturnError('Order, what happened and the reason are needed.');
-  const { data: order } = await supabase.from('orders').select('id, status, customers(full_name)').eq('id', input.orderId).maybeSingle();
+  const { data: order } = await supabase.from('orders').select('id, status, sales_person_name, customers(full_name)').eq('id', input.orderId).maybeSingle();
   if (!order) throw new CustomerReturnError('Order not found.');
 
   const lines = await getReturnableLines(supabase, input.orderId);
@@ -298,8 +330,17 @@ export async function createCustomerReturn(supabase: SupabaseClient, input: NewC
 
   const customer = (order as any).customers?.full_name || 'Customer';
   const pieces = picked.map((p) => `${p.qty}× ${p.line!.productName}`).join(', ');
-  await notifyOwners(supabase, `Return #${row.case_no} needs your decision`,
-    `#${shortOrder(input.orderId)} ${customer}: ${input.reason}. ${pieces}. Opened by ${actorName}.`, actorName);
+  if (input.source === 'rts') {
+    // Courier return: the order's agent decides resend / cancel (pop-up + bell).
+    const agent = (order as any).sales_person_name;
+    if (agent) {
+      await notifyNames(supabase, [agent], `Returned parcel #${shortOrder(input.orderId)}: resend or cancel?`,
+        `${customer}: ${pieces}. Logged by ${actorName}. Answer on the pop-up or Inventory Management → Returns.`);
+    }
+  } else {
+    await notifyOwners(supabase, `Return #${row.case_no} needs your decision`,
+      `#${shortOrder(input.orderId)} ${customer}: ${input.reason}. ${pieces}. Opened by ${actorName}.`, actorName);
+  }
   return { id: row.id as string, caseNo: Number(row.case_no) };
 }
 

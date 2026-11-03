@@ -22,7 +22,8 @@ const EVENT_LABELS: Record<string, string> = {
   decided: 'Owner decided',
   arrived: 'Parcel arrived',
   checked: 'Checked',
-  restocked: 'Good pieces back on shelf',
+  restocked: 'OK pieces put back on shelf',
+  waiting_customer: 'Asked the customer, waiting',
   throw_away: 'Damaged: thrown away',
   second_hand: 'Damaged: keep for 2nd-hand',
   outcome_done: 'Done',
@@ -41,11 +42,13 @@ const phDate = (iso: string) =>
 interface Props {
   ret: CustomerReturn;
   isManagement: boolean;
+  /** Sales or owners: may answer resend / cancel on courier returns. */
+  canDecideRts?: boolean;
   onDialog: (kind: CustomerReturnDialogKind, ret: CustomerReturn) => void;
   onAct: (action: CustomerReturnAction) => Promise<void>;
 }
 
-export function CustomerReturnCard({ ret, isManagement, onDialog, onAct }: Props) {
+export function CustomerReturnCard({ ret, isManagement, canDecideRts = false, onDialog, onAct }: Props) {
   const [showHistory, setShowHistory] = useState(false);
   const [busy, setBusy] = useState(false);
   const open = ret.status === 'open';
@@ -55,6 +58,9 @@ export function CustomerReturnCard({ ret, isManagement, onDialog, onAct }: Props
   // Which dialog carries out the decided outcome.
   const todoDialog: CustomerReturnDialogKind = ret.outcome === 'replacement' ? 'replacement' : ret.outcome === 'reship' ? 'done' : 'money';
   const canReplaceDamaged = open && ret.outcome === 'reship' && !!ret.checkedAt && damagedTotal > 0 && !ret.replacementOrderId;
+  // Courier return nobody has decided yet: sales answers resend / cancel (owners after 3 days).
+  const rtsUndecided = open && ret.source === 'rts' && !ret.decidedAt;
+  const okPieces = ret.items.filter((i) => i.goodQty > 0);
 
   const run = async (action: CustomerReturnAction) => {
     setBusy(true);
@@ -123,6 +129,17 @@ export function CustomerReturnCard({ ret, isManagement, onDialog, onAct }: Props
         </p>
       )}
       {ret.notes && <p className="text-xs text-muted-foreground italic">“{ret.notes}”</p>}
+      {rtsUndecided && ret.waitingCustomerAt && (
+        <p className="text-xs text-amber-700">
+          Waiting for the customer since {phDate(ret.waitingCustomerAt)}{ret.waitingCustomerByName ? ` (${ret.waitingCustomerByName})` : ''}
+          {ret.askAgainAt ? ` · asks again ${phDate(ret.askAgainAt)}` : ''}
+        </p>
+      )}
+      {open && ret.needsShelving && (
+        <p className="text-xs text-emerald-700">
+          OK pieces to put back on the shelf: {okPieces.map((i) => `${i.goodQty}× ${i.productName}`).join(', ')}
+        </p>
+      )}
       {open && ret.outcome === 'reship' && damagedTotal > 0 && (
         <p className="text-xs text-red-700">
           {damagedTotal} damaged piece(s) can&apos;t be re-shipped.{ret.replacementOrderId ? ' A replacement order was made for them.' : ' Make a replacement order for them.'}
@@ -141,21 +158,40 @@ export function CustomerReturnCard({ ret, isManagement, onDialog, onAct }: Props
       )}
 
       <div className="flex flex-wrap items-center gap-2">
+        {rtsUndecided && canDecideRts && (
+          <>
+            <Button size="sm" disabled={busy} onClick={() => run({ action: 'rts_decide', id: ret.id, choice: 'resend' })}>Resend</Button>
+            <Button size="sm" variant="outline" disabled={busy}
+              onClick={() => { if (confirm('Cancel this order? The OK pieces go back on the shelf.')) run({ action: 'rts_decide', id: ret.id, choice: 'cancel' }); }}>
+              Cancel order
+            </Button>
+            <Button size="sm" variant="ghost" disabled={busy} onClick={() => run({ action: 'waiting_customer', id: ret.id })}>Waiting for customer</Button>
+          </>
+        )}
+        {rtsUndecided && !canDecideRts && (
+          <span className="text-xs text-muted-foreground">{ret.escalated ? 'Waiting for the owners: resend or cancel?' : 'Waiting for sales: resend or cancel?'}</span>
+        )}
         {open && isManagement && canChangeDecision && (
-          <Button size="sm" variant={ret.decidedAt ? 'outline' : 'default'} onClick={() => onDialog('decide', ret)}>
-            {ret.decidedAt ? 'Change decision' : 'Decide'}
+          <Button size="sm" variant={rtsUndecided ? 'ghost' : ret.decidedAt ? 'outline' : 'default'} onClick={() => onDialog('decide', ret)}>
+            {ret.decidedAt ? 'Change decision' : rtsUndecided ? 'Other options' : 'Decide'}
           </Button>
         )}
-        {open && !isManagement && !ret.decidedAt && <span className="text-xs text-muted-foreground">Waiting for the owners to decide.</span>}
+        {open && !isManagement && !ret.decidedAt && ret.source !== 'rts' && <span className="text-xs text-muted-foreground">Waiting for the owners to decide.</span>}
         {open && ret.askBack && !ret.arrivedAt && (
           <Button size="sm" variant="outline" disabled={busy} onClick={() => run({ action: 'arrived', id: ret.id })}>Parcel arrived</Button>
         )}
         {open && ret.askBack && !ret.checkedAt && (
           <Button size="sm" variant={ret.stage === 'to_check' ? 'default' : 'outline'} onClick={() => onDialog('check', ret)}>Check pieces</Button>
         )}
-        {open && ret.stage === 'to_do' && todo && (todo.ownerOnly && !isManagement
+        {open && ret.stage === 'to_do' && todo && !ret.outcomeDoneAt && (todo.ownerOnly && !isManagement
           ? <span className="text-xs text-muted-foreground">Waiting for the owners: {todo.label.toLowerCase()}.</span>
           : <Button size="sm" onClick={() => onDialog(todoDialog, ret)}>{todo.label}</Button>)}
+        {open && ret.needsShelving && (
+          <Button size="sm" disabled={busy}
+            onClick={() => { if (confirm('Are the OK pieces back on the shelf? Stock goes up now.')) run({ action: 'shelved', id: ret.id }); }}>
+            Put back on shelf: done
+          </Button>
+        )}
         {canReplaceDamaged && (
           <Button size="sm" variant="outline" onClick={() => onDialog('replacement', ret)}>Replacement order for damaged</Button>
         )}

@@ -215,6 +215,27 @@ What happens to an RTS parcel **depends**: staff open it and **check every
 item for damage**. Then either the order is **re-shipped**, or the customer
 cancels and the good pieces **go back on the shelf**.
 
+Courier returns in practice (owner, 2026-11-03):
+
+- **Most returns are courier returns (RTS).** An inventory staff member
+  receives the parcel from the courier, then posts in a **Messenger group for
+  returns**. **Sales replies: resend to the customer, or cancel the order.**
+  Staff also check whether the item is damaged and tell the owners.
+- The courier's data comes in later than the parcel (2026-11-03: three parcels
+  came back, only one showed up from courier sync). So staff must be able to
+  **log the parcel when it is in their hands**, finding it by **order # or
+  customer name**.
+- **Sales decides resend vs cancel** for RTS; owners don't need to approve.
+  Owners decide only when something is **damaged**.
+- Sales agents **don't watch the bell**; a **pop-up** gets noticed.
+- Most orders are **COD**, so a cancelled RTS usually needs **no refund**.
+- Cancelled: OK pieces go back on the shelf, and staff confirm when that's done.
+- Customers often **don't reply right away**. Sales can answer **"Asked
+  customer, waiting for reply"**; the question comes back **after 4 hours**,
+  and the case shows how long it has waited. After **3 days** with no answer,
+  the **owners decide** resend or cancel.
+- Sales can answer from the pop-up **or from the Returns page** (same buttons).
+
 What the customer can get: a **replacement shipped**, a **full refund**, a
 **partial refund / discount** (they keep the item), or **store credit**. The
 **owners decide**; staff then do the work (check, re-ship, pack the

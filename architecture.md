@@ -480,6 +480,13 @@ Owner rules: `docs/BUSINESS_WORKFLOW.md` → "Customer returns". Separate from S
 - **Receiving**: `pending-pos` lines carry `reservedFor`; `pending-purchases.tsx` shows the violet "tag it and set aside" note.
 - Limits: a reservation is per product listing, so duplicate listings of one item (e.g. "Stainless thermal jar/Milktea barrels-12L" vs "… - 12L") aren't protected across each other.
 
+**Courier returns flow (built 2026-11-04)** (`scripts/migrations/2026-11-03_courier_returns_flow.sql`: `waiting_customer_at`, `waiting_customer_by_name`, `ask_again_at`). Owner rules: BUSINESS_WORKFLOW.md "Courier returns in practice". Code in `customer-return-rts.ts`.
+- **Log returned parcel** (Returns page, `log-parcel-dialog.tsx`): search by order # prefix (uuid range) or customer name (`?search=`), POST `log_parcel` → `logReturnedParcel`: an open RTS case for the order is marked arrived (no duplicate; a non-RTS open case is refused), otherwise a new RTS case with the parcel here (order → Returned). RTS cases notify the order's agent (bell), not the owners.
+- **Sales decides**: stage `needs_sales` for undecided RTS cases; `rts_decide` (sales or owners; `caller.isSales` from staff roles) sets outcome `reship` / `cancel_order`; `waiting_customer` sets `ask_again_at` = +4 h, moved to 9 AM PHT outside 9–18. `isEscalated`: undecided RTS more than 3 days after the case **opened** (`created_at`) → stage `needs_owner`.
+- **Pop-up** (`rts-decision-popup.tsx`, in the dashboard layout): `?prompts=1` → `listRtsPrompts`: undecided open RTS cases with `ask_again_at` passed, for the order's agent, all sales 2 h after the case opened, owners once escalated. Minimize → back in 30 min; refreshes every 5 min.
+- **Put back on shelf is explicit (all cases)**: good pieces no longer restock automatically after check + decision. `needsShelving` (checked, decided, not re-ship, good pieces, not `restocked_at`) keeps the stage at `to_do`; the `shelved` action (staff tap "Put back on shelf: done") runs the restock (`return` movement, mirrored to `shelf_stock`), once.
+- Priority List Returns tab names the step ("Sales (agent): Resend or cancel?", "Warehouse: put the OK pieces back").
+
 **Before phase 1**: `returns` table + `ProcessReturnDialog` (Orders page) + `/dashboard/inventory/returns` log. `restock` added stock with no check, `exchange` and `writeoff` only logged a row (40 of 44 uses were "exchange"). `useCourierSync` set orders to `Returned` and nothing happened after that.
 
 Original plan:

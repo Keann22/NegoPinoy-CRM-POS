@@ -5,7 +5,9 @@ import type {
   CustomerReturnAction,
   CustomerReturnsResponse,
   NewCustomerReturn,
+  ParcelOrderMatch,
   ReturnableOrderLine,
+  RtsDecisionPrompt,
 } from '@/types/customer-returns.types';
 
 const API = '/api/inventory/customer-returns';
@@ -61,6 +63,27 @@ export async function openCustomerReturn(input: NewCustomerReturn) {
 
 export async function patchCustomerReturn(action: CustomerReturnAction) {
   await send('PATCH', action);
+}
+
+/** Orders matching an order # or customer name, for logging a returned parcel. */
+export async function searchParcelOrders(query: string): Promise<ParcelOrderMatch[]> {
+  const res = await fetch(`${API}?search=${encodeURIComponent(query)}`, { cache: 'no-store' });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || 'Search failed');
+  return json.orders || [];
+}
+
+/** Staff have the courier's returned parcel in hand. */
+export async function logReturnedParcel(orderId: string, reason: string) {
+  return (await send('POST', { action: 'log_parcel', orderId, reason })) as { id: string; caseNo: number; existed: boolean };
+}
+
+/** Courier returns waiting on this person's resend / cancel answer. */
+export async function fetchRtsPrompts(): Promise<RtsDecisionPrompt[]> {
+  const res = await fetch(`${API}?prompts=1`, { cache: 'no-store' });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) return [];
+  return json.prompts || [];
 }
 
 /** After courier sync: open RTS cases for orders it just marked Returned. */

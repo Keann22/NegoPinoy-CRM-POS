@@ -17,6 +17,8 @@ export async function getReturnsCaller() {
   return {
     name: `${meta.first_name || ''} ${meta.last_name || ''}`.trim() || user.email || 'Staff',
     isManagement,
+    /** Sales agents decide resend / cancel on courier returns. */
+    isSales: roles.includes('sales'),
     canUse: isManagement || roles.some((r) => RETURN_ROLES.includes(r)),
   };
 }

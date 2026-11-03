@@ -8,16 +8,24 @@ import { CR_OUTCOME_TODO, CR_STAGE_LABELS, type CustomerReturn } from '@/types/c
 
 /** Who has to move next on a case, and what they do. Null = nothing to act on yet. */
 function nextStep(r: CustomerReturn): { who: string; what: string } | null {
+  const rtsUndecided = r.source === 'rts' && !r.decidedAt;
+  const waiting = r.waitingCustomerAt
+    ? ` (waiting for the customer since ${new Date(r.waitingCustomerAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })})`
+    : '';
   switch (r.stage) {
+    case 'needs_sales':
+      return { who: r.salesPersonName ? `Sales (${r.salesPersonName})` : 'Sales', what: `Resend or cancel?${waiting}` };
     case 'needs_owner':
+      if (rtsUndecided) return { who: 'Owners', what: `No answer for 3 days: resend or cancel?${waiting}` };
       return r.damagedPending
         ? { who: 'Owners', what: 'Damaged pieces: throw away or sell 2nd-hand' }
         : { who: 'Owners', what: 'Decide what the customer gets' };
     case 'to_check':
-      return { who: 'Warehouse', what: 'Open the parcel and check every piece' };
+      return { who: 'Warehouse', what: rtsUndecided ? 'Open the parcel and check every piece · Sales: resend or cancel?' : 'Open the parcel and check every piece' };
     case 'to_do': {
-      const todo = r.outcome ? CR_OUTCOME_TODO[r.outcome] : null;
-      return todo ? { who: todo.ownerOnly ? 'Owners' : 'Warehouse / agent', what: todo.label } : null;
+      const todo = r.outcome && !r.outcomeDoneAt ? CR_OUTCOME_TODO[r.outcome] : null;
+      if (todo) return { who: todo.ownerOnly ? 'Owners' : 'Warehouse / agent', what: todo.label };
+      return r.needsShelving ? { who: 'Warehouse', what: 'Put the OK pieces back on the shelf, then tap "Put back on shelf: done"' } : null;
     }
     case 'waiting_parcel':
       return r.isOverdue ? { who: 'Agent', what: `Parcel still not back after ${r.daysOpen} days: follow up` } : null;

@@ -97,7 +97,7 @@ export function OpenReturnDialog({ order, defaultSource = 'damage_report', open,
           <DialogTitle>Open a return case</DialogTitle>
           <DialogDescription>
             Order #{order?.id.slice(0, 7).toUpperCase()}{order?.customerName ? ` · ${order.customerName}` : ''}. Nothing goes back in
-            stock yet: the owners decide, then each returned piece is checked.
+            stock yet: each returned piece is checked first. Courier returns: sales decides resend or cancel; others: the owners decide.
           </DialogDescription>
         </DialogHeader>
 

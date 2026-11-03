@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { Loader2, PackageOpen, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -13,11 +13,13 @@ import { OutcomeDoneDialog } from '@/components/dashboard/customer-returns/outco
 import { OldReturnsLog } from '@/components/dashboard/customer-returns/old-returns-log';
 import { ReplacementOrderDialog } from '@/components/dashboard/customer-returns/replacement-order-dialog';
 import { RefundCreditDialog } from '@/components/dashboard/customer-returns/refund-credit-dialog';
+import { LogParcelDialog } from '@/components/dashboard/customer-returns/log-parcel-dialog';
 import { CR_STAGE_LABELS, type CustomerReturn, type CustomerReturnStage } from '@/types/customer-returns.types';
 
-const TABS: CustomerReturnStage[] = ['needs_owner', 'to_check', 'to_do', 'waiting_parcel', 'done'];
+const TABS: CustomerReturnStage[] = ['needs_sales', 'needs_owner', 'to_check', 'to_do', 'waiting_parcel', 'done'];
 
 const EMPTY: Record<CustomerReturnStage, string> = {
+  needs_sales: 'No returned parcels waiting for resend / cancel.',
   needs_owner: 'Nothing waiting on the owners.',
   to_check: 'No returned parcels to check.',
   to_do: 'Nothing to re-ship, send or refund.',
@@ -26,12 +28,15 @@ const EMPTY: Record<CustomerReturnStage, string> = {
 };
 
 // Customer returns: RTS parcels, damage reports and items shipped back. Cases
-// are opened from an order (Orders → Process Return) or automatically by
-// courier sync. See architecture.md "Planned: Customer Returns".
+// are opened from an order (Orders → Process Return), by staff logging a parcel
+// the courier brought back, or automatically by courier sync. See architecture.md
+// "Customer Returns".
 export default function CustomerReturnsPage() {
   const { data, isLoading, error, refresh, act } = useCustomerReturns();
   const [dialog, setDialog] = useState<{ kind: CustomerReturnDialogKind; ret: CustomerReturn } | null>(null);
   const isManagement = !!data?.isManagement;
+  const canDecideRts = isManagement || !!data?.isSales;
+  const [logging, setLogging] = useState(false);
 
   const groups = useMemo(() => {
     const all = data?.returns || [];
@@ -54,10 +59,13 @@ export default function CustomerReturnsPage() {
           <div>
             <h1 className="text-2xl font-bold font-headline">Customer Returns</h1>
             <p className="text-sm text-muted-foreground">
-              Parcels sent back, damage reports and items customers ship back. Open a case from the order (Process Return).
+              Parcels sent back, damage reports and items customers ship back. Damage reports: open them from the order (Process Return).
             </p>
           </div>
-          <Button variant="outline" size="icon" onClick={refresh} title="Refresh"><RefreshCw className="h-4 w-4" /></Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="icon" onClick={refresh} title="Refresh"><RefreshCw className="h-4 w-4" /></Button>
+            <Button onClick={() => setLogging(true)}><PackageOpen className="mr-2 h-4 w-4" />Log returned parcel</Button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -83,7 +91,7 @@ export default function CustomerReturnsPage() {
                 ) : (
                   <div className="space-y-2">
                     {groups[t].map((r) => (
-                      <CustomerReturnCard key={r.id} ret={r} isManagement={isManagement} onAct={act}
+                      <CustomerReturnCard key={r.id} ret={r} isManagement={isManagement} canDecideRts={canDecideRts} onAct={act}
                         onDialog={(kind, ret) => setDialog({ kind, ret })} />
                     ))}
                   </div>
@@ -101,6 +109,7 @@ export default function CustomerReturnsPage() {
       <OutcomeDoneDialog ret={dialogFor('done')} onClose={() => setDialog(null)} onSubmit={act} />
       <ReplacementOrderDialog ret={dialogFor('replacement')} onClose={() => setDialog(null)} onSubmit={act} />
       <RefundCreditDialog ret={dialogFor('money')} onClose={() => setDialog(null)} onSubmit={act} />
+      <LogParcelDialog open={logging} onOpenChange={setLogging} onLogged={refresh} />
     </Card>
   );
 }

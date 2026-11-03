@@ -12,6 +12,7 @@ import {
   shortOrder,
 } from './customer-return-service';
 import { createReplacementOrder, giveStoreCredit, recordRefund } from './customer-return-money';
+import { decideRts, waitForCustomer } from './customer-return-rts';
 
 /*
  * Moving a customer return case along. See customer-return-service.ts for the
@@ -65,13 +66,16 @@ async function restockPiece(supabase: SupabaseClient, productId: string, qty: nu
 }
 
 /**
- * Once the pieces are checked and the owners decided (and it isn't a re-ship,
- * where the pieces stay with the order), good pieces go back on the shelf.
- * restocked_at is claimed first, so this can only happen once.
+ * Staff tapped "Put back on shelf: done": the OK pieces are physically back, so
+ * stock goes up now (owner rule 2026-11-03), not when the check is saved.
+ * Only once the pieces are checked and decided, and never on a re-ship (the
+ * pieces stay with the order). restocked_at is claimed first, so it runs once.
  */
-async function settleGoodPieces(supabase: SupabaseClient, id: string, actorName: string) {
+async function shelveGoodPieces(supabase: SupabaseClient, id: string, actorName: string) {
   const r = await loadCase(supabase, id);
-  if (!r.checked_at || !r.decided_at || r.restocked_at || r.outcome === 'reship') return;
+  if (!r.checked_at || !r.decided_at || r.restocked_at || r.outcome === 'reship') {
+    throw new CustomerReturnError('Nothing to put back yet: the pieces need checking and a decision first.');
+  }
   const items: any[] = (r.customer_return_items || []).filter((i: any) => i.good_qty > 0 && i.product_id);
   const { data: claimed } = await supabase
     .from('customer_returns')
@@ -105,7 +109,8 @@ export async function applyCustomerReturnAction(
   supabase: SupabaseClient,
   a: CustomerReturnAction,
   actorName: string,
-  isManagement: boolean
+  isManagement: boolean,
+  isSales = false
 ) {
   if (OWNER_ACTIONS.has(a.action) && !isManagement) throw new CustomerReturnError('Only the owners can do this.');
   const r = await loadCase(supabase, a.id);
@@ -233,6 +238,18 @@ export async function applyCustomerReturnAction(
       await logEvent(supabase, r.id, 'photos', actorName, `${urls.length} photo(s)`);
       return;
     }
+    case 'shelved': {
+      await shelveGoodPieces(supabase, r.id, actorName);
+      break;
+    }
+    case 'rts_decide': {
+      await decideRts(supabase, r, a.choice, a.note, actorName, isManagement || isSales);
+      break;
+    }
+    case 'waiting_customer': {
+      await waitForCustomer(supabase, r, a.note, actorName, isManagement || isSales);
+      return;
+    }
     case 'cancel_case': {
       if (r.restocked_at || r.outcome_done_at || r.replacement_order_id) throw new CustomerReturnError('Already carried out; it can no longer be cancelled.');
       await guardedUpdate(supabase, r, { status: 'closed', closed_at: now });
@@ -243,6 +260,5 @@ export async function applyCustomerReturnAction(
       throw new CustomerReturnError('Unknown action.');
   }
 
-  await settleGoodPieces(supabase, r.id, actorName);
   await closeIfDone(supabase, r.id, actorName);
 }

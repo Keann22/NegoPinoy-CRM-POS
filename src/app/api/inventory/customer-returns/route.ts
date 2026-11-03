@@ -9,6 +9,7 @@ import {
   openCasesForCourierReturns,
 } from '@/lib/services/customer-returns/customer-return-service';
 import { applyCustomerReturnAction } from '@/lib/services/customer-returns/customer-return-actions';
+import { listRtsPrompts, logReturnedParcel, searchOrdersForParcel } from '@/lib/services/customer-returns/customer-return-rts';
 import type { CustomerReturnAction, NewCustomerReturn } from '@/types/customer-returns.types';
 
 export const dynamic = 'force-dynamic';
@@ -24,13 +25,19 @@ function errorResponse(e: unknown) {
 
 // GET            -> open cases + closed in the last 60 days
 // GET ?orderId=  -> that order's lines (for opening a case)
+// GET ?search=   -> orders matching an order # / customer name (logging a returned parcel)
+// GET ?prompts=1 -> courier returns waiting on this person's resend / cancel answer (pop-up)
 export async function GET(req: Request) {
   try {
     const caller = await getReturnsCaller();
     if (!caller?.canUse) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
-    const orderId = new URL(req.url).searchParams.get('orderId');
+    const params = new URL(req.url).searchParams;
+    if (params.get('prompts')) return NextResponse.json({ prompts: await listRtsPrompts(supabase, caller) });
+    const search = params.get('search');
+    if (search != null) return NextResponse.json({ orders: await searchOrdersForParcel(supabase, search) });
+    const orderId = params.get('orderId');
     if (orderId) return NextResponse.json({ lines: await getReturnableLines(supabase, orderId) });
-    return NextResponse.json(await listCustomerReturns(supabase, caller.isManagement));
+    return NextResponse.json(await listCustomerReturns(supabase, caller.isManagement, caller.isSales));
   } catch (e) {
     return errorResponse(e);
   }
@@ -38,11 +45,16 @@ export async function GET(req: Request) {
 
 // POST NewCustomerReturn                       -> open a case
 // POST { action: 'courier_rts', orderIds }     -> open RTS cases after courier sync
+// POST { action: 'log_parcel', orderId, reason } -> staff have the returned parcel in hand
 export async function POST(req: Request) {
   try {
     const caller = await getReturnsCaller();
     if (!caller?.canUse) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
     const body = await req.json();
+    if (body?.action === 'log_parcel') {
+      if (typeof body.orderId !== 'string') return NextResponse.json({ error: 'Pick the order' }, { status: 400 });
+      return NextResponse.json(await logReturnedParcel(supabase, body.orderId, String(body.reason || ''), caller.name));
+    }
     if (body?.action === 'courier_rts') {
       const opened = await openCasesForCourierReturns(supabase, Array.isArray(body.orderIds) ? body.orderIds : [], `${caller.name} (courier sync)`);
       return NextResponse.json({ opened });
@@ -58,7 +70,7 @@ export async function PATCH(req: Request) {
   try {
     const caller = await getReturnsCaller();
     if (!caller?.canUse) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
-    await applyCustomerReturnAction(supabase, (await req.json()) as CustomerReturnAction, caller.name, caller.isManagement);
+    await applyCustomerReturnAction(supabase, (await req.json()) as CustomerReturnAction, caller.name, caller.isManagement, caller.isSales);
     return NextResponse.json({ ok: true });
   } catch (e) {
     return errorResponse(e);
