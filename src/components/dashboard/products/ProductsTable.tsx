@@ -16,6 +16,23 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ChevronDown, ChevronRight, MoreHorizontal } from 'lucide-react';
 import { getStockStatus } from '@/types';
 import type { FormattedProduct } from '@/types';
+import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { featureOnWebsite } from '@/lib/services/website-feature-service';
+
+/** Owners/admins: make this product the one at the top of the customer website. */
+function FeatureOnWebsiteItem({ product }: { product: FormattedProduct }) {
+  const { toast } = useToast();
+  const feature = async () => {
+    try {
+      await featureOnWebsite(createClient(), product.id);
+      toast({ title: 'Nasa website na', description: `"${product.name}" is now at the top of the website.` });
+    } catch (e: unknown) {
+      toast({ variant: 'destructive', title: 'Could not feature it', description: e instanceof Error ? e.message : String(e) });
+    }
+  };
+  return <DropdownMenuItem onClick={feature}>Feature on website</DropdownMenuItem>;
+}
 
 /** Price cell: shows sale price with the regular price struck through when on sale. */
 function PriceLabel({ product }: { product: FormattedProduct }) {
@@ -166,6 +183,7 @@ function ProductActionsMenu({ product, isManagement, canManageProducts, onViewDe
           <DropdownMenuItem onClick={() => onAdjustStock(product)}>Adjust Stock</DropdownMenuItem>
         )}
         <DropdownMenuItem onClick={() => onViewHistory(product)}>View History</DropdownMenuItem>
+        {isManagement && !product.parentName && <FeatureOnWebsiteItem product={product} />}
         {isManagement && (
           <DropdownMenuItem
             className="text-destructive focus:text-destructive focus:bg-destructive/10"
