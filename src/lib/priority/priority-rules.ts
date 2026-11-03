@@ -160,6 +160,8 @@ export interface PriorityOrderInput {
   readyCount: number;
   /** Customer is in a hurry (latest urgent/urgent_cleared event is urgent). */
   urgent: { note: string | null; byName: string | null; at: string } | null;
+  /** Sales reserved incoming stock for this order (a replacement): pickers can't give its items to other orders. */
+  reserved: { note: string | null; byName: string | null; at: string } | null;
   /** Active send-today mark (latest send_today* event is a mark). */
   sendToday: SendTodayMark | null;
   /** The warehouse said it can't send this today (latest send_today* event, today only). */

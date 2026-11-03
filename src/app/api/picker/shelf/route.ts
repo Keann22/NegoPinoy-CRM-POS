@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import { createClient as createSessionClient } from '@/lib/supabase/server';
 import { getOrderPickedQty, getProductsWithPendingDelivery, getShelfForProducts, savePickerShelfCount } from '@/lib/services/inventory/picker-shelf-guard-service';
 import { staffRolesOf } from '@/lib/auth/staff-roles';
+import { isManagementUser } from '@/lib/services/purchase-summary-service';
+import { getReservations, logReservationOverride, reservationsToJson } from '@/lib/services/inventory/reservation-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +18,7 @@ async function getCaller() {
   const meta: any = user.user_metadata || {};
   const roles = staffRolesOf(user);
   if (!roles.some((r) => INVENTORY_ROLES.includes(r))) return null;
-  return { name: `${meta.first_name || ''} ${meta.last_name || ''}`.trim() || user.email || 'Picker' };
+  return { name: `${meta.first_name || ''} ${meta.last_name || ''}`.trim() || user.email || 'Picker', isManagement: isManagementUser(user) };
 }
 
 // Shelf numbers (unallocated, Unit 2 reserve) for the products on the order being picked,
@@ -27,13 +29,15 @@ export async function GET(req: Request) {
     const params = new URL(req.url).searchParams;
     const ids = (params.get('productIds') || '').split(',').filter(Boolean);
     const orderId = params.get('orderId');
-    const [shelf, picked, pending] = await Promise.all([
+    const [shelf, picked, pending, reserved] = await Promise.all([
       getShelfForProducts(supabase, ids),
       orderId ? getOrderPickedQty(supabase, orderId) : Promise.resolve({}),
       getProductsWithPendingDelivery(supabase, ids),
+      // Pieces other orders reserved for a replacement (this order's own reservation doesn't count against it).
+      getReservations(supabase, { productIds: ids, excludeOrderId: orderId }),
     ]);
     // pendingDelivery: a recorded purchase of it is still waiting on Receiving (no qty: the count stays blind).
-    return NextResponse.json({ shelf, picked, pendingDelivery: Array.from(pending) });
+    return NextResponse.json({ shelf, picked, pendingDelivery: Array.from(pending), reserved: reservationsToJson(reserved) });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }
@@ -46,6 +50,22 @@ export async function POST(req: Request) {
     if (!caller) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
     const body = await req.json();
     if (!body?.productId) return NextResponse.json({ error: 'Missing product' }, { status: 400 });
+    // Owner gives a piece reserved for a replacement to this order instead (reason required).
+    if (body.reserveOverride) {
+      if (!caller.isManagement) return NextResponse.json({ error: 'Only the owners can give a reserved piece to another order.' }, { status: 403 });
+      const reason = String(body.reason || '').trim().slice(0, 300);
+      if (reason.length < 3) return NextResponse.json({ error: 'Add why it goes to this order.' }, { status: 400 });
+      if (!body.orderId) return NextResponse.json({ error: 'Missing order' }, { status: 400 });
+      const productId = String(body.productId);
+      const res = (await getReservations(supabase, { productIds: [productId], excludeOrderId: body.orderId })).get(productId);
+      const { data: product } = await supabase.from('products').select('name').eq('id', productId).maybeSingle();
+      if (res) {
+        await logReservationOverride(supabase, {
+          productName: product?.name || 'item', toOrderId: String(body.orderId), reason, byName: caller.name, reserved: res.orders,
+        });
+      }
+      return NextResponse.json({ ok: true });
+    }
     const result = await savePickerShelfCount(supabase, {
       productId: String(body.productId),
       unit1Count: body.unit1Count,

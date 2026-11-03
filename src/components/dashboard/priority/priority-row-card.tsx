@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Ban, BadgeCheck, ChevronDown, Clock, Flame, MessageSquarePlus, PauseCircle, PlayCircle, Truck, X } from 'lucide-react';
+import { Ban, BadgeCheck, ChevronDown, Clock, Flame, MessageSquarePlus, PauseCircle, PlayCircle, Truck, X, Lock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -45,7 +45,10 @@ function timer(row: PriorityRow): { text: string; tone: 'late' | 'today' | 'ok' 
   return { text: `Due in ${days}d`, tone: 'ok' };
 }
 
-export type RowAction = PriorityAction | 'clear_hold' | 'unmark' | 'unurgent' | 'note';
+export type RowAction = PriorityAction | 'clear_hold' | 'unmark' | 'unurgent' | 'unreserve' | 'note';
+
+/** Orders that still have items to take off the shelf (a reservation only matters then). */
+const NEEDS_PICKING = ['Pending Payment', 'Processing', 'Waiting for Stock', 'On-Hold', 'Picked (with issue)'];
 
 export interface RowPermissions {
   /** Follow-ups and holds (sales, admin, jas). */
@@ -85,11 +88,16 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
         </div>
 
         <div className="min-w-0 flex-1 space-y-2">
-          {(row.urgent || paidBadge) && (
+          {(row.urgent || paidBadge || row.reserved) && (
             <div className="flex flex-wrap gap-1.5">
               {row.urgent && (
                 <span className="inline-flex items-center gap-1 rounded bg-red-600 px-2 py-0.5 text-xs font-semibold text-white">
                   <Flame className="h-3 w-3" />Nagmamadali
+                </span>
+              )}
+              {row.reserved && (
+                <span className="inline-flex items-center gap-1 rounded bg-violet-600 px-2 py-0.5 text-xs font-semibold text-white">
+                  <Lock className="h-3 w-3" />Reserved for replacement
                 </span>
               )}
               {paidBadge && (
@@ -168,6 +176,11 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
           {row.urgent && (
             <div className="text-xs text-red-700 dark:text-red-300">Nagmamadali: “{row.urgent.note}” — {row.urgent.byName}, {shortDate(row.urgent.at)}</div>
           )}
+          {row.reserved && (
+            <div className="text-xs text-violet-700 dark:text-violet-300">
+              Reserved: “{row.reserved.note}” — {row.reserved.byName}, {shortDate(row.reserved.at)}. Pickers can&apos;t give these items to other orders.
+            </div>
+          )}
           {row.sendToday && (
             <div className="text-xs text-muted-foreground">Send today: “{row.sendToday.note}” — {row.sendToday.byName}</div>
           )}
@@ -211,6 +224,16 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
             {canEdit && row.urgent && (
               <Button size="sm" variant="ghost" className="h-8" onClick={() => onAction(row, 'unurgent')}>
                 <X className="mr-1.5 h-4 w-4" />Not in a hurry
+              </Button>
+            )}
+            {canMark && !row.reserved && NEEDS_PICKING.includes(row.status) && (
+              <Button size="sm" variant="outline" className="h-8 border-violet-300 text-violet-700 dark:text-violet-300" onClick={() => onAction(row, 'reserve')}>
+                <Lock className="mr-1.5 h-4 w-4" />Reserve for replacement
+              </Button>
+            )}
+            {canMark && row.reserved && (
+              <Button size="sm" variant="ghost" className="h-8" onClick={() => onAction(row, 'unreserve')}>
+                <X className="mr-1.5 h-4 w-4" />Remove reservation
               </Button>
             )}
             {canEdit && row.group !== 'hold' && (

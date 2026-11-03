@@ -219,7 +219,7 @@ export async function getPriorityList(
     const orderIssues = issuesByOrder.get(o.id) || [];
     const missing = applyOwedReplacements(missingItems(orderIssues, sourcesByOrder.get(o.id) || [], poiById, receivedAt, productById, eventsByOrder.get(o.id) || [], borrowsByOrder.get(o.id) || [], now), owed);
     const osRounds = new Set(orderIssues.map((i) => String(i.created_at).slice(0, 16))).size;
-    const { followUps, lastFollowUp, hold, sendToday, sendTodayBlock, urgent } = summarizeEvents(eventsByOrder.get(o.id) || [], now);
+    const { followUps, lastFollowUp, hold, sendToday, sendTodayBlock, urgent, reserved } = summarizeEvents(eventsByOrder.get(o.id) || [], now);
     const itemCount = lineCount.get(o.id) || 0;
     const mayBeOs = NOT_PICKED_STATUSES.includes(o.status)
       ? negativeStockLines(linesByOrder.get(o.id) || [], new Set(missing.map((m) => m.productId)))
@@ -247,6 +247,7 @@ export async function getPriorityList(
       sendToday,
       sendTodayBlock,
       urgent,
+      reserved,
       recentNotes: notes.slice(-RECENT_NOTES).reverse(),
       noteCount: notes.length,
       itemCount,
@@ -382,6 +383,10 @@ function summarizeEvents(events: any[], now: Date) {
   const urgent = urgentRow?.kind === 'urgent'
     ? { note: urgentRow.note, byName: urgentRow.created_by_name, at: urgentRow.created_at }
     : null;
+  const reserveRow = [...sorted].reverse().find((e) => e.kind === 'reserve' || e.kind === 'reserve_cleared');
+  const reserved = reserveRow?.kind === 'reserve'
+    ? { note: reserveRow.note, byName: reserveRow.created_by_name, at: reserveRow.created_at }
+    : null;
   const sendRow = [...sorted].reverse().find((e) => SEND_KINDS.includes(e.kind));
   const sendToday: SendTodayMark | null = sendRow?.kind === 'send_today' && sendRow.send_date
     ? { date: sendRow.send_date, note: sendRow.note, byName: sendRow.created_by_name, at: sendRow.created_at }
@@ -391,6 +396,7 @@ function summarizeEvents(events: any[], now: Date) {
     : null;
   return {
     urgent,
+    reserved,
     sendToday,
     sendTodayBlock,
     followUps: followUpRows.length,
@@ -427,7 +433,8 @@ export type PriorityEventKind =
   | 'followup' | 'hold' | 'hold_cleared'
   | 'send_today' | 'send_today_blocked' | 'send_today_cancelled'
   | 'os_decision'
-  | 'urgent' | 'urgent_cleared' | 'paid_notice';
+  | 'urgent' | 'urgent_cleared' | 'paid_notice'
+  | 'reserve' | 'reserve_cleared';
 
 /** Just the orders due to go out today (for the warehouse reminder pop-up). */
 export async function getSendTodayList(supabase: SupabaseClient, now = new Date()): Promise<PriorityRow[]> {

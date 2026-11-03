@@ -7,13 +7,16 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import type { ShelfPrompt } from '@/hooks/picker/useShelfGuard';
+import type { CountOutcome, ShelfPrompt } from '@/hooks/picker/useShelfGuard';
+import { ReservedPieceDialog } from './reserved-piece-dialog';
 
 interface Props {
   prompt: ShelfPrompt | null;
-  onCount: (unit1Count: number) => Promise<boolean | undefined>;
+  onCount: (unit1Count: number) => Promise<CountOutcome | undefined>;
   onNotReceived: () => void;
   onBothEmpty: () => Promise<void>;
+  onLeaveReserved: () => void;
+  onOverrideReserved: (reason: string) => Promise<void>;
   onClose: () => void;
 }
 
@@ -21,7 +24,7 @@ interface Props {
  * Asked when a picker taps Found for more than the shelf has, or Borrow while
  * the shelf still has stock. The count is blind: the system's number isn't shown.
  */
-export function ShelfGuardDialog({ prompt, onCount, onNotReceived, onBothEmpty, onClose }: Props) {
+export function ShelfGuardDialog({ prompt, onCount, onNotReceived, onBothEmpty, onLeaveReserved, onOverrideReserved, onClose }: Props) {
   const { toast } = useToast();
   const [count, setCount] = useState('');
   const [saving, setSaving] = useState(false);
@@ -29,6 +32,9 @@ export function ShelfGuardDialog({ prompt, onCount, onNotReceived, onBothEmpty, 
   useEffect(() => { setCount(''); setSaving(false); }, [prompt]);
 
   if (!prompt) return null;
+  if (prompt.kind === 'reserved') {
+    return <ReservedPieceDialog prompt={prompt} onLeave={onLeaveReserved} onOverride={onOverrideReserved} onClose={onClose} />;
+  }
 
   const run = async (fn: () => Promise<unknown>) => {
     setSaving(true);
@@ -43,10 +49,11 @@ export function ShelfGuardDialog({ prompt, onCount, onNotReceived, onBothEmpty, 
   const saveCount = () => run(async () => {
     const n = Math.round(Number(count));
     if (count.trim() === '' || !(n >= 0)) throw new Error('Type how many you counted.');
-    const enough = await onCount(n);
+    const outcome = await onCount(n);
+    if (outcome === 'reserved') return; // the "reserved for a replacement" dialog takes over
     toast({
       title: 'Count saved',
-      description: enough ? 'Marked Found.' : 'Not enough on the shelf: the rest is marked OS.',
+      description: outcome === 'found' ? 'Marked Found.' : 'Not enough on the shelf: the rest is marked OS.',
     });
   });
 

@@ -381,6 +381,8 @@ export default function PickerApp() {
         onCount={guard.submitCount}
         onNotReceived={guard.notReceivedYet}
         onBothEmpty={guard.confirmBothEmpty}
+        onLeaveReserved={guard.leaveReserved}
+        onOverrideReserved={guard.overrideReserved}
         onClose={guard.closePrompt}
       />
       <ReportDamagedDialog

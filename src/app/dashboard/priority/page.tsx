@@ -82,7 +82,7 @@ export default function PriorityListPage() {
   useEffect(() => { load(); }, [load]);
 
   // One-tap actions (no dialog): remove a hold, remove a send-today mark.
-  const quickEvent = async (row: PriorityRow, kind: 'hold_cleared' | 'send_today_cancelled' | 'urgent_cleared', done: string) => {
+  const quickEvent = async (row: PriorityRow, kind: 'hold_cleared' | 'send_today_cancelled' | 'urgent_cleared' | 'reserve_cleared', done: string) => {
     const res = await fetch('/api/priority/events', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -98,6 +98,7 @@ export default function PriorityListPage() {
     if (action === 'clear_hold') return quickEvent(row, 'hold_cleared', 'Hold removed');
     if (action === 'unmark') return quickEvent(row, 'send_today_cancelled', 'Removed from send today');
     if (action === 'unurgent') return quickEvent(row, 'urgent_cleared', 'No longer nagmamadali');
+    if (action === 'unreserve') return quickEvent(row, 'reserve_cleared', 'Reservation removed');
     if (action === 'note') return setNoteRow(row);
     setDialog({ row, action });
   };

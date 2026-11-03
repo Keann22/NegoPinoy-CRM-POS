@@ -19,6 +19,7 @@ const KINDS: PriorityEventKind[] = [
   'followup', 'hold', 'hold_cleared',
   'send_today', 'send_today_blocked', 'send_today_cancelled',
   'urgent', 'urgent_cleared',
+  'reserve', 'reserve_cleared',
 ];
 
 const bad = (error: string, status = 400) => NextResponse.json({ error }, { status });
@@ -30,6 +31,7 @@ const bad = (error: string, status = 400) => NextResponse.json({ error }, { stat
  *  - send_today: sales or jas mark it (after 11 AM it lands on tomorrow unless admin/jas overrides)
  *  - send_today_cancelled: sales or jas remove the mark
  *  - send_today_blocked: warehouse can't send it today; reason required (customer_hold also sets a hold)
+ *  - reserve / reserve_cleared: sales reserves incoming stock for a replacement (reservation-service.ts)
  */
 export async function POST(req: Request) {
   try {
@@ -59,6 +61,10 @@ export async function POST(req: Request) {
       return bad('Only sales, admins and the jas accounts can mark a customer as nagmamadali.', 403);
     }
     if (kind === 'urgent' && cleanNote.length < 2) return bad('Add what the customer said (e.g. "kailangan bago Nov 5").');
+    if ((kind === 'reserve' || kind === 'reserve_cleared') && !canMark) {
+      return bad('Only sales, admins and the jas accounts can reserve stock for a replacement.', 403);
+    }
+    if (kind === 'reserve' && cleanNote.length < 2) return bad('Add what it replaces (e.g. "palit sa leaking jar").');
     if (kind === 'send_today_blocked') {
       if (!(reason in BLOCK_REASONS)) return bad('Pick why it can\'t be sent today.');
       if (reason === 'other' && cleanNote.length < 2) return bad('Add what is stopping it.');

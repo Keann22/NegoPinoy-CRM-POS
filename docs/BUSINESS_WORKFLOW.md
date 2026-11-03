@@ -186,6 +186,21 @@ Money and replacements (owner, 2026-10-31):
 - A **refund** is recorded in **Expenses** (Customer Refund) with how it was paid.
 - **Store credit** goes on the customer's balance and is used on their next order.
 
+Reserved for a replacement (owner, 2026-11-03):
+
+- Found 2026-10-30: a 12L jar bought for Virginia's replacement (#8E12BCB) was
+  re-picked for another customer's older order. Nothing told staff it was meant
+  for the replacement.
+- **Sales decides** when a replacement should be first in line: they tap
+  **Reserve for replacement** on the order (Priority List) with what it replaces.
+  Nothing is reserved automatically.
+- Until that order is picked, the **Picker blocks** Found on other orders when
+  the shelf can't cover both ("Leave it for them → mark OS"). **Only owners can
+  override**, with a reason; the agent who reserved it is told.
+- **Receiving shows** "reserved for a replacement: #order, customer. Tag it and
+  set it aside."
+- It ends by itself once the order is picked.
+
 How returns reach us:
 
 1. **Courier sends the parcel back (RTS):** failed delivery or rejected by the

@@ -473,6 +473,13 @@ Owner rules: `docs/BUSINESS_WORKFLOW.md` → "Customer returns". Separate from S
 - The generic `outcome_done` is now re-ship only, so refunds and credit always leave an accounting entry.
 - **Priority List → Returns tab** (`returns-to-act-list.tsx`): open cases waiting on someone (owners decide / damaged pieces, warehouse check, to-do step, parcels overdue), with who and what; taps open the Returns page.
 
+**Reserved for a replacement (built 2026-11-03)** (`scripts/migrations/2026-11-03_reserve_for_replacement.sql` adds priority event kinds `reserve` / `reserve_cleared`). Works on any order, not only ones made from a return case (sales opts in).
+- **Set**: Priority List row → "Reserve for replacement" (canMark: sales / admin / jas; note required) → `/api/priority/events`; "Remove reservation" posts `reserve_cleared`. `PriorityRow.reserved` from `summarizeEvents` (purple chip + note).
+- **Lookup**: `getReservations(supabase, { productIds?, excludeOrderId? })` in `src/lib/services/inventory/reservation-service.ts`: orders whose latest reserve* event is `reserve`; pieces still needed = unpicked lines (not `is_packed`) while in UNPICKED_STATUSES, or the largest open OS qty per product while `Picked (with issue)`; nothing once picked (ends by itself). Bundles are not exploded (reserve the part's order line). Never throws.
+- **Picker** (`useShelfGuard`): `/api/picker/shelf` GET returns `reserved` (other orders only). Found is blocked when `unallocated − reserved < needed` (also after a shelf count: reserved pieces don't count) → `reserved-piece-dialog.tsx`: "Leave it for them → mark OS", or owners (POST `reserveOverride` + reason, checked server-side) give it to this order; `logReservationOverride` writes `Reservation overridden` on each reserved order's trail and bells whoever reserved it.
+- **Receiving**: `pending-pos` lines carry `reservedFor`; `pending-purchases.tsx` shows the violet "tag it and set aside" note.
+- Limits: a reservation is per product listing, so duplicate listings of one item (e.g. "Stainless thermal jar/Milktea barrels-12L" vs "… - 12L") aren't protected across each other.
+
 **Before phase 1**: `returns` table + `ProcessReturnDialog` (Orders page) + `/dashboard/inventory/returns` log. `restock` added stock with no check, `exchange` and `writeoff` only logged a row (40 of 44 uses were "exchange"). `useCourierSync` set orders to `Returned` and nothing happened after that.
 
 Original plan:

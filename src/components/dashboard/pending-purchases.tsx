@@ -169,6 +169,13 @@ export function PendingPurchases({ onReceiveComplete, refreshKey = 0 }: { onRece
                                       If pieces from this delivery were already on the shelf then, receive only the rest.
                                   </div>
                               )}
+                              {item.reservedFor && (
+                                  <div className="mt-1 rounded-md border border-violet-300 bg-violet-50 px-2 py-1 text-[11px] font-medium text-violet-900">
+                                      🔒 {item.reservedFor.qty} pc{item.reservedFor.qty === 1 ? ' is' : 's are'} reserved for a replacement:{' '}
+                                      {item.reservedFor.orders.map((o: { shortId: string; customerName: string; qty: number }) => `#${o.shortId} ${o.customerName} (${o.qty})`).join(', ')}.
+                                      Tag {item.reservedFor.qty === 1 ? 'it' : 'them'} with the order number and set aside for the picker.
+                                  </div>
+                              )}
                               {isDiscrepancy && (
                                   <div className="mt-2">
                                       <Input 
