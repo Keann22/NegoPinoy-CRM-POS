@@ -116,8 +116,9 @@ Receipts:
   every 30 minutes and on every page load until each product is saved.
 - **Long lists go on a page (owner, 2026-11-04):** Inventory Management →
   **Pabilang (Recount)**. Each product saves on its own, so Jas can stop and
-  come back; it shows how many are done. With more than 5 products the pop-up
-  only says how many are left and opens the page (no pop-up on the page itself).
+  come back; it shows how many are done. With more than 5 products there is
+  **no pop-up**: just a small red chip in the corner ("38 pabilang pa") that
+  opens the page. Up to 5 products keep the sticky pop-up.
 - The owner gets a **Telegram message as soon as Jas finishes** (her counts vs
   the old numbers), and a **reminder at 12 noon** if she hasn't finished by the
   due date (not on Sundays). No work Nov 1, holiday Nov 2 (2026): the first

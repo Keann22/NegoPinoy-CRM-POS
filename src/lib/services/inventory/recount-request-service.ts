@@ -245,7 +245,7 @@ export async function remindUnfinishedRecounts(supabase: SupabaseClient, now = n
       `${open.length} sa ${rows.length} ang hindi pa nabibilang:`,
       ...open.map((r) => `• ${esc(r.productName)}`),
       '',
-      'Naka-pop-up pa rin sa kanya hanggang mabilang lahat.',
+      'Nakalista pa rin sa kanya (Pabilang page) hanggang mabilang lahat.',
     ].join('\n');
     const res = await sendTelegramMessage(text);
     if (res.success) sent += 1;
