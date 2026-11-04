@@ -9,10 +9,11 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import type { CountOutcome, ShelfPrompt } from '@/hooks/picker/useShelfGuard';
 import { ReservedPieceDialog } from './reserved-piece-dialog';
+import { OsShelfCheck } from './os-shelf-check';
 
 interface Props {
   prompt: ShelfPrompt | null;
-  onCount: (unit1Count: number) => Promise<CountOutcome | undefined>;
+  onCount: (unit1Count: number, opts?: { unit2Empty?: boolean }) => Promise<CountOutcome | undefined>;
   onNotReceived: () => void;
   onBothEmpty: () => Promise<void>;
   onLeaveReserved: () => void;
@@ -21,8 +22,9 @@ interface Props {
 }
 
 /**
- * Asked when a picker taps Found for more than the shelf has, or Borrow while
- * the shelf still has stock. The count is blind: the system's number isn't shown.
+ * Asked when a picker taps Found for more than the shelf has, OS while the
+ * shelf should still have some, or Borrow while the shelf still has stock.
+ * The count is blind: the system's number isn't shown.
  */
 export function ShelfGuardDialog({ prompt, onCount, onNotReceived, onBothEmpty, onLeaveReserved, onOverrideReserved, onClose }: Props) {
   const { toast } = useToast();
@@ -57,10 +59,22 @@ export function ShelfGuardDialog({ prompt, onCount, onNotReceived, onBothEmpty, 
     });
   });
 
+  // Tapped OS but the system says there should be some: the count fixes the number.
+  const saveOsCount = (n: number) => run(async () => {
+    const outcome = await onCount(n, { unit2Empty: true });
+    if (outcome === 'reserved') return;
+    toast({
+      title: 'Count saved',
+      description: outcome === 'found' ? 'You counted enough for this order: take it from the shelf. Marked Found.' : 'Marked OS. The system number is fixed.',
+    });
+  });
+
   return (
     <Dialog open onOpenChange={(o) => { if (!o && !saving) onClose(); }}>
       <DialogContent className="max-w-md">
-        {prompt.kind === 'count' ? (
+        {prompt.kind === 'os' ? (
+          <OsShelfCheck key={prompt.rowKey} prompt={prompt} saving={saving} onSave={saveOsCount} onBack={onClose} />
+        ) : prompt.kind === 'count' ? (
           <>
             <DialogHeader>
               <DialogTitle>The system says there isn&apos;t enough on the shelf</DialogTitle>

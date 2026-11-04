@@ -70,6 +70,7 @@ export async function POST(req: Request) {
       productId: String(body.productId),
       unit1Count: body.unit1Count,
       bothEmpty: !!body.bothEmpty,
+      unit2Empty: !!body.unit2Empty,
       orderId: body.orderId || null,
       actorName: caller.name,
     });

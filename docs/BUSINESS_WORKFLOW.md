@@ -87,6 +87,13 @@ Receipts:
   warns when a delivery of the item is waiting on Receiving. Receiving warns on
   any item a picker counted in the last 2 days: receive only the pieces that
   weren't already on the shelf.
+- **OS when the shelf should have some (owner, 2026-11-04).** If the system says
+  free pieces are on the shelf, tapping OS asks the picker to look again (Unit 1,
+  nearby bins, Unit 2, the right size/color). If there are still none, they count
+  the Unit 1 shelf (blind, 0 is fine) and confirm Unit 2 is empty; the count fixes
+  the system number, then OS goes through for what's missing. Found 2026-11-04:
+  52 open OS lines (32 products, e.g. KAISA VILLA BLENDER - Red) had been marked
+  OS, and a purchase requested, while the system still showed shelf stock.
 - **Unit 2 reserve is free stock, not borrowing.** If unallocated stock is above
   zero, the picker can't borrow from another order until they confirm **both
   Unit 1 and Unit 2 are empty**; that confirmation is saved as a count of 0.

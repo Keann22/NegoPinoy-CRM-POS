@@ -125,15 +125,33 @@ async function notifyOwners(supabase: SupabaseClient, title: string, message: st
   })));
 }
 
+/** The picker found Unit 2 empty: zero its row (the totals trigger updates stock_level) and log it. */
+async function zeroUnit2(supabase: SupabaseClient, productId: string, was: number, why: string, actorName: string) {
+  if (was <= 0) return;
+  const { data: wh } = await supabase.from('warehouses').select('id').eq('code', 'UNIT2').maybeSingle();
+  if (!wh) return;
+  await supabase.from('product_warehouse_stock').update({ stock_level: 0 }).eq('product_id', productId).eq('warehouse_id', wh.id);
+  await supabase.from('inventory_movements').insert({
+    product_id: productId,
+    quantity_change: -was,
+    movement_type: 'adjustment',
+    warehouse_id: wh.id,
+    timestamp: new Date().toISOString(),
+    reason: `${why}: empty (was ${was}). ${actorName}`,
+    performed_by_name: actorName,
+  });
+}
+
 /**
  * Saves a count made while picking. `unit1Count` = pieces on the Unit 1 shelf
- * including the ones in the picker's hand; Unit 2 is kept as recorded.
+ * including the ones in the picker's hand; Unit 2 is kept as recorded, unless
+ * `unit2Empty` (the picker tapped OS and checked Unit 2 too: it is zeroed).
  * `bothEmpty` = the picker checked Unit 1 and Unit 2 before borrowing: Unit 2 is
  * zeroed too and the count is 0.
  */
 export async function savePickerShelfCount(
   supabase: SupabaseClient,
-  input: { productId: string; unit1Count?: number; bothEmpty?: boolean; orderId?: string | null; actorName: string }
+  input: { productId: string; unit1Count?: number; bothEmpty?: boolean; unit2Empty?: boolean; orderId?: string | null; actorName: string }
 ): Promise<{ before: number; after: number }> {
   const { productId, actorName } = input;
   const orderTag = input.orderId ? ` #${input.orderId.slice(0, 8).toUpperCase()}` : '';
@@ -141,33 +159,24 @@ export async function savePickerShelfCount(
   if (!before) throw new Error('Product not found');
 
   let total: number;
+  let note: string;
   if (input.bothEmpty) {
-    if (before.unit2 > 0) {
-      // Unit 2 is empty too: zero its row (the totals trigger updates stock_level) and log it.
-      const { data: wh } = await supabase.from('warehouses').select('id').eq('code', 'UNIT2').maybeSingle();
-      if (wh) {
-        await supabase.from('product_warehouse_stock').update({ stock_level: 0 }).eq('product_id', productId).eq('warehouse_id', wh.id);
-        await supabase.from('inventory_movements').insert({
-          product_id: productId,
-          quantity_change: -before.unit2,
-          movement_type: 'adjustment',
-          warehouse_id: wh.id,
-          timestamp: new Date().toISOString(),
-          reason: `Picker checked Unit 2 before borrowing${orderTag}: empty (was ${before.unit2}). ${actorName}`,
-          performed_by_name: actorName,
-        });
-      }
-    }
+    await zeroUnit2(supabase, productId, before.unit2, `Picker checked Unit 2 before borrowing${orderTag}`, actorName);
     total = 0;
+    note = `Picker checked Unit 1 and Unit 2 before borrowing${orderTag}: both empty.`;
   } else {
     const n = Math.round(Number(input.unit1Count));
     if (!(n >= 0) || n > 100000) throw new Error('Enter how many are on the shelf.');
-    total = n + before.unit2;
+    if (input.unit2Empty) {
+      // Tapped OS: the system said there should be some, the picker looked in both units.
+      await zeroUnit2(supabase, productId, before.unit2, `Picker checked Unit 2 after tapping OS${orderTag}`, actorName);
+      total = n;
+      note = `Counted by picker ${actorName} while picking${orderTag} (tapped OS): Unit 1 ${n}, Unit 2 empty${before.unit2 ? ` (was ${before.unit2})` : ''}.`;
+    } else {
+      total = n + before.unit2;
+      note = `Counted by picker ${actorName} while picking${orderTag}: Unit 1 ${n}${before.unit2 ? ` + Unit 2 ${before.unit2} (kept)` : ''}.`;
+    }
   }
-
-  const note = input.bothEmpty
-    ? `Picker checked Unit 1 and Unit 2 before borrowing${orderTag}: both empty.`
-    : `Counted by picker ${actorName} while picking${orderTag}: Unit 1 ${total - before.unit2}${before.unit2 ? ` + Unit 2 ${before.unit2} (kept)` : ''}.`;
   await applyPhysicalShelfCount(supabase, { productId, physicalShelfCount: total, notes: note, actorName });
 
   if (total > before.unallocated) {

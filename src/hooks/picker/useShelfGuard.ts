@@ -12,11 +12,14 @@ import type { ProductReservation, ReservedOrder } from '@/lib/services/inventory
  *   - Borrow while the shelf has stock → confirm Unit 1 and Unit 2 are empty first.
  *   - Found when the pieces are reserved for another order's replacement → blocked
  *     (mark OS, or an owner overrides with a reason). Owner rule 2026-11-03.
+ *   - OS while the system says the shelf has some → look again, or count the shelf
+ *     (Unit 1, and confirm Unit 2 is empty) before OS goes through. Owner 2026-11-04.
  * If the shelf numbers can't be loaded, nothing is blocked (the warehouse keeps working).
  */
 
 export type ShelfPrompt =
   | { kind: 'count'; rowKey: string; productId: string; productName: string; needed: number; unit2: number; deliveryWaiting: boolean }
+  | { kind: 'os'; rowKey: string; productId: string; productName: string; needed: number; unit2: number; deliveryWaiting: boolean }
   | { kind: 'borrow'; rowKey: string; productId: string; productName: string; available: number; unit2: number }
   | { kind: 'reserved'; rowKey: string; productId: string; productName: string; needed: number; free: number; orders: ReservedOrder[] };
 
@@ -95,6 +98,15 @@ export function useShelfGuard(orderId: string | null, rows: PickRow[], marks: Ma
     setPrompt({ kind: 'count', rowKey: row.key, productId: row.productId, productName: row.productName, needed, unit2: info.unit2, deliveryWaiting: pendingDelivery.has(row.productId) });
   }, [shelf, neededFor, marks, pendingDelivery, reservedQty, reservedPrompt]);
 
+  /** OS tapped. If the system says free pieces are on the shelf, ask the picker to look again or count first. */
+  const onOutOfStock = useCallback((row: PickRow, alreadyOS: boolean) => {
+    const info = shelf?.[row.productId];
+    const needed = neededFor(row.productId);
+    const free = info ? info.unallocated - reservedQty(row.productId) : 0;
+    if (alreadyOS || !info || needed === 0 || free <= 0) return marks.markOutOfStock(row.key, row.quantity);
+    setPrompt({ kind: 'os', rowKey: row.key, productId: row.productId, productName: row.productName, needed, unit2: info.unit2, deliveryWaiting: pendingDelivery.has(row.productId) });
+  }, [shelf, neededFor, marks, pendingDelivery, reservedQty]);
+
   const beforeBorrow = useCallback((row: PickRow, openBorrow: () => void) => {
     const info = shelf?.[row.productId];
     if (!info || info.unallocated <= 0) return openBorrow();
@@ -109,12 +121,15 @@ export function useShelfGuard(orderId: string | null, rows: PickRow[], marks: Ma
     return json as { before: number; after: number };
   };
 
-  /** Saves the Unit 1 count; marks Found for what it covers and OS for the rest (reserved pieces don't count). */
-  const submitCount = async (unit1Count: number): Promise<CountOutcome | undefined> => {
-    if (prompt?.kind !== 'count') return;
+  /**
+   * Saves the Unit 1 count; marks Found for what it covers and OS for the rest (reserved pieces don't count).
+   * `unit2Empty`: the picker also found Unit 2 empty (OS prompt), so Unit 2 is zeroed instead of kept.
+   */
+  const submitCount = async (unit1Count: number, opts: { unit2Empty?: boolean } = {}): Promise<CountOutcome | undefined> => {
+    if (prompt?.kind !== 'count' && prompt?.kind !== 'os') return;
     const { rowKey, needed } = prompt;
     const row = rows.find((r) => r.key === rowKey);
-    const { after } = await post({ productId: prompt.productId, unit1Count });
+    const { after } = await post({ productId: prompt.productId, unit1Count, unit2Empty: !!opts.unit2Empty });
     const usable = Math.max(0, after - reservedQty(prompt.productId));
     if (usable >= needed) {
       marks.markFound(rowKey);
@@ -180,5 +195,5 @@ export function useShelfGuard(orderId: string | null, rows: PickRow[], marks: Ma
     setPendingBorrow(null);
   };
 
-  return { prompt, onFound, beforeBorrow, submitCount, notReceivedYet, confirmBothEmpty, leaveReserved, overrideReserved, closePrompt };
+  return { prompt, onFound, onOutOfStock, beforeBorrow, submitCount, notReceivedYet, confirmBothEmpty, leaveReserved, overrideReserved, closePrompt, reload: load };
 }

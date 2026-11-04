@@ -75,6 +75,11 @@ export default function PickerApp() {
     const row = allRows.find((r) => r.key === key);
     if (row) guard.onFound(row); else markFound(key);
   };
+  // OS while the system says the shelf has some: look again or count first (owner 2026-11-04).
+  const onOutOfStockClick = (key: string, qty: number) => {
+    const row = allRows.find((r) => r.key === key);
+    if (row) guard.onOutOfStock(row, outOfStockQty.has(key)); else markOutOfStock(key, qty);
+  };
 
   const onBorrowed = (target: BorrowTarget, qty: number, fromShortId: string) => {
     setBorrowedFrom(new Map(borrowedFrom).set(target.rowKey, `${qty} borrowed from #${fromShortId}`));
@@ -246,7 +251,7 @@ export default function PickerApp() {
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => markOutOfStock(key, qty)}
+                                      onClick={() => onOutOfStockClick(key, qty)}
                                       aria-pressed={isFlagged}
                                       className={cn('h-9 min-w-[3rem] rounded-md border px-2 text-xs font-semibold',
                                         isFlagged ? 'border-red-600 bg-red-600 text-white' : 'border-red-300 text-red-700 hover:bg-red-50')}
@@ -390,6 +395,7 @@ export default function PickerApp() {
         product={damaged}
         defaultFoundAt="picker"
         hint="Then pick a good one and tap Found, or tap OS if there's none left."
+        onReported={guard.reload}
         onClose={() => setDamaged(null)}
       />
 
