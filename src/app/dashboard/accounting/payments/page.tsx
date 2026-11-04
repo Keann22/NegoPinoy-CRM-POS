@@ -75,14 +75,22 @@ export default function PaymentsPage() {
     
     setIsLoadingPayments(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('payments')
         .select('*')
+        .not('proof_url', 'is', null)
+        .neq('proof_url', '')
+        .neq('payment_method', 'SPX COD Remittance')
         .order('payment_date', { ascending: false });
+
+      if (activeTab) {
+        query = query.eq('status', activeTab);
+      }
+        
+      const { data, error } = await query;
         
       if (error) throw error;
-      const withProof = (data || []).filter(p => p.proof_url && p.proof_url.trim() !== '');
-      setPayments(withProof);
+      setPayments(data || []);
     } catch (error) {
       console.error('Error fetching payments:', error);
       toast({
@@ -97,7 +105,7 @@ export default function PaymentsPage() {
 
   useEffect(() => {
     fetchPayments();
-  }, [supabase, isManagement]);
+  }, [supabase, isManagement, activeTab]);
 
   // Fetch order and customer details when payments change
   useEffect(() => {
@@ -120,7 +128,7 @@ export default function PaymentsPage() {
         if (error) throw error;
 
         if (data) {
-          data.forEach(o => {
+          data.forEach((o: any) => {
             // @ts-ignore - Supabase nested type casting
             const customerName = o.customers?.full_name || 'Unknown Customer';
             // @ts-ignore - Supabase nested type casting

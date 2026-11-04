@@ -28,6 +28,7 @@ const paymentSchema = z.object({
   }),
   notes: z.string().optional(),
   proofOfPayment: z.any().optional(),
+  isTip: z.boolean().default(false),
 }).superRefine((data, ctx) => {
     if (!data.proofOfPayment || data.proofOfPayment.length === 0) {
         ctx.addIssue({
@@ -63,8 +64,11 @@ export function LogPaymentDialog(props: LogPaymentDialogProps) {
       paymentMethod: "Cash",
       notes: "",
       proofOfPayment: [],
+      isTip: false,
     },
   });
+
+  const watchAmount = Number(form.watch("amount") || 0);
 
   useEffect(() => {
     if (order && open) {
@@ -74,6 +78,7 @@ export function LogPaymentDialog(props: LogPaymentDialogProps) {
         paymentMethod: "Cash",
         notes: "",
         proofOfPayment: [],
+        isTip: false,
       });
     }
   }, [order, open, form]);
@@ -126,6 +131,11 @@ export function LogPaymentDialog(props: LogPaymentDialogProps) {
         if (newBalanceDue < 0) {
             overpaymentAmount = Math.abs(newBalanceDue);
             newBalanceDue = 0; // Cap at 0
+        }
+
+        if (values.isTip && overpaymentAmount > 0) {
+            values.notes = (values.notes ? values.notes + "\n" : "") + `[Tip / Keep the change: ₱${overpaymentAmount.toFixed(2)}]`;
+            overpaymentAmount = 0; // Keep in business revenue, do not credit customer
         }
 
         // Fully paid only closes the order once it is already with the courier. A paid
@@ -277,6 +287,30 @@ export function LogPaymentDialog(props: LogPaymentDialogProps) {
                     <Input type="number" step="0.01" placeholder="0.00" {...field} />
                   </FormControl>
                   <FormMessage />
+                  {watchAmount > (order.balanceDue || 0) && (
+                    <div className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900 space-y-1.5 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
+                      <div className="font-semibold flex items-center gap-1.5">
+                        <span>💡</span>
+                        <span>Overpayment of ₱{(watchAmount - (order.balanceDue || 0)).toFixed(2)} detected</span>
+                      </div>
+                      <p className="text-[11px] text-emerald-900/80 dark:text-emerald-200/80">
+                        By default, this excess is automatically saved to the customer's Store Credit.
+                      </p>
+                      <label className="flex items-center gap-2 cursor-pointer font-medium text-foreground pt-1">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-emerald-500 accent-emerald-600"
+                          {...form.register("isTip")}
+                        />
+                        <span>This excess is a Tip / Keep the change (do not add store credit)</span>
+                      </label>
+                    </div>
+                  )}
+                  {watchAmount <= (order.balanceDue || 0) && (
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      💡 Enter the exact amount from GCash. Any excess is automatically credited to the customer.
+                    </p>
+                  )}
                 </FormItem>
               )}
             />
