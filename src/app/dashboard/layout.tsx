@@ -111,6 +111,11 @@ export default function DashboardLayout({
       links.push({ href: '/dashboard/priority', label: 'Priority List', icon: ListOrdered });
     }
 
+    // Sales answer resend / cancel on returned parcels there (they don't see Inventory Management).
+    if (isSales && !isManagement && !isInventory) {
+      links.push({ href: '/dashboard/inventory/returns', label: 'Returns', icon: Undo2 });
+    }
+
     links.push({ href: '/dashboard/orders', label: 'Orders', icon: ShoppingCart });
     links.push({ href: '/dashboard/messages', label: 'Messages', icon: MessageCircle });
     
