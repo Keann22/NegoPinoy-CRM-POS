@@ -19,6 +19,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { Order } from "@/app/dashboard/orders/page";
 import { useEffect, useState } from "react";
 import { FileUpload } from "../ui/file-upload";
+import { useGcashTransfer, uploadProof } from "@/hooks/useGcashTransfer";
+import { TransferOrdersPicker } from "./payments/transfer-orders-picker";
+import { paymentEffect } from "@/lib/services/payments/order-payment-rules";
 
 const paymentSchema = z.object({
   paymentDate: z.date({ required_error: "A payment date is required." }),
@@ -48,6 +51,7 @@ interface LogPaymentDialogProps {
   onSuccess?: () => void;
 }
 
+const SPLIT_METHODS = ["GCash", "Bank Transfer"];
 const paymentMethods = ["GCash", "Shopee Platform Payouts", "Cash", "Bank Transfer", "COD Payed", "Credit Card", "Other"];
 
 export function LogPaymentDialog(props: LogPaymentDialogProps) {
@@ -55,6 +59,7 @@ export function LogPaymentDialog(props: LogPaymentDialogProps) {
   const supabase = useSupabase();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [splitMode, setSplitMode] = useState(false);
 
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentSchema),
@@ -69,6 +74,10 @@ export function LogPaymentDialog(props: LogPaymentDialogProps) {
   });
 
   const watchAmount = Number(form.watch("amount") || 0);
+  // One GCash for several orders of this customer (owner, 2026-11-04).
+  const isSplit = splitMode && SPLIT_METHODS.includes(form.watch("paymentMethod"));
+  const transfer = useGcashTransfer(order.id, open && isSplit);
+  const extraAmount = isSplit ? watchAmount - transfer.sharesTotal : watchAmount - (order.balanceDue || 0);
 
   useEffect(() => {
     if (order && open) {
@@ -80,10 +89,49 @@ export function LogPaymentDialog(props: LogPaymentDialogProps) {
         proofOfPayment: [],
         isTip: false,
       });
+      setSplitMode(false);
     }
   }, [order, open, form]);
 
+  async function processTransfer(values: PaymentFormValues) {
+    const proofUrl = await uploadProof(supabase!, values.proofOfPayment[0]);
+    const result = await transfer.save({
+      transferAmount: values.amount,
+      paymentDate: values.paymentDate.toISOString(),
+      paymentMethod: values.paymentMethod,
+      notes: values.notes,
+      proofUrl,
+      isTip: values.isTip,
+    });
+    // OCR reads the reference once; the server copies it to the other orders' payments.
+    fetch('/api/payments/extract-ocr', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ proofUrl, paymentId: result.mainPaymentId }),
+    }).catch(() => {});
+    for (const orderId of result.fullyPaidOrderIds) {
+      fetch('/api/priority/paid-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId }),
+      }).catch(() => {});
+    }
+    const extraNote = result.storeCredit > 0 ? ` ₱${result.storeCredit.toFixed(2)} went to store credit.`
+      : result.tip > 0 ? ` ₱${result.tip.toFixed(2)} kept as a tip.` : '';
+    toast({ title: `Payment logged on ${transfer.shares.length} orders`, description: `₱${values.amount.toFixed(2)} GCash.${extraNote}` });
+  }
+
   function onSubmit(values: PaymentFormValues) {
+    if (isSplit) {
+      if (transfer.shares.length < 2) {
+        toast({ variant: 'destructive', title: 'Tick at least one other order', description: 'Or untick "This GCash also paid other orders".' });
+        return;
+      }
+      if (transfer.sharesTotal > values.amount + 0.01) {
+        toast({ variant: 'destructive', title: 'Orders add up to more than the GCash', description: "Lower an order's amount." });
+        return;
+      }
+    }
     setIsSubmitting(true);
     
     toast({
@@ -94,22 +142,17 @@ export function LogPaymentDialog(props: LogPaymentDialogProps) {
     const processPayment = async () => {
       try {
         if (!supabase) return;
+        if (isSplit) {
+          await processTransfer(values);
+          if (props.onSuccess) props.onSuccess();
+          props.onOpenChange(false);
+          return;
+        }
 
         // 1. Upload proof of payment
-        let proofUrl = null;
+        let proofUrl: string | null = null;
         if (values.proofOfPayment && values.proofOfPayment.length > 0) {
-            const file = values.proofOfPayment[0];
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
-            
-            const { data: uploadData, error: uploadError } = await supabase.storage
-                .from('proof_of_payment')
-                .upload(fileName, file, { upsert: false });
-                
-            if (uploadError) throw uploadError;
-            
-            const { data: { publicUrl } } = supabase.storage.from('proof_of_payment').getPublicUrl(uploadData.path);
-            proofUrl = publicUrl;
+            proofUrl = await uploadProof(supabase, values.proofOfPayment[0]);
         }
 
         // 2. Get current order data
@@ -123,27 +166,13 @@ export function LogPaymentDialog(props: LogPaymentDialogProps) {
             throw new Error("Order does not exist!");
         }
 
-        const newAmountPaid = (currentOrderData.amount_paid || 0) + values.amount;
-        let newBalanceDue = currentOrderData.total_amount - newAmountPaid;
-        const isCOD = currentOrderData.payment_method === 'COD' || values.paymentMethod === 'COD Payed';
-        
-        let overpaymentAmount = 0;
-        if (newBalanceDue < 0) {
-            overpaymentAmount = Math.abs(newBalanceDue);
-            newBalanceDue = 0; // Cap at 0
-        }
+        const effect = paymentEffect(currentOrderData, values.amount, values.paymentMethod);
+        const { newAmountPaid, newBalanceDue, newStatus } = effect;
+        let overpaymentAmount = effect.overpayment;
 
         if (values.isTip && overpaymentAmount > 0) {
             values.notes = (values.notes ? values.notes + "\n" : "") + `[Tip / Keep the change: ₱${overpaymentAmount.toFixed(2)}]`;
             overpaymentAmount = 0; // Keep in business revenue, do not credit customer
-        }
-
-        // Fully paid only closes the order once it is already with the courier. A paid
-        // lay-away that hasn't been packed must stay open, or it drops off the
-        // picker, packer and Priority List and nobody ships it.
-        let newStatus = currentOrderData.status;
-        if (newBalanceDue <= 0 && ['Shipped', 'For Pick-up'].includes(currentOrderData.status)) {
-            newStatus = isCOD ? 'Payment Received (COD)' : 'Completed';
         }
 
         // 3. Log Payment
@@ -242,7 +271,7 @@ export function LogPaymentDialog(props: LogPaymentDialogProps) {
     <Dialog open={props.open} onOpenChange={(open) => {
         if (!isSubmitting) props.onOpenChange(open);
     }}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className={cn("max-h-[90vh] overflow-y-auto", isSplit ? "sm:max-w-[560px]" : "sm:max-w-[425px]")}>
         <DialogHeader>
           <DialogTitle>Log Payment for Order</DialogTitle>
           <DialogDescription>
@@ -282,16 +311,16 @@ export function LogPaymentDialog(props: LogPaymentDialogProps) {
               name="amount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Amount (₱)</FormLabel>
+                  <FormLabel>{isSplit ? "Whole GCash amount (₱)" : "Amount (₱)"}</FormLabel>
                   <FormControl>
                     <Input type="number" step="0.01" placeholder="0.00" {...field} />
                   </FormControl>
                   <FormMessage />
-                  {watchAmount > (order.balanceDue || 0) && (
+                  {extraAmount > 0.009 && (
                     <div className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900 space-y-1.5 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
                       <div className="font-semibold flex items-center gap-1.5">
                         <span>💡</span>
-                        <span>Overpayment of ₱{(watchAmount - (order.balanceDue || 0)).toFixed(2)} detected</span>
+                        <span>Overpayment of ₱{extraAmount.toFixed(2)} detected</span>
                       </div>
                       <p className="text-[11px] text-emerald-900/80 dark:text-emerald-200/80">
                         By default, this excess is automatically saved to the customer's Store Credit.
@@ -306,7 +335,7 @@ export function LogPaymentDialog(props: LogPaymentDialogProps) {
                       </label>
                     </div>
                   )}
-                  {watchAmount <= (order.balanceDue || 0) && (
+                  {!isSplit && extraAmount <= 0.009 && (
                     <p className="text-[11px] text-muted-foreground mt-1">
                       💡 Enter the exact amount from GCash. Any excess is automatically credited to the customer.
                     </p>
@@ -336,6 +365,23 @@ export function LogPaymentDialog(props: LogPaymentDialogProps) {
                 </FormItem>
               )}
             />
+            {SPLIT_METHODS.includes(form.watch("paymentMethod")) && (
+              <label className="flex cursor-pointer items-start gap-2 rounded-lg border p-3 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 accent-primary"
+                  checked={splitMode}
+                  onChange={(e) => setSplitMode(e.target.checked)}
+                />
+                <span>
+                  <b>This GCash also paid other orders</b>
+                  <span className="block text-xs text-muted-foreground">
+                    Same customer only. Put the whole GCash amount above, then tick the orders.
+                  </span>
+                </span>
+              </label>
+            )}
+            {isSplit && <TransferOrdersPicker transfer={transfer} mainOrderId={order.id} gcashAmount={watchAmount} />}
             <FormField
                 control={form.control}
                 name="proofOfPayment"

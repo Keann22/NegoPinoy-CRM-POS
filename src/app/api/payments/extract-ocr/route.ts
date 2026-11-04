@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createWorker } from 'tesseract.js';
+import { afterReferenceRead } from '@/lib/services/payments/payment-reference-check';
 
 export const maxDuration = 60;
 
@@ -151,6 +152,14 @@ export async function POST(request: Request) {
         .eq('id', paymentId);
 
       if (error) throw error;
+
+      // Copy the reference to the rest of a several-orders transfer, and warn the
+      // owners if it was already used on another payment. Never fails the OCR.
+      try {
+        await afterReferenceRead(supabase, paymentId, referenceNumber, ocrAmount);
+      } catch (checkError) {
+        console.warn('[OCR] Reference check failed:', checkError);
+      }
 
       console.log(`[OCR] Finished. Saved to DB.`);
       return NextResponse.json({ success: true, referenceNumber, ocrAmount, usedFallback });
