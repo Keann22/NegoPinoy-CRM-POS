@@ -45,11 +45,13 @@ interface Props {
   isManagement: boolean;
   /** Sales or owners: may answer resend / cancel on courier returns. */
   canDecideRts?: boolean;
+  /** Owners and warehouse staff: parcel arrived, check pieces, put back, re-send order. */
+  isWarehouse?: boolean;
   onDialog: (kind: CustomerReturnDialogKind, ret: CustomerReturn) => void;
   onAct: (action: CustomerReturnAction) => Promise<void>;
 }
 
-export function CustomerReturnCard({ ret, isManagement, canDecideRts = false, onDialog, onAct }: Props) {
+export function CustomerReturnCard({ ret, isManagement, canDecideRts = false, isWarehouse = true, onDialog, onAct }: Props) {
   const [showHistory, setShowHistory] = useState(false);
   const [busy, setBusy] = useState(false);
   const open = ret.status === 'open';
@@ -195,22 +197,22 @@ export function CustomerReturnCard({ ret, isManagement, canDecideRts = false, on
           </Button>
         )}
         {open && !isManagement && !ret.decidedAt && ret.source !== 'rts' && <span className="text-xs text-muted-foreground">Waiting for the owners to decide.</span>}
-        {open && ret.askBack && !ret.arrivedAt && (
+        {isWarehouse && open && ret.askBack && !ret.arrivedAt && (
           <Button size="sm" variant="outline" disabled={busy} onClick={() => run({ action: 'arrived', id: ret.id })}>Parcel arrived</Button>
         )}
-        {open && ret.askBack && !ret.checkedAt && (
+        {isWarehouse && open && ret.askBack && !ret.checkedAt && (
           <Button size="sm" variant={ret.stage === 'to_check' ? 'default' : 'outline'} onClick={() => onDialog('check', ret)}>Check pieces</Button>
         )}
-        {open && ret.stage === 'to_do' && ret.partial && ret.outcome === 'reship' && !ret.outcomeDoneAt && (
+        {isWarehouse && open && ret.stage === 'to_do' && ret.partial && ret.outcome === 'reship' && !ret.outcomeDoneAt && (
           <Button size="sm" disabled={busy}
             onClick={() => { if (confirm(`Make a new order for the OK pieces of ${ret.boxNames || 'the box'}? Its money moves from the original order, and it starts at Packed.`)) run({ action: 'resend_box', id: ret.id }); }}>
             Create re-send order
           </Button>
         )}
-        {open && ret.stage === 'to_do' && todo && !ret.outcomeDoneAt && !(ret.partial && ret.outcome === 'reship') && (todo.ownerOnly && !isManagement
+        {open && ret.stage === 'to_do' && todo && !ret.outcomeDoneAt && !(ret.partial && ret.outcome === 'reship') && (isWarehouse || ret.outcome !== 'reship') && (todo.ownerOnly && !isManagement
           ? <span className="text-xs text-muted-foreground">Waiting for the owners: {todo.label.toLowerCase()}.</span>
           : <Button size="sm" onClick={() => onDialog(todoDialog, ret)}>{todo.label}</Button>)}
-        {open && ret.needsShelving && (
+        {isWarehouse && open && ret.needsShelving && (
           <Button size="sm" disabled={busy}
             onClick={() => {
               const msg = ret.partial

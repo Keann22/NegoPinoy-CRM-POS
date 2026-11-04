@@ -37,7 +37,7 @@ export async function GET(req: Request) {
     if (search != null) return NextResponse.json({ orders: await searchOrdersForParcel(supabase, search) });
     const orderId = params.get('orderId');
     if (orderId) return NextResponse.json({ lines: await getReturnableLines(supabase, orderId) });
-    return NextResponse.json(await listCustomerReturns(supabase, caller.isManagement, caller.isSales));
+    return NextResponse.json(await listCustomerReturns(supabase, caller.isManagement, caller.isSales, caller.isWarehouse));
   } catch (e) {
     return errorResponse(e);
   }

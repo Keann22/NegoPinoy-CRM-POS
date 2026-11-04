@@ -157,6 +157,8 @@ export interface CustomerReturnsResponse {
   isManagement: boolean;
   /** Sales agents answer resend / cancel on courier returns. */
   isSales: boolean;
+  /** Owners and warehouse staff: log parcels, check pieces, put back, re-send. */
+  isWarehouse: boolean;
   returns: CustomerReturn[];
 }
 

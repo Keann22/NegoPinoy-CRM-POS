@@ -237,7 +237,9 @@ function mapCase(r: any, now: number): CustomerReturn {
   };
 }
 
-export async function listCustomerReturns(supabase: SupabaseClient, isManagement: boolean, isSales = false): Promise<CustomerReturnsResponse> {
+export async function listCustomerReturns(
+  supabase: SupabaseClient, isManagement: boolean, isSales = false, isWarehouse = true
+): Promise<CustomerReturnsResponse> {
   const closedSince = new Date(Date.now() - CLOSED_SHOWN_DAYS * DAY_MS).toISOString();
   const { data, error } = await supabase
     .from('customer_returns')
@@ -246,7 +248,7 @@ export async function listCustomerReturns(supabase: SupabaseClient, isManagement
     .order('created_at', { ascending: false });
   if (error) throw error;
   const now = Date.now();
-  return { isManagement, isSales, returns: (data || []).map((r) => mapCase(r, now)) };
+  return { isManagement, isSales, isWarehouse, returns: (data || []).map((r) => mapCase(r, now)) };
 }
 
 /** Loads one case in the same shape the list uses. */

@@ -36,6 +36,8 @@ export default function CustomerReturnsPage() {
   const [dialog, setDialog] = useState<{ kind: CustomerReturnDialogKind; ret: CustomerReturn } | null>(null);
   const isManagement = !!data?.isManagement;
   const canDecideRts = isManagement || !!data?.isSales;
+  // Sales-only accounts answer resend / cancel; the parcel buttons are for the warehouse.
+  const isWarehouse = data?.isWarehouse ?? true;
   const [logging, setLogging] = useState(false);
 
   const groups = useMemo(() => {
@@ -64,7 +66,7 @@ export default function CustomerReturnsPage() {
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="icon" onClick={refresh} title="Refresh"><RefreshCw className="h-4 w-4" /></Button>
-            <Button onClick={() => setLogging(true)}><PackageOpen className="mr-2 h-4 w-4" />Log returned parcel</Button>
+            {isWarehouse && <Button onClick={() => setLogging(true)}><PackageOpen className="mr-2 h-4 w-4" />Log returned parcel</Button>}
           </div>
         </div>
 
@@ -91,7 +93,7 @@ export default function CustomerReturnsPage() {
                 ) : (
                   <div className="space-y-2">
                     {groups[t].map((r) => (
-                      <CustomerReturnCard key={r.id} ret={r} isManagement={isManagement} canDecideRts={canDecideRts} onAct={act}
+                      <CustomerReturnCard key={r.id} ret={r} isManagement={isManagement} canDecideRts={canDecideRts} isWarehouse={isWarehouse} onAct={act}
                         onDialog={(kind, ret) => setDialog({ kind, ret })} />
                     ))}
                   </div>
