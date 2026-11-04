@@ -207,6 +207,7 @@ export default function DashboardLayout({
     // Daily Log — visible to Sales and Management
     if (isManagement || isSales) {
       links.push({ href: '/dashboard/daily-log', label: 'Daily Task Log', icon: CalendarCheck2 });
+      links.push({ href: '/dashboard/payment-discrepancies', label: 'Payment Fix', icon: Receipt });
     }
 
     return links;

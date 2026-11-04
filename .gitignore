@@ -52,3 +52,7 @@ firestore-debug.log
 /bug report/
 test-query.js
 *-backup-*.json
+
+# Customer payment data (repo is public); the Payment Fix list lives in the payment_discrepancies table
+public/payment-discrepancies.html
+src/lib/services/payment-discrepancies-data.json
