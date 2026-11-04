@@ -1,11 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { ParcelOrderMatch, RtsDecisionPrompt } from '@/types/customer-returns.types';
+import type { ParcelOrderMatch, RtsDecisionPrompt, ShippingPayer } from '@/types/customer-returns.types';
 import {
   createCustomerReturn,
   CustomerReturnError,
   getReturnableLines,
   isEscalated,
   logEvent,
+  setOrderStatus,
   shortOrder,
 } from './customer-return-service';
 
@@ -56,7 +57,7 @@ export async function searchOrdersForParcel(supabase: SupabaseClient, query: str
   const q = query.trim().replace(/^#/, '');
   if (q.length < 3) return [];
   let orders: any[] = [];
-  const select = 'id, status, order_date, created_at, tracking_number, customers(full_name), order_items(product_name, quantity)';
+  const select = 'id, status, order_date, created_at, tracking_number, boxes_config, customers(full_name), order_items(product_name, quantity)';
   if (/^[0-9a-f]{4,8}$/i.test(q)) {
     // Order # prefix: a uuid range (no ::text casts in PostgREST).
     const p = q.toLowerCase();
@@ -89,7 +90,35 @@ export async function searchOrdersForParcel(supabase: SupabaseClient, query: str
     trackingNumber: o.tracking_number || null,
     items: (o.order_items || []).map((i: any) => `${i.quantity}× ${i.product_name}`).join(', '),
     openCaseNo: openByOrder.get(o.id) ?? null,
+    boxes: boxesOf(o.boxes_config).map((b) => ({ id: b.id, name: b.name, items: b.items.map((i) => `${i.qty}× ${i.name}`).join(', ') })),
   }));
+}
+
+interface OrderBox { id: string; name: string; items: { orderItemId: string; qty: number; name: string }[] }
+
+/** The order's boxes when it shipped as more than one parcel (else none). */
+function boxesOf(config: unknown): OrderBox[] {
+  if (!Array.isArray(config) || config.length < 2) return [];
+  return config.map((b: any, i: number) => ({
+    id: String(b.id || `box-${i + 1}`),
+    name: String(b.name || `Box ${i + 1}`),
+    items: (Array.isArray(b.items) ? b.items : []).map((it: any) => ({ orderItemId: it.id, qty: Number(it.quantity) || 0, name: it.product_name || 'item' })),
+  }));
+}
+
+const DELIVERY_STATUSES = ['Packed', 'For Shipping', 'For Pick-up', 'Shipped', 'Delivered', 'Completed', 'Payment Received (COD)'];
+
+/**
+ * Courier sync (before 2026-11-04) or an RTS case marked the whole order Returned,
+ * but only one box came back: put back the status it had before.
+ */
+async function undoWholeOrderReturned(supabase: SupabaseClient, orderId: string, actorName: string) {
+  const { data: order } = await supabase.from('orders').select('status').eq('id', orderId).single();
+  if (order?.status !== 'Returned') return;
+  const { data: logs } = await supabase.from('order_logs').select('status, created_at')
+    .eq('order_id', orderId).order('created_at', { ascending: false }).limit(30);
+  const before = (logs || []).find((l: any) => DELIVERY_STATUSES.includes(l.status))?.status || 'Shipped';
+  await setOrderStatus(supabase, orderId, before, `${actorName} (only one box came back)`);
 }
 
 /**
@@ -97,24 +126,59 @@ export async function searchOrdersForParcel(supabase: SupabaseClient, query: str
  * here (the order is marked Returned), or marks an existing open courier-return
  * case (e.g. from courier sync) as arrived.
  */
-export async function logReturnedParcel(supabase: SupabaseClient, orderId: string, reason: string, actorName: string) {
+export async function logReturnedParcel(
+  supabase: SupabaseClient, orderId: string, reason: string, actorName: string, boxIds: string[] = []
+) {
+  const { data: order } = await supabase.from('orders').select('boxes_config').eq('id', orderId).single();
+  const boxes = boxesOf(order?.boxes_config);
+  // Several boxes: staff say which came back. All of them = the whole order.
+  let chosen: OrderBox[] = [];
+  if (boxes.length > 0) {
+    chosen = boxes.filter((b) => boxIds.includes(b.id));
+    if (chosen.length === 0) throw new CustomerReturnError('This order shipped as more than one box: pick which box came back.');
+    if (chosen.length === boxes.length) chosen = [];
+  }
+  const boxNames = chosen.map((b) => b.name).join(', ');
+  const boxQty = new Map<string, number>();
+  chosen.forEach((b) => b.items.forEach((i) => boxQty.set(i.orderItemId, (boxQty.get(i.orderItemId) || 0) + i.qty)));
+
   const { data: existing } = await supabase.from('customer_returns').select('*')
     .eq('order_id', orderId).eq('status', 'open').limit(1).maybeSingle();
   if (existing) {
     if (existing.source !== 'rts') throw new CustomerReturnError(`This order already has an open return case (#${existing.case_no}).`);
-    if (!existing.arrived_at) {
+    if (chosen.length > 0 && !existing.checked_at && !existing.partial) {
+      // A whole-order case (e.g. from courier sync) for what is really one box: narrow it.
+      const lines = await getReturnableLines(supabase, orderId);
+      await supabase.from('customer_return_items').delete().eq('return_id', existing.id);
+      await supabase.from('customer_return_items').insert(lines.filter((l) => boxQty.has(l.orderItemId)).map((l) => ({
+        return_id: existing.id, order_item_id: l.orderItemId, product_id: l.productId, product_name: l.productName,
+        qty: Math.min(boxQty.get(l.orderItemId) || 0, l.orderedQty),
+      })).filter((i) => i.qty > 0));
+      await guarded(supabase, existing, {
+        partial: true, box_names: boxNames,
+        ...(existing.arrived_at ? {} : { arrived_at: new Date().toISOString(), arrived_by_name: actorName }),
+      });
+      await logEvent(supabase, existing.id, 'arrived', actorName, `Only ${boxNames} came back`);
+      await undoWholeOrderReturned(supabase, orderId, actorName);
+    } else if (!existing.arrived_at) {
       await guarded(supabase, existing, { arrived_at: new Date().toISOString(), arrived_by_name: actorName });
       await logEvent(supabase, existing.id, 'arrived', actorName);
     }
     return { id: existing.id as string, caseNo: Number(existing.case_no), existed: true };
   }
   const lines = await getReturnableLines(supabase, orderId);
-  const items = lines.filter((l) => l.orderedQty - l.inOpenCaseQty > 0)
-    .map((l) => ({ orderItemId: l.orderItemId, qty: l.orderedQty - l.inOpenCaseQty }));
+  const items = lines
+    .map((l) => ({
+      orderItemId: l.orderItemId,
+      qty: Math.min(l.orderedQty - l.inOpenCaseQty, chosen.length > 0 ? boxQty.get(l.orderItemId) || 0 : Infinity),
+    }))
+    .filter((i) => i.qty > 0);
   if (items.length === 0) throw new CustomerReturnError('This order has no items to return.');
   const out = await createCustomerReturn(supabase, {
     orderId, source: 'rts', reason: reason || 'Returned by courier', parcelHere: true, items,
+    boxNames: boxNames || undefined,
   }, actorName);
+  if (chosen.length > 0) await undoWholeOrderReturned(supabase, orderId, actorName);
   return { ...out, existed: false };
 }
 
@@ -123,14 +187,21 @@ export async function logReturnedParcel(supabase: SupabaseClient, orderId: strin
 // ---------------------------------------------------------------------------
 
 export async function decideRts(
-  supabase: SupabaseClient, r: any, choice: 'resend' | 'cancel', note: string | undefined, actorName: string, allowed: boolean
+  supabase: SupabaseClient, r: any, choice: 'resend' | 'cancel', note: string | undefined, actorName: string, allowed: boolean,
+  shippingPayer?: ShippingPayer
 ) {
   if (!allowed) throw new CustomerReturnError('Only sales and the owners can decide resend or cancel.');
   if (r.source !== 'rts') throw new CustomerReturnError('Resend / cancel is for parcels the courier sent back.');
   if (r.outcome_done_at || r.restocked_at || r.replacement_order_id) throw new CustomerReturnError('This case is already being carried out; the decision can no longer change.');
   if (choice !== 'resend' && choice !== 'cancel') throw new CustomerReturnError('Pick resend or cancel.');
+  // One box re-sent as its own order: sales picks who pays its shipping fee.
+  const payer = choice === 'resend' && r.partial ? shippingPayer : undefined;
+  if (choice === 'resend' && r.partial && payer !== 'us' && payer !== 'customer') {
+    throw new CustomerReturnError('Pick who pays the shipping fee for the re-sent box.');
+  }
   await guarded(supabase, r, {
     outcome: choice === 'resend' ? 'reship' : 'cancel_order',
+    ...(payer ? { shipping_payer: payer } : {}),
     ask_back: true,
     replacement_timing: null,
     decision_note: note?.trim() || null,
@@ -139,7 +210,8 @@ export async function decideRts(
     ask_again_at: null,
   });
   await logEvent(supabase, r.id, 'decided', actorName,
-    [choice === 'resend' ? 'Resend to the customer' : 'Order cancelled', note?.trim()].filter(Boolean).join(' · '));
+    [choice === 'resend' ? 'Resend to the customer' : r.partial ? "Customer doesn't want this box" : 'Order cancelled',
+      payer ? (payer === 'us' ? 'free shipping' : 'customer pays shipping') : '', note?.trim()].filter(Boolean).join(' · '));
 }
 
 export async function waitForCustomer(
@@ -192,5 +264,7 @@ export async function listRtsPrompts(
       loggedAt: r.arrived_at || r.created_at,
       waitingCustomerAt: r.waiting_customer_at,
       escalated: isEscalated(r, now),
+      partial: !!r.partial,
+      boxNames: r.box_names || null,
     }));
 }

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { fetchRtsPrompts, patchCustomerReturn } from '@/hooks/useCustomerReturns';
-import type { RtsDecisionPrompt } from '@/types/customer-returns.types';
+import type { RtsDecisionPrompt, ShippingPayer } from '@/types/customer-returns.types';
 
 const REOPEN_MS = 30 * 60 * 1000;
 const REFRESH_MS = 5 * 60 * 1000;
@@ -44,13 +44,16 @@ export function RtsDecisionPopup() {
 
   if (prompts.length === 0) return null;
 
-  const answer = async (p: RtsDecisionPrompt, kind: 'resend' | 'cancel' | 'wait') => {
-    if (kind === 'cancel' && !confirm(`Cancel ${p.customerName}'s order? The OK pieces go back on the shelf.`)) return;
+  const answer = async (p: RtsDecisionPrompt, kind: 'resend' | 'cancel' | 'wait', shippingPayer?: ShippingPayer) => {
+    const cancelMsg = p.partial
+      ? `${p.customerName} doesn't want ${p.boxNames || 'this box'}? Its items come off the order.`
+      : `Cancel ${p.customerName}'s order? The OK pieces go back on the shelf.`;
+    if (kind === 'cancel' && !confirm(cancelMsg)) return;
     setBusyId(p.id);
     try {
       await patchCustomerReturn(kind === 'wait'
         ? { action: 'waiting_customer', id: p.id }
-        : { action: 'rts_decide', id: p.id, choice: kind });
+        : { action: 'rts_decide', id: p.id, choice: kind, shippingPayer });
       toast({
         title: kind === 'resend' ? 'Resend: the warehouse sends it again' : kind === 'cancel' ? 'Order cancelled' : 'Okay, we’ll ask again in 4 hours',
         description: `${p.customerName} #${p.orderId.slice(0, 7).toUpperCase()}`,
@@ -99,6 +102,7 @@ export function RtsDecisionPopup() {
                     #{p.orderId.slice(0, 7).toUpperCase()}
                   </Link>
                 </p>
+                {p.partial && <p className="text-xs font-medium text-sky-700">Only {p.boxNames || 'part of the order'} came back; the rest was delivered.</p>}
                 <p className="text-xs text-muted-foreground break-words">{p.items}</p>
                 <p className="text-xs text-muted-foreground">
                   Back since {phTime(p.loggedAt)}{p.salesPersonName ? ` · agent ${p.salesPersonName}` : ''}
@@ -107,10 +111,21 @@ export function RtsDecisionPopup() {
                 {p.escalated && <p className="text-xs font-semibold text-red-700">No answer for 3 days: owners, please decide.</p>}
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" disabled={busyId === p.id} onClick={() => answer(p, 'resend')}>
-                  {busyId === p.id && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}Resend
+                {p.partial ? (
+                  <>
+                    <Button size="sm" disabled={busyId === p.id} onClick={() => answer(p, 'resend', 'customer')}>
+                      {busyId === p.id && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}Resend (customer pays shipping)
+                    </Button>
+                    <Button size="sm" disabled={busyId === p.id} onClick={() => answer(p, 'resend', 'us')}>Resend (free shipping)</Button>
+                  </>
+                ) : (
+                  <Button size="sm" disabled={busyId === p.id} onClick={() => answer(p, 'resend')}>
+                    {busyId === p.id && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}Resend
+                  </Button>
+                )}
+                <Button size="sm" variant="outline" disabled={busyId === p.id} onClick={() => answer(p, 'cancel')}>
+                  {p.partial ? "Doesn't want this box" : 'Cancel order'}
                 </Button>
-                <Button size="sm" variant="outline" disabled={busyId === p.id} onClick={() => answer(p, 'cancel')}>Cancel order</Button>
                 <Button size="sm" variant="ghost" disabled={busyId === p.id} onClick={() => answer(p, 'wait')}>Asked customer, waiting for reply</Button>
               </div>
             </li>

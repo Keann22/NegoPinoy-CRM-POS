@@ -23,8 +23,12 @@ function nextStep(r: CustomerReturn): { who: string; what: string } | null {
     case 'to_check':
       return { who: 'Warehouse', what: rtsUndecided ? 'Open the parcel and check every piece · Sales: resend or cancel?' : 'Open the parcel and check every piece' };
     case 'to_do': {
+      if (r.partial && r.outcome === 'reship' && !r.outcomeDoneAt) {
+        return { who: 'Warehouse / agent', what: `Create the re-send order for ${r.boxNames || 'the returned box'}` };
+      }
       const todo = r.outcome && !r.outcomeDoneAt ? CR_OUTCOME_TODO[r.outcome] : null;
       if (todo) return { who: todo.ownerOnly ? 'Owners' : 'Warehouse / agent', what: todo.label };
+      if (r.needsShelving && r.partial) return { who: 'Warehouse', what: `Take ${r.boxNames || 'the box'} off the order and put the OK pieces back` };
       return r.needsShelving ? { who: 'Warehouse', what: 'Put the OK pieces back on the shelf, then tap "Put back on shelf: done"' } : null;
     }
     case 'waiting_parcel':

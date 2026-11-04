@@ -58,13 +58,15 @@ export function DecideReturnDialog({ ret, onClose, onSubmit }: Props) {
 
   if (!ret) return null;
   const comesBackAnyway = ret.source !== 'damage_report';
+  // A replacement, or one returned box re-sent as its own order, needs a shipping-fee choice.
+  const needsPayer = outcome === 'replacement' || (outcome === 'reship' && ret.partial);
   const keepsIt = outcome === 'partial_refund';
   const effectiveAskBack = comesBackAnyway || (!keepsIt && askBack);
   const showTiming = effectiveAskBack && !!outcome && outcome !== 'reship' && !!CR_OUTCOME_TODO[outcome] && !(comesBackAnyway && ret.checkedAt);
 
   const submit = async () => {
     if (!outcome) return setError('Pick what the customer gets.');
-    if (outcome === 'replacement' && !shippingPayer) return setError('Pick who pays shipping on the replacement.');
+    if (needsPayer && !shippingPayer) return setError('Pick who pays the shipping fee.');
     setSaving(true);
     setError(null);
     try {
@@ -73,7 +75,7 @@ export function DecideReturnDialog({ ret, onClose, onSubmit }: Props) {
         replacementTiming: showTiming ? timing : undefined,
         amount: AMOUNT_OUTCOMES.includes(outcome) ? Number(amount) || 0 : 0,
         courierClaim, note,
-        shippingPayer: outcome === 'replacement' ? shippingPayer ?? undefined : undefined,
+        shippingPayer: needsPayer ? shippingPayer ?? undefined : undefined,
       });
       onClose();
     } catch (e) {
@@ -112,9 +114,9 @@ export function DecideReturnDialog({ ret, onClose, onSubmit }: Props) {
             </div>
           )}
 
-          {outcome === 'replacement' && (
+          {needsPayer && (
             <div className="space-y-1.5">
-              <Label>Who pays shipping on the replacement?</Label>
+              <Label>Who pays the shipping fee?</Label>
               <div className="grid gap-1.5">
                 {(Object.keys(CR_SHIPPING_PAYER_LABELS) as ShippingPayer[]).map((p) => (
                   <Button key={p} type="button" variant={shippingPayer === p ? 'default' : 'outline'} className="h-auto justify-start whitespace-normal py-2 text-left" onClick={() => setShippingPayer(p)}>

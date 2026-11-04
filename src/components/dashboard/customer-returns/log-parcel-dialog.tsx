@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Loader2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,12 +30,13 @@ export function LogParcelDialog({ open, onOpenChange, onLogged }: Props) {
   const [searching, setSearching] = useState(false);
   const [picked, setPicked] = useState<ParcelOrderMatch | null>(null);
   const [reason, setReason] = useState('Failed delivery');
+  const [boxIds, setBoxIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
-    setQuery(''); setResults(null); setPicked(null); setReason('Failed delivery'); setError(null);
+    setQuery(''); setResults(null); setPicked(null); setReason('Failed delivery'); setBoxIds([]); setError(null);
   }, [open]);
 
   // Search as they type (after 3 characters), a little after they stop.
@@ -52,10 +54,11 @@ export function LogParcelDialog({ open, onOpenChange, onLogged }: Props) {
 
   const save = async () => {
     if (!picked) return;
+    if (picked.boxes.length > 0 && boxIds.length === 0) return setError('Pick which box came back.');
     setSaving(true);
     setError(null);
     try {
-      const out = await logReturnedParcel(picked.orderId, reason);
+      const out = await logReturnedParcel(picked.orderId, reason, boxIds);
       toast({
         title: out.existed ? `Return #${out.caseNo}: parcel marked as here` : `Return #${out.caseNo} logged`,
         description: 'The agent is asked: resend or cancel. Check the pieces when you open the parcel.',
@@ -106,6 +109,19 @@ export function LogParcelDialog({ open, onOpenChange, onLogged }: Props) {
               <p className="text-xs text-muted-foreground break-words">{picked.items}</p>
               {picked.trackingNumber && <p className="text-xs text-muted-foreground">Tracking: {picked.trackingNumber}</p>}
             </div>
+            {picked.boxes.length > 0 && (
+              <div className="space-y-1.5">
+                <Label>This order shipped as {picked.boxes.length} boxes. Which came back?</Label>
+                {picked.boxes.map((b) => (
+                  <label key={b.id} className="flex items-start gap-2 rounded-md border p-2 text-sm">
+                    <Checkbox className="mt-0.5" checked={boxIds.includes(b.id)}
+                      onCheckedChange={(v) => setBoxIds((ids) => v === true ? [...ids, b.id] : ids.filter((x) => x !== b.id))} />
+                    <span><span className="font-medium">{b.name}</span><span className="block text-xs text-muted-foreground break-words">{b.items}</span></span>
+                  </label>
+                ))}
+                <p className="text-xs text-muted-foreground">Tick only the box(es) the courier brought back. The rest of the order stays delivered.</p>
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label>Why did it come back? (if the label says)</Label>
               <div className="grid grid-cols-2 gap-1.5">
@@ -114,7 +130,7 @@ export function LogParcelDialog({ open, onOpenChange, onLogged }: Props) {
                 ))}
               </div>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => setPicked(null)}>← Pick a different order</Button>
+            <Button variant="ghost" size="sm" onClick={() => { setPicked(null); setBoxIds([]); }}>← Pick a different order</Button>
           </div>
         )}
 

@@ -51,6 +51,8 @@ export interface StageInput {
   source?: string;
   created_at?: string;
   restocked_at?: string | null;
+  /** Only some boxes of the order came back. */
+  partial?: boolean;
   outcome: CustomerReturnOutcome | null;
   ask_back: boolean;
   replacement_timing: string | null;
@@ -80,8 +82,11 @@ export function isEscalated(r: StageInput, now = Date.now()): boolean {
 
 /** Checked and decided, not re-shipped, OK pieces not put back on the shelf yet. */
 export function needsShelving(r: StageInput, items: { good_qty?: number }[]): boolean {
-  return !!r.checked_at && !!r.decided_at && r.outcome !== 'reship' && !r.restocked_at
-    && items.some((i) => (Number(i.good_qty) || 0) > 0);
+  if (!r.checked_at || !r.decided_at || r.outcome === 'reship' || r.restocked_at) return false;
+  // One box came back and the order is cancelled for it: the box's items still have to
+  // come off the order, even when every piece was damaged.
+  if (r.partial && r.outcome === 'cancel_order') return true;
+  return items.some((i) => (Number(i.good_qty) || 0) > 0);
 }
 
 export function computeStage(
@@ -222,6 +227,8 @@ function mapCase(r: any, now: number): CustomerReturn {
     askAgainAt: r.ask_again_at ?? null,
     escalated: isEscalated(r, now),
     needsShelving: r.status === 'open' && needsShelving(r, rawItems),
+    partial: !!r.partial,
+    boxNames: r.box_names ?? null,
     daysOpen,
     isOverdue: stage !== 'done' && inStage > STAGE_LIMIT_DAYS[stage],
     damagedPending: !!r.checked_at && rawItems.some((i) => i.damaged_qty > 0 && !i.damaged_action),
@@ -296,6 +303,9 @@ export async function createCustomerReturn(supabase: SupabaseClient, input: NewC
   // RTS parcels and items the customer ships back always come back; for a
   // damage report the owners decide whether to ask for it.
   const askBack = input.source !== 'damage_report';
+  // Courier return of only part of the order (one box of several): the order isn't voided.
+  const orderedTotal = lines.reduce((sum, l) => sum + l.orderedQty, 0);
+  const partial = input.source === 'rts' && picked.reduce((sum, p) => sum + p.qty, 0) < orderedTotal;
   const now = new Date().toISOString();
   const { data: row, error } = await supabase
     .from('customer_returns')
@@ -309,6 +319,8 @@ export async function createCustomerReturn(supabase: SupabaseClient, input: NewC
       arrived_at: input.source === 'rts' && input.parcelHere ? now : null,
       arrived_by_name: input.source === 'rts' && input.parcelHere ? actorName : null,
       opened_by_name: actorName,
+      partial,
+      box_names: input.boxNames?.trim() || null,
     })
     .select('id, case_no')
     .single();
@@ -325,8 +337,9 @@ export async function createCustomerReturn(supabase: SupabaseClient, input: NewC
     await supabase.from('customer_returns').delete().eq('id', row.id);
     throw iErr;
   }
-  await logEvent(supabase, row.id, 'opened', actorName, input.notes?.trim());
-  if (input.source === 'rts' && order.status !== 'Returned') await setOrderStatus(supabase, input.orderId, 'Returned', actorName);
+  await logEvent(supabase, row.id, 'opened', actorName,
+    [input.boxNames?.trim() ? `${input.boxNames.trim()} came back (the other box was delivered)` : '', input.notes?.trim()].filter(Boolean).join(' · '));
+  if (input.source === 'rts' && !partial && order.status !== 'Returned') await setOrderStatus(supabase, input.orderId, 'Returned', actorName);
 
   const customer = (order as any).customers?.full_name || 'Customer';
   const pieces = picked.map((p) => `${p.qty}× ${p.line!.productName}`).join(', ');

@@ -13,6 +13,7 @@ import {
 } from './customer-return-service';
 import { createReplacementOrder, giveStoreCredit, recordRefund } from './customer-return-money';
 import { decideRts, waitForCustomer } from './customer-return-rts';
+import { removeBoxFromOrder, resendBoxAsNewOrder } from './customer-return-split';
 
 /*
  * Moving a customer return case along. See customer-return-service.ts for the
@@ -76,6 +77,8 @@ async function shelveGoodPieces(supabase: SupabaseClient, id: string, actorName:
   if (!r.checked_at || !r.decided_at || r.restocked_at || r.outcome === 'reship') {
     throw new CustomerReturnError('Nothing to put back yet: the pieces need checking and a decision first.');
   }
+  // One box of the order, cancelled: the box comes off the order (money and stock).
+  if (r.partial && r.outcome === 'cancel_order') return removeBoxFromOrder(supabase, r, actorName);
   const items: any[] = (r.customer_return_items || []).filter((i: any) => i.good_qty > 0 && i.product_id);
   const { data: claimed } = await supabase
     .from('customer_returns')
@@ -147,7 +150,8 @@ export async function applyCustomerReturnAction(
             .update({ good_qty: 0, damaged_qty: i.qty, damaged_action: 'never_came_back' }).eq('id', i.id);
         }
       }
-      if (a.outcome === 'cancel_order' && r.orders?.status !== 'Returned') await setOrderStatus(supabase, r.order_id, 'Returned', actorName);
+      // One box of the order: only that box comes off the order later (Put back on shelf), the order stays.
+      if (a.outcome === 'cancel_order' && !r.partial && r.orders?.status !== 'Returned') await setOrderStatus(supabase, r.order_id, 'Returned', actorName);
       const summary = `${CR_OUTCOME_LABELS[a.outcome]}${amount ? ` ₱${amount.toLocaleString('en-PH')}` : ''}${askBack ? '' : ', not asking for it back'}${shippingPayer && a.outcome === 'replacement' ? `, ${CR_SHIPPING_PAYER_LABELS[shippingPayer].toLowerCase()}` : ''}`;
       await logEvent(supabase, r.id, 'decided', actorName, [summary, a.courierClaim ? 'claim from courier' : '', a.note?.trim()].filter(Boolean).join(' · '));
       const agent = r.orders?.sales_person_name;
@@ -211,6 +215,7 @@ export async function applyCustomerReturnAction(
       if (!r.decided_at || !todo) throw new CustomerReturnError('Nothing to carry out on this case.');
       // Replacements, refunds and credit have their own steps (they make an order or a money entry).
       if (r.outcome !== 'reship') throw new CustomerReturnError('Use the button for this step on the case.');
+      if (r.partial) throw new CustomerReturnError('Only one box came back: use "Create re-send order" so the rest of the order stays delivered.');
       if (todo.ownerOnly && !isManagement) throw new CustomerReturnError('Only the owners can do this.');
       if (r.outcome_done_at) throw new CustomerReturnError('Already done.');
       if (!outcomeCanRunNow(r)) throw new CustomerReturnError('Wait for the item to arrive and be checked first.');
@@ -243,7 +248,11 @@ export async function applyCustomerReturnAction(
       break;
     }
     case 'rts_decide': {
-      await decideRts(supabase, r, a.choice, a.note, actorName, isManagement || isSales);
+      await decideRts(supabase, r, a.choice, a.note, actorName, isManagement || isSales, a.shippingPayer);
+      break;
+    }
+    case 'resend_box': {
+      await resendBoxAsNewOrder(supabase, r, actorName);
       break;
     }
     case 'waiting_customer': {

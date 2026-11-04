@@ -257,6 +257,27 @@ Courier returns in practice (owner, 2026-11-03):
   the **owners decide** resend or cancel.
 - Sales can answer from the pop-up **or from the Returns page** (same buttons).
 
+Only one box came back (owner, 2026-11-04; built 2026-11-04):
+
+- Rare: an order shipped as **several boxes** (each with its own tracking # and
+  COD amount); one box is delivered and accepted, another comes back.
+- Staff log the parcel and **pick which box came back**; only that box's items
+  are in the return, and the order is **not** voided (the delivered box was sold).
+- **Resend:** the box becomes **its own new order** (same customer, address,
+  agent, original order date), starting at **Packed** (it is already packed and
+  checked) so it goes straight to booking. **The money moves with the box**:
+  - COD: the box's unpaid amount moves to the new order (collected on re-send).
+  - Already paid: the payment for the box moves too, so the new order is paid
+    and the courier collects nothing for the item.
+  - Partly paid: what was paid covers the **delivered box first**; the rest moves.
+  - **Shipping fee: sales picks each time** (customer pays SF, or we pay).
+- **Customer doesn't want it:** the box's items are **removed from the order**,
+  so the sale only counts what the customer kept; OK pieces go back on the shelf.
+- If the customer had **already paid** for a box they don't keep, the order
+  shows as overpaid and the **owners are alerted** to refund or give store credit.
+- Courier sync no longer marks a multi-box order Returned when one box comes back;
+  staff log the parcel and pick the box.
+
 What the customer can get: a **replacement shipped**, a **full refund**, a
 **partial refund / discount** (they keep the item), or **store credit**. The
 **owners decide**; staff then do the work (check, re-ship, pack the

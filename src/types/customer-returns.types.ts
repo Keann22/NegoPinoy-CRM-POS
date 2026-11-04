@@ -141,6 +141,10 @@ export interface CustomerReturn {
   escalated: boolean;
   /** Checked and decided, OK pieces still to be put back on the shelf. */
   needsShelving: boolean;
+  /** Only some boxes of a multi-box order came back (the order isn't voided). */
+  partial: boolean;
+  /** Which box(es) came back, e.g. "Box 2". */
+  boxNames: string | null;
   daysOpen: number;
   isOverdue: boolean;
   /** Checked, has damaged pieces, and the owners haven't said what to do with them. */
@@ -173,6 +177,8 @@ export interface NewCustomerReturn {
   photoUrls?: string[];
   /** RTS only: the parcel is already at the warehouse. */
   parcelHere?: boolean;
+  /** Which box(es) came back, for multi-box orders. */
+  boxNames?: string;
   items: { orderItemId: string; qty: number }[];
 }
 
@@ -201,7 +207,9 @@ export type CustomerReturnAction =
   | { action: 'add_photos'; id: string; photoUrls: string[] }
   | { action: 'cancel_case'; id: string; note?: string }
   /** Courier return: sales (or owners) choose resend or cancel. */
-  | { action: 'rts_decide'; id: string; choice: 'resend' | 'cancel'; note?: string }
+  | { action: 'rts_decide'; id: string; choice: 'resend' | 'cancel'; note?: string; shippingPayer?: ShippingPayer }
+  /** One box came back and is re-sent: make its own order (money moves with it). */
+  | { action: 'resend_box'; id: string }
   /** Courier return: sales asked the customer; ask again in 4 hours. */
   | { action: 'waiting_customer'; id: string; note?: string }
   /** Staff put the OK pieces back on the shelf (stock goes up now). */
@@ -217,6 +225,14 @@ export interface ParcelOrderMatch {
   trackingNumber: string | null;
   items: string;
   openCaseNo: number | null;
+  /** Boxes when the order shipped as more than one parcel (else empty). */
+  boxes: ParcelBox[];
+}
+
+export interface ParcelBox {
+  id: string;
+  name: string;
+  items: string;
 }
 
 /** A courier return waiting on this person's resend / cancel answer (the pop-up). */
@@ -230,4 +246,7 @@ export interface RtsDecisionPrompt {
   loggedAt: string;
   waitingCustomerAt: string | null;
   escalated: boolean;
+  /** Only some boxes came back: resend needs a shipping-fee choice. */
+  partial: boolean;
+  boxNames: string | null;
 }

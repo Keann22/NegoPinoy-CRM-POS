@@ -74,8 +74,8 @@ export async function searchParcelOrders(query: string): Promise<ParcelOrderMatc
 }
 
 /** Staff have the courier's returned parcel in hand. */
-export async function logReturnedParcel(orderId: string, reason: string) {
-  return (await send('POST', { action: 'log_parcel', orderId, reason })) as { id: string; caseNo: number; existed: boolean };
+export async function logReturnedParcel(orderId: string, reason: string, boxIds: string[] = []) {
+  return (await send('POST', { action: 'log_parcel', orderId, reason, boxIds })) as { id: string; caseNo: number; existed: boolean };
 }
 
 /** Courier returns waiting on this person's resend / cancel answer. */

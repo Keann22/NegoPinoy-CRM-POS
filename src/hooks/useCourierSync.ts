@@ -97,7 +97,7 @@ export function useCourierSync() {
       while (true) {
         const { data, error } = await supabase
           .from('orders')
-          .select('id, status, tracking_number, payment_method, balance_due, next_due_date, shipped_at')
+          .select('id, status, tracking_number, payment_method, balance_due, next_due_date, shipped_at, boxes_config')
           .order('id')
           .range(from, from + step - 1);
           
@@ -196,6 +196,20 @@ export function useCourierSync() {
                 newStatus: systemStatus,
                 category: 'already_updated',
                 message: 'Order is already marked as Payment Received (COD). Skipping update.'
+            });
+            return;
+        }
+
+        // Multi-box order: one returned box doesn't mean the whole order came back
+        // (the other box may be delivered). Staff log the parcel and pick the box.
+        if (systemStatus === 'Returned' && Array.isArray(matchedOrder.boxes_config) && matchedOrder.boxes_config.length > 1) {
+            syncResults.push({
+                orderId: matchedOrder.id.substring(0,7).toUpperCase(),
+                trackingNumber: rawTracking,
+                originalStatus: matchedOrder.status,
+                newStatus: matchedOrder.status,
+                category: 'partial_match',
+                message: `Shipped as ${matchedOrder.boxes_config.length} boxes and one came back: not marked Returned. When it arrives, log it on Returns ("Log returned parcel") and pick the box.`
             });
             return;
         }

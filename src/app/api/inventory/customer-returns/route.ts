@@ -53,7 +53,8 @@ export async function POST(req: Request) {
     const body = await req.json();
     if (body?.action === 'log_parcel') {
       if (typeof body.orderId !== 'string') return NextResponse.json({ error: 'Pick the order' }, { status: 400 });
-      return NextResponse.json(await logReturnedParcel(supabase, body.orderId, String(body.reason || ''), caller.name));
+      const boxIds = Array.isArray(body.boxIds) ? body.boxIds.map(String) : [];
+      return NextResponse.json(await logReturnedParcel(supabase, body.orderId, String(body.reason || ''), caller.name, boxIds));
     }
     if (body?.action === 'courier_rts') {
       const opened = await openCasesForCourierReturns(supabase, Array.isArray(body.orderIds) ? body.orderIds : [], `${caller.name} (courier sync)`);

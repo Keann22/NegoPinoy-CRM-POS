@@ -18,6 +18,7 @@ import {
 export type CustomerReturnDialogKind = 'decide' | 'check' | 'done' | 'replacement' | 'money';
 
 const EVENT_LABELS: Record<string, string> = {
+  resend_order: 'Re-send order made',
   opened: 'Opened',
   decided: 'Owner decided',
   arrived: 'Parcel arrived',
@@ -118,7 +119,7 @@ export function CustomerReturnCard({ ret, isManagement, canDecideRts = false, on
       {(ret.replacementOrderId || ret.refundMethod || ret.creditGiven > 0) && (
         <p className="text-xs text-emerald-700">
           {ret.replacementOrderId && (
-            <>Replacement order{' '}
+            <>{ret.partial && ret.outcome === 'reship' ? 'Re-send order' : 'Replacement order'}{' '}
               <Link href={`/dashboard/orders/${ret.replacementOrderId}`} className="font-mono underline">
                 #{ret.replacementOrderId.slice(0, 7).toUpperCase()}
               </Link>
@@ -126,6 +127,11 @@ export function CustomerReturnCard({ ret, isManagement, canDecideRts = false, on
           )}
           {ret.refundMethod && `Refunded ${peso(ret.amount)} by ${ret.refundMethod}${ret.refundReference ? ` (ref ${ret.refundReference})` : ''}`}
           {ret.creditGiven > 0 && `${peso(ret.creditGiven)} store credit given`}
+        </p>
+      )}
+      {ret.partial && (
+        <p className="text-xs font-medium text-sky-700 dark:text-sky-300">
+          Only {ret.boxNames || 'part of the order'} came back; the rest of the order was delivered.
         </p>
       )}
       {ret.notes && <p className="text-xs text-muted-foreground italic">“{ret.notes}”</p>}
@@ -137,7 +143,9 @@ export function CustomerReturnCard({ ret, isManagement, canDecideRts = false, on
       )}
       {open && ret.needsShelving && (
         <p className="text-xs text-emerald-700">
-          OK pieces to put back on the shelf: {okPieces.map((i) => `${i.goodQty}× ${i.productName}`).join(', ')}
+          {okPieces.length > 0
+            ? `OK pieces to put back on the shelf: ${okPieces.map((i) => `${i.goodQty}× ${i.productName}`).join(', ')}`
+            : "Nothing to put back on the shelf (all damaged); the box's items still come off the order."}
         </p>
       )}
       {open && ret.outcome === 'reship' && damagedTotal > 0 && (
@@ -160,10 +168,20 @@ export function CustomerReturnCard({ ret, isManagement, canDecideRts = false, on
       <div className="flex flex-wrap items-center gap-2">
         {rtsUndecided && canDecideRts && (
           <>
-            <Button size="sm" disabled={busy} onClick={() => run({ action: 'rts_decide', id: ret.id, choice: 'resend' })}>Resend</Button>
+            {ret.partial ? (
+              <>
+                <Button size="sm" disabled={busy} onClick={() => run({ action: 'rts_decide', id: ret.id, choice: 'resend', shippingPayer: 'customer' })}>Resend (customer pays shipping)</Button>
+                <Button size="sm" disabled={busy} onClick={() => run({ action: 'rts_decide', id: ret.id, choice: 'resend', shippingPayer: 'us' })}>Resend (free shipping)</Button>
+              </>
+            ) : (
+              <Button size="sm" disabled={busy} onClick={() => run({ action: 'rts_decide', id: ret.id, choice: 'resend' })}>Resend</Button>
+            )}
             <Button size="sm" variant="outline" disabled={busy}
-              onClick={() => { if (confirm('Cancel this order? The OK pieces go back on the shelf.')) run({ action: 'rts_decide', id: ret.id, choice: 'cancel' }); }}>
-              Cancel order
+              onClick={() => {
+                const msg = ret.partial ? "Customer doesn't want this box? Its items come off the order." : 'Cancel this order? The OK pieces go back on the shelf.';
+                if (confirm(msg)) run({ action: 'rts_decide', id: ret.id, choice: 'cancel' });
+              }}>
+              {ret.partial ? "Doesn't want this box" : 'Cancel order'}
             </Button>
             <Button size="sm" variant="ghost" disabled={busy} onClick={() => run({ action: 'waiting_customer', id: ret.id })}>Waiting for customer</Button>
           </>
@@ -183,13 +201,24 @@ export function CustomerReturnCard({ ret, isManagement, canDecideRts = false, on
         {open && ret.askBack && !ret.checkedAt && (
           <Button size="sm" variant={ret.stage === 'to_check' ? 'default' : 'outline'} onClick={() => onDialog('check', ret)}>Check pieces</Button>
         )}
-        {open && ret.stage === 'to_do' && todo && !ret.outcomeDoneAt && (todo.ownerOnly && !isManagement
+        {open && ret.stage === 'to_do' && ret.partial && ret.outcome === 'reship' && !ret.outcomeDoneAt && (
+          <Button size="sm" disabled={busy}
+            onClick={() => { if (confirm(`Make a new order for the OK pieces of ${ret.boxNames || 'the box'}? Its money moves from the original order, and it starts at Packed.`)) run({ action: 'resend_box', id: ret.id }); }}>
+            Create re-send order
+          </Button>
+        )}
+        {open && ret.stage === 'to_do' && todo && !ret.outcomeDoneAt && !(ret.partial && ret.outcome === 'reship') && (todo.ownerOnly && !isManagement
           ? <span className="text-xs text-muted-foreground">Waiting for the owners: {todo.label.toLowerCase()}.</span>
           : <Button size="sm" onClick={() => onDialog(todoDialog, ret)}>{todo.label}</Button>)}
         {open && ret.needsShelving && (
           <Button size="sm" disabled={busy}
-            onClick={() => { if (confirm('Are the OK pieces back on the shelf? Stock goes up now.')) run({ action: 'shelved', id: ret.id }); }}>
-            Put back on shelf: done
+            onClick={() => {
+              const msg = ret.partial
+                ? "Take this box's items off the order and count the OK pieces back on the shelf?"
+                : 'Are the OK pieces back on the shelf? Stock goes up now.';
+              if (confirm(msg)) run({ action: 'shelved', id: ret.id });
+            }}>
+            {ret.partial ? 'Remove box from order & put back: done' : 'Put back on shelf: done'}
           </Button>
         )}
         {canReplaceDamaged && (
