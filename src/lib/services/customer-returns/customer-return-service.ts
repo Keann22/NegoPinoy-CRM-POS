@@ -318,8 +318,9 @@ export async function createCustomerReturn(supabase: SupabaseClient, input: NewC
       notes: input.notes?.trim() || null,
       photo_urls: (input.photoUrls || []).slice(0, 10),
       ask_back: askBack,
-      arrived_at: input.source === 'rts' && input.parcelHere ? now : null,
-      arrived_by_name: input.source === 'rts' && input.parcelHere ? actorName : null,
+      // The parcel is already in staff's hands (courier return or the customer's own parcel).
+      arrived_at: input.source !== 'damage_report' && input.parcelHere ? now : null,
+      arrived_by_name: input.source !== 'damage_report' && input.parcelHere ? actorName : null,
       opened_by_name: actorName,
       partial,
       box_names: input.boxNames?.trim() || null,

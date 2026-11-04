@@ -145,7 +145,9 @@ export async function logReturnedParcel(
   const { data: existing } = await supabase.from('customer_returns').select('*')
     .eq('order_id', orderId).eq('status', 'open').limit(1).maybeSingle();
   if (existing) {
-    if (existing.source !== 'rts') throw new CustomerReturnError(`This order already has an open return case (#${existing.case_no}).`);
+    if (existing.source !== 'rts') {
+      throw new CustomerReturnError(`This order already has return #${existing.case_no} from the customer. Under "Who sent it back?" choose "Customer" instead.`);
+    }
     if (chosen.length > 0 && !existing.checked_at && !existing.partial) {
       // A whole-order case (e.g. from courier sync) for what is really one box: narrow it.
       const lines = await getReturnableLines(supabase, orderId);
@@ -179,6 +181,36 @@ export async function logReturnedParcel(
     boxNames: boxNames || undefined,
   }, actorName);
   if (chosen.length > 0) await undoWholeOrderReturned(supabase, orderId, actorName);
+  return { ...out, existed: false };
+}
+
+/**
+ * The customer sent items back themselves (damaged, defective, wrong item): not a
+ * failed delivery, so the order is not voided and the owners decide what the
+ * customer gets (owner, 2026-11-05; found on return #7, a leaking jar logged as
+ * a courier return). If the order already has a case that asked for the item
+ * back (e.g. a damage report), the parcel is just marked as arrived.
+ */
+export async function logCustomerParcel(
+  supabase: SupabaseClient, orderId: string, reason: string, actorName: string, items: { orderItemId: string; qty: number }[]
+) {
+  const { data: existing } = await supabase.from('customer_returns').select('*')
+    .eq('order_id', orderId).eq('status', 'open').limit(1).maybeSingle();
+  if (existing) {
+    if (!existing.ask_back) {
+      throw new CustomerReturnError(`Return #${existing.case_no} for this order says the customer keeps the item. Ask the owners before logging this parcel.`);
+    }
+    if (!existing.arrived_at) {
+      await guarded(supabase, existing, { arrived_at: new Date().toISOString(), arrived_by_name: actorName });
+      await logEvent(supabase, existing.id, 'arrived', actorName, 'Parcel from the customer arrived');
+    }
+    return { id: existing.id as string, caseNo: Number(existing.case_no), existed: true };
+  }
+  const picked = (items || []).filter((i) => i.orderItemId && Number(i.qty) > 0);
+  if (picked.length === 0) throw new CustomerReturnError('Pick which items the customer sent back.');
+  const out = await createCustomerReturn(supabase, {
+    orderId, source: 'shipped_back', reason: reason || 'Defective / not working', parcelHere: true, items: picked,
+  }, actorName);
   return { ...out, existed: false };
 }
 

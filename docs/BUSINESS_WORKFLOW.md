@@ -256,6 +256,13 @@ Courier returns in practice (owner, 2026-11-03):
   and the case shows how long it has waited. After **3 days** with no answer,
   the **owners decide** resend or cancel.
 - Sales can answer from the pop-up **or from the Returns page** (same buttons).
+- **Log returned parcel asks "Who sent it back?"** (owner, 2026-11-05). Found on
+  return #7: a leaking jar the **customer** sent back was logged as a courier
+  return, so the paid order was voided. **Courier** (failed delivery, rejected):
+  as above, sales decides. **Customer** (damaged, defective, wrong item): staff
+  pick the items, the order stays a sale, and the **owners decide** (replacement,
+  refund...). If the order already has a case asking for the item back, logging
+  just marks the parcel as arrived.
 
 Only one box came back (owner, 2026-11-04; built 2026-11-04):
 

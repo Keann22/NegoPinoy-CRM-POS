@@ -9,7 +9,7 @@ import {
   openCasesForCourierReturns,
 } from '@/lib/services/customer-returns/customer-return-service';
 import { applyCustomerReturnAction } from '@/lib/services/customer-returns/customer-return-actions';
-import { listRtsPrompts, logReturnedParcel, searchOrdersForParcel } from '@/lib/services/customer-returns/customer-return-rts';
+import { listRtsPrompts, logCustomerParcel, logReturnedParcel, searchOrdersForParcel } from '@/lib/services/customer-returns/customer-return-rts';
 import type { CustomerReturnAction, NewCustomerReturn } from '@/types/customer-returns.types';
 
 export const dynamic = 'force-dynamic';
@@ -53,6 +53,10 @@ export async function POST(req: Request) {
     const body = await req.json();
     if (body?.action === 'log_parcel') {
       if (typeof body.orderId !== 'string') return NextResponse.json({ error: 'Pick the order' }, { status: 400 });
+      if (body.from === 'customer') {
+        const items = Array.isArray(body.items) ? body.items.map((i: any) => ({ orderItemId: String(i.orderItemId), qty: Number(i.qty) || 0 })) : [];
+        return NextResponse.json(await logCustomerParcel(supabase, body.orderId, String(body.reason || ''), caller.name, items));
+      }
       const boxIds = Array.isArray(body.boxIds) ? body.boxIds.map(String) : [];
       return NextResponse.json(await logReturnedParcel(supabase, body.orderId, String(body.reason || ''), caller.name, boxIds));
     }
