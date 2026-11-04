@@ -1,6 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { applyPhysicalShelfCount } from './inventory-guardian-action-service';
-import type { RecountRequest } from '@/types/inventory-guardian.types';
+import type { RecountPageRow, RecountRequest } from '@/types/inventory-guardian.types';
 import { getShelfForProducts } from './picker-shelf-guard-service';
 import { sendTelegramMessage } from './inventory-guardian-telegram-service';
 
@@ -39,6 +39,47 @@ export async function listOpenRecounts(supabase: SupabaseClient): Promise<Recoun
       message: r.message,
       requestedByName: r.requested_by_name,
       createdAt: r.created_at,
+    };
+  });
+}
+
+function productLabel(p: any): string | null {
+  if (!p) return null;
+  return p.variant_name && !String(p.name).includes(p.variant_name) ? `${p.name} [${p.variant_name}]` : p.name;
+}
+
+/**
+ * The Pabilang page: every line of each batch that still has something to count,
+ * counted ones included so Jas sees her progress. No system numbers (blind count).
+ */
+export async function listRecountPage(supabase: SupabaseClient): Promise<RecountPageRow[]> {
+  const { data: open, error: openErr } = await supabase.from('recount_requests').select('batch_id').eq('status', 'open');
+  if (openErr) throw openErr;
+  const batchIds = Array.from(new Set((open || []).map((r: any) => r.batch_id)));
+  if (batchIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from('recount_requests')
+    .select('id, batch_id, product_id, message, requested_by_name, created_at, status, counted_unit1, counted_unit2, done_by_name, done_at, due_date, products(name, variant_name, sku)')
+    .in('batch_id', batchIds)
+    .order('created_at');
+  if (error) throw error;
+  return (data || []).map((r: any) => {
+    const p = Array.isArray(r.products) ? r.products[0] : r.products;
+    return {
+      id: r.id,
+      batchId: r.batch_id,
+      productId: r.product_id,
+      productName: productLabel(p) || 'Unknown product',
+      sku: p?.sku || null,
+      message: r.message,
+      requestedByName: r.requested_by_name,
+      createdAt: r.created_at,
+      status: r.status === 'open' ? 'open' : 'done',
+      countedUnit1: r.counted_unit1,
+      countedUnit2: r.counted_unit2,
+      doneByName: r.done_by_name,
+      doneAt: r.done_at,
+      dueDate: r.due_date,
     };
   });
 }

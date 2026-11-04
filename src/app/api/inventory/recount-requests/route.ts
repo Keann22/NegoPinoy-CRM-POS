@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createSessionClient } from '@/lib/supabase/server';
 import { isManagementUser } from '@/lib/services/purchase-summary-service';
-import { completeRecount, isRecountAssignee, listOpenRecounts, RecountError } from '@/lib/services/inventory/recount-request-service';
+import { completeRecount, isRecountAssignee, listOpenRecounts, listRecountPage, RecountError } from '@/lib/services/inventory/recount-request-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,9 +21,14 @@ async function getCaller() {
 }
 
 // Open recount requests, for the sticky pop-up on Jas's accounts. Everyone else gets none.
-export async function GET() {
+// ?view=page: the Pabilang page (Jas and the owners), counted lines included.
+export async function GET(req: Request) {
   try {
     const caller = await getCaller();
+    if (new URL(req.url).searchParams.get('view') === 'page') {
+      if (!caller || !(caller.isAssignee || caller.isManagement)) return NextResponse.json({ rows: [], canCount: false });
+      return NextResponse.json({ rows: await listRecountPage(supabase), canCount: true });
+    }
     if (!caller?.isAssignee) return NextResponse.json({ requests: [] });
     return NextResponse.json({ requests: await listOpenRecounts(supabase) });
   } catch (e) {

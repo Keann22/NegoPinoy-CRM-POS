@@ -128,3 +128,13 @@ export interface RecountRequest {
   requestedByName: string | null;
   createdAt: string;
 }
+
+/** A recount line on the Pabilang page: open, or already counted (Jas's own counts, never the system's). */
+export interface RecountPageRow extends RecountRequest {
+  status: 'open' | 'done';
+  countedUnit1: number | null;
+  countedUnit2: number | null;
+  doneByName: string | null;
+  doneAt: string | null;
+  dueDate: string | null;
+}

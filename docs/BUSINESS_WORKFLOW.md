@@ -114,6 +114,10 @@ Receipts:
   the products. She counts Unit 1 (shelf) and Unit 2 (reserve) without seeing
   the system's numbers. It can be minimized while she counts but comes back
   every 30 minutes and on every page load until each product is saved.
+- **Long lists go on a page (owner, 2026-11-04):** Inventory Management →
+  **Pabilang (Recount)**. Each product saves on its own, so Jas can stop and
+  come back; it shows how many are done. With more than 5 products the pop-up
+  only says how many are left and opens the page (no pop-up on the page itself).
 - The owner gets a **Telegram message as soon as Jas finishes** (her counts vs
   the old numbers), and a **reminder at 12 noon** if she hasn't finished by the
   due date (not on Sundays). No work Nov 1, holiday Nov 2 (2026): the first

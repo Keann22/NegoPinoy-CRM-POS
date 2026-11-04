@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -9,16 +11,23 @@ import { useToast } from '@/hooks/use-toast';
 import { useRecountRequests } from '@/hooks/useRecountRequests';
 
 const REOPEN_MS = 30 * 60 * 1000;
+export const RECOUNT_PAGE = '/dashboard/inventory/recount';
+/** More open products than this: the pop-up sends Jas to the Pabilang page instead of listing inputs. */
+const INLINE_MAX = 5;
 
 /**
  * Sticky pop-up on Jas's accounts: an owner asked her to count these products.
  * It can be minimized to a red chip while she goes to count, but it comes back
  * every 30 minutes and on every page load until each product is counted.
+ * Long lists are counted on the Pabilang page (no pop-up there).
  * The count is blind: the system's numbers aren't shown.
  */
 export function RecountRequestPopup() {
   const { toast } = useToast();
-  const { requests, save } = useRecountRequests();
+  const pathname = usePathname();
+  const { requests, save, refresh } = useRecountRequests();
+  // Counts saved on the Pabilang page: reload when she moves to another page.
+  useEffect(() => { refresh(); }, [pathname, refresh]);
   const [minimized, setMinimized] = useState(false);
   const [counts, setCounts] = useState<Record<string, { u1: string; u2: string }>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -35,7 +44,8 @@ export function RecountRequestPopup() {
     return Array.from(map.values());
   }, [requests]);
 
-  if (requests.length === 0) return null;
+  if (requests.length === 0 || pathname?.startsWith(RECOUNT_PAGE)) return null;
+  const inline = requests.length <= INLINE_MAX;
 
   const setCount = (id: string, key: 'u1' | 'u2', value: string) =>
     setCounts((c) => ({ ...c, [id]: { u1: c[id]?.u1 ?? '', u2: c[id]?.u2 ?? '', [key]: value } }));
@@ -87,6 +97,10 @@ export function RecountRequestPopup() {
                 {batch[0].requestedByName && <span className="block text-sm text-muted-foreground mt-1">— {batch[0].requestedByName}</span>}
               </DialogDescription>
             </DialogHeader>
+            {!inline ? (
+              <p className="text-sm font-medium">{batch.length} produkto pa ang hindi nabibilang.</p>
+            ) : (
+            <>
             <p className="text-xs text-muted-foreground">
               Bilangin ang nasa Unit 1 (shelf) at Unit 2 (reserve). Ilagay 0 kung wala.
             </p>
@@ -110,8 +124,13 @@ export function RecountRequestPopup() {
                 </li>
               ))}
             </ul>
+            </>
+            )}
           </div>
         ))}
+        <Button asChild className="w-full" variant={inline ? 'outline' : 'default'}>
+          <Link href={RECOUNT_PAGE}>Buksan ang Pabilang page</Link>
+        </Button>
         <Button variant="ghost" className="w-full" onClick={() => setMinimized(true)}>
           Mamaya na, bibilangin ko pa
         </Button>

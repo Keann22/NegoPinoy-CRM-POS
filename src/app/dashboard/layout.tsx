@@ -135,6 +135,7 @@ export default function DashboardLayout({
         { href: '/dashboard/inventory/procurement-request', label: 'Procurement Request', icon: ListChecks },
         { href: '/dashboard/inventory/print-list', label: 'Inventory List', icon: Printer },
         { href: '/dashboard/inventory/audit', label: 'Out of Stock Audit', icon: ListChecks },
+        { href: '/dashboard/inventory/recount', label: 'Pabilang (Recount)', icon: ListChecks },
         { href: '/dashboard/inventory/transfers', label: 'Unit 1 ⇄ Unit 2 Transfers', icon: ArrowRightLeft },
         { href: '/dashboard/inventory/receive', label: 'Receiving', icon: Truck },
         { href: '/dashboard/inventory/restock', label: 'Restock / Purchase', icon: ArrowDownUp },
