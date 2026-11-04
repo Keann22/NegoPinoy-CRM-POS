@@ -111,8 +111,8 @@ Receipts:
 
 - When the owners suspect a stock number is wrong, they ask Jas to count it.
   Jas gets a **sticky pop-up** on all her accounts with the owner's message and
-  the products. She counts Unit 1 (shelf) and Unit 2 (reserve) without seeing
-  the system's numbers. It can be minimized while she counts but comes back
+  the products. She counts the **Unit 1 shelf only** (owner, 2026-11-04: Unit 2
+  is rarely used; it is left as recorded), without seeing the system's numbers. It can be minimized while she counts but comes back
   every 30 minutes and on every page load until each product is saved.
 - **Long lists go on a page (owner, 2026-11-04):** left menu →
   **Pabilang (Recount)**. Each product saves on its own, so Jas can stop and

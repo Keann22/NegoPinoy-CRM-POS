@@ -32,8 +32,8 @@ export function useRecountPage() {
     return () => window.removeEventListener('focus', onFocus);
   }, [refresh]);
 
-  const save = useCallback(async (id: string, unit1: number, unit2: number) => {
-    const res = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, unit1, unit2 }) });
+  const save = useCallback(async (id: string, unit1: number) => {
+    const res = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, unit1 }) });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(json.error || 'Hindi na-save');
     await refresh();

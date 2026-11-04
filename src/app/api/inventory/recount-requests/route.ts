@@ -36,13 +36,13 @@ export async function GET(req: Request) {
   }
 }
 
-// Save one product's count: { id, unit1, unit2 }.
+// Save one product's Unit 1 count: { id, unit1 }. Unit 2 is left as recorded.
 export async function POST(req: Request) {
   try {
     const caller = await getCaller();
     if (!caller || !(caller.isAssignee || caller.isManagement)) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
     const body = await req.json();
-    await completeRecount(supabase, { id: String(body.id), unit1: body.unit1, unit2: body.unit2, actorName: caller.name });
+    await completeRecount(supabase, { id: String(body.id), unit1: body.unit1, actorName: caller.name });
     return NextResponse.json({ ok: true });
   } catch (e) {
     const status = e instanceof RecountError ? 400 : 500;

@@ -3,12 +3,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { AlertTriangle, Loader2 } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { useToast } from '@/hooks/use-toast';
 import { useRecountRequests } from '@/hooks/useRecountRequests';
+import { RecountLine } from '@/components/dashboard/inventory/recount-line';
 
 const REOPEN_MS = 30 * 60 * 1000;
 export const RECOUNT_PAGE = '/dashboard/inventory/recount';
@@ -23,17 +22,14 @@ const CHIP = 'fixed bottom-4 left-4 z-50 inline-flex items-center gap-2 rounded-
  * back every 30 minutes and on every page load until each product is counted.
  * More than 5: just a red chip ("38 pabilang pa") that opens the Pabilang page.
  * Nothing shows on the Pabilang page itself.
- * The count is blind: the system's numbers aren't shown.
+ * Jas counts the Unit 1 shelf only (Unit 2 is left as recorded), blind: no system numbers.
  */
 export function RecountRequestPopup() {
-  const { toast } = useToast();
   const pathname = usePathname();
   const { requests, save, refresh } = useRecountRequests();
   // Counts saved on the Pabilang page: reload when she moves to another page.
   useEffect(() => { refresh(); }, [pathname, refresh]);
   const [minimized, setMinimized] = useState(false);
-  const [counts, setCounts] = useState<Record<string, { u1: string; u2: string }>>({});
-  const [savingId, setSavingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!minimized) return;
@@ -55,26 +51,6 @@ export function RecountRequestPopup() {
       </Link>
     );
   }
-
-  const setCount = (id: string, key: 'u1' | 'u2', value: string) =>
-    setCounts((c) => ({ ...c, [id]: { u1: c[id]?.u1 ?? '', u2: c[id]?.u2 ?? '', [key]: value } }));
-
-  const submit = async (id: string, name: string) => {
-    const c = counts[id];
-    if (!c || c.u1.trim() === '' || c.u2.trim() === '') {
-      toast({ title: 'Ilagay ang bilang sa Unit 1 at Unit 2', description: 'Ilagay 0 kung wala.', variant: 'destructive' });
-      return;
-    }
-    setSavingId(id);
-    try {
-      await save(id, Number(c.u1), Number(c.u2));
-      toast({ title: 'Salamat! Na-save ang bilang', description: name });
-    } catch (e) {
-      toast({ title: 'Hindi na-save', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
-    } finally {
-      setSavingId(null);
-    }
-  };
 
   if (minimized) {
     return (
@@ -107,28 +83,11 @@ export function RecountRequestPopup() {
               </DialogDescription>
             </DialogHeader>
             <p className="text-xs text-muted-foreground">
-              Bilangin ang nasa Unit 1 (shelf) at Unit 2 (reserve). Ilagay 0 kung wala.
+              Bilangin ang nasa Unit 1 (shelf). Ilagay 0 kung wala.
             </p>
-            <ul className="space-y-3">
-              {batch.map((r) => (
-                <li key={r.id} className="rounded-md border p-3 space-y-2">
-                  <p className="font-medium leading-tight">{r.productName}{r.sku ? <span className="text-xs text-muted-foreground"> · {r.sku}</span> : null}</p>
-                  <div className="flex flex-wrap items-end gap-2">
-                    <label className="text-xs text-muted-foreground">
-                      Unit 1
-                      <Input type="number" inputMode="numeric" min={0} className="h-9 w-20" value={counts[r.id]?.u1 ?? ''} onChange={(e) => setCount(r.id, 'u1', e.target.value)} />
-                    </label>
-                    <label className="text-xs text-muted-foreground">
-                      Unit 2
-                      <Input type="number" inputMode="numeric" min={0} className="h-9 w-20" value={counts[r.id]?.u2 ?? ''} onChange={(e) => setCount(r.id, 'u2', e.target.value)} />
-                    </label>
-                    <Button size="sm" onClick={() => submit(r.id, r.productName)} disabled={savingId === r.id}>
-                      {savingId === r.id && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}I-save
-                    </Button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <div className="space-y-3">
+              {batch.map((r) => <RecountLine key={r.id} row={r} onSave={save} />)}
+            </div>
           </div>
         ))}
         <Button asChild className="w-full" variant="outline">

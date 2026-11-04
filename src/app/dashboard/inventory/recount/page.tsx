@@ -39,7 +39,7 @@ export default function RecountPage() {
           <ClipboardCheck className="h-6 w-6 text-primary" /> Pabilang (Recount)
         </h1>
         <p className="text-sm text-muted-foreground">
-          Bilangin ang nasa Unit 1 (shelf) at Unit 2 (reserve). Ilagay 0 kung wala. Bawat produkto ay naka-save agad,
+          Bilangin ang nasa Unit 1 (shelf). Ilagay 0 kung wala. Bawat produkto ay naka-save agad,
           kaya puwedeng ituloy mamaya.
         </p>
       </div>
@@ -90,7 +90,7 @@ export default function RecountPage() {
                       <li key={r.id} className="flex flex-wrap justify-between gap-x-3 py-2">
                         <span className="font-medium">{r.productName}</span>
                         <span className="text-muted-foreground">
-                          Unit 1: {r.countedUnit1} · Unit 2: {r.countedUnit2} · {r.doneByName} {phTime(r.doneAt)}
+                          Unit 1: {r.countedUnit1}{r.countedUnit2 != null && <> · Unit 2: {r.countedUnit2}</>} · {r.doneByName} {phTime(r.doneAt)}
                         </span>
                       </li>
                     ))}

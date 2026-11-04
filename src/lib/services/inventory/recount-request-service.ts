@@ -94,56 +94,38 @@ export async function createRecountBatch(supabase: SupabaseClient, productIds: s
   return batchId;
 }
 
-/** Saves Jas's count: Unit 2 set to what she counted there, total = Unit 1 + Unit 2. */
+/**
+ * Saves Jas's count of the Unit 1 shelf (owner 2026-11-04: Jas counts Unit 1 only,
+ * Unit 2 is rarely used and is left as recorded). Total = her Unit 1 + recorded Unit 2.
+ * system_before is the system's Unit 1 number, so the Telegram summary compares like with like.
+ */
 export async function completeRecount(
   supabase: SupabaseClient,
-  input: { id: string; unit1: number; unit2: number; actorName: string }
+  input: { id: string; unit1: number; actorName: string }
 ) {
   const unit1 = Math.round(Number(input.unit1));
-  const unit2 = Math.round(Number(input.unit2));
-  if (!(unit1 >= 0) || !(unit2 >= 0)) throw new RecountError('Ilagay ang bilang sa Unit 1 at Unit 2 (0 kung wala).');
+  if (!(unit1 >= 0)) throw new RecountError('Ilagay ang bilang sa Unit 1 (0 kung wala).');
 
   const { data: req, error } = await supabase.from('recount_requests').select('*').eq('id', input.id).single();
   if (error || !req) throw new RecountError('Request not found.');
   if (req.status !== 'open') throw new RecountError('Nabilang na ito.');
 
-  const systemBefore = (await getShelfForProducts(supabase, [req.product_id]))[req.product_id]?.unallocated ?? null;
+  const shelf = (await getShelfForProducts(supabase, [req.product_id]))[req.product_id];
+  const unit2Kept = shelf?.unit2 ?? 0;
+  const systemUnit1Before = shelf ? Math.max(0, shelf.unallocated - unit2Kept) : null;
 
   // Claim it first so two Jas accounts can't save the same item twice.
   const { data: claimed } = await supabase
     .from('recount_requests')
-    .update({ status: 'done', counted_unit1: unit1, counted_unit2: unit2, system_before: systemBefore, done_by_name: input.actorName, done_at: new Date().toISOString() })
+    .update({ status: 'done', counted_unit1: unit1, counted_unit2: null, system_before: systemUnit1Before, done_by_name: input.actorName, done_at: new Date().toISOString() })
     .eq('id', req.id).eq('status', 'open').select('id');
   if (!claimed || claimed.length === 0) throw new RecountError('Nabilang na ito.');
 
   try {
-    const { data: wh } = await supabase.from('warehouses').select('id').eq('code', 'UNIT2').maybeSingle();
-    if (wh) {
-      const { data: row } = await supabase
-        .from('product_warehouse_stock').select('stock_level').eq('product_id', req.product_id).eq('warehouse_id', wh.id).maybeSingle();
-      const before = Number(row?.stock_level) || 0;
-      if (before !== unit2) {
-        if (row) {
-          await supabase.from('product_warehouse_stock').update({ stock_level: unit2 }).eq('product_id', req.product_id).eq('warehouse_id', wh.id);
-        } else {
-          await supabase.from('product_warehouse_stock').insert({ product_id: req.product_id, warehouse_id: wh.id, stock_level: unit2 });
-        }
-        await supabase.from('inventory_movements').insert({
-          product_id: req.product_id,
-          quantity_change: unit2 - before,
-          movement_type: 'adjustment',
-          warehouse_id: wh.id,
-          timestamp: new Date().toISOString(),
-          reason: `Recount (Unit 2 reserve) by ${input.actorName}: ${unit2} (was ${before}). Requested by ${req.requested_by_name || 'owner'}.`,
-          performed_by_name: input.actorName,
-        });
-      }
-    }
-
     await applyPhysicalShelfCount(supabase, {
       productId: req.product_id,
-      physicalShelfCount: unit1 + unit2,
-      notes: `Recount requested by ${req.requested_by_name || 'owner'}: Unit 1 ${unit1} + Unit 2 ${unit2}. Counted by ${input.actorName}.`,
+      physicalShelfCount: unit1 + unit2Kept,
+      notes: `Recount requested by ${req.requested_by_name || 'owner'}: Unit 1 ${unit1}${unit2Kept ? ` + Unit 2 ${unit2Kept} (kept, not counted)` : ''}. Counted by ${input.actorName}.`,
       actorName: input.actorName,
     });
   } catch (e) {
@@ -188,11 +170,14 @@ export async function notifyIfBatchDone(supabase: SupabaseClient, batchId: strin
   if (!claimed || claimed.length === 0) return; // already sent
 
   const lines = rows.filter((r) => r.status === 'done').map((r) => {
+    // counted_unit2 null = Unit 1-only count (since 2026-11-04); system_before is then the system's Unit 1 number.
+    const unit1Only = r.counted_unit2 == null;
     const total = (r.counted_unit1 || 0) + (r.counted_unit2 || 0);
     const before = r.system_before;
     const diff = before == null ? null : before - total;
     const verdict = diff == null ? '' : diff > 0 ? `, sobra ng ${diff} ang system` : diff < 0 ? `, kulang ng ${-diff} ang system` : ', tama ang system';
-    return `✅ ${esc(r.productName)}: <b>${total}</b> (Unit 1 ${r.counted_unit1}, Unit 2 ${r.counted_unit2})` +
+    const counted = unit1Only ? `Unit 1 <b>${total}</b>` : `<b>${total}</b> (Unit 1 ${r.counted_unit1}, Unit 2 ${r.counted_unit2})`;
+    return `✅ ${esc(r.productName)}: ${counted}` +
       `${before != null ? `, dati ${before}` : ''}${verdict} — ${esc(r.done_by_name || 'Jas')}, ${phTime(r.done_at)}`;
   });
   const text = [
