@@ -114,7 +114,7 @@ Receipts:
   the products. She counts Unit 1 (shelf) and Unit 2 (reserve) without seeing
   the system's numbers. It can be minimized while she counts but comes back
   every 30 minutes and on every page load until each product is saved.
-- **Long lists go on a page (owner, 2026-11-04):** Inventory Management →
+- **Long lists go on a page (owner, 2026-11-04):** left menu →
   **Pabilang (Recount)**. Each product saves on its own, so Jas can stop and
   come back; it shows how many are done. With more than 5 products there is
   **no pop-up**: just a small red chip in the corner ("38 pabilang pa") that
