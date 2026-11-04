@@ -50,6 +50,15 @@ Receipts:
   by hand.
 - Receipt lines are often cryptic abbreviations.
 
+## Lay-away and Need to Buy (owner, 2026-11-04)
+
+- A lay-away still being paid off is **not** bought for: it uses stock on the
+  shelf but never goes on the Procurement Sheet's Need to Buy.
+- Once the customer has **paid for the items**, it goes on Need to Buy like any
+  other order (and is marked paid, so it is listed first). **Insurance and
+  shipping fee don't count**: a lay-away with only the ₱28 insurance left is
+  paid for (found 2026-11-04, #924BB26 rice cooker missing from the sheet).
+
 ## Receiving and counting
 
 - Staff count **only after everything has arrived** and the unpacking is done,

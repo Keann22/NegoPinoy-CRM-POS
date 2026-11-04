@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { layawayItemsPaid } from './procurement-demand-service';
 
 /**
  * Which items on the Procurement Sheet are holding up a customer who is in a
@@ -62,7 +63,7 @@ export async function getItemPriorities(
 
   const [orders, events] = await Promise.all([
     inChunks<any>(orderIds, (c) => supabase.from('orders')
-      .select('id, status, payment_method, balance_due, customers(full_name)').in('id', c).in('status', OPEN_STATUSES)),
+      .select('id, status, payment_method, balance_due, subtotal, total_discount, amount_paid, customers(full_name)').in('id', c).in('status', OPEN_STATUSES)),
     inChunks<any>(orderIds, (c) => supabase.from('order_priority_events')
       .select('order_id, kind, note, created_at').in('kind', ['urgent', 'urgent_cleared']).in('order_id', c)),
   ]).catch((error) => {
@@ -86,7 +87,9 @@ export async function getItemPriorities(
       const ref: PriorityOrderRef = { orderId: o.id, shortOrderId: o.id.slice(0, 7).toUpperCase(), customerName: o.customers?.full_name || 'Customer' };
       const u = latestUrgent.get(oid);
       if (u?.kind === 'urgent') p.urgent.push({ ...ref, note: u.note });
-      else if (o.payment_method !== 'COD' && Number(o.balance_due || 0) < 1) p.paid.push(ref);
+      else if (o.payment_method !== 'COD' && (Number(o.balance_due || 0) < 1 ||
+        // Lay-away with the items paid; only insurance / shipping left.
+        (o.payment_method === 'Lay-away' && layawayItemsPaid(o)))) p.paid.push(ref);
     });
     if (p.urgent.length || p.paid.length) result.set(pid, p);
   });

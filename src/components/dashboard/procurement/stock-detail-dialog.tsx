@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ALL_OPEN_STATUSES, UNFULFILLED_STATUSES } from '@/lib/services/procurement-service';
-import { fetchAllPages } from '@/lib/services/procurement-demand-service';
+import { fetchAllPages, layawayItemsPaid } from '@/lib/services/procurement-demand-service';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Package, CheckCircle2, Loader2, ExternalLink, ShoppingBag, Info, MousePointerClick } from 'lucide-react';
 import { format } from 'date-fns';
@@ -103,6 +103,10 @@ export function ProcurementStockDetailDialog({ item, isOpen, onClose }: Procurem
                     status,
                     customer_id,
                     payment_method,
+                    subtotal,
+                    total_discount,
+                    amount_paid,
+                    balance_due,
                     customers(full_name)
                   )
                 `)
@@ -131,7 +135,8 @@ export function ProcurementStockDetailDialog({ item, isOpen, onClose }: Procurem
         // so each list adds up to the number on its card.
         const categorize = (row: any): Exclude<OrderCategory, 'all'> => {
           const status = row.orders.status;
-          if (row.orders.payment_method === 'Lay-away') {
+          // A paid-for lay-away is handled like any other order (it's on Need to Buy).
+          if (row.orders.payment_method === 'Lay-away' && !layawayItemsPaid(row.orders)) {
             return !row.is_packed && !PICKED_STATUSES.includes(status) ? 'layaway' : 'allocated';
           }
           if (status === 'Picked (with issue)') {

@@ -66,6 +66,7 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
     negativeStockIds,
     unscannedLayawayMap,
     openUnscannedMap,
+    paidLayawayOrdersByProduct,
   } = await calculateProcurementDemand(supabase, initialProductIdsToFetch, purchased || []);
 
   // 4. Calculate negative stock reconciliation
@@ -290,7 +291,11 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
 
   // Mark items holding up a nagmamadali or fully paid customer, and list them first.
   const linkedOrders = new Map<string, string[]>();
-  osMap.forEach((item: any, pid: string) => linkedOrders.set(pid, (item.sourceOrders || []).map((o: any) => o.orderId)));
+  osMap.forEach((item: any, pid: string) => linkedOrders.set(pid, [
+    ...(item.sourceOrders || []).map((o: any) => o.orderId),
+    // Paid-for lay-aways have no OS issue or buy request, but are still waiting on it.
+    ...(paidLayawayOrdersByProduct.get(pid) || []),
+  ]));
   const priorities = await getItemPriorities(supabase, Array.from(osMap.keys()), linkedOrders)
     .catch((e) => { console.error('procurement priorities failed:', e?.message); return new Map(); });
   osMap.forEach((item: any, pid: string) => { item.priority = priorities.get(pid) || null; });

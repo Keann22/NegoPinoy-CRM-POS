@@ -15,6 +15,22 @@ export async function fetchAllPages<T>(
   return all;
 }
 
+/**
+ * Owner rule (2026-11-04): a lay-away goes on Need to Buy once the customer has
+ * paid for the items. Insurance and shipping fee don't count toward that, so an
+ * order can still show a small balance (e.g. ₱28 insurance) and qualify.
+ */
+export function layawayItemsPaid(o: {
+  amount_paid?: number | null;
+  subtotal?: number | null;
+  total_discount?: number | null;
+  balance_due?: number | null;
+}): boolean {
+  if (o.balance_due != null && Number(o.balance_due) < 1) return true;
+  const itemsTotal = Number(o.subtotal || 0) - Number(o.total_discount || 0);
+  return itemsTotal > 0 && Number(o.amount_paid || 0) >= itemsTotal - 0.5;
+}
+
 export interface ProcurementDemandResult {
   productIdsToFetch: Set<string>;
   totalOpenDemandMap: Map<string, number>;
@@ -24,6 +40,8 @@ export interface ProcurementDemandResult {
   unscannedLayawayMap: Map<string, number>;
   /** Unfulfilled order qty before pending-receipt POs are netted off needToBuyMap. */
   openUnscannedMap: Map<string, number>;
+  /** Product id -> paid-for lay-away orders waiting on it (marked "paid" on the sheet). */
+  paidLayawayOrdersByProduct: Map<string, string[]>;
 }
 
 export async function calculateProcurementDemand(
@@ -109,7 +127,7 @@ export async function calculateProcurementDemand(
       fetchAllPages<any>((from, to) =>
         supabase
           .from('order_items')
-          .select('product_id, quantity, is_packed, orders!inner(id, status, payment_method)')
+          .select('product_id, quantity, is_packed, orders!inner(id, status, payment_method, subtotal, total_discount, amount_paid, balance_due)')
           .in('product_id', chunk)
           .in('orders.status', ALL_OPEN_STATUSES)
           .range(from, to)
@@ -143,7 +161,8 @@ export async function calculateProcurementDemand(
   };
 
   const isUnfulfilledFor = (row: any, targetProductId: string): boolean => {
-    if (row.orders.payment_method === 'Lay-away') return false; // consume stock, but don't auto-buy
+    // Lay-away still being paid off: consume stock, but don't auto-buy.
+    if (row.orders.payment_method === 'Lay-away' && !layawayItemsPaid(row.orders)) return false;
     if (row.orders.status === 'Picked (with issue)') {
       return (
         openIssueKeys.has(`${row.orders.id}-${targetProductId}`) ||
@@ -156,6 +175,8 @@ export async function calculateProcurementDemand(
 
   const isUnscannedLayaway = (row: any): boolean => {
     if (row.orders.payment_method !== 'Lay-away') return false;
+    // Paid for: counted as an order to buy for, not as a lay-away.
+    if (layawayItemsPaid(row.orders)) return false;
     if (row.is_packed) return false;
     // Orders already picked or packed were physically pulled from shelf
     if (['Picked', 'Photo', 'Packed', 'For Shipping', 'For Pick-up', 'Picked (with issue)'].includes(row.orders.status)) {
@@ -165,10 +186,20 @@ export async function calculateProcurementDemand(
     return true;
   };
 
+  const paidLayawayOrdersByProduct = new Map<string, string[]>();
+  const notePaidLayaway = (productId: string, row: any) => {
+    if (row.orders.payment_method !== 'Lay-away') return;
+    const list = paidLayawayOrdersByProduct.get(productId) || [];
+    if (!list.includes(row.orders.id)) list.push(row.orders.id);
+    paidLayawayOrdersByProduct.set(productId, list);
+  };
+
   demandRows?.forEach((row: any) => {
     const isLayawayOnShelf = isUnscannedLayaway(row);
     if (candidateIds.has(row.product_id)) {
-      addDemand(row.product_id, row.quantity, isUnfulfilledFor(row, row.product_id));
+      const unfulfilled = isUnfulfilledFor(row, row.product_id);
+      addDemand(row.product_id, row.quantity, unfulfilled);
+      if (unfulfilled) notePaidLayaway(row.product_id, row);
       if (isLayawayOnShelf) {
         addLayawayDemand(row.product_id, row.quantity);
       }
@@ -176,7 +207,9 @@ export async function calculateProcurementDemand(
     const components = bundleToComponents.get(row.product_id);
     components?.forEach((c) => {
       const compQty = row.quantity * c.qtyPerBundle;
-      addDemand(c.componentId, compQty, isUnfulfilledFor(row, c.componentId));
+      const unfulfilled = isUnfulfilledFor(row, c.componentId);
+      addDemand(c.componentId, compQty, unfulfilled);
+      if (unfulfilled) notePaidLayaway(c.componentId, row);
       if (isLayawayOnShelf) {
         addLayawayDemand(c.componentId, compQty);
       }
@@ -225,6 +258,7 @@ export async function calculateProcurementDemand(
     negativeStockIds,
     unscannedLayawayMap,
     openUnscannedMap,
+    paidLayawayOrdersByProduct,
   };
 }
 
