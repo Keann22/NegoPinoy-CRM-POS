@@ -1,8 +1,15 @@
-export type ReconcileAction = 'overpayment_credit' | 'tip' | 'split_payment' | 'typo_correction';
+export type ReconcileAction =
+  | 'overpayment_credit'
+  | 'tip'
+  | 'split_payment'
+  | 'typo_correction'
+  /** No money change: fixed by hand, or the recorded amount was right. */
+  | 'mark_checked';
 
 /** Another payment logged with the same GCash reference (one transfer paid several orders). */
 export interface SharedTransferPayment {
   paymentId: string;
+  orderId: string | null;
   orderShortId: string;
   amount: number;
   isReconciled: boolean;

@@ -153,6 +153,7 @@ export function othersOnTransfer(
     .filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true)))
     .map((p) => ({
       paymentId: p.id,
+      orderId: p.order_id,
       orderShortId: shortId(p.order_id),
       amount: p.amount,
       isReconciled: isReconciled(p.notes),
@@ -180,6 +181,16 @@ export async function buildDiscrepancyItems(
     if (isReconciled(p.notes)) {
       return { ...base, recordedAmount: p.amount, isResolved: true, allowedActions: [] };
     }
+    // Edited by hand since the list was made: only "Checked" fits now.
+    if (Math.abs(p.amount - source.recordedAmount) > 0.01) {
+      return {
+        ...base,
+        recordedAmount: p.amount,
+        isResolved: false,
+        allowedActions: ['mark_checked'],
+        blockedReason: `This payment was changed by hand (it was ₱${source.recordedAmount}). If it's right now, mark it checked.`,
+      };
+    }
     const rules = reconcileRules({
       recorded: p.amount,
       gcash: source.gcashAmount,
@@ -190,7 +201,9 @@ export async function buildDiscrepancyItems(
       ...base,
       recordedAmount: p.amount,
       isResolved: false,
-      allowedActions: rules.allowed,
+      // "Checked" is always offered: after a fix by hand, or when the proof shows the
+      // recorded amount was right and the GCash figure was wrong.
+      allowedActions: [...rules.allowed, 'mark_checked'],
       blockedReason: rules.blockedReason,
     };
   });

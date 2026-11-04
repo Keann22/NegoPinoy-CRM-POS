@@ -39,8 +39,8 @@ export function reconcileRules(f: TransferFigures): RuleResult {
         allowed: [],
         share,
         blockedReason:
-          `${f.otherCount + 1} orders use this GCash transfer and their payments add up to ${peso(total)}, ` +
-          `more than the ${peso(f.gcash)} received. Open each order and fix the duplicate or wrong payment by hand.`,
+          `The ${f.otherCount + 1} orders on this transfer add up to ${peso(total)}, but only ${peso(f.gcash)} was received. ` +
+          'Open each order (links under GCash Ref), fix the wrong or duplicate payment, then tap Checked.',
       };
     }
     // The orders cover the transfer: link them. Money left over can go to this customer.
@@ -59,4 +59,5 @@ export const ACTION_LABELS: Record<ReconcileAction, string> = {
   tip: 'Tip / keep the change',
   split_payment: 'Split transfer',
   typo_correction: 'Fix typo',
+  mark_checked: 'Checked, no change',
 };

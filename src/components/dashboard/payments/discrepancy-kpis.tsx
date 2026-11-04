@@ -13,7 +13,7 @@ export function DiscrepancyKpis({ kpis }: DiscrepancyKpisProps) {
           <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">Orders to Fix</CardTitle>
         </CardHeader>
         <CardContent className="py-2 px-4">
-          <div className="text-2xl font-bold text-amber-500 font-mono">{kpis.remaining}</div>
+          <div className="text-2xl font-bold text-amber-600 dark:text-amber-400 font-mono">{kpis.remaining}</div>
           <p className="text-xs text-muted-foreground mt-1">{kpis.resolved} resolved of {kpis.total}</p>
         </CardContent>
       </Card>
@@ -23,7 +23,7 @@ export function DiscrepancyKpis({ kpis }: DiscrepancyKpisProps) {
           <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">GCash Received</CardTitle>
         </CardHeader>
         <CardContent className="py-2 px-4">
-          <div className="text-2xl font-bold text-emerald-400 font-mono">
+          <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 font-mono">
             ₱{kpis.gcashSum.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
           </div>
           <p className="text-xs text-muted-foreground mt-1">From bank/statement receipts</p>
@@ -35,7 +35,7 @@ export function DiscrepancyKpis({ kpis }: DiscrepancyKpisProps) {
           <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">Net Variance</CardTitle>
         </CardHeader>
         <CardContent className="py-2 px-4">
-          <div className={`text-2xl font-bold font-mono ${kpis.varSum < 0 ? 'text-rose-400' : 'text-sky-400'}`}>
+          <div className={`text-2xl font-bold font-mono ${kpis.varSum < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-sky-700 dark:text-sky-400'}`}>
             {kpis.varSum >= 0 ? '+' : ''}₱{kpis.varSum.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
           </div>
           <p className="text-xs text-muted-foreground mt-1">

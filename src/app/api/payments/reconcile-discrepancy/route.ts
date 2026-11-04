@@ -29,11 +29,12 @@ export async function POST(request: Request) {
     const supabase = serviceClient();
     const source = await loadDiscrepancySource(supabase, String(paymentId));
     if (!source) return NextResponse.json({ error: 'This payment is not on the GCash mismatch list' }, { status: 404 });
-    if (!canSeeSource(source, discrepancyAccess(user))) {
+    const access = discrepancyAccess(user);
+    if (!canSeeSource(source, access)) {
       return NextResponse.json({ error: 'You can only fix payments on your own orders' }, { status: 403 });
     }
 
-    const message = await reconcilePayment(supabase, source, action);
+    const message = await reconcilePayment(supabase, source, action, access.name);
     return NextResponse.json({ success: true, message });
   } catch (err: unknown) {
     if (err instanceof ReconcileError) {

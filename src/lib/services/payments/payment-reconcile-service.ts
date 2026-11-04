@@ -28,10 +28,18 @@ export async function reconcilePayment(
   supabase: SupabaseClient,
   source: DiscrepancySource,
   action: ReconcileAction,
+  actorName: string,
 ): Promise<string> {
   const payment = (await loadPayments(supabase, [source.paymentId])).get(source.paymentId);
   if (!payment) throw new ReconcileError('This payment no longer exists.', 404);
   if (isReconciled(payment.notes)) throw new ReconcileError('This payment was already fixed. Reload the page.', 409);
+
+  if (action === 'mark_checked') {
+    await claimPayment(supabase, payment, {
+      notes: appendNote(payment.notes, `[Reconciled: Checked by ${actorName}, amount ${peso(payment.amount)} kept]`),
+    });
+    return `Marked as checked. The payment stays ${peso(payment.amount)}.`;
+  }
   if (Math.abs(payment.amount - source.recordedAmount) > 0.01) {
     throw new ReconcileError(
       `This payment was changed after the list was made (${peso(source.recordedAmount)} → ${peso(payment.amount)}). ` +
@@ -88,7 +96,7 @@ async function splitTransfer(
 async function changeAmount(
   supabase: SupabaseClient,
   payment: LivePayment,
-  action: Exclude<ReconcileAction, 'split_payment'>,
+  action: 'overpayment_credit' | 'tip' | 'typo_correction',
   newAmount: number,
 ): Promise<string> {
   if (!payment.order_id) throw new ReconcileError('This payment is not linked to an order.');
