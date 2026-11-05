@@ -25,8 +25,10 @@ interface Props {
 /** What we paid the bus company for these orders. */
 export function BusFeeForm({ orders, trips, onSaved }: Props) {
   const { toast } = useToast();
-  const [company, setCompany] = useState('');
-  const [destination, setDestination] = useState('');
+  // From what sales marked (Waiting for bus), when there is one.
+  const plan = orders.find((o) => o.busPlan)?.busPlan;
+  const [company, setCompany] = useState(plan?.busCompany || '');
+  const [destination, setDestination] = useState(plan?.destination || '');
   // Filled from the orders (the page remounts this form when the ticked orders change).
   const [weight, setWeight] = useState(() => {
     const kg = orders.every((o) => o.weightKg) ? round2(orders.reduce((s, o) => s + (o.weightKg || 0), 0)) : null;

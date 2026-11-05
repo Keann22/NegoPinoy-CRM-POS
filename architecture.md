@@ -629,9 +629,18 @@ typed into `tracking_number`.
   boxes, receipt photo, money check `advance_sf / credit_used / sf_owed / sf_extra /
   balance_after`, pop-up state `settled_at / ask_again_at`, `expense_id`) and
   `bus_shipment_orders` (order + `fee_share`). Photos: public bucket `bus-receipts`.
-- **Page** `/dashboard/bus-shipping` (`?order=` from the "Ship by bus" buttons on
-  Packed Orders and For Shipping; `?tab=rates`). API `/api/shipping/bus` (+ `/photo`),
-  any staff role.
+- **Page** `/dashboard/bus-shipping`: tabs Waiting (default) / Record fee / Bus rates
+  (`?order=` from the "Ship by bus" buttons on Packed Orders and For Shipping opens
+  Record fee; `?tab=rates`). API `/api/shipping/bus` (+ `/photo`), any staff role.
+- **Marked for bus** (`bus_ship_requests`, one row per order: company, station, note,
+  who/when; `scripts/migrations/2026-11-05_bus_ship_requests.sql`). Service
+  `bus-request-service.ts`: `markForBus` (one customer, open statuses, not already on
+  a trip; sets `not_for_shipping_reason` = "BUS SHIPPING: company — station" only if
+  empty or ours), `unmarkForBus` (clears only our reason), `listBusQueue` (groups by
+  customer + company + station; drops marks on closed orders or orders already on a
+  trip), `listBusSuggestions` (open orders whose notes / tracking / reason mention
+  bus). Saving a trip deletes the marks. `BusCandidateOrder.busPlan` carries the mark,
+  and the fee form takes company + station from it.
 - **Rules** `src/lib/services/shipping/bus-fee-rules.ts` (pure, used by screen and
   server): `defaultShares` (advance SF first, rest by item value), `busSfResult`
   (advance = `amount_paid − total_amount` above 0, summed over the trip), and

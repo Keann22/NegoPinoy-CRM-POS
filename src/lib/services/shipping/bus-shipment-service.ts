@@ -186,6 +186,8 @@ export async function saveBusShipment(
     });
     await resolveOpenOrderIssues(supabase, s.orderId, actorName);
   }
+  // They've left: off the "Waiting for bus" list.
+  await supabase.from('bus_ship_requests').delete().in('order_id', shares.map((s) => s.orderId));
   if (result.creditShort > 0.009) {
     await notifyOwners(
       supabase,

@@ -389,9 +389,25 @@ that order. Each order gets its own payment, linked as one transfer.
   put any amount above the order total into the customer's store credit (found
   2026-11-05: 188 overpaid orders, 53 of those customers still have credit).
 
+**Mark for bus first (owner, 2026-11-05):** it's hard to look up order numbers
+at the terminal; staff want to see a list of what goes by bus. So when a customer
+wants bus shipping, **sales marks the orders** (Bus Shipping → Waiting → "Mark
+orders for bus"): tick the customer's orders (they don't need to be packed yet),
+pick the **bus company and station**, add a note if needed. The **Waiting for
+bus** list then shows one card per customer + bus + station, which orders are
+ready (picked or later) and which aren't yet. Marking also sets the order's
+not-for-shipping reason to "BUS SHIPPING: …" (unless someone already typed one),
+so once packed it waits in Packed Orders → Waiting to be Shipped instead of being
+verified for SPX. "X" on an order = not by bus anymore. Open orders whose notes
+say bus but aren't marked are listed under the cards (12 on 2026-11-05) for sales
+to mark.
+
+At the terminal, staff tap **"Paid the bus? Record fee"** on the customer's card:
+the ready orders are ticked and the bus and station filled in; they enter the fee.
+
 How it works (built 2026-11-05): left menu → **Bus Shipping** (or **Ship by
 bus** on Packed Orders / For Shipping). Staff find the customer by order # or
-name, tick the orders that went on the bus, and enter the bus company,
+name (or from the Waiting list), tick the orders that went on the bus, and enter the bus company,
 destination, weight, item value, boxes and the fee (optional photo of the bus
 receipt). One save:
 

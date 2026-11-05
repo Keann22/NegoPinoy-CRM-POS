@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { shrinkPhoto } from '@/lib/image-shrink';
 import type {
-  BusCandidateOrder, BusSfAnswer, BusSfPrompt, BusTrip, SaveBusShipmentInput, SaveBusShipmentResult,
+  BusCandidateOrder, BusQueueGroup, BusSfAnswer, BusSfPrompt, BusSuggestion, BusTrip, MarkForBusInput,
+  SaveBusShipmentInput, SaveBusShipmentResult,
 } from '@/types/bus-shipping.types';
 
 /** Bus shipping API calls (fees, rates, the agent's SF pop-up). */
@@ -66,4 +67,25 @@ export function useBusTrips() {
   );
   useEffect(() => { void reload(); }, [reload]);
   return { trips, loading, error, reload };
+}
+
+export const markForBus = (input: MarkForBusInput) => postJson<{ marked: number }>({ action: 'mark', ...input });
+
+export const unmarkForBus = (orderId: string) => postJson<{ ok: true }>({ action: 'unmark', orderId });
+
+/** "Waiting for bus" groups, and open orders whose notes say bus but aren't marked. */
+export function useBusQueue() {
+  const [groups, setGroups] = useState<BusQueueGroup[]>([]);
+  const [suggestions, setSuggestions] = useState<BusSuggestion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const reload = useCallback(
+    () => getJson<{ groups: BusQueueGroup[]; suggestions: BusSuggestion[] }>(`${API}?queue=1`)
+      .then((json) => { setGroups(json.groups || []); setSuggestions(json.suggestions || []); setError(null); })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false)),
+    [],
+  );
+  useEffect(() => { void reload(); }, [reload]);
+  return { groups, suggestions, loading, error, reload };
 }

@@ -6,7 +6,8 @@ import { isManagementUser } from '@/lib/services/purchase-summary-service';
 import { busOrdersForOrder, searchBusOrders } from '@/lib/services/shipping/bus-order-search';
 import { BusShipmentError, saveBusShipment } from '@/lib/services/shipping/bus-shipment-service';
 import { answerBusSfPrompt, listBusSfPrompts, listBusTrips } from '@/lib/services/shipping/bus-shipment-queries';
-import type { BusSfAnswer, SaveBusShipmentInput } from '@/types/bus-shipping.types';
+import { listBusQueue, listBusSuggestions, markForBus, unmarkForBus } from '@/lib/services/shipping/bus-request-service';
+import type { BusSfAnswer, MarkForBusInput, SaveBusShipmentInput } from '@/types/bus-shipping.types';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -35,6 +36,7 @@ function fail(err: unknown) {
 // GET ?orderId=  -> that order's customer and their orders
 // GET ?trips=1   -> every recorded trip (Bus Rates)
 // GET ?prompts=1 -> trips where this agent must collect SF / decide about extra (pop-up)
+// GET ?queue=1   -> "Waiting for bus" groups + open orders whose notes mention bus
 export async function GET(req: Request) {
   try {
     const caller = await getCaller();
@@ -42,6 +44,10 @@ export async function GET(req: Request) {
     const params = new URL(req.url).searchParams;
     if (params.get('prompts')) return NextResponse.json({ prompts: await listBusSfPrompts(supabase, caller) });
     if (params.get('trips')) return NextResponse.json({ trips: await listBusTrips(supabase) });
+    if (params.get('queue')) {
+      const [groups, suggestions] = await Promise.all([listBusQueue(supabase), listBusSuggestions(supabase)]);
+      return NextResponse.json({ groups, suggestions });
+    }
     const orderId = params.get('orderId');
     if (orderId) return NextResponse.json({ orders: await busOrdersForOrder(supabase, orderId) });
     return NextResponse.json({ orders: await searchBusOrders(supabase, params.get('search') || '') });
@@ -52,6 +58,8 @@ export async function GET(req: Request) {
 
 // POST SaveBusShipmentInput                -> record a bus trip
 // POST { action: 'answer', id, answer }    -> the agent's answer on the pop-up
+// POST { action: 'mark', orderIds, busCompany, destination, note } -> ship these by bus
+// POST { action: 'unmark', orderId }        -> not by bus after all
 export async function POST(req: Request) {
   try {
     const caller = await getCaller();
@@ -62,6 +70,14 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Bad answer' }, { status: 400 });
       }
       await answerBusSfPrompt(supabase, body.id, body.answer, caller.name);
+      return NextResponse.json({ ok: true });
+    }
+    if (body?.action === 'mark') {
+      return NextResponse.json({ marked: await markForBus(supabase, body as MarkForBusInput, caller.name) });
+    }
+    if (body?.action === 'unmark') {
+      if (typeof body.orderId !== 'string') return NextResponse.json({ error: 'Pick the order' }, { status: 400 });
+      await unmarkForBus(supabase, body.orderId, caller.name);
       return NextResponse.json({ ok: true });
     }
     return NextResponse.json(await saveBusShipment(supabase, body as SaveBusShipmentInput, caller.name));

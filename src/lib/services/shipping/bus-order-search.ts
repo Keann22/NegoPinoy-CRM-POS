@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { BUS_SHIPPABLE_STATUSES, type BusCandidateOrder } from '@/types/bus-shipping.types';
+import { BUS_SHIPPABLE_STATUSES, type BusCandidateOrder, type BusPlan } from '@/types/bus-shipping.types';
 import { round2 } from './bus-fee-rules';
 
 /**
@@ -46,7 +46,7 @@ function boxesInfo(config: unknown, packageWeight: unknown): { weightKg: number 
   return { weightKg: num(packageWeight) || null, boxCount: null };
 }
 
-export function toCandidate(o: BusOrderRow, busShipmentId: string | null): BusCandidateOrder {
+export function toCandidate(o: BusOrderRow, busShipmentId: string | null, busPlan: BusPlan | null = null): BusCandidateOrder {
   const total = num(o.total_amount);
   const paid = num(o.amount_paid);
   const canShip = !busShipmentId && BUS_SHIPPABLE_STATUSES.includes(o.status);
@@ -67,6 +67,7 @@ export function toCandidate(o: BusOrderRow, busShipmentId: string | null): BusCa
     advance: round2(Math.max(0, paid - total)),
     ...boxesInfo(o.boxes_config, o.package_weight),
     busShipmentId,
+    busPlan,
     canShip,
     blockedReason: busShipmentId
       ? 'Bus fee already recorded'
@@ -81,6 +82,34 @@ async function tripsOf(supabase: SupabaseClient, orderIds: string[]): Promise<Ma
   return new Map(((data || []) as { order_id: string; shipment_id: string }[]).map((r) => [r.order_id, r.shipment_id]));
 }
 
+interface PlanRow {
+  order_id: string;
+  bus_company: string;
+  destination: string;
+  note: string | null;
+  requested_by_name: string | null;
+  requested_at: string;
+}
+
+export const toBusPlan = (r: PlanRow): BusPlan => ({
+  busCompany: r.bus_company, destination: r.destination, note: r.note,
+  requestedBy: r.requested_by_name, requestedAt: r.requested_at,
+});
+
+async function plansOf(supabase: SupabaseClient, orderIds: string[]): Promise<Map<string, BusPlan>> {
+  if (orderIds.length === 0) return new Map();
+  const { data, error } = await supabase.from('bus_ship_requests').select('*').in('order_id', orderIds);
+  if (error) throw error;
+  return new Map(((data || []) as PlanRow[]).map((r) => [r.order_id, toBusPlan(r)]));
+}
+
+/** Orders with their bus trip (if recorded) and bus plan (if marked). */
+export async function toCandidates(supabase: SupabaseClient, rows: BusOrderRow[]): Promise<BusCandidateOrder[]> {
+  const ids = rows.map((r) => r.id);
+  const [trips, plans] = await Promise.all([tripsOf(supabase, ids), plansOf(supabase, ids)]);
+  return rows.map((r) => toCandidate(r, trips.get(r.id) ?? null, plans.get(r.id) ?? null));
+}
+
 /** Every order of these customers that can ship or is still being worked on (newest first). */
 async function customersOrders(supabase: SupabaseClient, customerIds: string[]): Promise<BusCandidateOrder[]> {
   const { data, error } = await supabase
@@ -92,12 +121,10 @@ async function customersOrders(supabase: SupabaseClient, customerIds: string[]):
     .limit(60);
   if (error) throw error;
   const rows = (data || []) as unknown as BusOrderRow[];
-  const trips = await tripsOf(supabase, rows.map((r) => r.id));
   // "Shipped" orders only matter if their bus fee wasn't recorded yet, and only recent ones.
   const monthAgo = Date.now() - 30 * 86_400_000;
-  return rows
-    .filter((r) => r.status !== 'Shipped' || (!trips.has(r.id) && new Date(r.created_at || 0).getTime() > monthAgo))
-    .map((r) => toCandidate(r, trips.get(r.id) ?? null));
+  return (await toCandidates(supabase, rows))
+    .filter((c) => c.status !== 'Shipped' || (!c.busShipmentId && new Date(c.orderDate || 0).getTime() > monthAgo));
 }
 
 /** Search by order # (first 4-8 characters) or customer name. */
@@ -129,6 +156,5 @@ export async function busOrdersForOrder(supabase: SupabaseClient, orderId: strin
   if (data.customer_id) return customersOrders(supabase, [data.customer_id]);
   const { data: one } = await supabase.from('orders').select(BUS_ORDER_COLUMNS).eq('id', orderId).single();
   if (!one) return [];
-  const trips = await tripsOf(supabase, [orderId]);
-  return [toCandidate(one as unknown as BusOrderRow, trips.get(orderId) ?? null)];
+  return toCandidates(supabase, [one as unknown as BusOrderRow]);
 }

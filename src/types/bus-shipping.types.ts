@@ -36,9 +36,49 @@ export interface BusCandidateOrder {
   boxCount: number | null;
   /** Already on a recorded bus trip. */
   busShipmentId: string | null;
+  /** Sales marked it "ship by bus" (company + station), before it goes. */
+  busPlan: BusPlan | null;
   canShip: boolean;
   /** Why it can't go (status), when canShip is false. */
   blockedReason: string | null;
+}
+
+export interface BusPlan {
+  busCompany: string;
+  destination: string;
+  note: string | null;
+  requestedBy: string | null;
+  requestedAt: string;
+}
+
+/** Statuses that can't be marked for bus (already gone or closed). */
+export const BUS_PLAN_CLOSED_STATUSES = ['Shipped', 'Completed', 'Payment Received (COD)', 'Cancelled', 'Returned'];
+
+export interface MarkForBusInput {
+  orderIds: string[];
+  busCompany: string;
+  destination: string;
+  note?: string | null;
+}
+
+/** "Waiting for bus": one customer's orders marked for the same bus and station. */
+export interface BusQueueGroup {
+  key: string;
+  customerId: string | null;
+  customerName: string;
+  busCompany: string;
+  destination: string;
+  note: string | null;
+  requestedBy: string | null;
+  requestedAt: string;
+  orders: BusCandidateOrder[];
+}
+
+/** An open order whose notes mention bus shipping but isn't marked yet. */
+export interface BusSuggestion {
+  order: BusCandidateOrder;
+  /** The part of the notes that mentions the bus. */
+  hint: string;
 }
 
 export interface BusFeeShare {

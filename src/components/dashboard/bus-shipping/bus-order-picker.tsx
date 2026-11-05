@@ -5,21 +5,33 @@ import { Loader2, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { busOrdersForOrder, searchBusOrders } from '@/hooks/useBusShipping';
-import type { BusCandidateOrder } from '@/types/bus-shipping.types';
+import { BUS_PLAN_CLOSED_STATUSES, type BusCandidateOrder } from '@/types/bus-shipping.types';
 
 const peso = (n: number) => `₱${n.toLocaleString('en-PH', { maximumFractionDigits: 2 })}`;
 
 interface Props {
   /** Opened from an order ("Ship by bus"): load that customer and tick the order. */
   initialOrderId?: string | null;
+  /** Start with these orders listed (from the Waiting for bus list). */
+  seedOrders?: BusCandidateOrder[];
   selected: BusCandidateOrder[];
   onChange: (orders: BusCandidateOrder[]) => void;
+  /** 'ship': only orders that can go now. 'mark': any open order (marking ahead). */
+  mode?: 'ship' | 'mark';
+}
+
+/** Whether the order can be ticked in this mode, and why not. */
+function tickable(o: BusCandidateOrder, mode: 'ship' | 'mark'): { ok: boolean; why: string | null } {
+  if (mode === 'ship') return { ok: o.canShip, why: o.blockedReason };
+  if (o.busShipmentId) return { ok: false, why: 'Already went by bus' };
+  if (BUS_PLAN_CLOSED_STATUSES.includes(o.status)) return { ok: false, why: `Already ${o.status}` };
+  return { ok: true, why: null };
 }
 
 /** Find the customer by order # or name, then tick the orders that went on this bus. */
-export function BusOrderPicker({ initialOrderId, selected, onChange }: Props) {
+export function BusOrderPicker({ initialOrderId, seedOrders, selected, onChange, mode = 'ship' }: Props) {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<BusCandidateOrder[]>([]);
+  const [results, setResults] = useState<BusCandidateOrder[]>(seedOrders || []);
   const [loading, setLoading] = useState(!!initialOrderId);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,7 +40,7 @@ export function BusOrderPicker({ initialOrderId, selected, onChange }: Props) {
     busOrdersForOrder(initialOrderId)
       .then((orders) => {
         setResults(orders);
-        const first = orders.find((o) => o.id === initialOrderId && o.canShip);
+        const first = orders.find((o) => o.id === initialOrderId && tickable(o, mode).ok);
         if (first) onChange([first]);
       })
       .catch((e) => setError(e.message))
@@ -89,13 +101,15 @@ export function BusOrderPicker({ initialOrderId, selected, onChange }: Props) {
         <div key={orders[0].customerId || orders[0].id} className="rounded-md border">
           <p className="border-b bg-muted/40 px-3 py-2 text-sm font-semibold">{orders[0].customerName}</p>
           <ul className="divide-y">
-            {orders.map((o) => (
+            {orders.map((o) => {
+              const t = tickable(o, mode);
+              return (
               <li key={o.id}>
-                <label className={`flex gap-3 px-3 py-3 ${o.canShip ? 'cursor-pointer' : 'opacity-60'}`}>
+                <label className={`flex gap-3 px-3 py-3 ${t.ok ? 'cursor-pointer' : 'opacity-60'}`}>
                   <Checkbox
                     className="mt-0.5 h-5 w-5"
                     checked={selectedIds.has(o.id)}
-                    disabled={!o.canShip}
+                    disabled={!t.ok}
                     onCheckedChange={() => toggle(o)}
                   />
                   <span className="min-w-0 flex-1 space-y-0.5">
@@ -110,11 +124,17 @@ export function BusOrderPicker({ initialOrderId, selected, onChange }: Props) {
                         Paid {peso(o.advance)} above the items (SF sent in advance?)
                       </span>
                     )}
-                    {o.blockedReason && <span className="block text-xs text-amber-700 dark:text-amber-400">{o.blockedReason}</span>}
+                    {o.busPlan && (
+                      <span className="block text-xs font-medium text-sky-700 dark:text-sky-400">
+                        Marked for bus: {o.busPlan.busCompany} — {o.busPlan.destination}
+                      </span>
+                    )}
+                    {t.why && <span className="block text-xs text-amber-700 dark:text-amber-400">{t.why}</span>}
                   </span>
                 </label>
               </li>
-            ))}
+              );
+            })}
           </ul>
         </div>
       ))}
