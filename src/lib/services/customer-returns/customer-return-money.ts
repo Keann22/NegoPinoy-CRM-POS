@@ -1,8 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
+  CR_CREDIT_METHOD,
   CR_REFUND_METHODS,
   CR_WAIVE_METHOD,
   REFUND_EXPENSE_CATEGORY,
+  REFUND_STORE_CREDIT_EXPENSE_CATEGORY,
   REFUND_VOIDED_SALE_EXPENSE_CATEGORY,
 } from '@/types/customer-returns.types';
 import { CustomerReturnError, logEvent, notifyNames, outcomeCanRunNow, setOrderStatus, shortOrder } from './customer-return-service';
@@ -15,7 +17,8 @@ import { CustomerReturnError, logEvent, notifyNames, outcomeCanRunNow, setOrderS
  *   refund sent       -> an expenses row ('Customer Refund'; a full refund uses
  *                        its own category that P&L skips, because the sale of a
  *                        Returned order is already out of P&L)
- *   credit given      -> added to customers.store_credit (New Order offers it)
+ *   credit given      -> added to customers.store_credit (New Order offers it) +
+ *                        a 'Customer Refund (store credit)' expense: P&L only, Cash Flow skips it
  *
  * Each one first "claims" the case with an update guarded on updated_at, so a
  * double tap can't make two orders or two expenses.
@@ -162,6 +165,10 @@ export async function recordRefund(
   const amount = Math.round((Number(input.amount) || 0) * 100) / 100;
   if (!(amount > 0)) throw new CustomerReturnError('Enter the amount refunded.');
   if (input.method === CR_WAIVE_METHOD) return waiveBalance(supabase, r, amount, input.note, actorName);
+  if (input.method === CR_CREDIT_METHOD) {
+    if (r.outcome !== 'partial_refund') throw new CustomerReturnError('For a full refund as store credit, decide "Store credit" instead.');
+    return addReturnCredit(supabase, r, amount, input.note, actorName, { refund_method: CR_CREDIT_METHOD });
+  }
   if (!(CR_REFUND_METHODS as readonly string[]).includes(input.method)) throw new CustomerReturnError('Pick how it was paid.');
 
   const now = new Date().toISOString();
@@ -240,22 +247,50 @@ export async function giveStoreCredit(
   if (!outcomeCanRunNow(r)) throw new CustomerReturnError('Wait for the item to arrive and be checked first.');
   const amount = Math.round((Number(input.amount) || 0) * 100) / 100;
   if (!(amount > 0)) throw new CustomerReturnError('Enter the credit amount.');
+  await addReturnCredit(supabase, r, amount, input.note, actorName, {});
+}
 
+/**
+ * Store credit from a return case (a "Store credit" decision, or a partial refund
+ * given as credit): added to customers.store_credit, used on the next order.
+ * Also one 'Customer Refund (store credit)' expense, so P&L shows what it cost
+ * (Cash Flow skips that category: no cash went out).
+ */
+async function addReturnCredit(
+  supabase: SupabaseClient, r: any, amount: number, note: string | undefined, actorName: string,
+  extra: Record<string, unknown>
+) {
   const { data: order } = await supabase.from('orders').select('customer_id').eq('id', r.order_id).single();
   if (!order?.customer_id) throw new CustomerReturnError('This order has no customer to give credit to.');
 
   const now = new Date().toISOString();
   await claim(supabase, r, {
-    outcome_done_at: now, outcome_done_by_name: actorName, outcome_done_note: input.note?.trim() || null,
-    credit_given: amount, amount,
+    outcome_done_at: now, outcome_done_by_name: actorName, outcome_done_note: note?.trim() || null,
+    credit_given: amount, amount, ...extra,
   });
+  const undo = () => supabase.from('customer_returns').update({
+    outcome_done_at: null, outcome_done_by_name: null, credit_given: 0, refund_method: null, updated_at: new Date().toISOString(),
+  }).eq('id', r.id);
+
   const { data: cust } = await supabase.from('customers').select('store_credit').eq('id', order.customer_id).single();
+  const before = Number(cust?.store_credit) || 0;
   const { error } = await supabase.from('customers')
-    .update({ store_credit: (Number(cust?.store_credit) || 0) + amount })
+    .update({ store_credit: Math.round((before + amount) * 100) / 100 })
     .eq('id', order.customer_id);
-  if (error) {
-    await supabase.from('customer_returns').update({ outcome_done_at: null, outcome_done_by_name: null, credit_given: 0, updated_at: new Date().toISOString() }).eq('id', r.id);
-    throw error;
+  if (error) { await undo(); throw error; }
+
+  const customer = r.orders?.customers?.full_name || 'Customer';
+  const { data: expense, error: exErr } = await supabase.from('expenses').insert({
+    expense_date: now,
+    category: REFUND_STORE_CREDIT_EXPENSE_CATEGORY,
+    amount,
+    description: `Return #${r.case_no} · order #${shortOrder(r.order_id)} · ${customer} · store credit (no cash out)`,
+  }).select('id').single();
+  if (exErr) {
+    await supabase.from('customers').update({ store_credit: before }).eq('id', order.customer_id);
+    await undo();
+    throw exErr;
   }
-  await logEvent(supabase, r.id, 'credit_given', actorName, [`₱${amount.toLocaleString('en-PH')} store credit`, input.note?.trim()].filter(Boolean).join(' · '));
+  await supabase.from('customer_returns').update({ refund_expense_id: expense.id }).eq('id', r.id);
+  await logEvent(supabase, r.id, 'credit_given', actorName, [`₱${amount.toLocaleString('en-PH')} store credit`, note?.trim()].filter(Boolean).join(' · '));
 }

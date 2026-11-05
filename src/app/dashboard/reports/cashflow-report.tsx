@@ -10,6 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import Link from 'next/link';
 import { fetchAllPages } from '@/lib/services/report-orders-service';
+import { REFUND_STORE_CREDIT_EXPENSE_CATEGORY } from '@/types/customer-returns.types';
 
 type Payment = { amount: number; paymentDate: string; method?: string; orderId?: string; };
 type Expense = { amount: number; expenseDate: string; category: string; description?: string; };
@@ -52,7 +53,8 @@ export function CashFlowReport({ date: externalDate, setDate: externalSetDate }:
                     orderId: p.order_id,
                 })));
 
-                setAllExpenses(expensesData.map((e: any) => ({
+                // Store credit given on a return is a cost, not cash out (P&L only).
+                setAllExpenses(expensesData.filter((e: any) => e.category !== REFUND_STORE_CREDIT_EXPENSE_CATEGORY).map((e: any) => ({
                     amount: Number(e.amount) || 0,
                     expenseDate: e.created_at,
                     category: e.category || 'Uncategorized',

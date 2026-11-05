@@ -11,6 +11,7 @@ import {
   CR_OUTCOME_TODO,
   CR_SOURCE_LABELS,
   CR_STAGE_LABELS,
+  CR_CREDIT_METHOD,
   CR_WAIVE_METHOD,
   type CustomerReturn,
   type CustomerReturnAction,
@@ -128,7 +129,7 @@ export function CustomerReturnCard({ ret, isManagement, canDecideRts = false, is
               </Link>
             </>
           )}
-          {ret.refundMethod && (ret.refundMethod === CR_WAIVE_METHOD ? `${peso(ret.amount)} taken off what the customer owes` : `Refunded ${peso(ret.amount)} by ${ret.refundMethod}${ret.refundReference ? ` (ref ${ret.refundReference})` : ''}`)}
+          {ret.refundMethod && ret.refundMethod !== CR_CREDIT_METHOD && (ret.refundMethod === CR_WAIVE_METHOD ? `${peso(ret.amount)} taken off what the customer owes` : `Refunded ${peso(ret.amount)} by ${ret.refundMethod}${ret.refundReference ? ` (ref ${ret.refundReference})` : ''}`)}
           {ret.creditGiven > 0 && `${peso(ret.creditGiven)} store credit given`}
         </p>
       )}

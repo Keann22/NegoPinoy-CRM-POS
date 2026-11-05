@@ -65,9 +65,17 @@ export const CR_REFUND_METHODS = ['GCash', 'Bank Transfer', 'Cash', 'Maya'] as c
  */
 export const CR_WAIVE_METHOD = 'Waived balance';
 
+/** Partial refund given as store credit instead of money (owner, 2026-11-05). */
+export const CR_CREDIT_METHOD = 'Store credit';
+
 /** Expense categories for refunds. A full refund's sale is already removed from P&L (order is Returned), so P&L skips that one. */
 export const REFUND_EXPENSE_CATEGORY = 'Customer Refund';
 export const REFUND_VOIDED_SALE_EXPENSE_CATEGORY = 'Customer Refund (returned order)';
+/**
+ * Store credit given on a return: a cost in P&L (the next order is paid with it,
+ * so no cash comes in for that part), but no cash goes out, so Cash Flow skips it.
+ */
+export const REFUND_STORE_CREDIT_EXPENSE_CATEGORY = 'Customer Refund (store credit)';
 
 export const CR_DAMAGED_ACTION_LABELS: Record<DamagedAction, string> = {
   throw_away: 'Thrown away',

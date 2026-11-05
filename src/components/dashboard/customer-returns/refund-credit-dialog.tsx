@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { CR_REFUND_METHODS, CR_WAIVE_METHOD, type CustomerReturn, type CustomerReturnAction } from '@/types/customer-returns.types';
+import { CR_CREDIT_METHOD, CR_REFUND_METHODS, CR_WAIVE_METHOD, type CustomerReturn, type CustomerReturnAction } from '@/types/customer-returns.types';
 
 interface Props {
   ret: CustomerReturn | null;
@@ -18,12 +18,15 @@ interface Props {
 /**
  * Owners: record the refund (logged in Expenses as Customer Refund) or give
  * store credit (added to the customer's balance; New Order offers it).
- * A partial refund can also be waived: taken off what the customer still owes.
+ * A partial refund can be sent as money, given as store credit, or taken off
+ * what the customer still owes (waived).
  */
+type How = 'money' | 'credit' | 'waive';
+
 export function RefundCreditDialog({ ret, onClose, onSubmit }: Props) {
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState<string>('GCash');
-  const [waive, setWaive] = useState(false);
+  const [how, setHow] = useState<How>('money');
   const [reference, setReference] = useState('');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
@@ -33,16 +36,18 @@ export function RefundCreditDialog({ ret, onClose, onSubmit }: Props) {
     if (!ret) return;
     setAmount(ret.amount ? String(ret.amount) : '');
     setMethod('GCash');
-    setWaive(false);
+    setHow('money');
     setReference('');
     setNote('');
     setError(null);
   }, [ret]);
 
   if (!ret) return null;
-  const isCredit = ret.outcome === 'store_credit';
+  const waive = how === 'waive';
+  const isCredit = ret.outcome === 'store_credit' || how === 'credit';
   const owed = ret.orderBalance ?? 0;
-  const canWaive = ret.outcome === 'partial_refund' && owed > 0;
+  const isPartial = ret.outcome === 'partial_refund';
+  const canWaive = isPartial && owed > 0;
   const peso = (n: number) => `₱${n.toLocaleString('en-PH')}`;
 
   const submit = async () => {
@@ -52,9 +57,11 @@ export function RefundCreditDialog({ ret, onClose, onSubmit }: Props) {
     setSaving(true);
     setError(null);
     try {
-      await onSubmit(isCredit
+      await onSubmit(ret.outcome === 'store_credit'
         ? { action: 'credit_given', id: ret.id, amount: value, note }
-        : waive
+        : how === 'credit'
+          ? { action: 'refund_sent', id: ret.id, amount: value, method: CR_CREDIT_METHOD, note }
+          : waive
           ? { action: 'refund_sent', id: ret.id, amount: value, method: CR_WAIVE_METHOD, note }
           : { action: 'refund_sent', id: ret.id, amount: value, method, reference, note });
       onClose();
@@ -72,7 +79,7 @@ export function RefundCreditDialog({ ret, onClose, onSubmit }: Props) {
           <DialogTitle>Return #{ret.caseNo}: {isCredit ? 'give store credit' : waive ? 'waive what they owe' : 'refund sent'}</DialogTitle>
           <DialogDescription>
             {isCredit
-              ? `Added to ${ret.customerName}'s store credit. New Order offers it on their next order.`
+              ? `Added to ${ret.customerName}'s store credit; New Order offers it on their next order. P&L counts it as a refund; Cash Flow doesn't (no cash goes out).`
               : waive
                 ? `No money goes out. The amount comes off the order as a discount, so the sale and the balance go down (now ${peso(owed)} owed).`
                 : ret.outcome === 'full_refund'
@@ -82,19 +89,25 @@ export function RefundCreditDialog({ ret, onClose, onSubmit }: Props) {
         </DialogHeader>
 
         <div className="space-y-3">
-          {canWaive && (
+          {isPartial && (
             <div className="space-y-1.5">
               <Label>How?</Label>
-              <div className="grid grid-cols-2 gap-1.5">
-                <Button type="button" variant={!waive ? 'default' : 'outline'} className="h-auto flex-col gap-0.5 whitespace-normal py-2" onClick={() => setWaive(false)}>
-                  <span className="font-semibold">Sent money back</span>
+              <div className={`grid gap-1.5 ${canWaive ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                <Button type="button" variant={how === 'money' ? 'default' : 'outline'} className="h-auto flex-col gap-0.5 whitespace-normal px-2 py-2" onClick={() => setHow('money')}>
+                  <span className="font-semibold">Sent money</span>
                   <span className="text-[11px] font-normal opacity-80">GCash, bank, cash</span>
                 </Button>
-                <Button type="button" variant={waive ? 'default' : 'outline'} className="h-auto flex-col gap-0.5 whitespace-normal py-2"
-                  onClick={() => { setWaive(true); setAmount(String(owed)); }}>
-                  <span className="font-semibold">Take it off what they owe</span>
-                  <span className="text-[11px] font-normal opacity-80">{peso(owed)} still owed</span>
+                <Button type="button" variant={how === 'credit' ? 'default' : 'outline'} className="h-auto flex-col gap-0.5 whitespace-normal px-2 py-2" onClick={() => setHow('credit')}>
+                  <span className="font-semibold">Store credit</span>
+                  <span className="text-[11px] font-normal opacity-80">Used on their next order</span>
                 </Button>
+                {canWaive && (
+                  <Button type="button" variant={waive ? 'default' : 'outline'} className="h-auto flex-col gap-0.5 whitespace-normal px-2 py-2"
+                    onClick={() => { setHow('waive'); setAmount(String(owed)); }}>
+                    <span className="font-semibold">Off what they owe</span>
+                    <span className="text-[11px] font-normal opacity-80">{peso(owed)} still owed</span>
+                  </Button>
+                )}
               </div>
             </div>
           )}

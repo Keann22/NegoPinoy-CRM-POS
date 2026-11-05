@@ -212,6 +212,12 @@ Money and replacements (owner, 2026-10-31):
   Expenses: the amount is added to the order's **discount**, so the sale becomes
   what she paid and the balance drops. Only on return cases.
 - **Store credit** goes on the customer's balance and is used on their next order.
+- **Partial refund, customer keeps the damaged item** (owner, 2026-11-05): paid
+  three ways, picked under "How?" when recording it: **Sent money** (GCash, bank,
+  cash: an Expenses row), **Store credit** (used on the next order), or **Off what
+  they owe** (waived, above). Store credit from a return is recorded as
+  "Customer Refund (store credit)": P&L counts it as a cost, Cash Flow leaves it
+  out (no cash went out).
 
 Reserved for a replacement (owner, 2026-11-03):
 
