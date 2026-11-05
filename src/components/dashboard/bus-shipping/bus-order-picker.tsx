@@ -104,7 +104,7 @@ export function BusOrderPicker({ initialOrderId, selected, onChange }: Props) {
                       <span className="text-xs text-muted-foreground">{o.status}</span>
                       <span className="ml-auto text-xs">{peso(o.itemValue)}</span>
                     </span>
-                    <span className="block break-words text-xs text-muted-foreground">{o.items}</span>
+                    <span className="line-clamp-2 break-words text-xs text-muted-foreground" title={o.items}>{o.items}</span>
                     {o.advance > 0 && (
                       <span className="block text-xs font-medium text-emerald-700 dark:text-emerald-400">
                         Paid {peso(o.advance)} above the items (SF sent in advance?)
