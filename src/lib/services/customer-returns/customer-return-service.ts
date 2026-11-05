@@ -123,7 +123,9 @@ export async function setOrderStatus(supabase: SupabaseClient, orderId: string, 
 }
 
 /** Bell notification for everyone whose role is owner/admin. */
-export async function notifyOwners(supabase: SupabaseClient, title: string, message: string, exceptName?: string) {
+export async function notifyOwners(
+  supabase: SupabaseClient, title: string, message: string, exceptName?: string, link = '/dashboard/inventory/returns'
+) {
   const { data, error } = await supabase.rpc('get_all_users');
   if (error) return;
   const skip = exceptName?.trim().toLowerCase();
@@ -137,17 +139,19 @@ export async function notifyOwners(supabase: SupabaseClient, title: string, mess
       .map((u: any) => `${u.raw_user_meta_data?.first_name || ''} ${u.raw_user_meta_data?.last_name || ''}`.trim())
       .filter((n: string) => n && n.toLowerCase() !== skip)
   ));
-  await notifyNames(supabase, names as string[], title, message);
+  await notifyNames(supabase, names as string[], title, message, link);
 }
 
-export async function notifyNames(supabase: SupabaseClient, names: string[], title: string, message: string) {
+export async function notifyNames(
+  supabase: SupabaseClient, names: string[], title: string, message: string, link = '/dashboard/inventory/returns'
+) {
   const list = names.filter(Boolean);
   if (list.length === 0) return;
   await supabase.from('notifications').insert(list.map((name) => ({
     sales_person_name: name,
     title,
     message: message.length > 240 ? `${message.slice(0, 237)}...` : message,
-    link: '/dashboard/inventory/returns',
+    link,
     is_read: false,
   })));
 }

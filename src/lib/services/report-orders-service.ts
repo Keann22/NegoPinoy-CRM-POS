@@ -113,3 +113,12 @@ export function formatDateParam(date: Date): string {
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 }
+
+/**
+ * What an order counts for in sales and commission: its total without the
+ * shipping fee. Bus SF (2026-11-05) is put on the order so the customer pays it,
+ * but it only passes through to the bus company, so it isn't a sale.
+ */
+export function salesAmount(order: { total_amount?: unknown; shipping_fee?: unknown }): number {
+  return (Number(order.total_amount) || 0) - (Number(order.shipping_fee) || 0);
+}

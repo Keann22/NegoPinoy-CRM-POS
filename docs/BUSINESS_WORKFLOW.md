@@ -312,6 +312,100 @@ Why nothing happened before return cases (2026-10-30):
   (The old "Process return" button only logs a row; 40 of 44 uses were
   "exchange", which does nothing.)
 
+## One GCash payment for several orders (owner, 2026-11-04; built 2026-11-05)
+
+How it happens today:
+
+- A customer often pays **2-3 of their orders in one GCash transfer**, usually
+  lay-aways. There is no tool for it: the agent uploads the same screenshot to
+  each order and types each order's share, with notes like "kasama po dito
+  payment sa isang invoice".
+- Found 2026-11-04: 149 GCash references are on more than one payment (34 in the
+  last 30 days). Only 80 add up to the transfer. 11 have the **full amount on
+  every order** (one order looks paid when it isn't), 35 add up to more than the
+  transfer, 22 to less. 22 references show up again more than 3 days later (an
+  **old screenshot reused** for a new payment), and 18 involve a cancelled order
+  whose payment was copied to the new order but left on the old one too.
+- The app reads the reference number and amount from the screenshot (OCR); it
+  can misread the amount.
+
+Owner decisions:
+
+- **Same customer only.** One transfer can pay only that customer's own orders.
+  A reference shared with another customer's payment is flagged for the owners.
+- **Extra money goes to store credit** when the transfer is more than the chosen
+  orders still owe.
+- **Reused reference: warn and tell the owners.** If a screenshot's reference is
+  already on another payment that isn't part of the same split, the payment still
+  saves, is marked "reference already used on #order", and the owners get a bell
+  notification.
+- **The app pre-fills each order's share; the agent edits it.** Pre-fill what
+  each order needs now: a lay-away's monthly installment (never more than its
+  balance), the rest of the balance for other orders. The agent changes it to
+  what the customer said, and the shares must add up to the transfer. (Not
+  "oldest first": customers pay one month of each lay-away, e.g. a ₱1,691
+  transfer on 2026-11-02 = ₱871 + ₱460 + ₱360, 1/5 of each of 3 lay-aways.)
+
+How it works (built 2026-11-05): Log Payment → method GCash or Bank Transfer →
+tick **"This GCash also paid other orders"**, enter the whole GCash amount, tick
+the customer's other orders. "Installment" orders store a monthly amount;
+"Lay-away" orders don't, so the app suggests what the customer paid last time on
+that order. Each order gets its own payment, linked as one transfer.
+
+## Bus shipping and shipping fees (owner, 2026-11-05; built 2026-11-05)
+
+- Normal courier orders (SPX, "SF Only"): the customer pays the shipping fee to
+  the courier on delivery; it never passes through us.
+- **Bus shipping** (Victory Liner, Five Star, Partas, Florida...): often several
+  orders of one customer go together ("sabay-sabay"). **We only learn the fee
+  after bringing the parcel to the bus company and paying it ourselves**; then
+  the customer is charged that amount.
+- Sometimes customers **send the SF in advance** together with the item price in
+  one GCash ("kasama na po SF dito"). Orders have no place for it today
+  (`shipping_fee` is 0 on every order), so the payment looks like the customer
+  paid more. Found 2026-11-05: at least 20 of the 148 Payment Fix rows are this.
+  Do not use Credit on those (it would turn the SF into store credit).
+- What we pay the bus company is not recorded in Expenses.
+- Owner idea: **track each bus company's fee per destination**, entered every
+  time we ship, so over time we know where to send and which is cheapest, and
+  can quote the customer an estimate before shipping.
+- **How bus companies charge (owner, 2026-11-05):** by **weight plus the item's
+  value**, not by box size like SPX. Several boxes sent together = **one fee**
+  for the whole trip.
+- Today the company and terminal are only typed into the order notes and the
+  tracking number (e.g. "VICTORY LINER -- BINALONAN PANGASINAN"); found 37 such
+  orders on 2026-11-05. Many bus orders skip the Packer scan, so box weight is
+  often missing on the order.
+- Owner decisions (2026-11-05): **staff record the fee on their phone at the
+  terminal**, right after paying. If the customer owes more SF or sent extra, the
+  **sales agent gets a pop-up**. Bus fees are not confidential.
+- SF sent in advance already became **store credit**: Log Payment has always
+  put any amount above the order total into the customer's store credit (found
+  2026-11-05: 188 overpaid orders, 53 of those customers still have credit).
+
+How it works (built 2026-11-05): left menu → **Bus Shipping** (or **Ship by
+bus** on Packed Orders / For Shipping). Staff find the customer by order # or
+name, tick the orders that went on the bus, and enter the bus company,
+destination, weight, item value, boxes and the fee (optional photo of the bus
+receipt). One save:
+
+- splits the fee over the orders (orders where SF was sent in advance take it
+  first, the rest by item value; editable) and adds it to each order's
+  shipping fee, so the order total and balance go up;
+- marks the orders **Shipped** with "BUS: VICTORY LINER — BINALONAN, PANGASINAN"
+  as the tracking text;
+- records one **Shipping Fee** expense for the trip;
+- uses the SF sent in advance: that money is taken back from store credit
+  (owners get a bell if the credit was already spent).
+- Then the **sales agent's pop-up**: "Collect ₱X SF" (goes away once the payment
+  is logged; "Asked customer, waiting" hides it 4 hours), or "Customer sent ₱X
+  more": keep as store credit, tip, or refund (owners are told).
+- **Free shipping** tick: only the expense is recorded; the customer isn't charged.
+- **Bus rates** tab: past trips per company and destination, and a quote for a
+  weight and value (cheapest first). It's rough until a few trips are recorded.
+- Sales and commission reports leave out the shipping fee (it passes through to
+  the bus company). Profit & Loss keeps it in sales and in expenses, so it nets out.
+
 ## Being decided (not built yet)
 
 - **Customer purchase planner (owner, 2026-11-01)**: a premium feature on the

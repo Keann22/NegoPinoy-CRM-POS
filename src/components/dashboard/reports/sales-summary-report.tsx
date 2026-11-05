@@ -16,7 +16,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSupabase, useUser } from '@/lib/supabase/hooks';
 import { ReportDateFilter } from '@/components/dashboard/reports/report-date-filter';
-import { fetchOrdersInRange } from '@/lib/services/report-orders-service';
+import { fetchOrdersInRange, salesAmount } from '@/lib/services/report-orders-service';
 
 interface SalesSummaryReportProps {
   date?: DateRange | undefined;
@@ -54,7 +54,7 @@ export function SalesSummaryReport({ date: externalDate, setDate: externalSetDat
 
         // Fetch ALL orders in range without hitting the 1000-row cap
         const data = await fetchOrdersInRange(supabase, {
-          selectCols: 'id, total_amount, status, created_at, order_date',
+          selectCols: 'id, total_amount, shipping_fee, status, created_at, order_date',
           fromISO: fromDate,
           toISO: toDate,
           dateColumn: 'order_date',
@@ -69,7 +69,7 @@ export function SalesSummaryReport({ date: externalDate, setDate: externalSetDat
         let pCount = 0;
 
         (data || []).forEach((order: any) => {
-          const amt = Number(order.total_amount) || 0;
+          const amt = salesAmount(order);
           
           // Total Processed: All except Cancelled
           if (order.status !== 'Cancelled') {

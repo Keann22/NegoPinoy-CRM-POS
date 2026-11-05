@@ -617,6 +617,39 @@ A **separate Vite + React app** deployed independently.
 
 ---
 
+## Bus Shipping Fees (added 2026-11-05)
+
+Owner workflow: docs/BUSINESS_WORKFLOW.md, "Bus shipping and shipping fees". Bus
+orders never went through For Shipping: they sat at Photo / Packed with
+`not_for_shipping_reason` "BUS SHIPPING" and were set Shipped by hand, with the bus
+typed into `tracking_number`.
+
+- **Tables** (`scripts/migrations/2026-11-05_bus_shipments.sql`, RLS on, service role
+  only): `bus_shipments` (one trip: company, destination, fee, kg, declared value,
+  boxes, receipt photo, money check `advance_sf / credit_used / sf_owed / sf_extra /
+  balance_after`, pop-up state `settled_at / ask_again_at`, `expense_id`) and
+  `bus_shipment_orders` (order + `fee_share`). Photos: public bucket `bus-receipts`.
+- **Page** `/dashboard/bus-shipping` (`?order=` from the "Ship by bus" buttons on
+  Packed Orders and For Shipping; `?tab=rates`). API `/api/shipping/bus` (+ `/photo`),
+  any staff role.
+- **Rules** `src/lib/services/shipping/bus-fee-rules.ts` (pure, used by screen and
+  server): `defaultShares` (advance SF first, rest by item value), `busSfResult`
+  (advance = `amount_paid − total_amount` above 0, summed over the trip), and
+  `estimateBusFees` (3+ weighed trips → least-squares line; else nearest trip scaled
+  by kg; no weight → median).
+- **Save** `bus-shipment-service.ts`: per order `shipping_fee += share`,
+  `total_amount += share`, `balance_due` recomputed, status `Shipped`, tracking text,
+  guarded on unchanged `amount_paid` / `total_amount`; store credit −= `credit_used`
+  (guarded); one `expenses` row (category `Shipping Fee`, "Bus SF: …"). Any failure
+  rolls everything back. Then `order_logs` (snapshot has `bus_shipment_id`) and
+  `resolveOpenOrderIssues`. Free shipping: shares are stored for history, orders aren't charged.
+- **Pop-up** `bus-sf-popup.tsx` in the dashboard layout, for the trip's
+  `sales_person_name` (owners for trips with no agent). Owed clears itself when the
+  orders' summed `balance_due` drops to `balance_after − sf_owed`.
+- **Reports**: `salesAmount()` in `report-orders-service.ts` (= `total_amount −
+  shipping_fee`) for Sales, Sales Summary, Sales by Person and Commission. P&L still
+  uses `total_amount` (SF revenue and the SF expense cancel out).
+
 ## SPX Remittance Rules
 
 **Location**: `src/app/dashboard/accounting/remittances/page.tsx`

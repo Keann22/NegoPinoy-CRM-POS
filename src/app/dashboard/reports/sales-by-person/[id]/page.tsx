@@ -31,7 +31,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSupabase, useUser } from '@/lib/supabase/hooks';
 import { Badge } from '@/components/ui/badge';
-import { fetchAllPages } from '@/lib/services/report-orders-service';
+import { fetchAllPages, salesAmount } from '@/lib/services/report-orders-service';
 
 type Order = {
   id: string;
@@ -69,14 +69,14 @@ export default function SalesBreakdownPage(props: { params: Promise<{ id: string
         const data = await fetchAllPages(() =>
           supabase
             .from('orders')
-            .select('id, total_amount, order_date, created_at, status, sales_person_id, customer_id')
+            .select('id, total_amount, shipping_fee, order_date, created_at, status, sales_person_id, customer_id')
             .eq('sales_person_id', params.id)
             .order('id')
         );
 
         setAllOrders(data.map((o: any) => ({
           id: o.id,
-          totalAmount: Number(o.total_amount) || 0,
+          totalAmount: salesAmount(o),
           orderDate: o.order_date || o.created_at,
           orderStatus: o.status,
           salesPersonId: o.sales_person_id,

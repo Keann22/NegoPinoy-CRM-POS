@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUser, useSupabase } from '@/lib/supabase/hooks';
 import { ReportDateFilter } from '@/components/dashboard/reports/report-date-filter';
-import { fetchOrdersInRange } from '@/lib/services/report-orders-service';
+import { fetchOrdersInRange, salesAmount } from '@/lib/services/report-orders-service';
 
 type Order = {
   id: string;
@@ -93,7 +93,7 @@ export function SalesReport({ date: externalDate, setDate: externalSetDate }: Sa
         const toISO = toDateObj.toISOString();
 
         const ordersData = await fetchOrdersInRange(supabase, {
-          selectCols: 'id, total_amount, order_date, created_at, status, sales_person_id',
+          selectCols: 'id, total_amount, shipping_fee, order_date, created_at, status, sales_person_id',
           fromISO,
           toISO,
           dateColumn: 'order_date',
@@ -104,7 +104,7 @@ export function SalesReport({ date: externalDate, setDate: externalSetDate }: Sa
 
         setOrders(ordersData.map((o: any) => ({
           id: o.id,
-          totalAmount: Number(o.total_amount) || 0,
+          totalAmount: salesAmount(o),
           orderDate: o.order_date || o.created_at,
           orderStatus: o.status,
           salesPersonId: o.sales_person_id || '',

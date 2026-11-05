@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CheckCircle2, XCircle, Search, RotateCcw } from 'lucide-react';
+import { CheckCircle2, XCircle, Search, RotateCcw, Bus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useSupabase } from '@/lib/supabase/hooks';
 import { useEffect } from 'react';
@@ -232,6 +232,9 @@ export default function PackedOrdersPage() {
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => setNotForShippingOrder(order)} className="text-destructive hover:text-destructive hover:bg-destructive/10" title="Not for shipping">
                   <XCircle className="h-4 w-4 mr-1" /> Delay
+                </Button>
+                <Button variant="outline" size="sm" asChild title="Went by bus: record the fee we paid">
+                  <Link href={`/dashboard/bus-shipping?order=${order.id}`}><Bus className="h-4 w-4 mr-1" /> Ship by bus</Link>
                 </Button>
                 <Button variant="default" size="sm" onClick={() => setVerifyOrder(order)} className="bg-emerald-600 hover:bg-emerald-700" title="Verify for shipping">
                   <CheckCircle2 className="h-4 w-4 mr-1" /> Verify

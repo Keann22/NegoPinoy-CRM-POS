@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Download, Truck, Upload, RotateCcw } from 'lucide-react';
+import { Download, Truck, Upload, RotateCcw, Bus } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MarkShippedDialog } from '@/components/dashboard/mark-shipped-dialog';
 import { RevertPendingDialog } from '@/components/dashboard/revert-pending-dialog';
@@ -106,6 +106,9 @@ export default function ForShippingPage() {
                     <div className="flex justify-end gap-2">
                       <Button variant="outline" size="sm" onClick={() => setRevertOrder(order)} title="Revert to Processing">
                         <RotateCcw className="h-4 w-4 mr-1" /> Revert
+                      </Button>
+                      <Button variant="outline" size="sm" asChild title="Went by bus: record the fee we paid">
+                        <Link href={`/dashboard/bus-shipping?order=${order.id}`}><Bus className="h-4 w-4 mr-1" /> Ship by bus</Link>
                       </Button>
                       <Button variant="outline" size="sm" onClick={() => setMarkShippedOrder({ id: order.id, tracking_number: '' })}>
                         <Truck className="h-4 w-4 mr-1" /> Mark Shipped

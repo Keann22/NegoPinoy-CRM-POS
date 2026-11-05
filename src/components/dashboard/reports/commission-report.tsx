@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUser, useSupabase } from '@/lib/supabase/hooks';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { salesAmount } from '@/lib/services/report-orders-service';
 
 type CommissionData = {
   userId: string;
@@ -61,7 +62,7 @@ export function CommissionReport() {
         // Fetch eligible orders for commission
         let query = supabase
           .from('orders')
-          .select('id, total_amount, order_date, created_at, status, sales_person_id, completed_at, sales_person_name')
+          .select('id, total_amount, shipping_fee, order_date, created_at, status, sales_person_id, completed_at, sales_person_name')
           .in('status', ['Shipped', 'Completed', 'Payment Received (COD)']);
 
         if (!isManagement) {
@@ -105,7 +106,7 @@ export function CommissionReport() {
         acc[key] = { userId: key, name: displayName, shippedCount: 0, totalShippedAmount: 0 };
       }
       acc[key].shippedCount += 1;
-      acc[key].totalShippedAmount += (Number(order.total_amount) || 0);
+      acc[key].totalShippedAmount += salesAmount(order);
       return acc;
     }, {} as Record<string, CommissionData>);
     

@@ -65,6 +65,8 @@ import { EscalationModal } from '@/components/dashboard/escalation-modal';
 import { SendTodayReminder } from '@/components/dashboard/priority/send-today-reminder';
 import { RecountRequestPopup } from '@/components/dashboard/recount-request-popup';
 import { RtsDecisionPopup } from '@/components/dashboard/customer-returns/rts-decision-popup';
+import { BusSfPopup } from '@/components/dashboard/bus-shipping/bus-sf-popup';
+import { Bus } from 'lucide-react';
 import { InventoryGuardianAlertModal } from '@/components/dashboard/inventory/InventoryGuardianAlertModal';
 import { InventoryGuardianTrigger } from '@/components/dashboard/inventory/InventoryGuardianTrigger';
 import { InventoryGuardianProvider } from '@/hooks/useInventoryGuardian';
@@ -123,6 +125,7 @@ export default function DashboardLayout({
       links.push({ href: '/dashboard/packed-orders', label: 'Packed Orders', icon: PackageCheck });
       links.push({ href: '/dashboard/for-shipping', label: 'For Shipping', icon: Truck });
       links.push({ href: '/dashboard/for-pick-up', label: 'For Pick-up', icon: PackageCheck });
+      links.push({ href: '/dashboard/bus-shipping', label: 'Bus Shipping', icon: Bus });
       links.push({ href: '/dashboard/photo-review', label: 'Photo Orders Review', icon: ClipboardList });
     }
 
@@ -313,6 +316,7 @@ export default function DashboardLayout({
       {/* Owner asked Jas to count products: sticky until counted (Jas accounts only). */}
       <RecountRequestPopup />
       <RtsDecisionPopup />
+      <BusSfPopup />
       <InventoryGuardianAlertModal />
       <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr] print:block">
         <div className="hidden border-r bg-sidebar md:block print:hidden">
