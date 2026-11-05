@@ -3,6 +3,8 @@ export type ReconcileAction =
   | 'tip'
   | 'split_payment'
   | 'typo_correction'
+  /** The extra was the shipping fee paid in advance (SPX): it goes on the order, not store credit. */
+  | 'shipping_fee'
   /** No money change: fixed by hand, or the recorded amount was right. */
   | 'mark_checked';
 

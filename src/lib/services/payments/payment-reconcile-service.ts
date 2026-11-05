@@ -57,6 +57,7 @@ export async function reconcilePayment(
   }
 
   if (action === 'split_payment') return splitTransfer(supabase, payment, others, gcash);
+  if (action === 'shipping_fee') return addShippingFee(supabase, payment, rules.share);
 
   const newAmount = action === 'typo_correction' ? gcash : rules.share;
   return changeAmount(supabase, payment, action, newAmount);
@@ -158,6 +159,48 @@ async function changeAmount(
     parts.push(action === 'tip' ? `${peso(newExcess)} kept as a tip.` : `${peso(newExcess)} added to the customer's store credit.`);
   }
   return parts.join(' ');
+}
+
+/**
+ * The extra was the shipping fee the customer paid in advance (SPX, 2026-11-05: #4238B22):
+ * the payment goes up to the GCash amount and the same amount is added to the order's
+ * shipping fee and total, so nothing goes to store credit and the balance doesn't change.
+ */
+async function addShippingFee(supabase: SupabaseClient, payment: LivePayment, newAmount: number): Promise<string> {
+  if (!payment.order_id) throw new ReconcileError('This payment is not linked to an order.');
+  const { data: order, error } = await supabase
+    .from('orders')
+    .select('id, amount_paid, total_amount, shipping_fee')
+    .eq('id', payment.order_id)
+    .single();
+  if (error || !order) throw new ReconcileError('The order for this payment was not found.', 404);
+
+  const fee = Math.round((newAmount - payment.amount) * 100) / 100;
+  if (!(fee > 0)) throw new ReconcileError('There is no extra money to treat as a shipping fee.');
+  const oldPaid = Number(order.amount_paid || 0);
+  const newTotal = Number(order.total_amount || 0) + fee;
+  const newPaid = oldPaid + fee;
+
+  await claimPayment(supabase, payment, {
+    amount: newAmount,
+    notes: appendNote(payment.notes, `[Reconciled: ${peso(fee)} shipping fee paid in advance, added to the order's shipping fee]`),
+  });
+  let update = supabase
+    .from('orders')
+    .update({
+      shipping_fee: Number(order.shipping_fee || 0) + fee,
+      total_amount: newTotal,
+      amount_paid: newPaid,
+      balance_due: Math.max(0, newTotal - newPaid),
+    })
+    .eq('id', order.id);
+  update = order.amount_paid === null ? update.is('amount_paid', null) : update.eq('amount_paid', oldPaid);
+  const { data: updated, error: updateError } = await update.select('id');
+  if (updateError || !updated || updated.length === 0) {
+    await supabase.from('payments').update({ amount: payment.amount, notes: payment.notes, status: payment.status }).eq('id', payment.id);
+    throw updateError || new ReconcileError('The order was changed by someone else just now. Reload and try again.', 409);
+  }
+  return `Payment raised to ${peso(newAmount)}; ${peso(fee)} added to the order as its shipping fee. No store credit.`;
 }
 
 /** Saves only if nobody changed the payment since we read it (no double fixes). */

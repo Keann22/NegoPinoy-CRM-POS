@@ -45,11 +45,11 @@ export function reconcileRules(f: TransferFigures): RuleResult {
     }
     // The orders cover the transfer: link them. Money left over can go to this customer.
     const allowed: ReconcileAction[] = ['split_payment'];
-    if (share > f.recorded + PESO_TOLERANCE) allowed.push('overpayment_credit', 'tip');
+    if (share > f.recorded + PESO_TOLERANCE) allowed.push('overpayment_credit', 'tip', 'shipping_fee');
     return { allowed, share };
   }
 
-  if (f.gcash > f.recorded + 0.01) return { allowed: ['overpayment_credit', 'tip'], share };
+  if (f.gcash > f.recorded + 0.01) return { allowed: ['overpayment_credit', 'tip', 'shipping_fee'], share };
   if (f.gcash < f.recorded - 0.01) return { allowed: ['typo_correction'], share };
   return { allowed: [], share, blockedReason: 'The payment already matches the GCash amount.' };
 }
@@ -59,5 +59,6 @@ export const ACTION_LABELS: Record<ReconcileAction, string> = {
   tip: 'Tip / keep the change',
   split_payment: 'Split transfer',
   typo_correction: 'Fix typo',
+  shipping_fee: 'Shipping fee',
   mark_checked: 'Checked, no change',
 };

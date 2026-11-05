@@ -29,6 +29,12 @@ const BUTTONS: Record<ReconcileAction, { label: string; title: string; className
     className:
       'text-rose-800 border-rose-300 hover:bg-rose-50 dark:text-rose-300 dark:border-rose-800 dark:hover:bg-rose-950/40',
   },
+  shipping_fee: {
+    label: 'Shipping fee',
+    title: "The extra was the shipping fee paid in advance (SPX): add it to the order's shipping fee, no store credit",
+    className:
+      'text-violet-800 border-violet-300 hover:bg-violet-50 dark:text-violet-300 dark:border-violet-800 dark:hover:bg-violet-950/40',
+  },
   mark_checked: {
     label: '✓ Checked',
     title: 'No money change: use after fixing by hand, or when the recorded amount is right',

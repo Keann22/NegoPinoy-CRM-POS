@@ -30,6 +30,9 @@ export function confirmText(item: DiscrepancyItem, action: ReconcileAction): str
       return `Order #${item.orderShortId}: lower the payment from ${peso(item.recordedAmount)} to ` +
         `${peso(item.gcashAmount)}, the GCash amount. The customer will owe the difference.\n\n` +
         'Check the proof photo first: if it shows the recorded amount, the GCash figure is wrong, so don\'t fix it here.';
+    case 'shipping_fee':
+      return `Order #${item.orderShortId}: the extra ${peso(share - item.recordedAmount)} was the shipping fee paid in advance (e.g. SPX). ` +
+        `The payment goes up to ${peso(share)} and the extra is added to the order's shipping fee. Nothing goes to store credit.${shared}`;
     case 'mark_checked':
       return `Order #${item.orderShortId}: mark as checked and take it off the to-fix list? ` +
         `The payment stays ${peso(item.recordedAmount)}; no money changes.
