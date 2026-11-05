@@ -3,16 +3,22 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 /**
  * Runs after OCR reads a screenshot's GCash reference (owner, 2026-11-04):
  * 1. A transfer paid several orders: copy the reference to every payment in it.
- * 2. The reference is already on a payment outside this transfer (old screenshot
+ * 2. More was recorded than the largest amount on the screenshot (e.g. the balance
+ *    was typed instead of the ₱1,590 sent, #9BD7150 on 2026-11-05): mark it, tell owners.
+ *    Only this direction: OCR takes the largest number, so a higher screenshot amount
+ *    is often noise, but a lower one means the recorded money isn't on the screenshot.
+ * 3. The reference is already on a payment outside this transfer (old screenshot
  *    reused, or a duplicate): mark the payment and tell the owners. It still saves.
  */
 
 const MARK = '[GCash reference already used';
+const AMOUNT_MARK = '[Screenshot says';
 
 interface PaymentRow {
   id: string;
   order_id: string | null;
   transfer_id: string | null;
+  transfer_amount?: number | string | null;
   amount: number | string;
   notes: string | null;
   payment_date: string | null;
@@ -32,7 +38,7 @@ export async function afterReferenceRead(
 ): Promise<void> {
   const { data: payment } = await supabase
     .from('payments')
-    .select('id, order_id, transfer_id, amount, notes, payment_date')
+    .select('id, order_id, transfer_id, transfer_amount, amount, notes, payment_date')
     .eq('id', paymentId)
     .single();
   if (!payment) return;
@@ -51,7 +57,23 @@ export async function afterReferenceRead(
     groupIds = (group || []).map((g: { id: string }) => g.id);
   }
 
-  // 2. Already used outside this transfer?
+  // 2. Recorded more than the screenshot shows?
+  const recorded = Number(p.transfer_id ? p.transfer_amount ?? p.amount : p.amount);
+  if (ocrAmount !== null && ocrAmount > 0 && ocrAmount < recorded - 1) {
+    const flagged = await markPayments(
+      supabase, groupIds, AMOUNT_MARK, `${AMOUNT_MARK} ${peso(ocrAmount)}, recorded ${peso(recorded)}]`,
+    );
+    if (flagged) {
+      await notifyOwners(
+        supabase,
+        'Payment higher than its screenshot',
+        `#${shortId(p.order_id)}: recorded ${peso(recorded)}, but the screenshot shows ${peso(ocrAmount)}. ` +
+          'Check the proof and fix the payment if it was typed wrong.',
+      );
+    }
+  }
+
+  // 3. Already used outside this transfer?
   const digits = referenceNumber?.match(/\d{8,}/)?.[0];
   if (!digits) return;
   const { data: matches } = await supabase
@@ -70,18 +92,25 @@ export async function afterReferenceRead(
     .join(', ');
   const mark = `${MARK} on ${where}]`;
 
-  const { data: own } = await supabase.from('payments').select('id, notes').in('id', groupIds);
-  for (const row of (own || []) as { id: string; notes: string | null }[]) {
-    if ((row.notes || '').includes(MARK)) continue;
-    await supabase.from('payments').update({ notes: `${(row.notes || '').trim()} ${mark}`.trim() }).eq('id', row.id);
-  }
-
+  await markPayments(supabase, groupIds, MARK, mark);
   await notifyOwners(
     supabase,
     'GCash reference used twice',
     `Payment on #${shortId(p.order_id)} (${peso(Number(p.amount))}) has GCash ref ${digits}, already used on ${where}. ` +
       'Check if it is an old screenshot or a duplicate.',
   );
+}
+
+/** Adds a note to each payment that doesn't have it yet; false if all already had it. */
+async function markPayments(supabase: SupabaseClient, ids: string[], marker: string, note: string): Promise<boolean> {
+  const { data } = await supabase.from('payments').select('id, notes').in('id', ids);
+  let changed = false;
+  for (const row of (data || []) as { id: string; notes: string | null }[]) {
+    if ((row.notes || '').includes(marker)) continue;
+    await supabase.from('payments').update({ notes: `${(row.notes || '').trim()} ${note}`.trim() }).eq('id', row.id);
+    changed = true;
+  }
+  return changed;
 }
 
 /** Bell notification for everyone whose role is owner/admin (same lookup as returns). */

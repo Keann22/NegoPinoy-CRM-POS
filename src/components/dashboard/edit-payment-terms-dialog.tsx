@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { InstallmentPlanCheck } from "./installment-plan-check";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useForm } from "react-hook-form";
@@ -316,6 +317,16 @@ export function EditPaymentTermsDialog({ order, open, onOpenChange, onSuccess }:
                         )}
                     />
                 </div>
+            )}
+
+            {form.watch("paymentType") === "Installment" && cashTotal !== null && (
+                <InstallmentPlanCheck
+                    price={cashTotal}
+                    alreadyPaid={existingPaid}
+                    downpayment={Number(form.watch("amountPaid") || 0)}
+                    months={Number(form.watch("installmentMonths") || 0)}
+                    monthly={Number(form.watch("monthlyPayment") || 0)}
+                />
             )}
 
             {((form.watch("paymentType") === "Full Payment") || (form.watch("amountPaid") !== undefined && form.watch("amountPaid")! > 0 && !form.watch("isDownpaymentCOD"))) && (
