@@ -59,6 +59,12 @@ export const CR_SHIPPING_PAYER_LABELS: Record<ShippingPayer, string> = {
 
 export const CR_REFUND_METHODS = ['GCash', 'Bank Transfer', 'Cash', 'Maya'] as const;
 
+/**
+ * Partial refund without money going back: the customer keeps the damaged item and
+ * stops paying the rest (owner, 2026-11-05). Taken off the order as a discount.
+ */
+export const CR_WAIVE_METHOD = 'Waived balance';
+
 /** Expense categories for refunds. A full refund's sale is already removed from P&L (order is Returned), so P&L skips that one. */
 export const REFUND_EXPENSE_CATEGORY = 'Customer Refund';
 export const REFUND_VOIDED_SALE_EXPENSE_CATEGORY = 'Customer Refund (returned order)';
@@ -102,6 +108,8 @@ export interface CustomerReturn {
   caseNo: number;
   orderId: string;
   orderStatus: string | null;
+  /** What the customer still owes on the order (for waiving it). */
+  orderBalance: number | null;
   customerName: string;
   salesPersonName: string | null;
   source: CustomerReturnSource;

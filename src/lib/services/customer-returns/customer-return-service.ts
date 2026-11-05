@@ -196,6 +196,7 @@ function mapCase(r: any, now: number): CustomerReturn {
     caseNo: Number(r.case_no),
     orderId: r.order_id,
     orderStatus: r.orders?.status ?? null,
+    orderBalance: r.orders?.balance_due != null ? Number(r.orders.balance_due) : null,
     customerName: r.orders?.customers?.full_name || 'Customer',
     salesPersonName: r.orders?.sales_person_name ?? null,
     source: r.source,
@@ -247,7 +248,7 @@ export async function listCustomerReturns(
   const closedSince = new Date(Date.now() - CLOSED_SHOWN_DAYS * DAY_MS).toISOString();
   const { data, error } = await supabase
     .from('customer_returns')
-    .select('*, customer_return_items(*), customer_return_events(*), orders!customer_returns_order_id_fkey(status, sales_person_name, customers(full_name))')
+    .select('*, customer_return_items(*), customer_return_events(*), orders!customer_returns_order_id_fkey(status, sales_person_name, balance_due, customers(full_name))')
     .or(`status.eq.open,closed_at.gte.${closedSince}`)
     .order('created_at', { ascending: false });
   if (error) throw error;
@@ -259,7 +260,7 @@ export async function listCustomerReturns(
 export async function getCustomerReturn(supabase: SupabaseClient, id: string): Promise<CustomerReturn> {
   const { data, error } = await supabase
     .from('customer_returns')
-    .select('*, customer_return_items(*), customer_return_events(*), orders!customer_returns_order_id_fkey(status, sales_person_name, customers(full_name))')
+    .select('*, customer_return_items(*), customer_return_events(*), orders!customer_returns_order_id_fkey(status, sales_person_name, balance_due, customers(full_name))')
     .eq('id', id)
     .single();
   if (error || !data) throw new CustomerReturnError('Return case not found.');

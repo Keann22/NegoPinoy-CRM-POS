@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   CR_REFUND_METHODS,
+  CR_WAIVE_METHOD,
   REFUND_EXPENSE_CATEGORY,
   REFUND_VOIDED_SALE_EXPENSE_CATEGORY,
 } from '@/types/customer-returns.types';
@@ -160,6 +161,7 @@ export async function recordRefund(
   if (!outcomeCanRunNow(r)) throw new CustomerReturnError('Wait for the item to arrive and be checked first.');
   const amount = Math.round((Number(input.amount) || 0) * 100) / 100;
   if (!(amount > 0)) throw new CustomerReturnError('Enter the amount refunded.');
+  if (input.method === CR_WAIVE_METHOD) return waiveBalance(supabase, r, amount, input.note, actorName);
   if (!(CR_REFUND_METHODS as readonly string[]).includes(input.method)) throw new CustomerReturnError('Pick how it was paid.');
 
   const now = new Date().toISOString();
@@ -185,6 +187,45 @@ export async function recordRefund(
   if (r.outcome === 'full_refund' && r.orders?.status !== 'Returned') await setOrderStatus(supabase, r.order_id, 'Returned', actorName);
   await logEvent(supabase, r.id, 'refund_sent', actorName,
     [`₱${amount.toLocaleString('en-PH')} by ${input.method}`, reference ? `ref ${reference}` : '', input.note?.trim()].filter(Boolean).join(' · '));
+}
+
+/**
+ * Owners: the customer keeps the damaged item and stops paying the rest (owner,
+ * 2026-11-05: #D4CEF54, an installment whose last ₱973 was forgiven). No money
+ * moves, so no expense: the amount comes off the order as a discount (net sales
+ * drop) and the balance goes down, so it leaves collections and receivables.
+ */
+async function waiveBalance(supabase: SupabaseClient, r: any, amount: number, note: string | undefined, actorName: string) {
+  if (r.outcome !== 'partial_refund') throw new CustomerReturnError('Waiving the balance is for "Partial refund / discount (customer keeps it)".');
+  const { data: order, error: oErr } = await supabase.from('orders')
+    .select('id, total_amount, total_discount, balance_due, payment_method').eq('id', r.order_id).single();
+  if (oErr || !order) throw new CustomerReturnError('Order not found.');
+  const owed = Math.round((Number(order.balance_due) || 0) * 100) / 100;
+  if (!(owed > 0)) throw new CustomerReturnError("The customer doesn't owe anything on this order. Record money sent back instead.");
+  if (amount > owed) throw new CustomerReturnError(`The customer only owes ₱${owed.toLocaleString('en-PH')}. Waive at most that.`);
+
+  const now = new Date().toISOString();
+  await claim(supabase, r, {
+    outcome_done_at: now, outcome_done_by_name: actorName, outcome_done_note: note?.trim() || null,
+    refund_method: CR_WAIVE_METHOD, refund_reference: null, amount,
+  });
+  const newBalance = Math.round((owed - amount) * 100) / 100;
+  const { error } = await supabase.from('orders').update({
+    total_discount: Math.round(((Number(order.total_discount) || 0) + amount) * 100) / 100,
+    total_amount: Math.round(((Number(order.total_amount) || 0) - amount) * 100) / 100,
+    balance_due: newBalance,
+    ...(newBalance <= 0 ? { next_due_date: null } : {}),
+  }).eq('id', order.id);
+  if (error) {
+    await supabase.from('customer_returns').update({ outcome_done_at: null, outcome_done_by_name: null, refund_method: null, updated_at: new Date().toISOString() }).eq('id', r.id);
+    throw error;
+  }
+  await supabase.from('order_logs').insert({
+    order_id: order.id, status: 'Balance waived', user_name: actorName,
+    snapshot_data: { amount, returnNo: r.case_no, note: note?.trim() || null },
+  });
+  await logEvent(supabase, r.id, 'refund_sent', actorName,
+    [`₱${amount.toLocaleString('en-PH')} waived (taken off what the customer still owes)`, note?.trim()].filter(Boolean).join(' · '));
 }
 
 /** Owners: store credit for the customer, used on their next order. */

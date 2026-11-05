@@ -205,6 +205,12 @@ Money and replacements (owner, 2026-10-31):
 - **Who pays shipping on a replacement is decided each time** (we pay = free
   shipping, or the customer pays the shipping fee).
 - A **refund** is recorded in **Expenses** (Customer Refund) with how it was paid.
+- **Waiving what's still owed** (owner, 2026-11-05): on an installment or lay-away
+  that arrived damaged, the owners sometimes let the customer stop paying the
+  rest (#D4CEF54, Jazzly Luna: ₱973 forgiven). Decide **Partial refund / discount**,
+  then **Take it off what they owe**. No money goes out, so nothing goes to
+  Expenses: the amount is added to the order's **discount**, so the sale becomes
+  what she paid and the balance drops. Only on return cases.
 - **Store credit** goes on the customer's balance and is used on their next order.
 
 Reserved for a replacement (owner, 2026-11-03):

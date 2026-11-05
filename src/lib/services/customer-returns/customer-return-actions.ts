@@ -26,7 +26,7 @@ const OWNER_ACTIONS = new Set(['decide', 'damaged_action', 'cancel_case', 'refun
 async function loadCase(supabase: SupabaseClient, id: string) {
   const { data, error } = await supabase
     .from('customer_returns')
-    .select('*, customer_return_items(*), orders!customer_returns_order_id_fkey(status, sales_person_name, customers(full_name))')
+    .select('*, customer_return_items(*), orders!customer_returns_order_id_fkey(status, sales_person_name, balance_due, customers(full_name))')
     .eq('id', id)
     .single();
   if (error || !data) throw new CustomerReturnError('Return case not found.');
