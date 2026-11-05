@@ -12,17 +12,17 @@ import { RecountLine } from '@/components/dashboard/inventory/recount-line';
 const REOPEN_MS = 30 * 60 * 1000;
 export const RECOUNT_PAGE = '/dashboard/inventory/recount';
 /** More open products than this: only a corner chip that opens the Pabilang page, no pop-up (owner 2026-11-04). */
-const INLINE_MAX = 5;
+const INLINE_MAX = 10;
 
 const CHIP = 'fixed bottom-4 left-4 z-50 inline-flex items-center gap-2 rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-lg hover:bg-red-700';
 
 /**
- * Recount requests on Jas's accounts: an owner asked her to count these products.
- * Up to 5 products: a sticky pop-up she can minimize to a red chip, but it comes
+ * Recount requests on Jas's and Al's accounts: an owner asked them to count these products.
+ * Up to 10 products: a sticky pop-up they can minimize to a red chip, but it comes
  * back every 30 minutes and on every page load until each product is counted.
- * More than 5: just a red chip ("38 pabilang pa") that opens the Pabilang page.
+ * More than 10: just a red chip ("38 pabilang pa") that opens the Pabilang page.
  * Nothing shows on the Pabilang page itself.
- * Jas counts the Unit 1 shelf only (Unit 2 is left as recorded), blind: no system numbers.
+ * Jas / Al counts the Unit 1 shelf only (Unit 2 is left as recorded), blind: no system numbers.
  */
 export function RecountRequestPopup() {
   const pathname = usePathname();

@@ -11,8 +11,13 @@ import { sendTelegramMessage } from './inventory-guardian-telegram-service';
  * between the two units. Saved like a Guardian shelf count.
  */
 
-/** Accounts that get the recount pop-up (Jas's accounts). */
-export const RECOUNT_ASSIGNEE_EMAILS = ['jas@gmail.com', 'jas@usares.com', 'jassy@gmail.com'];
+/** Accounts that get the recount pop-up (Jas's and Al's accounts). */
+export const RECOUNT_ASSIGNEE_EMAILS = [
+  'jas@gmail.com',
+  'jas@usares.com',
+  'jassy@gmail.com',
+  'alpinakacute@gmail.com',
+];
 
 export class RecountError extends Error {}
 
@@ -180,13 +185,14 @@ export async function notifyIfBatchDone(supabase: SupabaseClient, batchId: strin
     return `✅ ${esc(r.productName)}: ${counted}` +
       `${before != null ? `, dati ${before}` : ''}${verdict} — ${esc(r.done_by_name || 'Jas')}, ${phTime(r.done_at)}`;
   });
+  const actor = rows.find((r) => r.done_by_name)?.done_by_name || 'Jas / Al';
   const text = [
-    `<b>Tapos na ang pabilang ni Jas</b>`,
+    `<b>Tapos na ang pabilang (${esc(actor)})</b>`,
     `"${esc(rows[0].message)}"`,
     '',
     ...lines,
     '',
-    'Na-update na ang stocks sa bilang niya.',
+    'Na-update na ang stocks sa bilang.',
   ].join('\n');
   const sent = await sendTelegramMessage(text);
   if (!sent.success) {
@@ -223,14 +229,15 @@ export async function remindUnfinishedRecounts(supabase: SupabaseClient, now = n
     if (!claimed || claimed.length === 0) continue;
     const rows = await batchRows(supabase, batchId);
     const open = rows.filter((r) => r.status === 'open');
+    const timeLabel = new Intl.DateTimeFormat('en-PH', { timeZone: PH_TZ, hour: 'numeric', minute: '2-digit' }).format(now);
     const text = [
-      `<b>⏰ Hindi pa tapos ni Jas ang pabilang</b> (12 PM)`,
+      `<b>⏰ Hindi pa tapos nina Jas at Al ang pabilang</b> (${timeLabel})`,
       `"${esc(rows[0].message)}"`,
       '',
       `${open.length} sa ${rows.length} ang hindi pa nabibilang:`,
       ...open.map((r) => `• ${esc(r.productName)}`),
       '',
-      'Nakalista pa rin sa kanya (Pabilang page) hanggang mabilang lahat.',
+      'Nakalista pa rin sa kanila (Pabilang page) hanggang mabilang lahat.',
     ].join('\n');
     const res = await sendTelegramMessage(text);
     if (res.success) sent += 1;
