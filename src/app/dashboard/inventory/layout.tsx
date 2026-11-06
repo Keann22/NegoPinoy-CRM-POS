@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useRoleCheck } from '@/hooks/useRoleCheck';
 import { Loader2, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -13,8 +13,13 @@ export default function InventoryLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { isManagement, isInventory, isLoading, userProfile } = useRoleCheck();
-  const canAccessInventory = isManagement || isInventory;
+  const pathname = usePathname();
+  const { isManagement, isInventory, isSales, isLoading, userProfile } = useRoleCheck();
+
+  // Sales agents have access to the returns page (/dashboard/inventory/returns)
+  // to decide whether to cancel or resend returned orders.
+  const isReturnsRoute = pathname?.startsWith('/dashboard/inventory/returns');
+  const canAccessInventory = isManagement || isInventory || (isSales && isReturnsRoute);
 
   useEffect(() => {
     if (!isLoading && userProfile && !canAccessInventory) {

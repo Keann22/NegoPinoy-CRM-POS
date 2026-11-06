@@ -49,7 +49,8 @@ export default function CustomerReturnsPage() {
     return out;
   }, [data]);
 
-  const firstBusy = TABS.find((t) => t !== 'done' && groups[t].length > 0) || 'needs_owner';
+  const defaultTab = data?.isSales && !data?.isManagement ? 'needs_sales' : 'needs_owner';
+  const firstBusy = TABS.find((t) => t !== 'done' && groups[t].length > 0) || defaultTab;
   const [tab, setTab] = useState<CustomerReturnStage | null>(null);
 
   const dialogFor = (kind: CustomerReturnDialogKind) => (dialog?.kind === kind ? dialog.ret : null);
