@@ -1,0 +1,85 @@
+[
+  {
+    "id": "84230765-2217-44d2-9c95-5f28b30de072",
+    "name": "Sdd9 Table mat -  D9-2 (4PCS)",
+    "stock_level": -6,
+    "product_warehouse_stock": [
+      {
+        "stock_level": -6,
+        "warehouse_id": "0a198669-28e4-48a7-912c-7930ab18ec07"
+      }
+    ]
+  },
+  {
+    "id": "5c4ea779-040c-4ec7-8d8b-cb530f588a01",
+    "name": "Sdd8 table runner - TM1",
+    "stock_level": -1,
+    "product_warehouse_stock": [
+      {
+        "stock_level": -1,
+        "warehouse_id": "0a198669-28e4-48a7-912c-7930ab18ec07"
+      }
+    ]
+  },
+  {
+    "id": "83bb7fb7-503a-451c-bc97-5c83ae749ece",
+    "name": "Sdd8 table runner - TM2",
+    "stock_level": 4,
+    "product_warehouse_stock": [
+      {
+        "stock_level": 4,
+        "warehouse_id": "0a198669-28e4-48a7-912c-7930ab18ec07"
+      }
+    ]
+  },
+  {
+    "id": "9842a421-e44f-4710-9142-bd4c5eaa2d0f",
+    "name": "Sdd9 Table mat - D9-3 (4PCS)",
+    "stock_level": 8,
+    "product_warehouse_stock": [
+      {
+        "stock_level": 8,
+        "warehouse_id": "0a198669-28e4-48a7-912c-7930ab18ec07"
+      }
+    ]
+  },
+  {
+    "id": "89bf846e-49de-43cf-855a-ae8eecf6d54c",
+    "name": "Sdd8 table runner - TM3",
+    "stock_level": -2,
+    "product_warehouse_stock": [
+      {
+        "stock_level": -2,
+        "warehouse_id": "0a198669-28e4-48a7-912c-7930ab18ec07"
+      }
+    ]
+  },
+  {
+    "id": "e668ca59-79f8-4715-adc7-d26a512349e0",
+    "name": "Sdd9 Table mat - D9-1 (4PCS)",
+    "stock_level": 0,
+    "product_warehouse_stock": []
+  },
+  {
+    "id": "025747c9-8561-4bc4-b340-f7992b5c9e69",
+    "name": "Sdd8 table runner",
+    "stock_level": 23,
+    "product_warehouse_stock": [
+      {
+        "stock_level": 23,
+        "warehouse_id": "20c1869b-9a2c-4f43-8a2d-932b5c419e85"
+      }
+    ]
+  },
+  {
+    "id": "6770eada-6aee-4146-be31-a3443c231912",
+    "name": "Sdd9 Table mat",
+    "stock_level": 48,
+    "product_warehouse_stock": [
+      {
+        "stock_level": 48,
+        "warehouse_id": "20c1869b-9a2c-4f43-8a2d-932b5c419e85"
+      }
+    ]
+  }
+]
