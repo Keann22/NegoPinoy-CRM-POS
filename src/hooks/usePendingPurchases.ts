@@ -18,6 +18,12 @@ const askOverrideReason = (): string | null => {
   return reason && reason.trim() ? reason.trim() : null;
 };
 
+const variantCountsOf = (item: any) => item.variants
+  ? Object.entries(item.variantCounts || {})
+      .map(([productId, qty]) => ({ productId, qty: Math.round(Number(qty) || 0) }))
+      .filter(c => c.qty > 0)
+  : undefined;
+
 export function usePendingPurchases(onReceiveComplete: () => void, refreshKey = 0) {
   const supabase = useSupabase();
   const [items, setItems] = useState<any[]>([]);
@@ -93,6 +99,17 @@ export function usePendingPurchases(onReceiveComplete: () => void, refreshKey = 
     setItems(items.map(i => i.id === id ? { ...i, receivedQty: qty } : i));
   };
 
+  // Bought as the main product (e.g. "Sdd8 table runner"): count each variant.
+  // The total is what was received.
+  const handleVariantQtyChange = (id: string, variantId: string, qty: string) => {
+    setItems(items.map(i => {
+      if (i.id !== id) return i;
+      const variantCounts = { ...(i.variantCounts || {}), [variantId]: qty };
+      const total = Object.values(variantCounts).reduce((s: number, v: any) => s + (Number(v) > 0 ? Math.round(Number(v)) : 0), 0);
+      return { ...i, variantCounts, receivedQty: total > 0 ? String(total) : "" };
+    }));
+  };
+
   const handleReasonChange = (id: string, reason: string) => {
     setItems(items.map(i => i.id === id ? { ...i, discrepancyReason: reason } : i));
   };
@@ -124,6 +141,7 @@ export function usePendingPurchases(onReceiveComplete: () => void, refreshKey = 
         toReceive.push({
             itemId: item.id,
             receivedQty: Number(item.receivedQty),
+            variantCounts: variantCountsOf(item),
             discrepancyReason: Number(item.receivedQty) < Number(item.remainingQty) ? item.discrepancyReason : undefined
         });
     }
@@ -214,6 +232,7 @@ export function usePendingPurchases(onReceiveComplete: () => void, refreshKey = 
     const toReceive = allowed.filter(i => i.receivedQty && Number(i.receivedQty) > 0).map(i => ({
       itemId: i.id,
       receivedQty: Number(i.receivedQty),
+      variantCounts: variantCountsOf(i),
       discrepancyReason: Number(i.receivedQty) < Number(i.remainingQty) ? i.discrepancyReason : undefined
     }));
 
@@ -288,6 +307,7 @@ export function usePendingPurchases(onReceiveComplete: () => void, refreshKey = 
     isSubmitting,
     submittingId,
     handleQtyChange,
+    handleVariantQtyChange,
     handleReasonChange,
     handleReceiveSingle,
     handleCancel,

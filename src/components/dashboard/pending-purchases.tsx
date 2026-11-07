@@ -37,6 +37,7 @@ export function PendingPurchases({ onReceiveComplete, refreshKey = 0 }: { onRece
     isSubmitting,
     submittingId,
     handleQtyChange,
+    handleVariantQtyChange,
     handleReasonChange,
     handleReceiveSingle,
     handleCancel,
@@ -194,6 +195,29 @@ export function PendingPurchases({ onReceiveComplete, refreshKey = 0 }: { onRece
                               )}
                           </td>
                           <td className="p-4 flex items-center gap-2">
+                            {item.variants ? (
+                              // Bought as the main product: stock goes on the variants the orders use.
+                              <div className="flex-1 min-w-[150px] space-y-1">
+                                <div className="text-[11px] font-semibold text-indigo-800">How many of each?</div>
+                                {item.variants.map((v: { id: string; label: string }) => (
+                                  <label key={v.id} className="flex items-center gap-2 text-xs">
+                                    <span className="flex-1 min-w-0 break-words font-medium text-slate-700">{v.label}</span>
+                                    <Input
+                                      type="number"
+                                      inputMode="numeric"
+                                      min={0}
+                                      placeholder="0"
+                                      value={item.variantCounts?.[v.id] || ''}
+                                      onChange={(e) => handleVariantQtyChange(item.id, v.id, e.target.value)}
+                                      className="h-8 w-16 shrink-0 border-indigo-200 focus-visible:ring-indigo-500"
+                                    />
+                                  </label>
+                                ))}
+                                <div className={`text-[11px] font-semibold ${isDiscrepancy ? "text-red-600" : "text-slate-500"}`}>
+                                  Total: {Number(item.receivedQty) || 0}
+                                </div>
+                              </div>
+                            ) : (
                             <Input 
                               type="number" 
                               placeholder={`Matches ${item.remainingQty}?`}
@@ -201,6 +225,7 @@ export function PendingPurchases({ onReceiveComplete, refreshKey = 0 }: { onRece
                               onChange={(e) => handleQtyChange(item.id, e.target.value)}
                               className={isDiscrepancy ? "border-red-300" : "border-indigo-200 focus-visible:ring-indigo-500"}
                             />
+                            )}
                             <Button 
                                 type="button" 
                                 size="sm"
@@ -298,7 +323,8 @@ export function PendingPurchases({ onReceiveComplete, refreshKey = 0 }: { onRece
                 type="button" 
                 variant="outline" 
                 onClick={() => {
-                    setItems(items.map(i => ({ ...i, receivedQty: i.remainingQty.toString() })));
+                    // Lines with variants need a count per variant, so they are left empty.
+                    setItems(items.map(i => i.variants ? i : ({ ...i, receivedQty: i.remainingQty.toString() })));
                 }}
             >
                 Auto-Fill Expected

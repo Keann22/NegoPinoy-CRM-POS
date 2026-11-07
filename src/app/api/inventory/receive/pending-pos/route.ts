@@ -10,6 +10,7 @@ import { insertLinkedMovement, editorFromUser } from '@/lib/services/receipt-cor
 import { checkReceiptGate, logReceiptOverrides } from '@/lib/services/receipt-gate-service';
 import { getRecentPickerCounts } from '@/lib/services/inventory/picker-shelf-guard-service';
 import { getReservations } from '@/lib/services/inventory/reservation-service';
+import { leafVariantsOf, splitLineOntoVariants } from '@/lib/services/variant-receive-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,10 +65,12 @@ export async function GET() {
     const STAFF_REQUEST_SORT_KEY = '0000-00-00';
     // A picker count in the last 2 days may already include pieces from this delivery.
     const lineProductIds = Array.from(new Set(filteredItems.map((i: any) => i.product_id)));
-    const [pickerCounts, reservations] = await Promise.all([
+    const [pickerCounts, reservations, variantsOf] = await Promise.all([
       getRecentPickerCounts(supabase, lineProductIds),
       // Pieces sales reserved for a replacement: staff tag them and set them aside.
       getReservations(supabase, { productIds: lineProductIds as string[] }),
+      // Bought as the main product: staff count each variant (TM1, TM2...).
+      leafVariantsOf(supabase, lineProductIds as string[]),
     ]);
 
     const mapped = filteredItems.map((i: any) => {
@@ -99,6 +102,7 @@ export async function GET() {
         shipping: shippingFor(i.purchase_orders),
         pickerCount: pickerCounts.get(i.product_id) || null,
         reservedFor: reservations.get(i.product_id) || null,
+        variants: variantsOf.get(i.product_id) || null,
       };
     });
 
@@ -163,8 +167,113 @@ export async function POST(req: Request) {
       return escalationRecipients;
     };
 
-    if (receives && receives.length > 0) {
-      for (const r of receives) {
+    // Stock never goes on a product that has variants (orders always use a
+    // variant). Lines bought as the parent ("17 x SDD-8") are counted per
+    // variant and split onto them. Checked for every item before any write.
+    const receiveList: any[] = receives || [];
+    const unexpectedList: any[] = unexpectedItems || [];
+    const { data: lineProducts, error: lpErr } = receiveList.length
+      ? await supabase.from('purchase_order_items').select('id, product_id').in('id', receiveList.map((r) => r.itemId))
+      : { data: [], error: null };
+    if (lpErr) throw lpErr;
+    const productOfLine = new Map((lineProducts || []).map((l: any) => [l.id as string, l.product_id as string]));
+    const variantsOf = await leafVariantsOf(supabase, [
+      ...Array.from(productOfLine.values()),
+      ...unexpectedList.map((u) => u.productId),
+    ]);
+    for (const r of receiveList) {
+      const options = variantsOf.get(productOfLine.get(r.itemId) || '');
+      if (options && !(Array.isArray(r.variantCounts) && r.variantCounts.some((c: any) => Number(c.qty) > 0))) {
+        return NextResponse.json({
+          error: `This product has variants (${options.map((o) => o.label).join(', ')}). Refresh the page and enter how many of each arrived.`,
+        }, { status: 400 });
+      }
+    }
+    if (unexpectedList.some((u) => {
+      const options = variantsOf.get(u.productId);
+      return options && !options.some((o) => o.id === u.productId);
+    })) {
+      return NextResponse.json({ error: 'Pick the variant that arrived (size or color), not the main product.' }, { status: 400 });
+    }
+
+    // 5-6. Short delivery: urgent purchase issue for the Inbox, and a heads-up
+    // to the sales reps whose orders wait on this product.
+    const reportShortDelivery = async (
+      poItem: { po_id: string; product_id: string; expected_qty: number; received_qty: number },
+      receivedNow: number,
+      note: string,
+    ) => {
+          const reason = formatShortDelivery({
+            note,
+            receivedNow,
+            orderedTotal: poItem.expected_qty,
+            receivedEarlier: poItem.received_qty || 0,
+          });
+          const recipientNames = await getEscalationRecipients();
+
+          const { data: purchaseIssue, error: issueErr } = await supabase
+            .from('order_issues')
+            .insert({
+              issue_type: 'purchase_discrepancy',
+              po_id: poItem.po_id,
+              product_id: poItem.product_id,
+              status: 'open',
+              reported_by_name: reportedByName || 'Inventory Staff'
+            })
+            .select('id')
+            .single();
+
+          if (issueErr) {
+            console.error('Error creating purchase issue:', issueErr);
+          } else {
+            await supabase
+              .from('order_issue_messages')
+              .insert({
+                issue_id: purchaseIssue.id,
+                sender_role: 'inventory',
+                sender_name: reportedByName || 'Inventory Staff',
+                message: reason,
+                requires_attention: true,
+                mentions: recipientNames
+              });
+
+            // Actually ping Admin/Inventory leads via the Bell — previously this
+            // only created the Inbox Drawer thread with empty mentions, so
+            // nobody was notified unless they happened to be online at that moment.
+            await fanOutStaffNotifications(supabase, recipientNames, {
+              senderName: reportedByName || 'Inventory Staff',
+              message: reason,
+            });
+          }
+
+          // 6. Separately, create a product-issue thread pinged to whoever's order
+          // actually depends on this shortage — a distinct, customer-order-facing
+          // message (not the PO/batch-oriented purchase_discrepancy thread above,
+          // which is purchasing-ops internal) so the sales rep sees something
+          // relevant to them rather than PO batch details they don't need.
+          const repOrders = await getAffectedSalesRepOrders(supabase, poItem.product_id);
+          const affectedSalesReps = resolveRecipientNames(
+            Array.from(repOrders.keys()),
+            reportedByName || 'Inventory Staff'
+          );
+          if (affectedSalesReps.length > 0) {
+            await createStaffMessage(supabase, {
+              issueType: 'product',
+              productId: poItem.product_id,
+              message: reason,
+              senderName: reportedByName || 'Inventory Staff',
+              senderRole: 'inventory',
+              recipientNames: affectedSalesReps,
+              // Link each rep's notification to their own affected order so the
+              // Bell can pop the order card for it
+              linkByRecipient: new Map(
+                Array.from(repOrders, ([name, orderIdForRep]) => [name, `/dashboard/orders/${orderIdForRep}`])
+              ),
+            });
+          }
+    };
+
+    const receiveLine = async (r: { itemId: string; receivedQty: number; discrepancyReason?: string }) => {
         // 1. Get PO item
         const { data: poItem, error: poErr } = await supabase
           .from('purchase_order_items')
@@ -241,71 +350,7 @@ export async function POST(req: Request) {
         }, { ...receiptLinks, po_item_id: r.itemId })
           .catch((mvErr: any) => console.error('Receipt movement insert failed:', mvErr?.message || mvErr));
 
-        // 5. Raise an urgent purchase issue for the Inbox when fewer items arrived than expected
-        if (r.discrepancyReason) {
-          const recipientNames = await getEscalationRecipients();
-
-          const { data: purchaseIssue, error: issueErr } = await supabase
-            .from('order_issues')
-            .insert({
-              issue_type: 'purchase_discrepancy',
-              po_id: poItem.po_id,
-              product_id: poItem.product_id,
-              status: 'open',
-              reported_by_name: reportedByName || 'Inventory Staff'
-            })
-            .select('id')
-            .single();
-
-          if (issueErr) {
-            console.error('Error creating purchase issue:', issueErr);
-          } else {
-            await supabase
-              .from('order_issue_messages')
-              .insert({
-                issue_id: purchaseIssue.id,
-                sender_role: 'inventory',
-                sender_name: reportedByName || 'Inventory Staff',
-                message: reason,
-                requires_attention: true,
-                mentions: recipientNames
-              });
-
-            // Actually ping Admin/Inventory leads via the Bell — previously this
-            // only created the Inbox Drawer thread with empty mentions, so
-            // nobody was notified unless they happened to be online at that moment.
-            await fanOutStaffNotifications(supabase, recipientNames, {
-              senderName: reportedByName || 'Inventory Staff',
-              message: reason,
-            });
-          }
-
-          // 6. Separately, create a product-issue thread pinged to whoever's order
-          // actually depends on this shortage — a distinct, customer-order-facing
-          // message (not the PO/batch-oriented purchase_discrepancy thread above,
-          // which is purchasing-ops internal) so the sales rep sees something
-          // relevant to them rather than PO batch details they don't need.
-          const repOrders = await getAffectedSalesRepOrders(supabase, poItem.product_id);
-          const affectedSalesReps = resolveRecipientNames(
-            Array.from(repOrders.keys()),
-            reportedByName || 'Inventory Staff'
-          );
-          if (affectedSalesReps.length > 0) {
-            await createStaffMessage(supabase, {
-              issueType: 'product',
-              productId: poItem.product_id,
-              message: reason,
-              senderName: reportedByName || 'Inventory Staff',
-              senderRole: 'inventory',
-              recipientNames: affectedSalesReps,
-              // Link each rep's notification to their own affected order so the
-              // Bell can pop the order card for it
-              linkByRecipient: new Map(
-                Array.from(repOrders, ([name, orderIdForRep]) => [name, `/dashboard/orders/${orderIdForRep}`])
-              ),
-            });
-          }
-        }
+        if (r.discrepancyReason) await reportShortDelivery(poItem, r.receivedQty, r.discrepancyReason);
 
         // Auto-resolve any open procurement issues for this product
         const { data: issues } = await supabase
@@ -347,6 +392,24 @@ export async function POST(req: Request) {
             console.error(`Auto-record on receive failed for item ${r.itemId} (left for manual entry):`, autoErr?.message || autoErr);
           }
         }
+    };
+
+    for (const r of receiveList) {
+      const options = variantsOf.get(productOfLine.get(r.itemId) || "");
+      if (!options) {
+        await receiveLine(r);
+        continue;
+      }
+      // Bought as the parent: one line per variant counted, each received as usual.
+      const split = await splitLineOntoVariants(supabase, r.itemId, r.variantCounts, options);
+      for (const line of split.lines) await receiveLine({ itemId: line.itemId, receivedQty: line.qty });
+      if (r.discrepancyReason) {
+        await reportShortDelivery({
+          po_id: split.parentLine.po_id,
+          product_id: productOfLine.get(r.itemId)!,
+          expected_qty: split.parentLine.expected,
+          received_qty: split.parentLine.received,
+        }, split.parentLine.total, r.discrepancyReason);
       }
     }
 
