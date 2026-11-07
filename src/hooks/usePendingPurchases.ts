@@ -79,8 +79,9 @@ export function usePendingPurchases(onReceiveComplete: () => void, refreshKey = 
 
         if (data && data.length > 0) {
           setWarehouses(data);
-          const u2 = data.find((w: any) => w.code === 'UNIT2');
-          setTargetWarehouseId(u2 ? u2.id : data[0].id);
+          // Deliveries go on the Unit 1 shelf (owner 2026-11-07: Unit 2 is only for a few SKUs).
+          const u1 = data.find((w: any) => w.code === 'UNIT1');
+          setTargetWarehouseId(u1 ? u1.id : data[0].id);
         }
       } catch (err) {
         console.error('Failed to load warehouses:', err);

@@ -116,6 +116,11 @@ Receipts:
   pop-up said "Unit 2 has 3" when all 3 were gone. Found on 329 products (1,851
   pieces). Pickers now see at most the shelf total, and after each pick the extra
   is moved from Unit 2 to Unit 1 (a transfer; the total doesn't change).
+- **One warehouse in practice (owner, 2026-11-07).** The two-unit setup (Unit 1
+  shelf, Unit 2 reserve, runner transfers) isn't used yet; only a few SKUs are
+  kept in Unit 2 (none right now). Receiving had put every delivery into Unit 2
+  by default, so on 2026-11-07 all Unit 2 numbers (4,068 pieces, 550 products)
+  were moved to Unit 1 and Receiving now defaults to Unit 1.
 - **Unit 2 reserve is free stock, not borrowing.** If unallocated stock is above
   zero, the picker can't borrow from another order until they confirm **both
   Unit 1 and Unit 2 are empty**; that confirmation is saved as a count of 0.

@@ -127,8 +127,9 @@ export async function POST(req: Request) {
 
     let targetWarehouseId = reqTargetWarehouseId;
     if (!targetWarehouseId) {
-      const { data: u2 } = await supabase.from('warehouses').select('id').eq('code', 'UNIT2').maybeSingle();
-      if (u2) targetWarehouseId = u2.id;
+      // Unit 1 unless Receiving picked Unit 2 (owner 2026-11-07: Unit 2 is only for a few SKUs).
+      const { data: u1 } = await supabase.from('warehouses').select('id').eq('code', 'UNIT1').maybeSingle();
+      if (u1) targetWarehouseId = u1.id;
     }
 
     // Who received it and where, so the receipt can be corrected later from

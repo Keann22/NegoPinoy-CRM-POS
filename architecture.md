@@ -308,7 +308,7 @@ To guarantee 100% backward compatibility with POS orders, P&L reports, and the s
 
 #### Runner Transfers & Inbound Receiving
 - **Internal Transfers** (`/dashboard/inventory/transfers`): Screen for the daily runner. Features a **Runner Sheet** suggesting items to transfer from Unit 2 Reserve to Unit 1 Active (where Unit 1 stock $\le$ reorder threshold and Unit 2 has stock), plus Quick Transfer and Transfer History. Executed atomically via `execute_stock_transfer` RPC.
-- **Inbound Receiving** (`/dashboard/inventory/receive`): Defaults receiving destination to **Unit 2 (Reserve & Inbound)** with a dropdown to select Unit 1 for urgent direct-to-shelf restocks.
+- **Inbound Receiving** (`/dashboard/inventory/receive`): Defaults receiving destination to **Unit 1** (owner 2026-11-07: the team works from one warehouse; Unit 2 is only for a few SKUs), with a dropdown to pick Unit 2. It used to default to Unit 2, so Unit 2 showed 4,068 pieces on 550 products that were really on the Unit 1 shelf; moved to Unit 1 on 2026-11-07 with `scripts/fixes/move_unit2_into_unit1.mjs` (one transfer, totals unchanged, snapshots in `scripts/reports/unit2_merge_*`).
 - **Picker Alert** (`/dashboard/pick`): If an item on Unit 1 shelf is empty, the picker UI displays Unit 2 reserve stock so pickers can request replenishment rather than reporting false out-of-stock issues.
 
 ### Unallocated Stock = What Is on the Shelf (LOCKED, 2026-10-30)
