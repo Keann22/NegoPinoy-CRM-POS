@@ -238,6 +238,14 @@ export function usePickerData(
         snapshot_data: { items: itemSnapshot }
       });
 
+      // Pieces taken from Unit 2 lower its number too (it can't hold more than the whole shelf).
+      const foundProductIds = Array.from(new Set(flatRows.filter(r => marks.foundKeys.has(r.key) || outOfStockQty.has(r.key)).map(r => r.productId)));
+      fetch('/api/picker/shelf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ syncUnit2: true, productIds: foundProductIds, orderId: scannedOrderId })
+      }).catch(err => console.error('Unit 2 sync failed:', err));
+
       if (hasIssues) {
         const missingQtyFor = (r: PickRow) => outOfStockQty.get(r.key) ?? r.quantity;
 

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createSessionClient } from '@/lib/supabase/server';
-import { getOrderPickedQty, getProductsWithPendingDelivery, getShelfForProducts, savePickerShelfCount } from '@/lib/services/inventory/picker-shelf-guard-service';
+import { getOrderPickedQty, getOrdersWaitingFor, getProductsWithPendingDelivery, getShelfForProducts, savePickerShelfCount, syncUnit2AfterPick } from '@/lib/services/inventory/picker-shelf-guard-service';
 import { staffRolesOf } from '@/lib/auth/staff-roles';
 import { isManagementUser } from '@/lib/services/purchase-summary-service';
 import { getReservations, logReservationOverride, reservationsToJson } from '@/lib/services/inventory/reservation-service';
@@ -29,6 +29,9 @@ export async function GET(req: Request) {
     const params = new URL(req.url).searchParams;
     const ids = (params.get('productIds') || '').split(',').filter(Boolean);
     const orderId = params.get('orderId');
+    // Found fewer than the order needs: which other orders still need this product?
+    const waitingFor = params.get('waitingFor');
+    if (waitingFor) return NextResponse.json({ orders: await getOrdersWaitingFor(supabase, waitingFor, orderId) });
     const [shelf, picked, pending, reserved] = await Promise.all([
       getShelfForProducts(supabase, ids),
       orderId ? getOrderPickedQty(supabase, orderId) : Promise.resolve({}),
@@ -49,6 +52,12 @@ export async function POST(req: Request) {
     const caller = await getCaller();
     if (!caller) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
     const body = await req.json();
+    // After a pick: move what Unit 2 has above the whole shelf to Unit 1 (pieces were taken from Unit 2).
+    if (body?.syncUnit2) {
+      const ids = Array.isArray(body.productIds) ? body.productIds.map(String) : [];
+      const moved = await syncUnit2AfterPick(supabase, ids, body.orderId ? String(body.orderId) : null, caller.name);
+      return NextResponse.json({ moved });
+    }
     if (!body?.productId) return NextResponse.json({ error: 'Missing product' }, { status: 400 });
     // Owner gives a piece reserved for a replacement to this order instead (reason required).
     if (body.reserveOverride) {

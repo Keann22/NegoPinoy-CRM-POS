@@ -201,7 +201,9 @@ export default function PickerApp() {
                           const memoryHint = productMemories.get(productId);
                           const hasVerifiedMemory = !!(memoryHint && memoryHint.verifiedCount > 0 && memoryHint.actorName);
                           const hasSystemStock = !!(memoryHint && (memoryHint.systemStock ?? 0) > 0);
-                          const hasReserveStock = !!(memoryHint && (memoryHint.unit2ReserveStock ?? 0) > 0);
+                          // Unit 2 can't hold more than the whole shelf: prefer the shelf guard's (capped) number.
+                          const reserveStock = guard.shelf?.[productId]?.unit2 ?? memoryHint?.unit2ReserveStock ?? 0;
+                          const hasReserveStock = reserveStock > 0;
                           const showHint = isFlagged && (hasVerifiedMemory || hasSystemStock || hasReserveStock);
 
                           return (
@@ -217,7 +219,7 @@ export default function PickerApp() {
                                     )}
                                     {hasReserveStock && (
                                       <Badge variant="outline" className="text-[10px] text-blue-700 bg-blue-50 border-blue-300 font-semibold">
-                                        Unit 2: {memoryHint.unit2ReserveStock} in reserve
+                                        Unit 2: {reserveStock} in reserve
                                       </Badge>
                                     )}
                                   </div>
@@ -285,7 +287,7 @@ export default function PickerApp() {
                                         </p>
                                         {hasReserveStock && (
                                           <div className="bg-blue-100/90 text-blue-950 p-2 rounded border border-blue-200 font-medium">
-                                            📦 <strong>Unit 2 Reserve has {memoryHint?.unit2ReserveStock} pcs in stock!</strong>
+                                            📦 <strong>Unit 2 Reserve has {reserveStock} pcs in stock!</strong>
                                             <span className="block text-blue-800 text-[11px] font-normal mt-0.5">
                                               This item is available in Unit 2 bulk storage. Check Unit 2 or request replenishment from the runner instead of reporting an OOS issue.
                                             </span>
@@ -388,6 +390,8 @@ export default function PickerApp() {
         onBothEmpty={guard.confirmBothEmpty}
         onLeaveReserved={guard.leaveReserved}
         onOverrideReserved={guard.overrideReserved}
+        onFindOrders={guard.ordersPiecesCanFinish}
+        onGiveAway={guard.giveToOtherOrder}
         onClose={guard.closePrompt}
       />
       <ReportDamagedDialog

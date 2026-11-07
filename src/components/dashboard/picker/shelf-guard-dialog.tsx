@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import type { CountOutcome, ShelfPrompt } from '@/hooks/picker/useShelfGuard';
+import type { WaitingOrder } from '@/types/inventory-guardian.types';
 import { ReservedPieceDialog } from './reserved-piece-dialog';
 import { OsShelfCheck } from './os-shelf-check';
 
@@ -18,6 +19,8 @@ interface Props {
   onBothEmpty: () => Promise<void>;
   onLeaveReserved: () => void;
   onOverrideReserved: (reason: string) => Promise<void>;
+  onFindOrders: (pieces: number) => Promise<WaitingOrder[]>;
+  onGiveAway: (pieces: number) => Promise<void>;
   onClose: () => void;
 }
 
@@ -26,7 +29,7 @@ interface Props {
  * shelf should still have some, or Borrow while the shelf still has stock.
  * The count is blind: the system's number isn't shown.
  */
-export function ShelfGuardDialog({ prompt, onCount, onNotReceived, onBothEmpty, onLeaveReserved, onOverrideReserved, onClose }: Props) {
+export function ShelfGuardDialog({ prompt, onCount, onNotReceived, onBothEmpty, onLeaveReserved, onOverrideReserved, onFindOrders, onGiveAway, onClose }: Props) {
   const { toast } = useToast();
   const [count, setCount] = useState('');
   const [saving, setSaving] = useState(false);
@@ -59,13 +62,25 @@ export function ShelfGuardDialog({ prompt, onCount, onNotReceived, onBothEmpty, 
     });
   });
 
-  // Tapped OS but the system says there should be some: the count fixes the number.
+  // Tapped OS but the system says there should be some: the count (everything they found) fixes the number.
   const saveOsCount = (n: number) => run(async () => {
+    const needed = prompt?.kind === 'os' ? prompt.needed : 0;
     const outcome = await onCount(n, { unit2Empty: true });
     if (outcome === 'reserved') return;
     toast({
       title: 'Count saved',
-      description: outcome === 'found' ? 'You counted enough for this order: take it from the shelf. Marked Found.' : 'Marked OS. The system number is fixed.',
+      description: outcome === 'found' ? 'You counted enough for this order: take it from the shelf. Marked Found.'
+        : n > 0 ? `${Math.min(n, needed)} Found, the other ${Math.max(0, needed - n)} marked OS. The system number is fixed.`
+        : 'Marked OS. The system number is fixed.',
+    });
+  });
+
+  // Found too few: the pieces go to an order they can finish; this one is OS.
+  const giveAway = (n: number, order: WaitingOrder) => run(async () => {
+    await onGiveAway(n);
+    toast({
+      title: `Keep ${n === 1 ? 'it' : `the ${n}`} for #${order.orderId.slice(0, 7).toUpperCase()}`,
+      description: `This order is marked OS. Pick #${order.orderId.slice(0, 7).toUpperCase()} (${order.customerName}) next.`,
     });
   });
 
@@ -73,7 +88,8 @@ export function ShelfGuardDialog({ prompt, onCount, onNotReceived, onBothEmpty, 
     <Dialog open onOpenChange={(o) => { if (!o && !saving) onClose(); }}>
       <DialogContent className="max-w-md">
         {prompt.kind === 'os' ? (
-          <OsShelfCheck key={prompt.rowKey} prompt={prompt} saving={saving} onSave={saveOsCount} onBack={onClose} />
+          <OsShelfCheck key={prompt.rowKey} prompt={prompt} saving={saving} onSave={saveOsCount}
+            onFindOrders={onFindOrders} onGiveAway={giveAway} onBack={onClose} />
         ) : prompt.kind === 'count' ? (
           <>
             <DialogHeader>

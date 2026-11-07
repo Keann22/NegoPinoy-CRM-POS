@@ -117,6 +117,15 @@ export interface PickerShelfInfo {
   unit2: number;
 }
 
+/** Another open order that still needs a product (picker: give the pieces to the order they can finish). */
+export interface WaitingOrder {
+  orderId: string;
+  customerName: string;
+  need: number;
+  status: string;
+  createdAt: string;
+}
+
 /** An owner's request for Jas to count a product (sticky pop-up until counted). */
 export interface RecountRequest {
   id: string;

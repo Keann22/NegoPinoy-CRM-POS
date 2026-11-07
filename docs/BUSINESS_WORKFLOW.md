@@ -103,6 +103,19 @@ Receipts:
   the system number, then OS goes through for what's missing. Found 2026-11-04:
   52 open OS lines (32 products, e.g. KAISA VILLA BLENDER - Red) had been marked
   OS, and a purchase requested, while the system still showed shelf stock.
+- **Found some, but not enough (owner, 2026-11-07).** In that OS pop-up the
+  picker counts **everything they can find** (in hand, Unit 1, nearby bins,
+  Unit 2). Found goes through for those pieces and the rest is OS. If the pieces
+  can **finish another order** (it needs that many or fewer), the pop-up lists up
+  to 3 such orders (oldest first) and the picker chooses: give the pieces to that
+  order (this one becomes all OS, pick that order next) or keep them here. Found
+  2026-11-07: one Korean Utensils Gold piece left, #38CDA89 needed 2 and
+  #0E212665 needed 1; Tess worked around the pop-up to give it to #0E212665.
+- **Unit 2 can't show more than the whole shelf (2026-11-07).** Orders take stock
+  off Unit 1's number, so pieces picked from Unit 2 never lowered Unit 2: the
+  pop-up said "Unit 2 has 3" when all 3 were gone. Found on 329 products (1,851
+  pieces). Pickers now see at most the shelf total, and after each pick the extra
+  is moved from Unit 2 to Unit 1 (a transfer; the total doesn't change).
 - **Unit 2 reserve is free stock, not borrowing.** If unallocated stock is above
   zero, the picker can't borrow from another order until they confirm **both
   Unit 1 and Unit 2 are empty**; that confirmation is saved as a count of 0.

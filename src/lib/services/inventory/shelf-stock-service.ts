@@ -115,12 +115,8 @@ export async function getUnpickedQtyMap(supabase: SupabaseClient): Promise<Map<s
   return unpicked;
 }
 
-/** Unpicked qty for one product, plus how many orders it comes from. */
-export async function getUnpickedQtyForProduct(
-  supabase: SupabaseClient,
-  productId: string
-): Promise<{ qty: number; orderCount: number }> {
-  // Bundles that contain this product, with how many of it each bundle uses.
+/** The product itself (1) plus every bundle that contains it, with how many of it each bundle uses. */
+export async function bundleQtyPerUnit(supabase: SupabaseClient, productId: string): Promise<Map<string, number>> {
   const qtyPerUnit = new Map<string, number>([[productId, 1]]);
   for (const key of ['productId', 'component_id']) {
     const { data: bundles, error } = await supabase
@@ -134,6 +130,15 @@ export async function getUnpickedQtyForProduct(
       if (comp) qtyPerUnit.set(b.id, comp.qtyPerBundle);
     }
   }
+  return qtyPerUnit;
+}
+
+/** Unpicked qty for one product, plus how many orders it comes from. */
+export async function getUnpickedQtyForProduct(
+  supabase: SupabaseClient,
+  productId: string
+): Promise<{ qty: number; orderCount: number }> {
+  const qtyPerUnit = await bundleQtyPerUnit(supabase, productId);
 
   const [linesRes, issuesRes] = await Promise.all([
     supabase

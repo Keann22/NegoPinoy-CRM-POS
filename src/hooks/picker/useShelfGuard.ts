@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { PickRow } from './types';
-import type { PickerShelfInfo } from '@/types/inventory-guardian.types';
+import type { PickerShelfInfo, WaitingOrder } from '@/types/inventory-guardian.types';
 import type { ProductReservation, ReservedOrder } from '@/lib/services/inventory/reservation-service';
 
 /*
@@ -12,8 +12,10 @@ import type { ProductReservation, ReservedOrder } from '@/lib/services/inventory
  *   - Borrow while the shelf has stock → confirm Unit 1 and Unit 2 are empty first.
  *   - Found when the pieces are reserved for another order's replacement → blocked
  *     (mark OS, or an owner overrides with a reason). Owner rule 2026-11-03.
- *   - OS while the system says the shelf has some → look again, or count the shelf
- *     (Unit 1, and confirm Unit 2 is empty) before OS goes through. Owner 2026-11-04.
+ *   - OS while the system says the shelf has some → look again, or count what they
+ *     can find (Unit 1, nearby bins, Unit 2) before OS goes through. Owner 2026-11-04.
+ *     Found some but not enough → Found for those, OS for the rest; or, if the pieces
+ *     can finish another order, give them to that order and mark this one OS (2026-11-07).
  * If the shelf numbers can't be loaded, nothing is blocked (the warehouse keeps working).
  */
 
@@ -171,6 +173,34 @@ export function useShelfGuard(orderId: string | null, rows: PickRow[], marks: Ma
     setPrompt(null);
   };
 
+  /** Other orders that need this product and that `pieces` can finish (oldest first, at most 3). */
+  const ordersPiecesCanFinish = async (pieces: number): Promise<WaitingOrder[]> => {
+    if (prompt?.kind !== 'os' || pieces <= 0) return [];
+    try {
+      const res = await fetch(`/api/picker/shelf?waitingFor=${encodeURIComponent(prompt.productId)}&orderId=${encodeURIComponent(orderId || '')}`, { cache: 'no-store' });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      return ((json.orders || []) as WaitingOrder[]).filter((o) => o.need <= pieces).slice(0, 3);
+    } catch (e) {
+      console.error('Shelf guard: could not load waiting orders', e);
+      return [];
+    }
+  };
+
+  /** Found too few: save the count, then this order is all OS; the pieces go to another order. */
+  const giveToOtherOrder = async (pieces: number) => {
+    if (prompt?.kind !== 'os') return;
+    const { rowKey, needed } = prompt;
+    const row = rows.find((r) => r.key === rowKey);
+    await post({ productId: prompt.productId, unit1Count: pieces, unit2Empty: true });
+    if (row) {
+      marks.markOutOfStock(rowKey, row.quantity);
+      marks.setMissingQty(rowKey, String(Math.min(row.quantity, needed)));
+    }
+    setPrompt(null);
+    await load();
+  };
+
   /** "From a delivery that isn't recorded yet": blocked, the line becomes OS. */
   const notReceivedYet = () => {
     if (prompt?.kind !== 'count') return;
@@ -195,5 +225,8 @@ export function useShelfGuard(orderId: string | null, rows: PickRow[], marks: Ma
     setPendingBorrow(null);
   };
 
-  return { prompt, onFound, onOutOfStock, beforeBorrow, submitCount, notReceivedYet, confirmBothEmpty, leaveReserved, overrideReserved, closePrompt, reload: load };
+  return {
+    prompt, shelf, onFound, onOutOfStock, beforeBorrow, submitCount, notReceivedYet, confirmBothEmpty,
+    leaveReserved, overrideReserved, ordersPiecesCanFinish, giveToOtherOrder, closePrompt, reload: load,
+  };
 }

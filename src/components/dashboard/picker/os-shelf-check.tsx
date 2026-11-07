@@ -7,24 +7,81 @@ import { DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/di
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { ShelfPrompt } from '@/hooks/picker/useShelfGuard';
+import type { WaitingOrder } from '@/types/inventory-guardian.types';
 
 interface Props {
   prompt: Extract<ShelfPrompt, { kind: 'os' }>;
   saving: boolean;
-  onSave: (unit1Count: number) => void;
+  onSave: (found: number) => void;
+  onFindOrders: (pieces: number) => Promise<WaitingOrder[]>;
+  onGiveAway: (pieces: number, order: WaitingOrder) => void;
   onBack: () => void;
 }
 
+const shortId = (id: string) => `#${id.slice(0, 7).toUpperCase()}`;
+
 /**
  * Asked when a picker taps OS but the system says the shelf still has some
- * (owner 2026-11-04). The picker looks again, or counts the shelf so the system
- * number gets fixed before OS goes through. The count is blind: no system number.
+ * (owner 2026-11-04). The picker looks again, or counts what they can find so the
+ * system number gets fixed before OS goes through. The count is blind: no system number.
+ * Found some but not enough (2026-11-07): Found for those, OS for the rest, unless
+ * the pieces can finish another order: then the picker may give them to that order.
  */
-export function OsShelfCheck({ prompt, saving, onSave, onBack }: Props) {
+export function OsShelfCheck({ prompt, saving, onSave, onFindOrders, onGiveAway, onBack }: Props) {
   const [count, setCount] = useState('');
   const [unit2Checked, setUnit2Checked] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [choice, setChoice] = useState<{ pieces: number; orders: WaitingOrder[] } | null>(null);
   const needsUnit2 = prompt.unit2 > 0;
-  const canSave = count.trim() !== '' && Number(count) >= 0 && (!needsUnit2 || unit2Checked) && !saving;
+  const busy = saving || checking;
+  const canSave = count.trim() !== '' && Number(count) >= 0 && (!needsUnit2 || unit2Checked) && !busy;
+
+  const save = async () => {
+    const n = Math.round(Number(count));
+    if (n > 0 && n < prompt.needed) {
+      // Too few for this order: could they finish another one instead?
+      setChecking(true);
+      const orders = await onFindOrders(n);
+      setChecking(false);
+      if (orders.length > 0) return setChoice({ pieces: n, orders });
+    }
+    onSave(n);
+  };
+
+  if (choice) {
+    const { pieces, orders } = choice;
+    return (
+      <>
+        <DialogHeader>
+          <DialogTitle>You found {pieces}, this order needs {prompt.needed}</DialogTitle>
+          <DialogDescription>
+            {prompt.productName}: {pieces === 1 ? 'this piece' : `these ${pieces} pieces`} can finish another order.
+            Give {pieces === 1 ? 'it' : 'them'} to that order, or keep {pieces === 1 ? 'it' : 'them'} for this one.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          {orders.map((o) => (
+            <div key={o.orderId} className="rounded-md border p-3">
+              <p className="text-sm font-semibold">{shortId(o.orderId)} · {o.customerName}</p>
+              <p className="text-xs text-muted-foreground">
+                Needs {o.need}
+                {o.status === 'Picked (with issue)' ? ' (was marked OS, waiting to be picked again)' : ''}
+                {o.createdAt ? ` · ordered ${new Date(o.createdAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', timeZone: 'Asia/Manila' })}` : ''}
+              </p>
+              <Button className="mt-2 w-full whitespace-normal h-auto py-2" disabled={saving} onClick={() => onGiveAway(pieces, o)}>
+                {saving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+                Give to {shortId(o.orderId)}: this order is OS
+              </Button>
+            </div>
+          ))}
+          <Button variant="outline" className="w-full whitespace-normal h-auto py-2" disabled={saving} onClick={() => onSave(pieces)}>
+            Keep for this order: {pieces} Found, {prompt.needed - pieces} OS
+          </Button>
+          <Button variant="ghost" className="w-full" disabled={saving} onClick={() => setChoice(null)}>Back</Button>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -36,7 +93,7 @@ export function OsShelfCheck({ prompt, saving, onSave, onBack }: Props) {
         </DialogDescription>
       </DialogHeader>
       <div className="space-y-4">
-        <Button className="w-full" disabled={saving} onClick={onBack}>Found it: go back and tap Found</Button>
+        <Button className="w-full" disabled={busy} onClick={onBack}>Found all {prompt.needed}: go back and tap Found</Button>
 
         {prompt.deliveryWaiting && (
           <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
@@ -46,23 +103,23 @@ export function OsShelfCheck({ prompt, saving, onSave, onBack }: Props) {
         )}
 
         <div className="space-y-2 rounded-md border p-3">
-          <Label htmlFor="os-count" className="font-semibold">Still none? Count the shelf</Label>
+          <Label htmlFor="os-count" className="font-semibold">Found some, or none? Count them</Label>
           <p className="text-xs text-muted-foreground">
-            How many are on the Unit 1 shelf now? Type 0 if there are none. This fixes the system&apos;s number.
+            How many did you find in total? Count the ones in your hand, on the Unit 1 shelf, in nearby bins and in Unit 2.
+            Type 0 if there are none. This fixes the system&apos;s number.
           </p>
           {needsUnit2 && (
             <label className="flex items-start gap-2 rounded-md bg-blue-50 p-2 text-xs text-blue-950">
               <input type="checkbox" className="mt-0.5 h-4 w-4" checked={unit2Checked} onChange={(e) => setUnit2Checked(e.target.checked)} />
               <span>
-                Unit 2 reserve is recorded with {prompt.unit2}. <strong>I checked Unit 2 too: none there.</strong>
-                {' '}(If there are some, take one and tap Found instead.)
+                Unit 2 reserve is recorded with {prompt.unit2}. <strong>I checked Unit 2 too</strong> (any pieces there are in my count).
               </span>
             </label>
           )}
           <div className="flex gap-2">
             <Input id="os-count" type="number" inputMode="numeric" min={0} value={count} onChange={(e) => setCount(e.target.value)} className="w-28" />
-            <Button variant="destructive" onClick={() => onSave(Math.round(Number(count)))} disabled={!canSave}>
-              {saving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}Save count
+            <Button variant="destructive" onClick={save} disabled={!canSave}>
+              {busy && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}Save count
             </Button>
           </div>
         </div>
