@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useLayawayReview } from '@/hooks/useLayawayReview';
+import { useLayawayCustomerHistory } from '@/hooks/useLayawayCustomerHistory';
 import { LayawayOrderCard } from '@/components/dashboard/accounting/layaway-order-card';
 import { LayawayHistoryDialog } from '@/components/dashboard/accounting/layaway-history-dialog';
 import {
@@ -42,12 +43,21 @@ export default function LayawaysReviewPage() {
     isUpdating,
     refreshLayaways,
     updateOrderNotes,
+    appendOrderNote,
     updateOrderStatus,
+  } = useLayawayReview();
+
+  const {
     fetchCustomerHistory,
     historyOrders,
     isHistoryLoading,
     historyCustomerName,
-  } = useLayawayReview();
+  } = useLayawayCustomerHistory();
+
+  const authorName = useMemo(() => {
+    if (!userProfile) return 'Owner';
+    return `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() || 'Owner';
+  }, [userProfile]);
 
   const [activeTab, setActiveTab] = useState<'dormant' | 'aging' | 'active' | 'all'>('dormant');
   const [searchQuery, setSearchQuery] = useState('');
@@ -317,7 +327,9 @@ export default function LayawaysReviewPage() {
               key={order.id}
               order={order}
               isUpdating={isUpdating === order.id}
+              authorName={authorName}
               onSaveNotes={updateOrderNotes}
+              onAppendNote={appendOrderNote}
               onUpdateStatus={updateOrderStatus}
               onViewHistory={handleViewCustomerHistory}
             />

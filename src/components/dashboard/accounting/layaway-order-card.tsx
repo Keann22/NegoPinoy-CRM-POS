@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { format, parseISO } from 'date-fns';
 import {
   Card,
@@ -21,14 +22,19 @@ import {
   Truck,
   Check,
   XCircle,
-  PackageCheck
+  ExternalLink,
+  FileText,
+  PlusCircle,
+  Send
 } from 'lucide-react';
 import type { LayawayReviewOrder } from '@/types/accounting.types';
 
 interface LayawayOrderCardProps {
   order: LayawayReviewOrder;
   isUpdating: boolean;
+  authorName: string;
   onSaveNotes: (orderId: string, notes: string) => Promise<boolean>;
+  onAppendNote: (orderId: string, newNoteText: string, authorName: string) => Promise<boolean>;
   onUpdateStatus: (orderId: string, status: string, reason?: string) => Promise<boolean>;
   onViewHistory: (customerId?: string, customerName?: string) => void;
 }
@@ -36,29 +42,42 @@ interface LayawayOrderCardProps {
 export function LayawayOrderCard({
   order,
   isUpdating,
+  authorName,
   onSaveNotes,
+  onAppendNote,
   onUpdateStatus,
   onViewHistory,
 }: LayawayOrderCardProps) {
-  const [notes, setNotes] = useState(order.notes || '');
-  const [isNotesDirty, setIsNotesDirty] = useState(false);
-  const [isSavingNotes, setIsSavingNotes] = useState(false);
+  // Existing notes edit state
+  const [isEditingRawNotes, setIsEditingRawNotes] = useState(false);
+  const [rawNotes, setRawNotes] = useState(order.notes || '');
+  const [isSavingRawNotes, setIsSavingRawNotes] = useState(false);
+
+  // New note append state
+  const [newNote, setNewNote] = useState('');
+  const [isAddingNote, setIsAddingNote] = useState(false);
 
   const formatMoney = (val: number) =>
     '₱' + val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setNotes(e.target.value);
-    setIsNotesDirty(e.target.value !== (order.notes || ''));
+  const handleSaveRawNotes = async () => {
+    setIsSavingRawNotes(true);
+    const success = await onSaveNotes(order.id, rawNotes);
+    if (success) {
+      setIsEditingRawNotes(false);
+    }
+    setIsSavingRawNotes(false);
   };
 
-  const handleSave = async () => {
-    setIsSavingNotes(true);
-    const success = await onSaveNotes(order.id, notes);
+  const handleAddNewNote = async () => {
+    if (!newNote.trim()) return;
+    setIsAddingNote(true);
+    const success = await onAppendNote(order.id, newNote, authorName);
     if (success) {
-      setIsNotesDirty(false);
+      setNewNote('');
+      setRawNotes((prev) => (prev ? `${prev}\n\n[Note]: ${newNote}` : newNote));
     }
-    setIsSavingNotes(false);
+    setIsAddingNote(false);
   };
 
   const getDormantBadge = () => {
@@ -95,9 +114,15 @@ export function LayawayOrderCard({
             {/* Top row: Order ID, Age, Dormancy Badge */}
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <span className="font-mono font-bold text-sm bg-muted px-2 py-0.5 rounded text-foreground">
+                <Link
+                  href={`/dashboard/orders/${order.id}`}
+                  target="_blank"
+                  className="font-mono font-bold text-sm bg-muted px-2 py-0.5 rounded text-foreground hover:text-primary hover:underline flex items-center gap-1"
+                  title="Click to open full order form"
+                >
                   #{order.id.substring(0, 8)}
-                </span>
+                  <ExternalLink className="h-3 w-3 opacity-70" />
+                </Link>
                 <span className="text-xs text-muted-foreground flex items-center gap-1">
                   <Clock className="h-3.5 w-3.5" />
                   {order.orderDate ? format(parseISO(order.orderDate), 'MMM d, yyyy') : '-'}
@@ -176,47 +201,113 @@ export function LayawayOrderCard({
             )}
           </div>
 
-          {/* RIGHT SIDE: Notes Editor & Quick Actions (Cols 8 - 12) */}
+          {/* RIGHT SIDE: Notes & Quick Actions (Cols 8 - 12) */}
           <div className="lg:col-span-5 p-4 sm:p-5 bg-muted/10 flex flex-col justify-between space-y-3">
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                  Internal Notes & Adjustments
-                </label>
-                <Button
-                  size="sm"
-                  variant={isNotesDirty ? 'default' : 'ghost'}
-                  disabled={!isNotesDirty || isSavingNotes || isUpdating}
-                  onClick={handleSave}
-                  className="h-7 px-2.5 text-xs flex items-center gap-1"
+            <div className="space-y-3">
+              {/* Header: Title and link to full order form */}
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                  <FileText className="h-3.5 w-3.5 text-primary" />
+                  Order Notes
+                </span>
+                <Link
+                  href={`/dashboard/orders/${order.id}`}
+                  target="_blank"
+                  className="text-[11px] text-primary hover:underline flex items-center gap-1 font-medium"
                 >
-                  <Save className="h-3 w-3" />
-                  {isSavingNotes ? 'Saving...' : 'Save Note'}
-                </Button>
+                  Open Order Form
+                  <ExternalLink className="h-3 w-3" />
+                </Link>
               </div>
 
-              <Textarea
-                value={notes}
-                onChange={handleNotesChange}
-                placeholder="Write notes here... (e.g. 'Already shipped via Lalamove c/o Ma'am Tess', 'Customer requested cancel', etc.)"
-                className="text-xs resize-y min-h-[75px] bg-background"
-                rows={3}
-              />
+              {/* SECTION 1: "Their Note" (Existing note from order form) */}
+              <div className="bg-background rounded-md border border-border/80 p-2.5 text-xs space-y-1.5 shadow-2xs">
+                <div className="flex items-center justify-between text-[11px] text-muted-foreground border-b border-border/50 pb-1">
+                  <span className="font-semibold text-foreground/90">Sales / Order Form Note:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditingRawNotes(!isEditingRawNotes);
+                      setRawNotes(order.notes || '');
+                    }}
+                    className="text-primary hover:underline text-[10px] font-medium"
+                  >
+                    {isEditingRawNotes ? 'Cancel' : 'Edit Note'}
+                  </button>
+                </div>
+
+                {isEditingRawNotes ? (
+                  <div className="space-y-1.5 pt-1">
+                    <Textarea
+                      value={rawNotes}
+                      onChange={(e) => setRawNotes(e.target.value)}
+                      rows={3}
+                      className="text-xs font-mono bg-muted/30"
+                    />
+                    <div className="flex justify-end">
+                      <Button
+                        size="sm"
+                        disabled={isSavingRawNotes || isUpdating}
+                        onClick={handleSaveRawNotes}
+                        className="h-6 text-[11px] px-2.5 flex items-center gap-1"
+                      >
+                        <Save className="h-3 w-3" />
+                        {isSavingRawNotes ? 'Saving...' : 'Save Changes'}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="max-h-24 overflow-y-auto text-muted-foreground whitespace-pre-wrap font-mono text-[11px] leading-relaxed pt-0.5">
+                    {order.notes ? (
+                      order.notes
+                    ) : (
+                      <span className="italic text-muted-foreground/60">No notes written on this order yet.</span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* SECTION 2: Add New Note (Connected to Order Form) */}
+              <div className="space-y-1.5 pt-0.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-semibold text-foreground flex items-center gap-1">
+                    <PlusCircle className="h-3 w-3 text-emerald-600" />
+                    Add New Note:
+                  </label>
+                  <span className="text-[10px] text-muted-foreground">Syncs to order form</span>
+                </div>
+                <Textarea
+                  value={newNote}
+                  onChange={(e) => setNewNote(e.target.value)}
+                  placeholder="Type update note (e.g. 'Checked with Tess, shipped via Lalamove', 'Customer promised to pay on 15th')..."
+                  rows={2}
+                  className="text-xs bg-background resize-none min-h-[50px]"
+                />
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    disabled={!newNote.trim() || isAddingNote || isUpdating}
+                    onClick={handleAddNewNote}
+                    className="h-7 text-xs px-2.5 flex items-center gap-1"
+                  >
+                    <Send className="h-3 w-3" />
+                    {isAddingNote ? 'Saving...' : 'Add Note to Order'}
+                  </Button>
+                </div>
+              </div>
             </div>
 
             {/* Quick action buttons */}
             <div className="pt-2 border-t border-border/60 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onViewHistory(order.customerId, order.customerName)}
-                  className="w-full text-xs h-7 text-primary border-primary/30 hover:bg-primary/10 flex items-center justify-center gap-1.5"
-                >
-                  <History className="h-3.5 w-3.5" />
-                  Check Customer History
-                </Button>
-              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onViewHistory(order.customerId, order.customerName)}
+                className="w-full text-xs h-7 text-primary border-primary/30 hover:bg-primary/10 flex items-center justify-center gap-1.5"
+              >
+                <History className="h-3.5 w-3.5" />
+                Check Customer History
+              </Button>
 
               {/* Status change actions */}
               <div className="grid grid-cols-3 gap-1.5 text-xs">

@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { differenceInDays, parseISO } from 'date-fns';
+import { differenceInDays, parseISO, format } from 'date-fns';
 import { useSupabase } from '@/lib/supabase/hooks';
 import { useToast } from '@/hooks/use-toast';
-import type { LayawayReviewOrder, LayawayCustomerHistoryOrder } from '@/types/accounting.types';
+import type { LayawayReviewOrder } from '@/types/accounting.types';
 
 interface RawOrderRow {
   id: string;
@@ -40,19 +40,6 @@ interface RawPaymentRow {
   payment_method: string;
 }
 
-interface RawCustomerHistoryRow {
-  id: string;
-  created_at: string;
-  order_date: string | null;
-  status: string;
-  payment_method: string;
-  total_amount: number | null;
-  amount_paid: number | null;
-  balance_due: number | null;
-  tracking_number: string | null;
-  notes: string | null;
-}
-
 export function useLayawayReview() {
   const supabase = useSupabase();
   const { toast } = useToast();
@@ -60,11 +47,6 @@ export function useLayawayReview() {
   const [orders, setOrders] = useState<LayawayReviewOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
-
-  // Customer order history dialog state
-  const [historyOrders, setHistoryOrders] = useState<LayawayCustomerHistoryOrder[]>([]);
-  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
-  const [historyCustomerName, setHistoryCustomerName] = useState<string>('');
 
   const fetchLayaways = useCallback(async () => {
     if (!supabase) return;
@@ -236,7 +218,7 @@ export function useLayawayReview() {
     fetchLayaways();
   }, [fetchLayaways]);
 
-  // Update order notes
+  // Update entire raw order notes
   const updateOrderNotes = async (orderId: string, newNotes: string) => {
     if (!supabase) return false;
     setIsUpdating(orderId);
@@ -261,6 +243,49 @@ export function useLayawayReview() {
       toast({
         variant: 'destructive',
         title: 'Failed to update notes',
+        description: err instanceof Error ? err.message : 'Unknown error',
+      });
+      return false;
+    } finally {
+      setIsUpdating(null);
+    }
+  };
+
+  // Append a new note (connected to the order form)
+  const appendOrderNote = async (
+    orderId: string,
+    newNoteText: string,
+    authorName: string
+  ) => {
+    if (!supabase || !newNoteText.trim()) return false;
+    setIsUpdating(orderId);
+    try {
+      const order = orders.find((o) => o.id === orderId);
+      const existingNotes = order?.notes || '';
+      const timestamp = format(new Date(), 'MMM d, yyyy h:mm a');
+      const formattedEntry = `[${timestamp}] ${authorName}:\n${newNoteText.trim()}`;
+      const updatedNotes = existingNotes ? `${existingNotes}\n\n${formattedEntry}` : formattedEntry;
+
+      const { error } = await supabase
+        .from('orders')
+        .update({ notes: updatedNotes })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, notes: updatedNotes } : o))
+      );
+
+      toast({
+        title: 'Note Added to Order Form',
+        description: `New note saved for Order #${orderId.substring(0, 8)}.`,
+      });
+      return true;
+    } catch (err: unknown) {
+      toast({
+        variant: 'destructive',
+        title: 'Failed to add note',
         description: err instanceof Error ? err.message : 'Unknown error',
       });
       return false;
@@ -319,100 +344,13 @@ export function useLayawayReview() {
     }
   };
 
-  // Fetch full customer order history (e.g. for Jessica Simon)
-  const fetchCustomerHistory = async (customerId?: string, customerName?: string) => {
-    if (!supabase) return;
-    setIsHistoryLoading(true);
-    setHistoryCustomerName(customerName || 'Customer');
-    setHistoryOrders([]);
-
-    try {
-      let query = supabase
-        .from('orders')
-        .select(`
-          id,
-          created_at,
-          order_date,
-          status,
-          payment_method,
-          total_amount,
-          amount_paid,
-          balance_due,
-          tracking_number,
-          notes
-        `)
-        .order('created_at', { ascending: false });
-
-      if (customerId) {
-        query = query.eq('customer_id', customerId);
-      } else if (customerName) {
-        query = query.ilike('shipping_name', `%${customerName}%`);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      const rawHistory = (data || []) as RawCustomerHistoryRow[];
-      if (rawHistory.length === 0) {
-        setHistoryOrders([]);
-        return;
-      }
-
-      const orderIds = rawHistory.map((o: RawCustomerHistoryRow) => o.id);
-      const itemsMap = new Map<string, string[]>();
-
-      for (let i = 0; i < orderIds.length; i += 200) {
-        const chunk = orderIds.slice(i, i + 200);
-        const { data: items } = await supabase
-          .from('order_items')
-          .select('order_id, product_name, quantity')
-          .in('order_id', chunk);
-
-        const typedItems = (items || []) as RawOrderItemRow[];
-        typedItems.forEach((it: RawOrderItemRow) => {
-          if (!itemsMap.has(it.order_id)) {
-            itemsMap.set(it.order_id, []);
-          }
-          itemsMap.get(it.order_id)!.push(`${it.product_name} (x${it.quantity})`);
-        });
-      }
-
-      const historyList: LayawayCustomerHistoryOrder[] = rawHistory.map((o: RawCustomerHistoryRow) => ({
-        id: o.id,
-        orderDate: o.order_date || o.created_at,
-        status: o.status,
-        paymentMethod: o.payment_method,
-        totalAmount: o.total_amount || 0,
-        amountPaid: o.amount_paid || 0,
-        balanceDue: o.balance_due || 0,
-        trackingNumber: o.tracking_number || undefined,
-        notes: o.notes || undefined,
-        itemsSummary: (itemsMap.get(o.id) || []).join(', ') || 'No items',
-      }));
-
-      setHistoryOrders(historyList);
-    } catch (err: unknown) {
-      console.error('Error fetching customer history:', err);
-      toast({
-        variant: 'destructive',
-        title: 'Error loading customer history',
-        description: err instanceof Error ? err.message : 'Unknown error',
-      });
-    } finally {
-      setIsHistoryLoading(false);
-    }
-  };
-
   return {
     orders,
     isLoading,
     isUpdating,
     refreshLayaways: fetchLayaways,
     updateOrderNotes,
+    appendOrderNote,
     updateOrderStatus,
-    fetchCustomerHistory,
-    historyOrders,
-    isHistoryLoading,
-    historyCustomerName,
   };
 }
