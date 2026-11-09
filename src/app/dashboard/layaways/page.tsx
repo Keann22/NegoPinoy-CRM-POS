@@ -7,6 +7,7 @@ import { useLayawayReview } from '@/hooks/useLayawayReview';
 import { useLayawayCustomerHistory } from '@/hooks/useLayawayCustomerHistory';
 import { LayawayOrderCard } from '@/components/dashboard/accounting/layaway-order-card';
 import { LayawayHistoryDialog } from '@/components/dashboard/accounting/layaway-history-dialog';
+import { LayawayMetricCards } from '@/components/dashboard/accounting/layaway-metric-cards';
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from '@/components/ui/card';
@@ -197,67 +198,7 @@ export default function LayawaysPage() {
       </div>
 
       {/* Metric Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-        <Card className="bg-amber-50/50 dark:bg-amber-950/20 border-amber-200/60">
-          <CardHeader className="p-3 sm:p-4 pb-1">
-            <CardDescription className="text-xs font-semibold text-amber-800 dark:text-amber-400 flex items-center gap-1">
-              <AlertTriangle className="h-3.5 w-3.5" />
-              Dormant (&ge;90d No Pay)
-            </CardDescription>
-            <CardTitle className="text-xl sm:text-2xl font-bold text-amber-900 dark:text-amber-300">
-              {stats.dormantCount} orders
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-1 text-xs text-muted-foreground">
-            Deposits held: <strong className="text-foreground">{formatMoney(stats.dormantPaid)}</strong>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200/60">
-          <CardHeader className="p-3 sm:p-4 pb-1">
-            <CardDescription className="text-xs font-semibold text-emerald-800 dark:text-emerald-400 flex items-center gap-1">
-              <Wallet className="h-3.5 w-3.5" />
-              Cash Collected in Advance
-            </CardDescription>
-            <CardTitle className="text-xl sm:text-2xl font-bold text-emerald-700 dark:text-emerald-300">
-              {formatMoney(stats.totalPaid)}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-1 text-xs text-muted-foreground">
-            Across {stats.totalCount} open lay-away orders
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="p-3 sm:p-4 pb-1">
-            <CardDescription className="text-xs font-semibold flex items-center gap-1">
-              <Clock className="h-3.5 w-3.5" />
-              Aging &gt;90 Days
-            </CardDescription>
-            <CardTitle className="text-xl sm:text-2xl font-bold">
-              {stats.aging90Count} orders
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-1 text-xs text-muted-foreground">
-            Created between May and August
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="p-3 sm:p-4 pb-1">
-            <CardDescription className="text-xs font-semibold flex items-center gap-1">
-              <Package className="h-3.5 w-3.5" />
-              Unpaid Balance
-            </CardDescription>
-            <CardTitle className="text-xl sm:text-2xl font-bold text-rose-600">
-              {formatMoney(stats.totalBalance)}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-1 text-xs text-muted-foreground">
-            Total pending customer balance
-          </CardContent>
-        </Card>
-      </div>
+      <LayawayMetricCards stats={stats} isManagement={!!isManagement} />
 
       {/* Filter Tabs, Agent Selector & Search Bar */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pt-2">
