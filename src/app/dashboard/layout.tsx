@@ -2,42 +2,11 @@
 
 import Link from 'next/link';
 import {
-  Archive,
-  ArrowDownUp,
-  ArrowRightLeft,
-  AlertTriangle,
-  BookCopy,
-  Building,
-  ChevronDown,
-  Home,
-  CreditCard,
-  LineChart,
-  ListChecks,
-  ListOrdered,
-  LogOut,
-  Menu,
-  MessageCircle,
-  Package,
-  PackageCheck,
-  Repeat,
-  Bot,
-  ShoppingCart,
-  Truck,
-  Users,
-  Wallet,
-  History,
-  PhilippinePeso,
-  FileText,
-  ClipboardList,
-  ShieldCheck,
-  ShieldAlert,
-  CalendarCheck2,
-  Undo2,
-  PackageX,
-  Printer,
-  Mail,
-  Receipt,
-  Camera,
+  Archive, ArrowDownUp, ArrowRightLeft, AlertTriangle, BookCopy, Building, ChevronDown,
+  Home, CreditCard, LineChart, ListChecks, ListOrdered, LogOut, Menu, MessageCircle,
+  Package, PackageCheck, Repeat, Bot, ShoppingCart, Truck, Users, Wallet, History,
+  PhilippinePeso, FileText, ClipboardList, ShieldCheck, ShieldAlert, CalendarCheck2,
+  Undo2, PackageX, Printer, Mail, Receipt, Camera, Clock,
 } from 'lucide-react';
 import { useAuth, useUser } from '@/lib/supabase/hooks';
 import { usePathname, useRouter } from 'next/navigation';
@@ -137,7 +106,7 @@ export default function DashboardLayout({
       // Jas's recount list (owners ask her to count products); its own item so it's easy to find.
       links.push({ href: '/dashboard/inventory/recount', label: 'Pabilang (Recount)', icon: ListChecks });
     }
-    
+
     if (isManagement || isInventory) {
       links.push({ href: '/dashboard/categories', label: 'Categories', icon: ListChecks });
     }
@@ -185,6 +154,7 @@ export default function DashboardLayout({
         setIsOpen: setOpenAccounting,
         subItems: [
           { href: '/dashboard/accounting/payments', label: 'Payments', icon: CreditCard },
+          { href: '/dashboard/accounting/layaways', label: 'Lay-away Review', icon: Clock },
           { href: '/dashboard/accounting/unpaid-shipped', label: 'Unpaid Shipped Orders', icon: AlertTriangle },
           { href: '/dashboard/accounting/remittances', label: 'SPX Remittances', icon: FileText },
           { href: '/dashboard/accounting/expenses', label: 'Expenses', icon: Wallet },

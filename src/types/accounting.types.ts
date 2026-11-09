@@ -78,3 +78,45 @@ export type FinancialSummary = {
   totalAccountsReceivable: number;
   arCount: number;
 };
+
+export type LayawayReviewItem = {
+  name: string;
+  quantity: number;
+  unitPrice: number;
+};
+
+export type LayawayReviewOrder = {
+  id: string;
+  orderDate: string;
+  createdAt: string;
+  customerId?: string;
+  customerName: string;
+  customerPhone: string;
+  salesPersonName: string;
+  totalAmount: number;
+  amountPaid: number;
+  balanceDue: number;
+  status: string;
+  notes: string;
+  trackingNumber?: string;
+  lastPaymentDate?: string;
+  lastPaymentAmount?: number;
+  lastPaymentMethod?: string;
+  daysSinceLastPayment?: number;
+  orderAgeDays: number;
+  activityStatus: 'dormant' | 'active_paying' | 'no_payment';
+  items: LayawayReviewItem[];
+};
+
+export type LayawayCustomerHistoryOrder = {
+  id: string;
+  orderDate: string;
+  status: string;
+  paymentMethod: string;
+  totalAmount: number;
+  amountPaid: number;
+  balanceDue: number;
+  trackingNumber?: string;
+  notes?: string;
+  itemsSummary: string;
+};
