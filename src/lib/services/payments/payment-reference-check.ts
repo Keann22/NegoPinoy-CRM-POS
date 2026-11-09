@@ -78,13 +78,14 @@ export async function afterReferenceRead(
   if (!digits) return;
   const { data: matches } = await supabase
     .from('payments')
-    .select('id, order_id, transfer_id, amount, notes, payment_date')
+    .select('id, order_id, transfer_id, transfer_amount, amount, notes, payment_date, ocr_amount')
     .ilike('reference_number', `%${digits}%`)
     .limit(20);
   const earlier = ((matches || []) as PaymentRow[]).filter(
     (m) => !groupIds.includes(m.id) && !(p.transfer_id && m.transfer_id === p.transfer_id),
   );
   if (earlier.length === 0) return;
+  if (await isSplitOfOneTransfer(supabase, p, recorded, earlier, ocrAmount)) return;
 
   const where = earlier
     .slice(0, 3)
@@ -98,6 +99,52 @@ export async function afterReferenceRead(
     'GCash reference used twice',
     `Payment on #${shortId(p.order_id)} (${peso(Number(p.amount))}) has GCash ref ${digits}, already used on ${where}. ` +
       'Check if it is an old screenshot or a duplicate.',
+  );
+}
+
+const SPLIT_WINDOW_MS = 3 * 24 * 3600 * 1000;
+
+/**
+ * One GCash split by hand over the same customer's orders, without the "also paid
+ * other orders" tick (e.g. a downpayment typed while creating a new order). Not a
+ * reuse when: same customer, no cancelled order, within 3 days, and all payments
+ * with this reference add up to no more than the screenshot. Found 2026-11-09:
+ * ₱1,262 on #C3C41DD + ₱738 downpayment on new #F89542F = the ₱2,000 sent.
+ */
+async function isSplitOfOneTransfer(
+  supabase: SupabaseClient,
+  p: PaymentRow,
+  recorded: number,
+  earlier: (PaymentRow & { ocr_amount?: number | string | null })[],
+  ocrAmount: number | null,
+): Promise<boolean> {
+  const screenshot = Math.max(ocrAmount ?? 0, ...earlier.map((m) => Number(m.ocr_amount) || 0));
+  if (screenshot <= 0 || !p.order_id || earlier.some((m) => !m.order_id)) return false;
+
+  const when = new Date(p.payment_date || Date.now()).getTime();
+  if (earlier.some((m) => Math.abs(new Date(m.payment_date || 0).getTime() - when) > SPLIT_WINDOW_MS)) return false;
+
+  // Count a several-orders transfer once (its transfer_amount), other payments by amount.
+  let total = recorded;
+  const seenTransfers = new Set(p.transfer_id ? [p.transfer_id] : []);
+  for (const m of earlier) {
+    if (m.transfer_id) {
+      if (seenTransfers.has(m.transfer_id)) continue;
+      seenTransfers.add(m.transfer_id);
+      total += Number(m.transfer_amount ?? m.amount);
+    } else {
+      total += Number(m.amount);
+    }
+  }
+  if (total > screenshot + 1) return false;
+
+  const orderIds = Array.from(new Set([p.order_id, ...earlier.map((m) => m.order_id as string)]));
+  const { data: orders } = await supabase.from('orders').select('id, customer_id, status').in('id', orderIds);
+  const rows = (orders || []) as { id: string; customer_id: string | null; status: string | null }[];
+  if (rows.length !== orderIds.length) return false;
+  const customer = rows[0].customer_id;
+  return rows.every(
+    (o) => o.customer_id && o.customer_id === customer && !/cancel|void/i.test(o.status || ''),
   );
 }
 
