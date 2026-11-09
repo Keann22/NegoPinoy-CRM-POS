@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createWorker } from 'tesseract.js';
-import { afterReferenceRead, checkReceiver } from '@/lib/services/payments/payment-reference-check';
+import { afterReferenceRead, checkReceiver, readReceiver } from '@/lib/services/payments/payment-reference-check';
 
 export const maxDuration = 60;
 
@@ -142,7 +142,13 @@ export async function POST(request: Request) {
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
     // GCash must go to one of our two numbers; flag and tell the owners if not.
+    // Tesseract misses small or blurry numbers, so try Vision once before flagging.
     try {
+      const receiver = readReceiver(allText);
+      if (!usedFallback && !receiver.ours && receiver.others.length === 0) {
+        const visionText = await runGoogleVision(proofUrl);
+        if (visionText) allText = `${allText}\n${visionText}`;
+      }
       await checkReceiver(supabase, paymentId, allText);
     } catch (checkError) {
       console.warn('[OCR] Receiver check failed:', checkError);

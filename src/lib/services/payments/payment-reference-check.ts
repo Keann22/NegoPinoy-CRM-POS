@@ -109,10 +109,10 @@ const RECEIVER_MARK = '[Not sent to our GCash';
 /**
  * GCash screenshots must show one of our two numbers as the receiver (owner,
  * 2026-11-09). GCash-to-GCash shows the full number; from another wallet or bank
- * it shows the customer's number and ours hidden ("•••• 9554"). Flags only when a
- * PH mobile number is readable and none is ours; remittances and unreadable
- * photos often show no number, so those aren't flagged. Tested on 170 screenshots
- * on 2026-11-09: 147 ours, 23 no number, none wrongly flagged.
+ * it shows the customer's number and ours hidden ("•••• 9554"). Flagged: another PH
+ * number and none of ours, or no receiver number at all (remittances, cropped or
+ * blurry photos; owner said flag these too). Tested on 170 screenshots on
+ * 2026-11-09: 147 ours, 23 no number, none showing another number wrongly.
  */
 export function readReceiver(text: string): { ours: boolean; others: string[] } {
   const flat = text.replace(/\s+/g, ' ');
@@ -139,7 +139,22 @@ export async function checkReceiver(
   if (!/gcash|g-xchange/i.test(`${text} ${payment.payment_method || ''}`)) return;
 
   const { ours, others } = readReceiver(text);
-  if (ours || others.length === 0) return;
+  if (ours) return;
+  const order = `#${shortId(payment.order_id)} (${peso(Number(payment.amount))})`;
+
+  // No number at all (owner, 2026-11-09: flag these too): remittances, bank
+  // slips, cropped or blurry screenshots. The owners check the proof.
+  if (others.length === 0) {
+    const flagged = await markPayments(supabase, [payment.id], RECEIVER_MARK, `${RECEIVER_MARK}? No receiver number on the screenshot]`);
+    if (!flagged) return;
+    await notifyOwners(
+      supabase,
+      'GCash receiver not shown',
+      `Payment on ${order}: the screenshot doesn't show 0917 186 9554 or 0923 290 2128 (cropped, blurry, ` +
+        'or a remittance/bank slip). Check the proof before counting this payment.',
+    );
+    return;
+  }
 
   const shown = others.slice(0, 2).map((n) => `0${n}`).join(', ');
   const flagged = await markPayments(supabase, [payment.id], RECEIVER_MARK, `${RECEIVER_MARK}: screenshot shows ${shown}]`);
@@ -147,7 +162,7 @@ export async function checkReceiver(
   await notifyOwners(
     supabase,
     'GCash not sent to our number',
-    `Payment on #${shortId(payment.order_id)} (${peso(Number(payment.amount))}): the screenshot shows ${shown}, ` +
+    `Payment on ${order}: the screenshot shows ${shown}, ` +
       'not 0917 186 9554 or 0923 290 2128. Check the proof before counting this payment.',
   );
 }
