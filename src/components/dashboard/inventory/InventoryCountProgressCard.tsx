@@ -258,7 +258,7 @@ export function InventoryCountProgressCard({ progress }: Props) {
                     <div className="flex items-center gap-2 self-start sm:self-auto">
                       <div className="text-right text-[11px]">
                         <div>Physical shelf: <strong>{item.physicalCount}</strong></div>
-                        <div className="text-muted-foreground">Dati sa system: {item.systemStockBefore ?? '-'}</div>
+                        <div className="text-muted-foreground">Dati sa shelf: {item.shelfBefore ?? '-'}</div>
                       </div>
 
                       {isMatch ? (

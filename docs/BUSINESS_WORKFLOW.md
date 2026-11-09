@@ -125,6 +125,19 @@ Receipts:
   zero, the picker can't borrow from another order until they confirm **both
   Unit 1 and Unit 2 are empty**; that confirmation is saved as a count of 0.
 
+## Count accuracy (built 2026-11-09)
+
+- Every shelf count (Guardian, picker, Pabilang, Procurement Sheet edit) is
+  scored: **"Tugma sa shelf"** when the count equals the **shelf (unallocated)
+  number the system showed** before it. Shown on Pabilang → Pag-usad ng Bilang
+  (today, 14 days, per staff), on the Guardian card, and as "✓ Checked" on the
+  Procurement Sheet.
+- When stock is below zero the shelf shows 0, so **a count of 0 is a match**
+  (found 2026-11-09: 54 such counts had been scored "+N").
+- 2026-11-09: 157 Procurement Sheet edits made before the fix had saved the
+  system stock instead of the typed shelf number; repaired from each record's
+  note (backup in scripts/reports).
+
 ## Recount requests (owner, 2026-10-31)
 
 - When the owners suspect a stock number is wrong, they ask Jas to count it.

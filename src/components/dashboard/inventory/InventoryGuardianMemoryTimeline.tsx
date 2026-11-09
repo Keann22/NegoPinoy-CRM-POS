@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useInventoryGuardian } from '@/hooks/useInventoryGuardian';
 import type { InventoryGuardianMemoryEntry } from '@/types';
+import { scoreShelfCount } from '@/lib/services/inventory/count-match';
 
 interface InventoryGuardianMemoryTimelineProps {
   productId: string;
@@ -49,19 +50,27 @@ export function InventoryGuardianMemoryTimeline({ productId, adjustmentsOnly = f
 
   const getActionBadge = (entry: InventoryGuardianMemoryEntry) => {
     switch (entry.actionType) {
-      case 'physical_count_audit':
+      case 'physical_count_audit': {
+        // Scored against the shelf number staff saw (count-match.ts).
+        const { isMatch, shelfBefore, shelfDiff } = scoreShelfCount({
+          physical_count: entry.physicalCount,
+          system_stock_before: entry.systemStockBefore,
+          system_stock_after: entry.systemStockAfter,
+          discrepancy: entry.discrepancy,
+        });
         return (
           <Badge variant="outline" className={`text-[10px] gap-1 ${
-            entry.discrepancy === 0
+            isMatch
               ? 'bg-emerald-100 text-emerald-800 border-emerald-300 font-semibold dark:bg-emerald-950 dark:text-emerald-300'
               : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300'
           }`}>
             <CheckCircle className="h-2.5 w-2.5 text-emerald-600" />
-            {entry.discrepancy === 0
+            {isMatch
               ? `Tugma sa Shelf: ${entry.physicalCount ?? 0} (Confirmed Correct)`
-              : `Physical Count: ${entry.physicalCount ?? 0} (${entry.discrepancy && entry.discrepancy > 0 ? `+${entry.discrepancy}` : entry.discrepancy})`}
+              : `Physical Count: ${entry.physicalCount ?? 0} (${shelfDiff > 0 ? `+${shelfDiff}` : shelfDiff}${shelfBefore != null ? `, shelf was ${shelfBefore}` : ''})`}
           </Badge>
         );
+      }
       case 'purchase_backfill':
         return (
           <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 gap-1">

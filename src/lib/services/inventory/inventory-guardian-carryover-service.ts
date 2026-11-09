@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import type { GuardianDailyProgress, CompletedDailyAuditItem } from '@/types';
+import { scoreShelfCount } from './count-match';
 
 const BASE_DAILY_TARGET = 5;
 const MAX_CARRYOVER = 15; // Cap carry-over so the daily queue never exceeds 20 items
@@ -273,6 +274,8 @@ export async function getGuardianDailyProgress(
     for (const m of userMemories) {
       if (!m.product_id || seenProductIds.has(m.product_id)) continue;
       seenProductIds.add(m.product_id);
+      // Counts are scored against the shelf number staff saw; a recorded purchase isn't a count.
+      const isCount = m.action_type === 'physical_count_audit';
       completedItems.push({
         id: m.id,
         productId: m.product_id,
@@ -282,15 +285,16 @@ export async function getGuardianDailyProgress(
         physicalCount: m.physical_count,
         systemStockBefore: m.system_stock_before,
         systemStockAfter: m.system_stock_after,
-        discrepancy: m.discrepancy,
+        discrepancy: isCount ? scoreShelfCount(m).shelfDiff : null,
         timestamp: m.created_at
       });
     }
 
     const completedToday = completedItems.length;
     const remainingToday = Math.max(0, target - completedToday);
+    const countedToday = completedItems.filter((i) => i.actionType === 'physical_count_audit').length;
     const matchedToday = completedItems.filter((i) => i.discrepancy === 0).length;
-    const accuracyRateToday = completedToday > 0 ? Math.round((matchedToday / completedToday) * 100) : 0;
+    const accuracyRateToday = countedToday > 0 ? Math.round((matchedToday / countedToday) * 100) : 0;
 
     return {
       baseTarget,
@@ -305,6 +309,7 @@ export async function getGuardianDailyProgress(
       assignedStaffName,
       teamCompletedToday,
       allAuditedProductIdsToday,
+      countedToday,
       matchedToday,
       accuracyRateToday,
     };

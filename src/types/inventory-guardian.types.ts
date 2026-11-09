@@ -110,6 +110,8 @@ export interface GuardianDailyProgress {
   assignedStaffName?: string;
   teamCompletedToday?: number;
   allAuditedProductIdsToday?: string[];
+  /** Shelf counts today (recorded purchases left out): the base for accuracy. */
+  countedToday?: number;
   matchedToday?: number;
   accuracyRateToday?: number;
 }
@@ -124,6 +126,9 @@ export interface InventoryCountProgressItem {
   physicalCount: number;
   systemStockBefore: number | null;
   systemStockAfter: number | null;
+  /** Shelf (unallocated) number shown before the count; null on old rows without the numbers. */
+  shelfBefore: number | null;
+  /** Count minus shelfBefore (0 = matched the shelf). */
   discrepancy: number;
   actorName: string;
   actorId?: string | null;

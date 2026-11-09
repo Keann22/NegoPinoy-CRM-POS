@@ -1,0 +1,1692 @@
+[
+ {
+  "id": "21d1b06e-f7ba-48d0-8f26-97b9cbdf8bef",
+  "product_id": "a83c8e6e-01a9-41bc-a757-2081ac8751bb",
+  "physical_count": 5,
+  "system_stock_before": -4,
+  "system_stock_after": 5,
+  "discrepancy": 9,
+  "notes": "[Procurement Direct Edit] Reason: Physical Count Correction. Notes: May mali sa inventory",
+  "created_at": "2026-10-05T17:01:11.121076+00:00"
+ },
+ {
+  "id": "e3310244-ae21-4732-8a5f-c0f03c9d5b17",
+  "product_id": "a83c8e6e-01a9-41bc-a757-2081ac8751bb",
+  "physical_count": -5,
+  "system_stock_before": 4,
+  "system_stock_after": -5,
+  "discrepancy": -9,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 5 (Layaway: 11, Demand: 1). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-05T17:06:50.127767+00:00"
+ },
+ {
+  "id": "8ac8e665-f843-4486-8eb8-3cde540765d8",
+  "product_id": "a83c8e6e-01a9-41bc-a757-2081ac8751bb",
+  "physical_count": -5,
+  "system_stock_before": -4,
+  "system_stock_after": -5,
+  "discrepancy": -1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 5 (Layaway: 11, Demand: 1). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-05T17:07:13.720158+00:00"
+ },
+ {
+  "id": "927d5a9b-4445-492b-bdc0-b7fab3d3d5de",
+  "product_id": "a83c8e6e-01a9-41bc-a757-2081ac8751bb",
+  "physical_count": -5,
+  "system_stock_before": 4,
+  "system_stock_after": -5,
+  "discrepancy": -9,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 5 (Layaway: 11, Demand: 1). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-05T17:11:28.590487+00:00"
+ },
+ {
+  "id": "8672a13f-7b94-47a2-a9a7-b4b62a60c417",
+  "product_id": "a83c8e6e-01a9-41bc-a757-2081ac8751bb",
+  "physical_count": -5,
+  "system_stock_before": -5,
+  "system_stock_after": -5,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 5 (Layaway: 11, Demand: 1). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-05T17:21:30.916914+00:00"
+ },
+ {
+  "id": "13658292-cab9-4593-a104-2767590c9ec6",
+  "product_id": "a83c8e6e-01a9-41bc-a757-2081ac8751bb",
+  "physical_count": -5,
+  "system_stock_before": -5,
+  "system_stock_after": -5,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 5 (Layaway: 11, Demand: 1). Reason: Physical Count Correction. Notes: Automated HTTP verification test",
+  "created_at": "2026-10-05T17:24:00.567102+00:00"
+ },
+ {
+  "id": "4555abb0-6a9c-4134-9986-ff49d8aca17c",
+  "product_id": "3a5ab20f-f8b6-4dbe-b073-1554f8454a84",
+  "physical_count": 11,
+  "system_stock_before": 12,
+  "system_stock_after": 11,
+  "discrepancy": -1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 12 (Layaway: 2, Demand: 1). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-05T17:27:43.350079+00:00"
+ },
+ {
+  "id": "92be21e8-559b-405b-9bba-935c74df2964",
+  "product_id": "e215edf6-0466-46c7-afef-440b0c9d557a",
+  "physical_count": -3,
+  "system_stock_before": 31,
+  "system_stock_after": -3,
+  "discrepancy": -34,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 5, Demand: 2). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-05T17:28:31.40188+00:00"
+ },
+ {
+  "id": "d7671c2f-cafc-4d4c-8973-d826562037a1",
+  "product_id": "7121ab2b-38a1-4391-b26a-7cd4f4097be3",
+  "physical_count": -2,
+  "system_stock_before": 4,
+  "system_stock_after": -2,
+  "discrepancy": -6,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 3, Demand: 1). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-05T17:29:11.911915+00:00"
+ },
+ {
+  "id": "c7689d4c-6335-4c4b-a60f-3abec62668e3",
+  "product_id": "f8b5957f-1a05-404c-98c4-8a558d4d2201",
+  "physical_count": 5,
+  "system_stock_before": 5,
+  "system_stock_after": 5,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 8 (Layaway: 4, Demand: 1). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-05T17:29:23.877379+00:00"
+ },
+ {
+  "id": "0ad07c44-7440-4ef1-974c-22689647ffe4",
+  "product_id": "34e4b113-84b7-48c6-ba75-8cd4acf14c9c",
+  "physical_count": 1,
+  "system_stock_before": 7,
+  "system_stock_after": 1,
+  "discrepancy": -6,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 4 (Layaway: 5, Demand: 2). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-05T17:29:56.987703+00:00"
+ },
+ {
+  "id": "664b27ff-22c7-45e2-8c71-0db76cfacdad",
+  "product_id": "f8b5957f-1a05-404c-98c4-8a558d4d2201",
+  "physical_count": -3,
+  "system_stock_before": 5,
+  "system_stock_after": -3,
+  "discrepancy": -8,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 4, Demand: 1). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-05T17:30:17.148978+00:00"
+ },
+ {
+  "id": "50a70107-561e-43dc-a4a0-fdb21d5b0bb0",
+  "product_id": "151947b7-eb47-4a63-a6c4-be676c56cd06",
+  "physical_count": -1,
+  "system_stock_before": 2,
+  "system_stock_after": -1,
+  "discrepancy": -3,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 3, Demand: 2). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-05T17:31:13.474677+00:00"
+ },
+ {
+  "id": "4a7e5df4-626e-4341-9499-20952334bbb9",
+  "product_id": "6fc015f7-5b8b-4e04-ba15-f2c10dfa4a1d",
+  "physical_count": 4,
+  "system_stock_before": 5,
+  "system_stock_after": 4,
+  "discrepancy": -1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 1 (Layaway: 0, Demand: 3). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-05T17:32:06.98374+00:00"
+ },
+ {
+  "id": "78bfbc07-2999-4fd1-b67c-ab0caff83964",
+  "product_id": "28bca3c5-693b-494a-976c-71597c2b55d8",
+  "physical_count": 1,
+  "system_stock_before": 9,
+  "system_stock_after": 1,
+  "discrepancy": -8,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 1, Demand: 2). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-05T17:33:25.890325+00:00"
+ },
+ {
+  "id": "c7809661-34b9-4ae7-b565-204c7fa85952",
+  "product_id": "34816961-812c-4259-bece-60865a700c3a",
+  "physical_count": -12,
+  "system_stock_before": 15,
+  "system_stock_after": -12,
+  "discrepancy": -27,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 15, Demand: 3). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-05T17:35:03.555935+00:00"
+ },
+ {
+  "id": "fa6d8e59-27d4-47c5-afd8-20774c4145b6",
+  "product_id": "45d09b0e-0cec-44c0-ba1d-6311e55520aa",
+  "physical_count": -3,
+  "system_stock_before": 1,
+  "system_stock_after": -3,
+  "discrepancy": -4,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 3, Demand: 0). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-05T17:35:33.706246+00:00"
+ },
+ {
+  "id": "dd72ecd2-10ab-4ddd-9c40-fea8a475dedd",
+  "product_id": "b9e9248c-2615-4599-99b5-14d3ca439817",
+  "physical_count": -1,
+  "system_stock_before": 1,
+  "system_stock_after": -1,
+  "discrepancy": -2,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 7, Demand: 6). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-05T17:36:42.692529+00:00"
+ },
+ {
+  "id": "57382e27-4554-4ddd-a3e5-0227032c5391",
+  "product_id": "d4d1e350-89ac-4483-a6eb-91c485ab46a5",
+  "physical_count": 4,
+  "system_stock_before": 0,
+  "system_stock_after": 4,
+  "discrepancy": 4,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 4 (Layaway: 0, Demand: 0). Reason: Physical Count Correction. Notes: [Procurement Sheet Audit] Direct unallocated stock update to 4. User bulk request.",
+  "created_at": "2026-10-06T01:10:48.211511+00:00"
+ },
+ {
+  "id": "6e0bf29c-d731-4c04-a5ed-a16b99b9f38f",
+  "product_id": "28bca3c5-693b-494a-976c-71597c2b55d8",
+  "physical_count": 2,
+  "system_stock_before": 0,
+  "system_stock_after": 2,
+  "discrepancy": 2,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 1, Demand: 3). Reason: Physical Count Correction. Notes: [Procurement Sheet Audit] Direct unallocated stock update to 0. User bulk request.",
+  "created_at": "2026-10-06T01:10:50.13851+00:00"
+ },
+ {
+  "id": "90fa7415-dd3c-4d19-8251-5554aaa9efe4",
+  "product_id": "0a89ff13-e4d9-4b52-a847-ed2eda603d79",
+  "physical_count": -2,
+  "system_stock_before": 11,
+  "system_stock_after": -2,
+  "discrepancy": -13,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 2, Demand: 0). Reason: Physical Count Correction. Notes: [Procurement Sheet Audit] Direct unallocated stock update to 0. User bulk request.",
+  "created_at": "2026-10-06T01:10:52.066649+00:00"
+ },
+ {
+  "id": "ac6ccc05-e108-44e6-a594-5a0c23e9efdb",
+  "product_id": "303a1ee9-86d9-4622-963b-3dab27322875",
+  "physical_count": -2,
+  "system_stock_before": -2,
+  "system_stock_after": -2,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 5, Demand: 3). Reason: Physical Count Correction. Notes: [Procurement Sheet Audit] Direct unallocated stock update to 0. User bulk request.",
+  "created_at": "2026-10-06T01:10:53.963564+00:00"
+ },
+ {
+  "id": "64459f88-3601-4849-96fb-c2babde817f2",
+  "product_id": "6fc015f7-5b8b-4e04-ba15-f2c10dfa4a1d",
+  "physical_count": 4,
+  "system_stock_before": 4,
+  "system_stock_after": 4,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 1 (Layaway: 0, Demand: 3). Reason: Physical Count Correction. Notes: [Procurement Sheet Audit] Direct unallocated stock update to 1. User bulk request.",
+  "created_at": "2026-10-06T01:10:55.741586+00:00"
+ },
+ {
+  "id": "80227305-5d0c-446c-9b7d-6b4c1c61bc49",
+  "product_id": "45d09b0e-0cec-44c0-ba1d-6311e55520aa",
+  "physical_count": -3,
+  "system_stock_before": -3,
+  "system_stock_after": -3,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 3, Demand: 0). Reason: Physical Count Correction. Notes: [Procurement Sheet Audit] Direct unallocated stock update to 0. User bulk request.",
+  "created_at": "2026-10-06T01:10:57.638348+00:00"
+ },
+ {
+  "id": "da7953cf-8acd-41b5-98a5-940e973fb769",
+  "product_id": "3080f65e-4dd9-4483-8790-60166c9010b5",
+  "physical_count": -1,
+  "system_stock_before": -1,
+  "system_stock_after": -1,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 4, Demand: 3). Reason: Physical Count Correction. Notes: [Procurement Sheet Audit] Direct unallocated stock update to 0. User bulk request.",
+  "created_at": "2026-10-06T01:10:59.542859+00:00"
+ },
+ {
+  "id": "d9f10fff-26f1-4cf8-a706-ed892cc71be8",
+  "product_id": "34816961-812c-4259-bece-60865a700c3a",
+  "physical_count": -12,
+  "system_stock_before": -12,
+  "system_stock_after": -12,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 15, Demand: 3). Reason: Physical Count Correction. Notes: [Procurement Sheet Audit] Direct unallocated stock update to 0. User bulk request.",
+  "created_at": "2026-10-06T01:11:01.651598+00:00"
+ },
+ {
+  "id": "08bc9001-77ed-4ce5-ac8c-bbba012d29c7",
+  "product_id": "39803d5c-ae6e-4b03-8266-43e0935830cc",
+  "physical_count": -5,
+  "system_stock_before": -5,
+  "system_stock_after": -5,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 6, Demand: 1). Reason: Physical Count Correction. Notes: [Procurement Sheet Audit] Direct unallocated stock update to 0. User bulk request.",
+  "created_at": "2026-10-06T01:11:03.481596+00:00"
+ },
+ {
+  "id": "4d3613f5-f231-4081-916e-01ce77c3f0cd",
+  "product_id": "b9e9248c-2615-4599-99b5-14d3ca439817",
+  "physical_count": -1,
+  "system_stock_before": -1,
+  "system_stock_after": -1,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 7, Demand: 6). Reason: Physical Count Correction. Notes: [Procurement Sheet Audit] Direct unallocated stock update to 0. User bulk request.",
+  "created_at": "2026-10-06T01:11:05.337015+00:00"
+ },
+ {
+  "id": "05eff0f0-abaa-4614-934d-c46ceab3524e",
+  "product_id": "b524ee54-86b1-48d0-ae93-2ee35addee6f",
+  "physical_count": 8,
+  "system_stock_before": -2,
+  "system_stock_after": 8,
+  "discrepancy": 10,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 3 (Layaway: 1, Demand: 6). Reason: Physical Count Correction. Notes: [Procurement Sheet Audit] Direct unallocated stock update to 3. User bulk request.",
+  "created_at": "2026-10-06T01:11:07.172753+00:00"
+ },
+ {
+  "id": "f041236b-9382-4abd-8bd1-e61d82c4dcac",
+  "product_id": "8e5a6012-928a-470a-9fc3-4ae0cb1ffb0c",
+  "physical_count": 18,
+  "system_stock_before": 33,
+  "system_stock_after": 18,
+  "discrepancy": -15,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 19 (Layaway: 3, Demand: 2). Reason: Physical Count Correction. Notes: [Procurement Sheet Audit] Direct unallocated stock update to 19. User bulk request.",
+  "created_at": "2026-10-06T01:11:08.93603+00:00"
+ },
+ {
+  "id": "aedc99f5-a914-493e-a41d-4e53da40e6e6",
+  "product_id": "2ca24731-a5c6-41fe-8fb1-0124e8851ae7",
+  "physical_count": -1,
+  "system_stock_before": 2,
+  "system_stock_after": -1,
+  "discrepancy": -3,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 1, Demand: 0). Reason: Physical Count Correction. Notes: [Procurement Sheet Audit] Direct unallocated stock update to 0. User bulk request.",
+  "created_at": "2026-10-06T01:11:10.768571+00:00"
+ },
+ {
+  "id": "5bd5af0f-43b8-47ef-b7a5-1af7117981bb",
+  "product_id": "7ea2a64a-2d1b-418d-bbbe-6242e3dd27b4",
+  "physical_count": 1,
+  "system_stock_before": 6,
+  "system_stock_after": 1,
+  "discrepancy": -5,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 0, Demand: 1). Reason: Physical Count Correction. Notes: [Procurement Sheet Audit] Direct unallocated stock update to 0. User bulk request.",
+  "created_at": "2026-10-06T01:11:12.59937+00:00"
+ },
+ {
+  "id": "16000c07-2267-4241-842a-75acc6d0d8bb",
+  "product_id": "755f8691-a34c-4b28-8c83-004da192bcdc",
+  "physical_count": 0,
+  "system_stock_before": 0,
+  "system_stock_after": 0,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 0, Demand: 0). Reason: Physical Count Correction. Notes: [Procurement Sheet Audit] Direct unallocated stock update to 0. User bulk request.",
+  "created_at": "2026-10-06T01:11:14.385761+00:00"
+ },
+ {
+  "id": "6fc9d626-7454-4580-9890-fc513b5066dc",
+  "product_id": "9e58564a-4c78-4c8f-aca8-7a0e0c225882",
+  "physical_count": 1,
+  "system_stock_before": 1,
+  "system_stock_after": 1,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 0, Demand: 1). Reason: Physical Count Correction. Notes: [Procurement Sheet Audit] Direct unallocated stock update to 0. User bulk request.",
+  "created_at": "2026-10-06T01:11:16.182842+00:00"
+ },
+ {
+  "id": "34f3d30f-af90-4199-b92a-8f7c3d9a3f96",
+  "product_id": "e9abf916-a139-4333-97a3-137fd39b0e0e",
+  "physical_count": -4,
+  "system_stock_before": 2,
+  "system_stock_after": -4,
+  "discrepancy": -6,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 2 (Layaway: 6, Demand: 0). Reason: Physical Count Correction. Notes: [Procurement Sheet Audit] Direct unallocated stock update to 2. User bulk request.",
+  "created_at": "2026-10-06T01:11:17.971197+00:00"
+ },
+ {
+  "id": "b57667d4-3130-4557-bdc0-99b0d86bb8b0",
+  "product_id": "4dbe47e3-4202-45b5-a672-c3468fc66c09",
+  "physical_count": 2,
+  "system_stock_before": 3,
+  "system_stock_after": 2,
+  "discrepancy": -1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 2 (Layaway: 0, Demand: 0). Reason: Physical Count Correction. Notes: [Procurement Sheet Audit] Direct unallocated stock update to 2. User bulk request.",
+  "created_at": "2026-10-06T01:11:19.703941+00:00"
+ },
+ {
+  "id": "19a72d22-63bb-41a6-8f9e-0ecf1d43bd84",
+  "product_id": "34e4b113-84b7-48c6-ba75-8cd4acf14c9c",
+  "physical_count": 1,
+  "system_stock_before": 1,
+  "system_stock_after": 1,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 4 (Layaway: 5, Demand: 2). Reason: Physical Count Correction. Notes: [Procurement Batch Audit] Set unallocated stock to 4. User requested inventory audit update.",
+  "created_at": "2026-10-06T01:11:51.440304+00:00"
+ },
+ {
+  "id": "e67f4469-666d-4284-a8c5-9a17db0844d2",
+  "product_id": "28bca3c5-693b-494a-976c-71597c2b55d8",
+  "physical_count": 2,
+  "system_stock_before": 2,
+  "system_stock_after": 2,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 1, Demand: 3). Reason: Physical Count Correction. Notes: [Procurement Batch Audit] Set unallocated stock to 0. User requested inventory audit update.",
+  "created_at": "2026-10-06T01:11:54.290044+00:00"
+ },
+ {
+  "id": "7d8af282-f946-4493-83e6-9c540eb017da",
+  "product_id": "151947b7-eb47-4a63-a6c4-be676c56cd06",
+  "physical_count": -1,
+  "system_stock_before": -1,
+  "system_stock_after": -1,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 3, Demand: 2). Reason: Physical Count Correction. Notes: [Procurement Batch Audit] Set unallocated stock to 0. User requested inventory audit update.",
+  "created_at": "2026-10-06T01:11:56.281694+00:00"
+ },
+ {
+  "id": "49ef3dd8-8ecb-416a-80dc-525ec6266544",
+  "product_id": "303a1ee9-86d9-4622-963b-3dab27322875",
+  "physical_count": -2,
+  "system_stock_before": -2,
+  "system_stock_after": -2,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 5, Demand: 3). Reason: Physical Count Correction. Notes: [Procurement Batch Audit] Set unallocated stock to 0. User requested inventory audit update.",
+  "created_at": "2026-10-06T01:11:58.276667+00:00"
+ },
+ {
+  "id": "33a0e941-593a-42a1-b6f3-0aa3db092dfe",
+  "product_id": "6fc015f7-5b8b-4e04-ba15-f2c10dfa4a1d",
+  "physical_count": 4,
+  "system_stock_before": 4,
+  "system_stock_after": 4,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 1 (Layaway: 0, Demand: 3). Reason: Physical Count Correction. Notes: [Procurement Batch Audit] Set unallocated stock to 1. User requested inventory audit update.",
+  "created_at": "2026-10-06T01:12:00.509326+00:00"
+ },
+ {
+  "id": "d54fc180-f82a-4a88-a8bf-1246c6f4c578",
+  "product_id": "45d09b0e-0cec-44c0-ba1d-6311e55520aa",
+  "physical_count": -3,
+  "system_stock_before": -3,
+  "system_stock_after": -3,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 3, Demand: 0). Reason: Physical Count Correction. Notes: [Procurement Batch Audit] Set unallocated stock to 0. User requested inventory audit update.",
+  "created_at": "2026-10-06T01:12:03.003011+00:00"
+ },
+ {
+  "id": "42b2f2b7-b790-4351-b68c-d6272ddf7205",
+  "product_id": "3080f65e-4dd9-4483-8790-60166c9010b5",
+  "physical_count": -1,
+  "system_stock_before": -1,
+  "system_stock_after": -1,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 4, Demand: 3). Reason: Physical Count Correction. Notes: [Procurement Batch Audit] Set unallocated stock to 0. User requested inventory audit update.",
+  "created_at": "2026-10-06T01:12:04.927936+00:00"
+ },
+ {
+  "id": "b41c96dc-6e34-4fa1-9b6d-479c750f5363",
+  "product_id": "34816961-812c-4259-bece-60865a700c3a",
+  "physical_count": -12,
+  "system_stock_before": -12,
+  "system_stock_after": -12,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 15, Demand: 3). Reason: Physical Count Correction. Notes: [Procurement Batch Audit] Set unallocated stock to 0. User requested inventory audit update.",
+  "created_at": "2026-10-06T01:12:06.986303+00:00"
+ },
+ {
+  "id": "4b598f3b-6402-49ed-818b-cda774c482e0",
+  "product_id": "39803d5c-ae6e-4b03-8266-43e0935830cc",
+  "physical_count": -5,
+  "system_stock_before": -5,
+  "system_stock_after": -5,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 6, Demand: 1). Reason: Physical Count Correction. Notes: [Procurement Batch Audit] Set unallocated stock to 0. User requested inventory audit update.",
+  "created_at": "2026-10-06T01:12:09.06189+00:00"
+ },
+ {
+  "id": "bee1e8d1-9f3a-4aa4-98c4-2722f15e1851",
+  "product_id": "b9e9248c-2615-4599-99b5-14d3ca439817",
+  "physical_count": -1,
+  "system_stock_before": -1,
+  "system_stock_after": -1,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 7, Demand: 6). Reason: Physical Count Correction. Notes: [Procurement Batch Audit] Set unallocated stock to 0. User requested inventory audit update.",
+  "created_at": "2026-10-06T01:12:11.011846+00:00"
+ },
+ {
+  "id": "13034a87-3d6b-403f-a982-04714e78e43c",
+  "product_id": "90423318-4527-4e20-b69c-fca11c601e31",
+  "physical_count": -1,
+  "system_stock_before": 2,
+  "system_stock_after": -1,
+  "discrepancy": -3,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 3 (Layaway: 5, Demand: 1). Reason: Physical Count Correction. Notes: [Procurement Batch Audit] Set unallocated stock to 3. User requested inventory audit update.",
+  "created_at": "2026-10-06T01:12:13.108319+00:00"
+ },
+ {
+  "id": "8f728599-4fd6-4180-85fb-57d6dfd4e6b9",
+  "product_id": "8e5a6012-928a-470a-9fc3-4ae0cb1ffb0c",
+  "physical_count": 18,
+  "system_stock_before": 18,
+  "system_stock_after": 18,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 19 (Layaway: 3, Demand: 2). Reason: Physical Count Correction. Notes: [Procurement Batch Audit] Set unallocated stock to 19. User requested inventory audit update.",
+  "created_at": "2026-10-06T01:12:15.013206+00:00"
+ },
+ {
+  "id": "85938c3f-6f39-40fd-86ec-24966af16b1d",
+  "product_id": "2ca24731-a5c6-41fe-8fb1-0124e8851ae7",
+  "physical_count": -1,
+  "system_stock_before": -1,
+  "system_stock_after": -1,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 1, Demand: 0). Reason: Physical Count Correction. Notes: [Procurement Batch Audit] Set unallocated stock to 0. User requested inventory audit update.",
+  "created_at": "2026-10-06T01:12:16.868529+00:00"
+ },
+ {
+  "id": "f8c1b442-f435-4d05-84a6-f792c4bd645e",
+  "product_id": "7ea2a64a-2d1b-418d-bbbe-6242e3dd27b4",
+  "physical_count": 1,
+  "system_stock_before": 1,
+  "system_stock_after": 1,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 0, Demand: 1). Reason: Physical Count Correction. Notes: [Procurement Batch Audit] Set unallocated stock to 0. User requested inventory audit update.",
+  "created_at": "2026-10-06T01:12:18.736996+00:00"
+ },
+ {
+  "id": "c0031a9d-7753-453e-a121-a257d3e9730a",
+  "product_id": "951f85a7-390d-4cf0-9397-964d60554d38",
+  "physical_count": 0,
+  "system_stock_before": 1,
+  "system_stock_after": 0,
+  "discrepancy": -1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 0, Demand: 0). Reason: Physical Count Correction. Notes: [Procurement Batch Audit] Set unallocated stock to 0. User requested inventory audit update.",
+  "created_at": "2026-10-06T01:12:20.757981+00:00"
+ },
+ {
+  "id": "33fceffc-7046-4629-bc36-d16fbcec881c",
+  "product_id": "9e58564a-4c78-4c8f-aca8-7a0e0c225882",
+  "physical_count": 1,
+  "system_stock_before": 1,
+  "system_stock_after": 1,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 0, Demand: 1). Reason: Physical Count Correction. Notes: [Procurement Batch Audit] Set unallocated stock to 0. User requested inventory audit update.",
+  "created_at": "2026-10-06T01:12:22.821187+00:00"
+ },
+ {
+  "id": "1d60a1b7-e1a8-4a75-b73e-811e0579ed3e",
+  "product_id": "e9abf916-a139-4333-97a3-137fd39b0e0e",
+  "physical_count": -4,
+  "system_stock_before": -4,
+  "system_stock_after": -4,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 2 (Layaway: 6, Demand: 0). Reason: Physical Count Correction. Notes: [Procurement Batch Audit] Set unallocated stock to 2. User requested inventory audit update.",
+  "created_at": "2026-10-06T01:12:24.783335+00:00"
+ },
+ {
+  "id": "e7dc9a9f-5f94-4910-933f-7393c526b269",
+  "product_id": "4dbe47e3-4202-45b5-a672-c3468fc66c09",
+  "physical_count": 2,
+  "system_stock_before": 2,
+  "system_stock_after": 2,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 2 (Layaway: 0, Demand: 0). Reason: Physical Count Correction. Notes: [Procurement Batch Audit] Set unallocated stock to 2. User requested inventory audit update.",
+  "created_at": "2026-10-06T01:12:26.727106+00:00"
+ },
+ {
+  "id": "5f10127e-0e9b-431a-b24f-79b36a804927",
+  "product_id": "6fc015f7-5b8b-4e04-ba15-f2c10dfa4a1d",
+  "physical_count": 4,
+  "system_stock_before": 4,
+  "system_stock_after": 4,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 1 (Layaway: 0, Demand: 3). Reason: Physical Count Correction. Notes: [Procurement Additional Audit] Set unallocated stock to 1. User requested inventory audit update.",
+  "created_at": "2026-10-06T01:26:45.957493+00:00"
+ },
+ {
+  "id": "308cd5bc-9fe9-430b-9626-98c9eacb7c9e",
+  "product_id": "7d3e382f-f170-47f1-8f90-17d0a4751aaf",
+  "physical_count": -6,
+  "system_stock_before": -4,
+  "system_stock_after": -6,
+  "discrepancy": -2,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 1 (Layaway: 8, Demand: 1). Reason: Physical Count Correction. Notes: [Procurement Additional Audit] Set unallocated stock to 1. User requested inventory audit update.",
+  "created_at": "2026-10-06T01:26:47.862005+00:00"
+ },
+ {
+  "id": "3b42265e-8436-4041-8bc4-63f63896293e",
+  "product_id": "b524ee54-86b1-48d0-ae93-2ee35addee6f",
+  "physical_count": 5,
+  "system_stock_before": 8,
+  "system_stock_after": 5,
+  "discrepancy": -3,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 1, Demand: 6). Reason: Physical Count Correction. Notes: [Procurement Additional Audit] Set unallocated stock to 0. User requested inventory audit update.",
+  "created_at": "2026-10-06T01:26:49.800217+00:00"
+ },
+ {
+  "id": "b11ff274-0cfb-494d-b128-0231e0d66a78",
+  "product_id": "0bf2d3a9-02a2-436b-b64e-fef8ac40d4f3",
+  "physical_count": -21,
+  "system_stock_before": 19,
+  "system_stock_after": -21,
+  "discrepancy": -40,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 18 (Layaway: 41, Demand: 2). Reason: Physical Count Correction. Notes: [Procurement Additional Audit] Set unallocated stock to 18. User requested inventory audit update.",
+  "created_at": "2026-10-06T01:26:51.681005+00:00"
+ },
+ {
+  "id": "8f531625-d3e9-4898-a2d3-6ac19ab08146",
+  "product_id": "e972694c-3069-4040-b22d-532887523e6e",
+  "physical_count": 1,
+  "system_stock_before": 4,
+  "system_stock_after": 1,
+  "discrepancy": -3,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 0, Demand: 1). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-06T01:51:04.022928+00:00"
+ },
+ {
+  "id": "4ac4707e-69ae-4e39-a249-47623d562ceb",
+  "product_id": "c4b5bf04-35f2-489e-b805-bc5c1ec7a1c2",
+  "physical_count": 3,
+  "system_stock_before": 5,
+  "system_stock_after": 3,
+  "discrepancy": -2,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 0, Demand: 3). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-06T01:51:49.86987+00:00"
+ },
+ {
+  "id": "21544f61-3257-4811-918e-8f1a40684ca7",
+  "product_id": "b72e8fca-298e-486e-81c9-9cbbc2c85d32",
+  "physical_count": -2,
+  "system_stock_before": 0,
+  "system_stock_after": -2,
+  "discrepancy": -2,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 2, Demand: 0). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-06T01:52:56.013649+00:00"
+ },
+ {
+  "id": "ade7d393-2aed-4207-a418-1fc2fc59a23c",
+  "product_id": "3f3047d3-fdd2-470f-82bc-84bd005ac122",
+  "physical_count": -3,
+  "system_stock_before": 2,
+  "system_stock_after": -3,
+  "discrepancy": -5,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 5, Demand: 2). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-09T08:24:42.068147+00:00"
+ },
+ {
+  "id": "4b212aa5-70b6-44de-a40b-3f775106df90",
+  "product_id": "ac33f6d0-b989-42e2-a089-d18571454c1e",
+  "physical_count": -1,
+  "system_stock_before": 3,
+  "system_stock_after": -1,
+  "discrepancy": -4,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 3, Demand: 2). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-09T08:26:21.206351+00:00"
+ },
+ {
+  "id": "927556e3-264e-4676-81dc-a3269f2b1f55",
+  "product_id": "33ae2aa2-4f2c-495c-bdc2-f34abc7bf221",
+  "physical_count": -3,
+  "system_stock_before": -1,
+  "system_stock_after": -3,
+  "discrepancy": -2,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 4, Demand: 1). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-09T08:26:45.05108+00:00"
+ },
+ {
+  "id": "01a41b44-a1b9-41df-9490-2aa8604da849",
+  "product_id": "66ca2cb8-0d59-4112-95c8-546e053867fd",
+  "physical_count": -4,
+  "system_stock_before": 4,
+  "system_stock_after": -4,
+  "discrepancy": -8,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 5 (Layaway: 11, Demand: 2). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-09T08:29:56.627672+00:00"
+ },
+ {
+  "id": "0cd5de18-d77d-42b6-9311-db80bb742eac",
+  "product_id": "20170bc6-de66-4652-af07-b03704e4119a",
+  "physical_count": 1,
+  "system_stock_before": 20,
+  "system_stock_after": 1,
+  "discrepancy": -19,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 6 (Layaway: 10, Demand: 5). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-09T08:35:26.827149+00:00"
+ },
+ {
+  "id": "b28ad1a5-7205-4bec-be34-358ddc3acaba",
+  "product_id": "20f8c940-9833-4634-bb3b-1529fa7ecda8",
+  "physical_count": 1,
+  "system_stock_before": 2,
+  "system_stock_after": 1,
+  "discrepancy": -1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 0, Demand: 1). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-09T08:36:05.441135+00:00"
+ },
+ {
+  "id": "3add9d26-073b-45b6-8cbe-881785ec7588",
+  "product_id": "dcea27d9-282e-4655-a349-cbf48d2d0579",
+  "physical_count": -1,
+  "system_stock_before": 0,
+  "system_stock_after": -1,
+  "discrepancy": -1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 3, Demand: 2). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-09T08:37:44.29501+00:00"
+ },
+ {
+  "id": "ba959c5f-36a2-477b-86d9-b2fc4b2bf940",
+  "product_id": "81e2741c-f59e-4c78-a52e-b21e318035ce",
+  "physical_count": 0,
+  "system_stock_before": 2,
+  "system_stock_after": 0,
+  "discrepancy": -2,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 1, Demand: 1). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-09T08:41:28.55326+00:00"
+ },
+ {
+  "id": "6d266a68-5525-46b7-825b-07cb72d64569",
+  "product_id": "28bca3c5-693b-494a-976c-71597c2b55d8",
+  "physical_count": 4,
+  "system_stock_before": 5,
+  "system_stock_after": 4,
+  "discrepancy": -1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 3 (Layaway: 1, Demand: 2). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-09T08:46:00.559339+00:00"
+ },
+ {
+  "id": "99d715c2-a507-4f88-ad5e-61fd45dd7e47",
+  "product_id": "415b1ed0-e451-4a31-a7c6-e31187c270f6",
+  "physical_count": 1,
+  "system_stock_before": 27,
+  "system_stock_after": 1,
+  "discrepancy": -26,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 12 (Layaway: 14, Demand: 3). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-09T09:11:14.997891+00:00"
+ },
+ {
+  "id": "95a313d1-48ba-458d-a461-c34704144dda",
+  "product_id": "677d5570-d9ec-4b90-93e4-82251fa03f27",
+  "physical_count": -15,
+  "system_stock_before": -4,
+  "system_stock_after": -15,
+  "discrepancy": -11,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 16, Demand: 1). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-09T09:14:37.055031+00:00"
+ },
+ {
+  "id": "2847024c-c1f7-454d-a86c-18d2c7878292",
+  "product_id": "e76f0c80-2810-460f-a5fc-d41cbcf43be4",
+  "physical_count": 0,
+  "system_stock_before": 6,
+  "system_stock_after": 0,
+  "discrepancy": -6,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 0, Demand: 0). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T01:15:40.307987+00:00"
+ },
+ {
+  "id": "60bbf7bd-9f86-47f9-bb72-afd2d6956b25",
+  "product_id": "8841219c-9e2c-4a62-ab9d-31f972300610",
+  "physical_count": -2,
+  "system_stock_before": -1,
+  "system_stock_after": -2,
+  "discrepancy": -1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 4 (Layaway: 7, Demand: 1). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T01:22:05.092145+00:00"
+ },
+ {
+  "id": "7f610c92-9630-495d-b01e-0d492dc6f0ac",
+  "product_id": "f8b5957f-1a05-404c-98c4-8a558d4d2201",
+  "physical_count": 1,
+  "system_stock_before": -2,
+  "system_stock_after": 1,
+  "discrepancy": 3,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 4 (Layaway: 5, Demand: 2). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T01:22:40.152189+00:00"
+ },
+ {
+  "id": "553394ad-e57e-4b48-a893-00a643c82212",
+  "product_id": "d98afd1c-227c-4582-91b2-481ec8218dbc",
+  "physical_count": 1,
+  "system_stock_before": -2,
+  "system_stock_after": 1,
+  "discrepancy": 3,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 2 (Layaway: 2, Demand: 1). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T01:25:11.425296+00:00"
+ },
+ {
+  "id": "03ba6b0a-eebb-4302-8110-a391956f0ab4",
+  "product_id": "d5d56b13-5234-468b-af6d-fb0657564068",
+  "physical_count": 1,
+  "system_stock_before": 948,
+  "system_stock_after": 1,
+  "discrepancy": -947,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 0, Demand: 1). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T01:25:37.454763+00:00"
+ },
+ {
+  "id": "80e92208-7ff0-45b5-9975-d8394ac6d45a",
+  "product_id": "c9c7a418-dc1a-4682-9547-e391a18f4b7b",
+  "physical_count": -18,
+  "system_stock_before": -17,
+  "system_stock_after": -18,
+  "discrepancy": -1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 2 (Layaway: 24, Demand: 4). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T01:26:18.61448+00:00"
+ },
+ {
+  "id": "2d2e3fae-f8e0-444a-971e-27c5bf7cc090",
+  "product_id": "b4107173-1685-480b-9a66-9306d4f5d545",
+  "physical_count": -2,
+  "system_stock_before": 18,
+  "system_stock_after": -2,
+  "discrepancy": -20,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 2 (Layaway: 12, Demand: 8). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T01:27:15.334112+00:00"
+ },
+ {
+  "id": "8f9cc1a3-3d1b-4cb0-9b8d-ab254f319bb9",
+  "product_id": "1d80e401-974d-467a-920f-6cdc27ad3108",
+  "physical_count": -4,
+  "system_stock_before": 0,
+  "system_stock_after": -4,
+  "discrepancy": -4,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 4, Demand: 0). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T01:30:28.569006+00:00"
+ },
+ {
+  "id": "0e059917-a491-4d3f-813d-a31d5eb92e1d",
+  "product_id": "3080f65e-4dd9-4483-8790-60166c9010b5",
+  "physical_count": -3,
+  "system_stock_before": -1,
+  "system_stock_after": -3,
+  "discrepancy": -2,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 3 (Layaway: 8, Demand: 2). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T01:32:40.856289+00:00"
+ },
+ {
+  "id": "88bfe25c-ea07-46b7-b0e2-a23084aaea1b",
+  "product_id": "45d09b0e-0cec-44c0-ba1d-6311e55520aa",
+  "physical_count": -2,
+  "system_stock_before": -1,
+  "system_stock_after": -2,
+  "discrepancy": -1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 2, Demand: 0). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T01:33:09.268587+00:00"
+ },
+ {
+  "id": "8f756fd4-3217-47bb-8238-5db2c2d269ef",
+  "product_id": "683f49ce-5f9f-4770-8d92-c5e2a5a892cf",
+  "physical_count": -3,
+  "system_stock_before": -2,
+  "system_stock_after": -3,
+  "discrepancy": -1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 3, Demand: 0). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T01:33:38.667822+00:00"
+ },
+ {
+  "id": "da6cf4b4-f6b3-461c-97a2-af9b94310942",
+  "product_id": "34816961-812c-4259-bece-60865a700c3a",
+  "physical_count": -6,
+  "system_stock_before": 12,
+  "system_stock_after": -6,
+  "discrepancy": -18,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 5 (Layaway: 13, Demand: 2). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T01:34:05.126025+00:00"
+ },
+ {
+  "id": "1fb0cf5d-d235-4a86-bc46-ece347f097ba",
+  "product_id": "8143df56-5089-4f87-bcfe-de106d73d0c9",
+  "physical_count": 0,
+  "system_stock_before": 0,
+  "system_stock_after": 0,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 2 (Layaway: 2, Demand: 0). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T01:34:19.249629+00:00"
+ },
+ {
+  "id": "64476b55-5354-4f9b-b7ad-ddaa61d95a66",
+  "product_id": "68196f12-8560-43c1-978a-d11d95f1abe5",
+  "physical_count": 8,
+  "system_stock_before": 48,
+  "system_stock_after": 8,
+  "discrepancy": -40,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 63 (Layaway: 55, Demand: 0). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T01:34:31.016225+00:00"
+ },
+ {
+  "id": "7150768b-cb14-43ea-a1a7-2ce5ca22f5b1",
+  "product_id": "93a9adf8-7ca3-45c8-8a18-2e0f3127c229",
+  "physical_count": -2,
+  "system_stock_before": 2,
+  "system_stock_after": -2,
+  "discrepancy": -4,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 2, Demand: 0). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T01:34:50.330371+00:00"
+ },
+ {
+  "id": "3cdcbffe-1400-4827-ab26-84a2de3b287e",
+  "product_id": "68196f12-8560-43c1-978a-d11d95f1abe5",
+  "physical_count": -2,
+  "system_stock_before": 8,
+  "system_stock_after": -2,
+  "discrepancy": -10,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 53 (Layaway: 55, Demand: 0). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T01:35:01.988026+00:00"
+ },
+ {
+  "id": "2dca7305-ecd4-4341-b7ee-59bb04bf79eb",
+  "product_id": "be161fce-b4c7-4a51-a867-b114e27f1b3d",
+  "physical_count": -3,
+  "system_stock_before": 0,
+  "system_stock_after": -3,
+  "discrepancy": -3,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 4, Demand: 1). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T01:35:59.463418+00:00"
+ },
+ {
+  "id": "051eab4f-61df-4311-ba06-5a7fbf37bbc8",
+  "product_id": "9df06b5e-7562-4e90-99c1-d01434b76cf7",
+  "physical_count": 6,
+  "system_stock_before": 3,
+  "system_stock_after": 6,
+  "discrepancy": 3,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 7 (Layaway: 3, Demand: 2). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T01:36:11.868428+00:00"
+ },
+ {
+  "id": "0341685b-387f-4a41-bf8b-016e496ec2df",
+  "product_id": "de38c88a-1d0a-42a8-82e9-e16fb247e635",
+  "physical_count": 0,
+  "system_stock_before": 2,
+  "system_stock_after": 0,
+  "discrepancy": -2,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 1, Demand: 1). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T01:36:32.565383+00:00"
+ },
+ {
+  "id": "fd845822-deba-43e6-9196-fdeb9776bcad",
+  "product_id": "e8a5e43c-b129-4c7d-af34-5b698c77d460",
+  "physical_count": 2,
+  "system_stock_before": 7,
+  "system_stock_after": 2,
+  "discrepancy": -5,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 0, Demand: 2). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T01:37:16.058321+00:00"
+ },
+ {
+  "id": "477d9afd-4cf1-4768-ae35-ef194c734ac3",
+  "product_id": "e8a5e43c-b129-4c7d-af34-5b698c77d460",
+  "physical_count": 3,
+  "system_stock_before": 2,
+  "system_stock_after": 3,
+  "discrepancy": 1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 1 (Layaway: 0, Demand: 2). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T01:37:35.350644+00:00"
+ },
+ {
+  "id": "ddfe6d55-1a71-4b77-a653-b5ab8ff9f606",
+  "product_id": "ff0a4663-e135-4b66-8c81-bb396302164e",
+  "physical_count": -12,
+  "system_stock_before": 0,
+  "system_stock_after": -12,
+  "discrepancy": -12,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 12, Demand: 0). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T01:41:06.196549+00:00"
+ },
+ {
+  "id": "c17aa38c-8c8e-4553-b905-53d73a024d23",
+  "product_id": "a6c324ed-1076-43d2-9036-19cfa657210a",
+  "physical_count": -2,
+  "system_stock_before": -5,
+  "system_stock_after": -2,
+  "discrepancy": 3,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 5 (Layaway: 8, Demand: 1). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T01:41:20.693934+00:00"
+ },
+ {
+  "id": "b798c76a-3cc0-46ed-b687-6ad0209a88f7",
+  "product_id": "ed1cf49b-8c66-481c-b4cf-5ae6203f41c1",
+  "physical_count": -3,
+  "system_stock_before": -4,
+  "system_stock_after": -3,
+  "discrepancy": 1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 1 (Layaway: 5, Demand: 1). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T01:42:44.800788+00:00"
+ },
+ {
+  "id": "bff883e3-1369-442d-bf9b-5fde2ec6a875",
+  "product_id": "dd2a84bb-1bf5-4c31-b98d-24a16f1dcce2",
+  "physical_count": 4,
+  "system_stock_before": 3,
+  "system_stock_after": 4,
+  "discrepancy": 1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 3 (Layaway: 0, Demand: 1). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T01:44:07.590661+00:00"
+ },
+ {
+  "id": "8136c220-9853-459b-a7ba-edf597a12422",
+  "product_id": "415b1ed0-e451-4a31-a7c6-e31187c270f6",
+  "physical_count": -1,
+  "system_stock_before": -8,
+  "system_stock_after": -1,
+  "discrepancy": 7,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 9 (Layaway: 12, Demand: 2). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T01:45:10.490541+00:00"
+ },
+ {
+  "id": "4b5cf9e9-5027-4165-95ea-fa3d730852d4",
+  "product_id": "677d5570-d9ec-4b90-93e4-82251fa03f27",
+  "physical_count": -9,
+  "system_stock_before": -11,
+  "system_stock_after": -9,
+  "discrepancy": 2,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 3 (Layaway: 13, Demand: 1). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T01:45:25.707415+00:00"
+ },
+ {
+  "id": "5df2d595-4d8f-4492-9ebc-ef18e795d357",
+  "product_id": "b9e9248c-2615-4599-99b5-14d3ca439817",
+  "physical_count": -2,
+  "system_stock_before": 3,
+  "system_stock_after": -2,
+  "discrepancy": -5,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 1 (Layaway: 6, Demand: 3). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T01:57:18.338933+00:00"
+ },
+ {
+  "id": "dff84c13-d40b-4820-883a-ad0c760ce6f0",
+  "product_id": "8143df56-5089-4f87-bcfe-de106d73d0c9",
+  "physical_count": -2,
+  "system_stock_before": 0,
+  "system_stock_after": -2,
+  "discrepancy": -2,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 2, Demand: 0). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T02:01:22.044978+00:00"
+ },
+ {
+  "id": "95d2f8e9-6abe-4116-8e12-9e348352ec87",
+  "product_id": "fcb9fbac-ef7b-4a0b-a9e4-4ead80558ca2",
+  "physical_count": 1,
+  "system_stock_before": 4,
+  "system_stock_after": 1,
+  "discrepancy": -3,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 1 (Layaway: 0, Demand: 0). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T03:00:03.50623+00:00"
+ },
+ {
+  "id": "2d9bfa9f-e879-48a9-8e6b-5ee785a5b7f5",
+  "product_id": "8decd66e-8b1b-4e2f-aa70-91928d5de442",
+  "physical_count": 3,
+  "system_stock_before": 5,
+  "system_stock_after": 3,
+  "discrepancy": -2,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 3 (Layaway: 0, Demand: 0). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T03:00:25.386814+00:00"
+ },
+ {
+  "id": "0332c446-4051-4184-9504-dc0adb87d896",
+  "product_id": "dd2a84bb-1bf5-4c31-b98d-24a16f1dcce2",
+  "physical_count": 3,
+  "system_stock_before": 4,
+  "system_stock_after": 3,
+  "discrepancy": -1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 2 (Layaway: 0, Demand: 1). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T03:49:00.010173+00:00"
+ },
+ {
+  "id": "a67bfc35-852d-4364-92eb-c61e4ee7f873",
+  "product_id": "66ca2cb8-0d59-4112-95c8-546e053867fd",
+  "physical_count": 4,
+  "system_stock_before": -20,
+  "system_stock_after": 4,
+  "discrepancy": 24,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 3 (Layaway: 11, Demand: 12). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T04:00:27.172158+00:00"
+ },
+ {
+  "id": "21b48017-0d64-40f8-9b78-e95b4e0906a3",
+  "product_id": "66ca2cb8-0d59-4112-95c8-546e053867fd",
+  "physical_count": 7,
+  "system_stock_before": 4,
+  "system_stock_after": 7,
+  "discrepancy": 3,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 6 (Layaway: 11, Demand: 12). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-20T04:00:40.320746+00:00"
+ },
+ {
+  "id": "fad60e9b-8d38-4b79-ada3-f4410a26e818",
+  "product_id": "6184a76e-04a7-4dc4-88b6-b33d1f825aac",
+  "physical_count": -3,
+  "system_stock_before": -4,
+  "system_stock_after": -3,
+  "discrepancy": 1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 3, Demand: 0). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-22T16:01:09.354989+00:00"
+ },
+ {
+  "id": "a0a7639e-8457-4888-a346-cedec7e83dbf",
+  "product_id": "39e408a3-a6cd-4a65-b6b6-ac5c6513b6af",
+  "physical_count": -19,
+  "system_stock_before": -1,
+  "system_stock_after": -19,
+  "discrepancy": -18,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 20, Demand: 1). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-23T02:47:55.69406+00:00"
+ },
+ {
+  "id": "6638b405-4335-4ad6-92b5-38ca19237092",
+  "product_id": "0be8dd9a-c54a-489c-b333-e0673e0c3f7a",
+  "physical_count": -3,
+  "system_stock_before": -2,
+  "system_stock_after": -3,
+  "discrepancy": -1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 4, Demand: 1). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-23T02:50:32.603301+00:00"
+ },
+ {
+  "id": "88b36b4d-cb36-451d-a768-1ac0ccc43bbe",
+  "product_id": "5b0b1ff7-1de9-48d6-a0b9-19f9514f933f",
+  "physical_count": -2,
+  "system_stock_before": 0,
+  "system_stock_after": -2,
+  "discrepancy": -2,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 3, Demand: 1). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-23T02:50:53.026214+00:00"
+ },
+ {
+  "id": "1874fee1-acb0-468a-a11d-07c2900ad5b6",
+  "product_id": "6d553f53-395d-4cd8-ad4f-b415ee80b1d6",
+  "physical_count": 1,
+  "system_stock_before": 3,
+  "system_stock_after": 1,
+  "discrepancy": -2,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Layaway: 0, Demand: 1). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-29T03:55:19.264347+00:00"
+ },
+ {
+  "id": "978b3030-65ca-404e-b512-a84a59985b3c",
+  "product_id": "15edf381-1fa8-4a38-859d-2df9aab4e3e6",
+  "physical_count": -6,
+  "system_stock_before": 0,
+  "system_stock_after": -6,
+  "discrepancy": -6,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Waiting to be picked: 6 pcs on 4 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-31T03:08:49.075209+00:00"
+ },
+ {
+  "id": "d93e5989-2826-4064-857f-83398f250701",
+  "product_id": "a4b295ea-05ce-4504-995c-f38e2ced3e5f",
+  "physical_count": 9,
+  "system_stock_before": 1,
+  "system_stock_after": 9,
+  "discrepancy": 8,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 10 (Waiting to be picked: 1 pcs on 1 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-31T03:09:17.655172+00:00"
+ },
+ {
+  "id": "f137de53-4470-4ab4-9361-3b4a46c1c8ce",
+  "product_id": "a83c8e6e-01a9-41bc-a757-2081ac8751bb",
+  "physical_count": -6,
+  "system_stock_before": 3,
+  "system_stock_after": -6,
+  "discrepancy": -9,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 7 (Waiting to be picked: 13 pcs on 9 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-31T03:09:52.257385+00:00"
+ },
+ {
+  "id": "ab7d0384-c77f-45cc-8eae-24ea5df2f116",
+  "product_id": "0922def1-dff2-441a-b781-fced8ccf063c",
+  "physical_count": -13,
+  "system_stock_before": -15,
+  "system_stock_after": -13,
+  "discrepancy": 2,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 6 (Waiting to be picked: 19 pcs on 12 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-31T03:10:47.615344+00:00"
+ },
+ {
+  "id": "7cc63874-16d1-4970-b7ae-fca333294a5b",
+  "product_id": "f21600b6-b532-4cca-b266-1ac897d169a2",
+  "physical_count": -9,
+  "system_stock_before": 3,
+  "system_stock_after": -9,
+  "discrepancy": -12,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Waiting to be picked: 9 pcs on 9 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-31T03:26:03.16078+00:00"
+ },
+ {
+  "id": "7ed87ab7-ea58-4ef9-88d0-fd9353686b90",
+  "product_id": "7d30d875-029a-4023-b09d-39629642587f",
+  "physical_count": -3,
+  "system_stock_before": -1,
+  "system_stock_after": -3,
+  "discrepancy": -2,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 33 (Waiting to be picked: 36 pcs on 17 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-31T03:31:12.598575+00:00"
+ },
+ {
+  "id": "bdce5e22-73f2-4561-9952-f044db64be47",
+  "product_id": "e92de7a0-2bea-4568-9a77-3b2b1a123b69",
+  "physical_count": -8,
+  "system_stock_before": 6,
+  "system_stock_after": -8,
+  "discrepancy": -14,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 5 (Waiting to be picked: 13 pcs on 6 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-31T03:34:55.201092+00:00"
+ },
+ {
+  "id": "4423ff08-47f9-4696-a9a7-0fbe5c80b9c1",
+  "product_id": "420a34d5-9ee1-461e-a80a-73710e5b60e7",
+  "physical_count": -3,
+  "system_stock_before": -1,
+  "system_stock_after": -3,
+  "discrepancy": -2,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Waiting to be picked: 3 pcs on 3 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-31T03:35:33.749668+00:00"
+ },
+ {
+  "id": "a6bbd9a4-841e-48e1-bfae-9b787f3cf63f",
+  "product_id": "48195fd6-73a6-4fa9-ab86-e0480d00b3d2",
+  "physical_count": 12,
+  "system_stock_before": 11,
+  "system_stock_after": 12,
+  "discrepancy": 1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 21 (Waiting to be picked: 9 pcs on 6 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-31T03:36:46.621729+00:00"
+ },
+ {
+  "id": "603087bd-2e70-4517-8346-e1e67084a93e",
+  "product_id": "b105f0f4-64f5-42dd-8c36-37ae8398b977",
+  "physical_count": 1,
+  "system_stock_before": 2,
+  "system_stock_after": 1,
+  "discrepancy": -1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 3 (Waiting to be picked: 2 pcs on 2 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-31T03:37:10.641826+00:00"
+ },
+ {
+  "id": "0921c329-fb10-49c9-b1d7-d76e0a75c108",
+  "product_id": "c9c7a418-dc1a-4682-9547-e391a18f4b7b",
+  "physical_count": -30,
+  "system_stock_before": -22,
+  "system_stock_after": -30,
+  "discrepancy": -8,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 1 (Waiting to be picked: 31 pcs on 26 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-31T03:37:33.962519+00:00"
+ },
+ {
+  "id": "a94d298d-9e0e-4ca7-8a1c-75fdd9555bfb",
+  "product_id": "b4107173-1685-480b-9a66-9306d4f5d545",
+  "physical_count": -7,
+  "system_stock_before": -11,
+  "system_stock_after": -7,
+  "discrepancy": 4,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 6 (Waiting to be picked: 13 pcs on 9 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-31T03:38:10.289881+00:00"
+ },
+ {
+  "id": "2ee5de3a-6579-4382-93c5-dc4687f05217",
+  "product_id": "9c9ae41b-c71d-482c-8d31-27ce00b42600",
+  "physical_count": -12,
+  "system_stock_before": -11,
+  "system_stock_after": -12,
+  "discrepancy": -1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Waiting to be picked: 12 pcs on 5 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-31T03:38:28.701305+00:00"
+ },
+ {
+  "id": "17d6078e-43aa-4c05-bf62-e0b14c72b979",
+  "product_id": "6fc015f7-5b8b-4e04-ba15-f2c10dfa4a1d",
+  "physical_count": -3,
+  "system_stock_before": 3,
+  "system_stock_after": -3,
+  "discrepancy": -6,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Waiting to be picked: 3 pcs on 3 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-31T04:17:08.160032+00:00"
+ },
+ {
+  "id": "66dbe31b-9b79-41b3-9be6-95334a9b82a2",
+  "product_id": "ca780403-eacd-40b4-ba4f-b4da1e2959c1",
+  "physical_count": -5,
+  "system_stock_before": -2,
+  "system_stock_after": -5,
+  "discrepancy": -3,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Waiting to be picked: 5 pcs on 5 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-31T04:17:30.638007+00:00"
+ },
+ {
+  "id": "38b3dce6-8311-48cf-ade0-72a7c1ae26d4",
+  "product_id": "c51490f7-f461-4660-b71b-a15fbd6b913c",
+  "physical_count": -3,
+  "system_stock_before": -4,
+  "system_stock_after": -3,
+  "discrepancy": 1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 1 (Waiting to be picked: 4 pcs on 3 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-10-31T06:19:36.134098+00:00"
+ },
+ {
+  "id": "edae7a20-ed85-424d-b87b-cff9ba2f91db",
+  "product_id": "ccdfc1d3-e6eb-4be4-a376-66da87ad8909",
+  "physical_count": 0,
+  "system_stock_before": -1,
+  "system_stock_after": 0,
+  "discrepancy": 1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 1 (Waiting to be picked: 1 pcs on 1 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-03T05:08:18.637722+00:00"
+ },
+ {
+  "id": "0e3b403a-816b-4bda-a887-8b60825792b3",
+  "product_id": "ea865695-4eee-450d-b28b-ba38a5391bd6",
+  "physical_count": -7,
+  "system_stock_before": -9,
+  "system_stock_after": -7,
+  "discrepancy": 2,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 3 (Waiting to be picked: 10 pcs on 8 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-03T05:11:45.26408+00:00"
+ },
+ {
+  "id": "34db1089-b4c8-4d86-a0af-b95424d78aab",
+  "product_id": "ea865695-4eee-450d-b28b-ba38a5391bd6",
+  "physical_count": -6,
+  "system_stock_before": -7,
+  "system_stock_after": -6,
+  "discrepancy": 1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 4 (Waiting to be picked: 10 pcs on 8 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-03T05:12:02.123491+00:00"
+ },
+ {
+  "id": "83304ed5-a125-4c80-be5f-889db60f423d",
+  "product_id": "1c690613-b769-4bcb-9fdf-59d29aaf733c",
+  "physical_count": 0,
+  "system_stock_before": -3,
+  "system_stock_after": 0,
+  "discrepancy": 3,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 4 (Waiting to be picked: 4 pcs on 2 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-03T07:02:49.982221+00:00"
+ },
+ {
+  "id": "b0ae8e66-d77d-443d-9d68-1e221022809c",
+  "product_id": "b524ee54-86b1-48d0-ae93-2ee35addee6f",
+  "physical_count": 7,
+  "system_stock_before": -6,
+  "system_stock_after": 7,
+  "discrepancy": 13,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 13 (Waiting to be picked: 6 pcs on 6 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-04T01:56:12.675644+00:00"
+ },
+ {
+  "id": "cb4b3158-a929-42e6-89b9-265aa6adadee",
+  "product_id": "79612867-bc63-4844-8868-94c8cec988ba",
+  "physical_count": -5,
+  "system_stock_before": 0,
+  "system_stock_after": -5,
+  "discrepancy": -5,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Waiting to be picked: 5 pcs on 4 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-04T02:28:23.665275+00:00"
+ },
+ {
+  "id": "275ac103-69c1-481d-9d04-95910a5d9923",
+  "product_id": "71585f8f-3a4c-48aa-8d5d-7244287ff7ea",
+  "physical_count": -2,
+  "system_stock_before": 7,
+  "system_stock_after": -2,
+  "discrepancy": -9,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Waiting to be picked: 2 pcs on 2 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-04T02:31:02.194043+00:00"
+ },
+ {
+  "id": "9ab00987-2792-4638-be8d-87045c9650fe",
+  "product_id": "97cec088-5a19-4417-b961-68718cd78eb7",
+  "physical_count": 0,
+  "system_stock_before": 0,
+  "system_stock_after": 0,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 2 (Waiting to be picked: 2 pcs on 2 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-04T02:31:21.008993+00:00"
+ },
+ {
+  "id": "a8d5f94f-ab5e-4cc7-a399-93180ef38ba5",
+  "product_id": "b9e9248c-2615-4599-99b5-14d3ca439817",
+  "physical_count": -8,
+  "system_stock_before": -4,
+  "system_stock_after": -8,
+  "discrepancy": -4,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Waiting to be picked: 8 pcs on 8 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-04T02:31:39.392924+00:00"
+ },
+ {
+  "id": "c23fd815-5075-4a38-9126-c82ef2a33674",
+  "product_id": "34816961-812c-4259-bece-60865a700c3a",
+  "physical_count": -3,
+  "system_stock_before": 8,
+  "system_stock_after": -3,
+  "discrepancy": -11,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 14 (Waiting to be picked: 17 pcs on 17 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-04T02:32:16.685353+00:00"
+ },
+ {
+  "id": "4e4379fd-fc0f-436d-8ac6-d034f2e52c8a",
+  "product_id": "3a5ab20f-f8b6-4dbe-b073-1554f8454a84",
+  "physical_count": 8,
+  "system_stock_before": 7,
+  "system_stock_after": 8,
+  "discrepancy": 1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 11 (Waiting to be picked: 3 pcs on 3 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-04T02:36:26.028935+00:00"
+ },
+ {
+  "id": "3b80fb99-60d2-4d50-bbff-6d2b27b0855c",
+  "product_id": "3b280568-0225-4578-9c40-da6d586fd91e",
+  "physical_count": 4,
+  "system_stock_before": 5,
+  "system_stock_after": 4,
+  "discrepancy": -1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 7 (Waiting to be picked: 3 pcs on 2 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-04T02:37:10.73018+00:00"
+ },
+ {
+  "id": "5d4a3938-78f9-4ed0-91fd-a31a1e9c689e",
+  "product_id": "912d5e57-3a47-4833-ba43-571eb240973b",
+  "physical_count": 10,
+  "system_stock_before": 11,
+  "system_stock_after": 10,
+  "discrepancy": -1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 12 (Waiting to be picked: 2 pcs on 2 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-04T02:38:01.050816+00:00"
+ },
+ {
+  "id": "5b025a24-ec43-49a1-b8a0-f12e4f9ce969",
+  "product_id": "691652aa-730b-4b1a-b9f6-4475a758349a",
+  "physical_count": -5,
+  "system_stock_before": 0,
+  "system_stock_after": -5,
+  "discrepancy": -5,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Waiting to be picked: 5 pcs on 5 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-04T02:38:21.863096+00:00"
+ },
+ {
+  "id": "e99d4c06-41b3-4a7f-b181-068e8f107342",
+  "product_id": "691652aa-730b-4b1a-b9f6-4475a758349a",
+  "physical_count": 0,
+  "system_stock_before": -5,
+  "system_stock_after": 0,
+  "discrepancy": 5,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 5 (Waiting to be picked: 5 pcs on 5 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-04T02:40:15.402005+00:00"
+ },
+ {
+  "id": "47ff67cb-449d-4fce-9aab-b76b2b291722",
+  "product_id": "f2bd7484-d916-4116-a4b3-c5500203d3cd",
+  "physical_count": -3,
+  "system_stock_before": 4,
+  "system_stock_after": -3,
+  "discrepancy": -7,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 3 (Waiting to be picked: 6 pcs on 6 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-04T02:40:27.633355+00:00"
+ },
+ {
+  "id": "35fa00ad-4e4c-4237-8cde-3a8ee9db0e5d",
+  "product_id": "415b1ed0-e451-4a31-a7c6-e31187c270f6",
+  "physical_count": -14,
+  "system_stock_before": -5,
+  "system_stock_after": -14,
+  "discrepancy": -9,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 4 (Waiting to be picked: 18 pcs on 18 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-04T03:16:43.491343+00:00"
+ },
+ {
+  "id": "d2f19a47-fd29-4395-afc6-8121afb7aee5",
+  "product_id": "53d89012-5e66-4744-a0f2-4b0a59827f25",
+  "physical_count": -1,
+  "system_stock_before": 0,
+  "system_stock_after": -1,
+  "discrepancy": -1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Waiting to be picked: 1 pcs on 1 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-04T03:24:34.506599+00:00"
+ },
+ {
+  "id": "43debe8a-1e75-46b8-8057-45f423daf850",
+  "product_id": "0be8dd9a-c54a-489c-b333-e0673e0c3f7a",
+  "physical_count": -11,
+  "system_stock_before": -8,
+  "system_stock_after": -11,
+  "discrepancy": -3,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Waiting to be picked: 11 pcs on 11 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-04T03:24:57.362721+00:00"
+ },
+ {
+  "id": "c2bf6427-2a48-4a79-a323-33fb48e0c55b",
+  "product_id": "79612867-bc63-4844-8868-94c8cec988ba",
+  "physical_count": -4,
+  "system_stock_before": -5,
+  "system_stock_after": -4,
+  "discrepancy": 1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 1 (Waiting to be picked: 5 pcs on 4 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-04T03:55:21.281645+00:00"
+ },
+ {
+  "id": "dbeebb40-d135-44a6-9035-26532f8d492c",
+  "product_id": "6fc015f7-5b8b-4e04-ba15-f2c10dfa4a1d",
+  "physical_count": -5,
+  "system_stock_before": -6,
+  "system_stock_after": -5,
+  "discrepancy": 1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 1 (Waiting to be picked: 6 pcs on 5 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-04T06:27:19.132035+00:00"
+ },
+ {
+  "id": "4837657d-b6cb-4024-94f8-6446c19768dd",
+  "product_id": "7d30d875-029a-4023-b09d-39629642587f",
+  "physical_count": 40,
+  "system_stock_before": -4,
+  "system_stock_after": 40,
+  "discrepancy": 44,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 68 (Waiting to be picked: 28 pcs on 13 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-06T01:39:18.671259+00:00"
+ },
+ {
+  "id": "4de5db3c-d2f9-4e2e-b51d-c230bd514ab3",
+  "product_id": "66ca2cb8-0d59-4112-95c8-546e053867fd",
+  "physical_count": -21,
+  "system_stock_before": -15,
+  "system_stock_after": -21,
+  "discrepancy": -6,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Waiting to be picked: 21 pcs on 7 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-06T03:12:00.800855+00:00"
+ },
+ {
+  "id": "75c2e619-3b5f-489e-8a6c-924f72a1c63b",
+  "product_id": "b1108338-306d-4df2-ae45-daf201dc1db6",
+  "physical_count": -1,
+  "system_stock_before": 0,
+  "system_stock_after": -1,
+  "discrepancy": -1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Waiting to be picked: 1 pcs on 1 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-06T03:17:29.26174+00:00"
+ },
+ {
+  "id": "9a6e8367-8634-4ce4-ba06-18d5eb9e6318",
+  "product_id": "882cc49d-0227-4dd1-832a-a0d8aef74e10",
+  "physical_count": 3,
+  "system_stock_before": -1,
+  "system_stock_after": 3,
+  "discrepancy": 4,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 4 (Waiting to be picked: 1 pcs on 1 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-06T08:48:32.97738+00:00"
+ },
+ {
+  "id": "893c91c8-44e2-47b4-bb38-55843ceda6e9",
+  "product_id": "ce9573c4-0a94-4577-8513-5c5148bda600",
+  "physical_count": 14,
+  "system_stock_before": 14,
+  "system_stock_after": 14,
+  "discrepancy": 0,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 14 (Waiting to be picked: 0 pcs on 0 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-07T01:44:22.812643+00:00"
+ },
+ {
+  "id": "809c62c8-7650-408c-b4b3-345767e675c2",
+  "product_id": "8e5a6012-928a-470a-9fc3-4ae0cb1ffb0c",
+  "physical_count": -7,
+  "system_stock_before": -8,
+  "system_stock_after": -7,
+  "discrepancy": 1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 1 (Waiting to be picked: 8 pcs on 8 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-07T01:44:40.136716+00:00"
+ },
+ {
+  "id": "17a7a305-2492-425b-aa68-22693fe787d5",
+  "product_id": "3523d0a2-a853-42d2-9cc9-fb998786226d",
+  "physical_count": 0,
+  "system_stock_before": -1,
+  "system_stock_after": 0,
+  "discrepancy": 1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 1 (Waiting to be picked: 1 pcs on 1 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-07T01:47:20.225691+00:00"
+ },
+ {
+  "id": "50946209-b07f-4c4b-9804-0e8e54f07f3d",
+  "product_id": "206ffc20-01c9-4284-b662-7ac7e7fea982",
+  "physical_count": -1,
+  "system_stock_before": 2,
+  "system_stock_after": -1,
+  "discrepancy": -3,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Waiting to be picked: 1 pcs on 1 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-07T02:01:14.667585+00:00"
+ },
+ {
+  "id": "cb10b014-2790-4acc-99b0-2e22d8f593c0",
+  "product_id": "206ffc20-01c9-4284-b662-7ac7e7fea982",
+  "physical_count": 1,
+  "system_stock_before": -1,
+  "system_stock_after": 1,
+  "discrepancy": 2,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 2 (Waiting to be picked: 1 pcs on 1 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-07T02:01:29.714874+00:00"
+ },
+ {
+  "id": "0b740c32-3946-4a05-b596-8946036f4552",
+  "product_id": "7afc285f-ecf9-4ba3-938b-54db0a914133",
+  "physical_count": -1,
+  "system_stock_before": -3,
+  "system_stock_after": -1,
+  "discrepancy": 2,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 2 (Waiting to be picked: 3 pcs on 2 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-07T03:36:18.002042+00:00"
+ },
+ {
+  "id": "51f3295c-00ed-467d-9bf2-c46e5204db2e",
+  "product_id": "8e5a6012-928a-470a-9fc3-4ae0cb1ffb0c",
+  "physical_count": -3,
+  "system_stock_before": -7,
+  "system_stock_after": -3,
+  "discrepancy": 4,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 4 (Waiting to be picked: 7 pcs on 7 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-09T01:52:04.000941+00:00"
+ },
+ {
+  "id": "8cf25c69-6607-4aaf-bbb4-1431c4445826",
+  "product_id": "6debcba8-ae27-481e-b869-acf31abcc651",
+  "physical_count": -5,
+  "system_stock_before": -2,
+  "system_stock_after": -5,
+  "discrepancy": -3,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Waiting to be picked: 5 pcs on 5 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-09T04:39:00.750796+00:00"
+ },
+ {
+  "id": "12f60f05-6d78-4a59-a552-a08e62ca435a",
+  "product_id": "e8a5e43c-b129-4c7d-af34-5b698c77d460",
+  "physical_count": -5,
+  "system_stock_before": 6,
+  "system_stock_after": -5,
+  "discrepancy": -11,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Waiting to be picked: 5 pcs on 2 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-09T04:40:18.527524+00:00"
+ },
+ {
+  "id": "a61a8d7d-ddbd-427a-977f-dce79c77105d",
+  "product_id": "28bca3c5-693b-494a-976c-71597c2b55d8",
+  "physical_count": 0,
+  "system_stock_before": -1,
+  "system_stock_after": 0,
+  "discrepancy": 1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 1 (Waiting to be picked: 1 pcs on 1 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-09T05:53:33.258235+00:00"
+ },
+ {
+  "id": "70a5a638-0171-4c06-8260-15bf95132f43",
+  "product_id": "677d5570-d9ec-4b90-93e4-82251fa03f27",
+  "physical_count": -16,
+  "system_stock_before": -12,
+  "system_stock_after": -16,
+  "discrepancy": -4,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Waiting to be picked: 16 pcs on 16 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-09T08:24:53.314711+00:00"
+ },
+ {
+  "id": "cd8f16a6-2764-490a-8f79-f70bd19c738d",
+  "product_id": "dd2a84bb-1bf5-4c31-b98d-24a16f1dcce2",
+  "physical_count": -2,
+  "system_stock_before": 3,
+  "system_stock_after": -2,
+  "discrepancy": -5,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Waiting to be picked: 2 pcs on 1 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-09T08:41:24.692963+00:00"
+ },
+ {
+  "id": "3f2e0429-5334-42dc-ab74-7216e09ac5e2",
+  "product_id": "2f715bca-56e0-401d-8d76-ea3cc6b206f0",
+  "physical_count": 11,
+  "system_stock_before": 22,
+  "system_stock_after": 11,
+  "discrepancy": -11,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 16 (Waiting to be picked: 5 pcs on 5 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-09T08:46:22.581654+00:00"
+ },
+ {
+  "id": "da26ac07-216b-4293-a06a-e8b08984d7ac",
+  "product_id": "ea865695-4eee-450d-b28b-ba38a5391bd6",
+  "physical_count": -11,
+  "system_stock_before": 19,
+  "system_stock_after": -11,
+  "discrepancy": -30,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Waiting to be picked: 11 pcs on 9 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-09T08:56:29.764936+00:00"
+ },
+ {
+  "id": "bc3bcc08-f561-4368-aa74-5de0b73831f5",
+  "product_id": "2f6174a5-7643-4334-8424-cbecc49bcff5",
+  "physical_count": 62,
+  "system_stock_before": 148,
+  "system_stock_after": 62,
+  "discrepancy": -86,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 66 (Waiting to be picked: 4 pcs on 2 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-09T08:58:37.760379+00:00"
+ },
+ {
+  "id": "9adefa1c-74d4-4900-94fe-26dc21457b8d",
+  "product_id": "71585f8f-3a4c-48aa-8d5d-7244287ff7ea",
+  "physical_count": -5,
+  "system_stock_before": -3,
+  "system_stock_after": -5,
+  "discrepancy": -2,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 0 (Waiting to be picked: 5 pcs on 5 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-09T08:59:15.0502+00:00"
+ },
+ {
+  "id": "3935649c-dd21-4001-9c38-8136f473934d",
+  "product_id": "de38c88a-1d0a-42a8-82e9-e16fb247e635",
+  "physical_count": 1,
+  "system_stock_before": 2,
+  "system_stock_after": 1,
+  "discrepancy": -1,
+  "notes": "[Procurement Direct Edit] Target Unallocated: 4 (Waiting to be picked: 3 pcs on 3 orders). Reason: Physical Count Correction. Notes: None",
+  "created_at": "2026-11-09T09:05:26.688411+00:00"
+ }
+]

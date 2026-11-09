@@ -1,8 +1,9 @@
 import { getItemPriorities, priorityRank } from './procurement-priority-service';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { migrateLeakedBundleDrafts, autoCleanupStaffDrafts } from './procurement-service';
-import { calculateProcurementDemand } from './procurement-demand-service';
+import { calculateProcurementDemand, fetchAllPages } from './procurement-demand-service';
 import { getUnpickedQtyMap, unallocatedFromStockLevel } from './inventory/shelf-stock-service';
+import { scoreShelfCount } from './inventory/count-match';
 import { getNegativeStockReconciliationItems } from './procurement-reconciliation-service';
 import { getOwedReplacements } from './supplier-return-service';
 
@@ -130,26 +131,32 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
     // with an empty timeline. Every manual stock-edit path records a memory entry.
     // 'physical_count_audit' = a person typed a new stock number (Product Edit physical stock,
     // Adjust Stock, Edit Unallocated Stock, or the Guardian popup's physical count).
-    const memRes = await supabase
-      .from('inventory_guardian_memory')
-      .select('product_id, actor_name, created_at, discrepancy')
-      .in('product_id', pIdArray)
-      .eq('action_type', 'physical_count_audit')
-      .order('created_at', { ascending: false });
+    // Paged: all-time counts passed the 1,000-row API cap (1,110 on 2026-11-09).
+    const memRows = await fetchAllPages<any>((from, to) =>
+      supabase
+        .from('inventory_guardian_memory')
+        .select('id, product_id, actor_name, created_at, physical_count, system_stock_before, system_stock_after, discrepancy')
+        .in('product_id', pIdArray)
+        .eq('action_type', 'physical_count_audit')
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, to)
+    );
 
-    if (memRes.data) {
-      for (const m of memRes.data) {
-        const existing = lastEditMap.get(m.product_id);
-        if (existing) {
-          existing.count += 1;
-        } else {
-          lastEditMap.set(m.product_id, {
-            editedAt: m.created_at,
-            editedBy: m.actor_name || 'Staff',
-            count: 1,
-            isVerifiedMatch: m.discrepancy === 0,
-          });
-        }
+    for (const m of memRows) {
+      // Scored against the shelf number staff saw (count-match.ts).
+      const isMatch = scoreShelfCount(m).isMatch;
+      const existing = lastEditMap.get(m.product_id);
+      if (existing) {
+        // A check that matched the shelf is a verification, not an adjustment.
+        if (!isMatch) existing.count += 1;
+      } else {
+        lastEditMap.set(m.product_id, {
+          editedAt: m.created_at,
+          editedBy: m.actor_name || 'Staff',
+          count: isMatch ? 0 : 1,
+          isVerifiedMatch: isMatch,
+        });
       }
     }
 

@@ -5,6 +5,8 @@ import type {
   InventoryCountDailyStat,
   StaffCountAccuracy,
 } from '@/types/inventory-guardian.types';
+import { scoreShelfCount } from './count-match';
+import { fetchAllPages } from '../procurement-demand-service';
 
 const PH_TZ = 'Asia/Manila';
 
@@ -38,24 +40,31 @@ export async function getInventoryCountProgress(
   const todayStr = phDate(new Date());
   const cutoffDate = new Date(Date.now() - historyDays * 24 * 60 * 60 * 1000).toISOString();
 
-  const { data, error } = await supabase
-    .from('inventory_guardian_memory')
-    .select('id, product_id, action_type, physical_count, system_stock_before, system_stock_after, discrepancy, actor_name, actor_id, notes, created_at, products(name, sku, variant_name)')
-    .eq('action_type', 'physical_count_audit')
-    .gte('created_at', cutoffDate)
-    .order('created_at', { ascending: false });
-
-  if (error) {
+  // Paged: 60 days of counts can pass the 1,000-row API cap.
+  let data: any[];
+  try {
+    data = await fetchAllPages<any>((from, to) =>
+      supabase
+        .from('inventory_guardian_memory')
+        .select('id, product_id, action_type, physical_count, system_stock_before, system_stock_after, discrepancy, actor_name, actor_id, notes, created_at, products(name, sku, variant_name)')
+        .eq('action_type', 'physical_count_audit')
+        .gte('created_at', cutoffDate)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, to)
+    );
+  } catch (error) {
     console.error('Failed to fetch inventory count progress:', error);
     throw error;
   }
 
-  const rows = data || [];
+  // Score each count against the shelf number staff saw (count-match.ts).
+  const rows = data.map((r) => ({ ...r, ...scoreShelfCount(r) }));
 
   // 1. Filter Today's counts
   const todayRows = rows.filter((r) => phDate(r.created_at) === todayStr);
   const totalCounted = todayRows.length;
-  const matchedCount = todayRows.filter((r) => r.discrepancy === 0).length;
+  const matchedCount = todayRows.filter((r) => r.isMatch).length;
   const discrepancyCount = totalCounted - matchedCount;
   const accuracyRate = totalCounted > 0 ? Math.round((matchedCount / totalCounted) * 100) : 0;
 
@@ -68,7 +77,7 @@ export async function getInventoryCountProgress(
     }
     const stat = staffMap.get(actor)!;
     stat.total += 1;
-    if (r.discrepancy === 0) {
+    if (r.isMatch) {
       stat.matched += 1;
     }
   }
@@ -82,7 +91,7 @@ export async function getInventoryCountProgress(
     }))
     .sort((a, b) => b.totalCounted - a.totalCounted);
 
-  // 3. Format recent items (today's counts, or fallback to the latest 50 entries)
+  // 3. Format recent items (today's counts, or fallback to the latest 30 entries)
   const itemsToFormat = todayRows.length > 0 ? todayRows : rows.slice(0, 30);
   const recentItems: InventoryCountProgressItem[] = itemsToFormat.map((r) => {
     const { name, sku, variantName } = resolveItemName(r.products);
@@ -95,7 +104,8 @@ export async function getInventoryCountProgress(
       physicalCount: r.physical_count ?? 0,
       systemStockBefore: r.system_stock_before,
       systemStockAfter: r.system_stock_after,
-      discrepancy: r.discrepancy ?? 0,
+      shelfBefore: r.shelfBefore,
+      discrepancy: r.shelfDiff,
       actorName: r.actor_name || 'Staff',
       actorId: r.actor_id,
       createdAt: r.created_at,
@@ -113,7 +123,7 @@ export async function getInventoryCountProgress(
     }
     const h = historyMap.get(d)!;
     h.total += 1;
-    if (r.discrepancy === 0) {
+    if (r.isMatch) {
       h.matched += 1;
     }
   }

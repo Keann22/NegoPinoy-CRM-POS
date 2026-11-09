@@ -91,7 +91,7 @@ export function InventoryGuardianDailyGoalCard({
               <strong className="text-emerald-700 dark:text-emerald-400">
                 {dailyProgress.matchedToday ?? 0}
               </strong>{' '}
-              sa {dailyProgress.completedToday} ({dailyProgress.accuracyRateToday ?? 0}%)
+              sa {dailyProgress.countedToday ?? dailyProgress.completedToday} ({dailyProgress.accuracyRateToday ?? 0}%)
             </span>
             <button
               type="button"
