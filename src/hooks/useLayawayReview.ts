@@ -169,10 +169,10 @@ export function useLayawayReview() {
         if (latestPay?.date) {
           const payDate = parseISO(latestPay.date);
           daysSinceLastPayment = differenceInDays(now, payDate);
-          activityStatus = daysSinceLastPayment > 45 ? 'dormant' : 'active_paying';
+          activityStatus = daysSinceLastPayment >= 90 ? 'dormant' : 'active_paying';
         } else if ((o.amount_paid || 0) > 0) {
           daysSinceLastPayment = orderAgeDays;
-          activityStatus = orderAgeDays > 45 ? 'dormant' : 'active_paying';
+          activityStatus = orderAgeDays >= 90 ? 'dormant' : 'active_paying';
         } else {
           activityStatus = 'no_payment';
         }

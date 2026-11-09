@@ -196,7 +196,7 @@ export default function LayawaysReviewPage() {
           <CardHeader className="p-3 sm:p-4 pb-1">
             <CardDescription className="text-xs font-semibold text-amber-800 dark:text-amber-400 flex items-center gap-1">
               <AlertTriangle className="h-3.5 w-3.5" />
-              Dormant (&gt;45d No Pay)
+              Dormant (&ge;90d No Pay)
             </CardDescription>
             <CardTitle className="text-xl sm:text-2xl font-bold text-amber-900 dark:text-amber-300">
               {stats.dormantCount} orders
