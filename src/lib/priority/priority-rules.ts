@@ -133,6 +133,8 @@ export interface PriorityOrderInput {
   totalAmount: number;
   amountPaid: number;
   balanceDue: number;
+  /** Lay-away whose items are paid; only insurance or shipping fee is left. Counts as fully paid. */
+  itemsPaid?: boolean;
   orderDate: string;
   packedAt: string | null;
   /** Latest edit, pick, payment, OS scan or follow-up on the order. */
@@ -363,9 +365,9 @@ export function shipsBeforePaid(paymentMethod: string | null | undefined): boole
   return SHIPS_BEFORE_PAID.includes(paymentMethod || '');
 }
 
-/** Paid in full by the customer (COD pays on delivery, so it doesn't count). */
-export function isFullyPaid(o: Pick<PriorityOrderInput, 'paidAt' | 'paymentMethod' | 'balanceDue'>): boolean {
-  return !!o.paidAt && o.paymentMethod !== 'COD' && Number(o.balanceDue || 0) < 1;
+/** Paid in full by the customer (COD pays on delivery, so it doesn't count). Insurance / shipping fee left on a lay-away doesn't count. */
+export function isFullyPaid(o: Pick<PriorityOrderInput, 'paidAt' | 'paymentMethod' | 'balanceDue' | 'itemsPaid'>): boolean {
+  return !!o.paidAt && o.paymentMethod !== 'COD' && (Number(o.balanceDue || 0) < 1 || !!o.itemsPaid);
 }
 
 /** Forgotten orders go to their own tab so they don't bury today's work. */
@@ -399,7 +401,7 @@ export const LAYER_LABELS: Record<PriorityLayer, string> = {
   2: 'Others (COD, installment and not yet fully paid)',
 };
 
-export function layerOf(row: Pick<PriorityRow, 'urgent' | 'paidAt' | 'paymentMethod' | 'balanceDue'>): PriorityLayer {
+export function layerOf(row: Pick<PriorityRow, 'urgent' | 'paidAt' | 'paymentMethod' | 'balanceDue' | 'itemsPaid'>): PriorityLayer {
   if (row.urgent) return 0;
   return isFullyPaid(row) ? 1 : 2;
 }

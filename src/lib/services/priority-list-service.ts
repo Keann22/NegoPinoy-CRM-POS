@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { fetchAllPages } from './procurement-demand-service';
+import { fetchAllPages, layawayItemsPaid } from './procurement-demand-service';
 import { findStage } from '@/lib/online-order-tracking';
 import { staffNotes } from './order-trail-service';
 import { getOwedReplacements } from './supplier-return-service';
@@ -46,7 +46,7 @@ function negativeStockLines(orderLines: any[], alreadyMissing: Set<string>): { n
 
 /** How many of an order's latest notes the list shows. */
 const RECENT_NOTES = 3;
-const ORDER_COLUMNS = 'id, status, payment_method, total_amount, amount_paid, balance_due, order_date, created_at, packed_at, sales_person_name, notes, customers(full_name)';
+const ORDER_COLUMNS = 'id, status, payment_method, total_amount, subtotal, total_discount, amount_paid, balance_due, order_date, created_at, packed_at, sales_person_name, notes, customers(full_name)';
 const DAY = 24 * 60 * 60 * 1000;
 /** A buy request linked this long before the OS scan still belongs to that scan. */
 const SOURCE_MATCH_SLACK_MS = 10 * 60 * 1000;
@@ -136,7 +136,11 @@ export async function getPriorityList(
     urgentOrderIds(supabase),
   ]);
 
-  const isFullyPaid = (o: any) => Number(o.balance_due || 0) < 1;
+  // A lay-away with only insurance or shipping fee left counts as paid (owner
+  // rule 2026-11-04, same as Need to Buy). Found 2026-11-09: #31FDD36, #5F16CF5
+  // and #E5478FD sat in "Prep now" over ₱31-₱106 of insurance.
+  const itemsPaid = (o: any) => o.payment_method === 'Lay-away' && layawayItemsPaid(o);
+  const isFullyPaid = (o: any) => Number(o.balance_due || 0) < 1 || itemsPaid(o);
   const isPrep = (o: any) =>
     o.payment_method === 'Lay-away' && !isFullyPaid(o) &&
     Number(o.total_amount) > 0 && Number(o.amount_paid || 0) / Number(o.total_amount) >= PRIORITY_RULES.prepPaidRatio;
@@ -233,6 +237,7 @@ export async function getPriorityList(
       totalAmount: Number(o.total_amount || 0),
       amountPaid: Number(o.amount_paid || 0),
       balanceDue: Number(o.balance_due || 0),
+      itemsPaid: itemsPaid(o),
       orderDate: o.order_date || o.created_at,
       packedAt: o.packed_at,
       lastActivityAt: maxIso(lastActivity.get(o.id) || null, o.packed_at),
