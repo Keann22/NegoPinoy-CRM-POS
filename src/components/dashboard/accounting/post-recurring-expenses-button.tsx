@@ -58,7 +58,7 @@ export function PostRecurringExpensesButton() {
 
             if (monthlyError) throw monthlyError;
 
-            const postedDescriptions = new Set((monthlyExpenses || []).map(e => e.description));
+            const postedDescriptions = new Set((monthlyExpenses as { description: string }[] || []).map(e => e.description));
 
             // 3. Build list of expenses to insert
             const toInsert = [];

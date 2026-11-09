@@ -55,7 +55,7 @@ export function ProcurementProductDetailsDialog({ product, open, onOpenChange }:
 
         if (error) throw error;
 
-        const sold = orderItems?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
+        const sold = (orderItems as any[])?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 0;
         setTotalSold(sold);
       } catch (e) {
         console.error("Error fetching stats:", e);

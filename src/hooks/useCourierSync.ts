@@ -272,7 +272,7 @@ export function useCourierSync() {
             .from('orders')
             .update(updatePayload)
             .eq('id', matchedOrder.id)
-            .then(({ error }) => {
+            .then(({ error }: { error: any }) => {
                 if (error) {
                     syncResults.push({
                         orderId: matchedOrder.id.substring(0,7).toUpperCase(),

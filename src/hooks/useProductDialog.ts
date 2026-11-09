@@ -66,7 +66,7 @@ export function useProductDialog(props: ProductDialogProps) {
   useEffect(() => {
     if (!supabase || !user) return;
     setIsLoadingCategories(true);
-    supabase.from('categories').select('id, name').order('name').then(({ data }) => {
+    supabase.from('categories').select('id, name').order('name').then(({ data }: { data: any }) => {
       setCategoryResults(data || []);
       setIsLoadingCategories(false);
     });

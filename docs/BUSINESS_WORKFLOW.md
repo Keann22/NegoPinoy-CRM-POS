@@ -368,7 +368,15 @@ Owner decisions:
 - **Reused reference: warn and tell the owners.** If a screenshot's reference is
   already on another payment that isn't part of the same split, the payment still
   saves, is marked "reference already used on #order", and the owners get a bell
-  notification.
+  notification. A split typed by hand (e.g. a downpayment on a new order) isn't
+  flagged when it's the same customer, within 3 days, and the shares add up to no
+  more than the screenshot (2026-11-09, #C3C41DD + #F89542F = ₱2,000).
+- **GCash must go to our two numbers (owner, 2026-11-09):** 0917 186 9554 or
+  0923 290 2128. A screenshot showing another PH number and neither of ours is
+  marked "Not sent to our GCash" and the owners get a bell. From another wallet or
+  bank our number shows hidden ("•••• 9554"), which counts as ours. No receiver
+  number at all (remittance or bank slip, cropped or blurry) is flagged too
+  ("receiver not shown", owner 2026-11-09), after a second read with Google Vision.
 - **The app pre-fills each order's share; the agent edits it.** Pre-fill what
   each order needs now: a lay-away's monthly installment (never more than its
   balance), the rest of the balance for other orders. The agent changes it to
@@ -394,7 +402,11 @@ that order. Each order gets its own payment, linked as one transfer.
   one GCash ("kasama na po SF dito"). Orders have no place for it today
   (`shipping_fee` is 0 on every order), so the payment looks like the customer
   paid more. Found 2026-11-05: at least 20 of the 148 Payment Fix rows are this.
-  Do not use Credit on those (it would turn the SF into store credit).
+  On Payment Fix (2026-11-05): **SPX** advance SF (most of them, 14 of 18) →
+  **Shipping fee** button: the extra goes on the order as its shipping fee, no
+  store credit (SPX charges us the SF; found #4238B22, wrongly put in store
+  credit with Credit). **Bus** advance SF → **Credit**: recording the bus fee for
+  that order later takes it back from store credit as the shipping fee. Never Tip.
 - What we pay the bus company is not recorded in Expenses.
 - Owner idea: **track each bus company's fee per destination**, entered every
   time we ship, so over time we know where to send and which is cheapest, and

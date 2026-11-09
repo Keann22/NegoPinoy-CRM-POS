@@ -82,12 +82,24 @@ export async function POST(request: Request) {
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { data: pendingPayments, error } = await supabase
-      .from('payments')
-      .select('*')
-      .eq('status', 'Pending');
+    // Fetch all pending payments with reference numbers using pagination to bypass Supabase's 1000-row limit
+    let pendingPayments: any[] = [];
+    let from = 0;
+    const PAGE_SIZE = 1000;
+    while (true) {
+      const { data, error } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('status', 'Pending')
+        .not('reference_number', 'is', null)
+        .range(from, from + PAGE_SIZE - 1);
 
-    if (error) throw error;
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+      pendingPayments = pendingPayments.concat(data);
+      if (data.length < PAGE_SIZE) break;
+      from += PAGE_SIZE;
+    }
 
     // A single real transfer can legitimately be split across multiple payment
     // rows (e.g. applied toward two different lay-away orders), each correctly
@@ -114,14 +126,31 @@ export async function POST(request: Request) {
       groups.get(refClean)!.push(payment);
     }
 
-    let verifiedCount = 0;
+    const verifiedIds: string[] = [];
 
     for (const [refClean, payments] of groups) {
-      const matchingRow = lines.find((line) => line.replace(/\s/g, '').includes(refClean));
+      let matchingRow = lines.find((line) => line.replace(/\s/g, '').includes(refClean));
+      let matchedRef = refClean;
+
+      // Resilient check: handle OCR scans where leading zeros were prepended
+      if (!matchingRow && refClean.startsWith('0')) {
+        const noZeros = refClean.replace(/^0+/, '');
+        if (noZeros.length >= 8) {
+          const found = lines.find((line) => line.replace(/\s/g, '').includes(noZeros));
+          if (found) {
+            const token = found.split(/\s+/).find((t) => t.replace(/\D/g, '').startsWith(noZeros));
+            if (token) {
+              matchingRow = found;
+              matchedRef = token.replace(/\D/g, '');
+            }
+          }
+        }
+      }
+
       if (!matchingRow) continue;
 
       const tokens = matchingRow.split(/\s+/);
-      const refIdx = tokens.findIndex((t) => t.replace(/\D/g, '') === refClean);
+      const refIdx = tokens.findIndex((t) => t.replace(/\D/g, '') === matchedRef);
       const rowAmountStr = refIdx !== -1 ? tokens[refIdx + 1] : undefined;
       const rowAmount = rowAmountStr ? parseFloat(rowAmountStr.replace(/,/g, '')) : NaN;
       if (isNaN(rowAmount)) continue;
@@ -130,13 +159,25 @@ export async function POST(request: Request) {
       if (Math.abs(sum - rowAmount) > AMOUNT_TOLERANCE) continue;
 
       for (const payment of payments) {
-        await supabase
-          .from('payments')
-          .update({ status: 'Verified' })
-          .eq('id', payment.id);
-        verifiedCount++;
+        verifiedIds.push(payment.id);
       }
     }
+
+    // Batch update in chunks to avoid serverless timeouts
+    for (let i = 0; i < verifiedIds.length; i += 100) {
+      const chunk = verifiedIds.slice(i, i + 100);
+      const { error: updateError } = await supabase
+        .from('payments')
+        .update({ status: 'Verified' })
+        .in('id', chunk);
+
+      if (updateError) {
+        console.error('Error batch updating verified payments:', updateError);
+        throw updateError;
+      }
+    }
+
+    const verifiedCount = verifiedIds.length;
 
     return NextResponse.json({ success: true, verifiedCount });
 

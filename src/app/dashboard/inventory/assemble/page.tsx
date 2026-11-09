@@ -89,7 +89,7 @@ export default function AssembleKitPage() {
             }
 
             const detailsMap: Record<string, ComponentDetails> = {};
-            data?.forEach(d => {
+            data?.forEach((d: ComponentDetails) => {
                 detailsMap[d.id] = d;
             });
             setComponentDetails(detailsMap);

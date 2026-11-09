@@ -78,7 +78,7 @@ export function RecentSales({ dateRange, salespersonId = 'all' }: RecentSalesPro
                 const customerMap = new Map<string, { name: string; email: string }>();
 
                 if (canSeeCustomers) {
-                    const customerIds = [...new Set(orders.map(o => o.customer_id).filter(Boolean))];
+                    const customerIds = [...new Set((orders as any[]).map(o => o.customer_id).filter(Boolean))];
                     if (customerIds.length > 0) {
                         const { data: customers, error: customersError } = await supabase
                             .from('customers')
@@ -86,7 +86,7 @@ export function RecentSales({ dateRange, salespersonId = 'all' }: RecentSalesPro
                             .in('id', customerIds);
 
                         if (!customersError && customers) {
-                            customers.forEach(c => {
+                            (customers as any[]).forEach(c => {
                                 customerMap.set(c.id, {
                                     name: c.full_name || 'Unknown Customer',
                                     email: c.email || '',
@@ -96,7 +96,7 @@ export function RecentSales({ dateRange, salespersonId = 'all' }: RecentSalesPro
                     }
                 }
 
-                const sales: RecentSaleItem[] = orders.map(order => {
+                const sales: RecentSaleItem[] = (orders as any[]).map(order => {
                     let name = 'Unknown Customer';
                     let email = '';
 

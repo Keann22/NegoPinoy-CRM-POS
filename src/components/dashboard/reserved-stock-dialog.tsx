@@ -63,7 +63,7 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose, s
           .select('id')
           .or(`id.eq.${productId},parent_id.eq.${productId}`);
         
-        const targetProductIds = (family || []).map(f => f.id);
+        const targetProductIds = ((family as any[]) || []).map(f => f.id);
 
         if (targetProductIds.length === 0) {
             setReservedOrders([]);
@@ -181,7 +181,7 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose, s
           .filter((item: any) => {
             const hasOpenIssue = item.orders.status === 'Picked (with issue)' && (
               openIssueKeys.has(`${item.orders.id}-${item.product_id}`)
-              || targetProductIds.some(tid => openIssueKeys.has(`${item.orders.id}-${tid}`))
+              || targetProductIds.some((tid: string) => openIssueKeys.has(`${item.orders.id}-${tid}`))
             );
 
             // Packed view wants exactly the packed rows (excluding short items);

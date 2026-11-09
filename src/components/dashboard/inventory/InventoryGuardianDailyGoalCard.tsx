@@ -1,9 +1,11 @@
 'use client';
 
-import { Target, CheckCircle2, Award, ListFilter, RotateCcw } from 'lucide-react';
+import { useState } from 'react';
+import { Target, CheckCircle2, Award, ListFilter, RotateCcw, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { GuardianDailyProgress } from '@/types';
+import { InventoryCountProgressModal } from './InventoryCountProgressModal';
 
 interface InventoryGuardianDailyGoalCardProps {
   dailyProgress: GuardianDailyProgress;
@@ -16,8 +18,9 @@ export function InventoryGuardianDailyGoalCard({
   dailyProgress,
   showAllBacklog,
   onToggleShowAllBacklog,
-  onClose
 }: InventoryGuardianDailyGoalCardProps) {
+  const [showProgressModal, setShowProgressModal] = useState(false);
+
   const target = Math.max(1, dailyProgress.target);
   const percent = dailyProgress.isRestDay
     ? 100
@@ -30,101 +33,139 @@ export function InventoryGuardianDailyGoalCard({
     : "Today's Goal";
 
   return (
-    <div className="p-3 rounded-lg border bg-primary/5 space-y-2 text-xs">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5 font-semibold text-foreground flex-wrap">
-          <Target className="h-4 w-4 text-primary" />
-          {dailyProgress.isRestDay ? (
-            <span className="text-emerald-700 dark:text-emerald-400">
-              Sunday Rest Day: No audits scheduled today
-            </span>
-          ) : (
-            <span>
-              {staffTitle}: {dailyProgress.completedToday} of {dailyProgress.target} products verified
-            </span>
-          )}
-          {!dailyProgress.isRestDay && dailyProgress.carryOver > 0 && dailyProgress.target !== 30 && (
-            <span className="text-[10px] font-normal text-amber-700 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-300 px-1.5 py-0.5 rounded border border-amber-200/80">
-              +{dailyProgress.carryOver} carried over from previous day
-            </span>
-          )}
-          {dailyProgress.target === 30 && (
-            <span className="text-[10px] font-normal text-blue-700 bg-blue-50 dark:bg-blue-950/40 dark:text-blue-300 px-1.5 py-0.5 rounded border border-blue-200/80">
-              30 items assigned for today
-            </span>
-          )}
-        </div>
-        {dailyProgress.isRestDay ? (
-          <Badge className="bg-emerald-600/10 text-emerald-700 border-emerald-300 text-[10px]">
-            Rest Day
-          </Badge>
-        ) : dailyProgress.isGoalMet ? (
-          <Badge className="bg-emerald-600 hover:bg-emerald-700 text-[10px] gap-1">
-            <CheckCircle2 className="h-3 w-3" /> Goal Complete
-          </Badge>
-        ) : (
-          <Badge variant="outline" className="text-[10px] border-primary/40 text-primary">
-            {dailyProgress.remainingToday} item(s) left today
-          </Badge>
-        )}
-      </div>
-
-      {/* Progress Bar */}
-      <div className="w-full bg-muted/70 rounded-full h-2 overflow-hidden border">
-        <div
-          className={`h-full transition-all duration-500 rounded-full ${
-            dailyProgress.isGoalMet ? 'bg-emerald-600' : 'bg-primary'
-          }`}
-          style={{ width: `${percent}%` }}
-        />
-      </div>
-
-      {/* Staff Activity / Items Verified Today */}
-      {dailyProgress.completedItems.length > 0 && (
-        <div className="pt-1 border-t border-primary/10">
-          <p className="text-[11px] font-medium text-foreground pb-1">Verified today by staff:</p>
-          <div className="flex flex-wrap gap-1.5 max-h-16 overflow-y-auto">
-            {dailyProgress.completedItems.map((item) => (
-              <span
-                key={item.id}
-                className="bg-background px-2 py-0.5 rounded border text-[10px] flex items-center gap-1 text-muted-foreground"
-              >
-                <span className="font-semibold text-foreground truncate max-w-[120px]">{item.productName}</span>
-                <span className="text-primary font-medium">({item.actorName})</span>
+    <>
+      <div className="p-3 rounded-lg border bg-primary/5 space-y-2 text-xs">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5 font-semibold text-foreground flex-wrap">
+            <Target className="h-4 w-4 text-primary" />
+            {dailyProgress.isRestDay ? (
+              <span className="text-emerald-700 dark:text-emerald-400">
+                Sunday Rest Day: No audits scheduled today
               </span>
-            ))}
+            ) : (
+              <span>
+                {staffTitle}: {dailyProgress.completedToday} of {dailyProgress.target} products verified
+              </span>
+            )}
+            {!dailyProgress.isRestDay && dailyProgress.carryOver > 0 && dailyProgress.target !== 30 && (
+              <span className="text-[10px] font-normal text-amber-700 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-300 px-1.5 py-0.5 rounded border border-amber-200/80">
+                +{dailyProgress.carryOver} carried over from previous day
+              </span>
+            )}
+            {dailyProgress.target === 30 && (
+              <span className="text-[10px] font-normal text-blue-700 bg-blue-50 dark:bg-blue-950/40 dark:text-blue-300 px-1.5 py-0.5 rounded border border-blue-200/80">
+                30 items assigned for today
+              </span>
+            )}
           </div>
-        </div>
-      )}
-
-      {/* Mode Switcher: Today's Queue vs Full Backlog */}
-      <div className="flex items-center justify-between pt-1 text-[11px] text-muted-foreground border-t border-primary/10">
-        <span>
-          {showAllBacklog
-            ? 'Viewing full backlog mode'
-            : dailyProgress.isRestDay
-            ? 'No queue active today (Sunday)'
-            : `Focusing on today's ${dailyProgress.target}-product queue`}
-        </span>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => onToggleShowAllBacklog(!showAllBacklog)}
-          className="h-6 px-2 text-[11px] gap-1 text-primary hover:text-primary hover:bg-primary/10"
-        >
-          {showAllBacklog ? (
-            <>
-              <RotateCcw className="h-3 w-3" /> Back to Today's Queue
-            </>
+          {dailyProgress.isRestDay ? (
+            <Badge className="bg-emerald-600/10 text-emerald-700 border-emerald-300 text-[10px]">
+              Rest Day
+            </Badge>
+          ) : dailyProgress.isGoalMet ? (
+            <Badge className="bg-emerald-600 hover:bg-emerald-700 text-[10px] gap-1">
+              <CheckCircle2 className="h-3 w-3" /> Goal Complete
+            </Badge>
           ) : (
-            <>
-              <ListFilter className="h-3 w-3" /> View All Backlog ({dailyProgress.totalBacklogCount})
-            </>
+            <Badge variant="outline" className="text-[10px] border-primary/40 text-primary">
+              {dailyProgress.remainingToday} item(s) left today
+            </Badge>
           )}
-        </Button>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="w-full bg-muted/70 rounded-full h-2 overflow-hidden border">
+          <div
+            className={`h-full transition-all duration-500 rounded-full ${
+              dailyProgress.isGoalMet ? 'bg-emerald-600' : 'bg-primary'
+            }`}
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+
+        {/* Accuracy and Match Stats */}
+        {dailyProgress.completedToday > 0 && (
+          <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-0.5">
+            <span>
+              🎯 Tugma sa Shelf:{' '}
+              <strong className="text-emerald-700 dark:text-emerald-400">
+                {dailyProgress.matchedToday ?? 0}
+              </strong>{' '}
+              sa {dailyProgress.completedToday} ({dailyProgress.accuracyRateToday ?? 0}%)
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowProgressModal(true)}
+              className="text-primary hover:underline text-[10px] font-semibold flex items-center gap-1"
+            >
+              <TrendingUp className="h-3 w-3" /> Pag-usad ng Bilang →
+            </button>
+          </div>
+        )}
+
+        {/* Staff Activity / Items Verified Today */}
+        {dailyProgress.completedItems.length > 0 && (
+          <div className="pt-1 border-t border-primary/10">
+            <p className="text-[11px] font-medium text-foreground pb-1">Verified today by staff:</p>
+            <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto">
+              {dailyProgress.completedItems.map((item) => (
+                <span
+                  key={item.id}
+                  className={`px-2 py-0.5 rounded border text-[10px] flex items-center gap-1 ${
+                    item.discrepancy === 0
+                      ? 'bg-emerald-50 border-emerald-300 text-emerald-900 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300'
+                      : 'bg-background border-border text-muted-foreground'
+                  }`}
+                >
+                  <span className="font-semibold text-foreground truncate max-w-[120px]">{item.productName}</span>
+                  <span className="text-primary font-medium">({item.actorName})</span>
+                  {item.discrepancy === 0 ? (
+                    <span className="text-emerald-700 dark:text-emerald-400 font-bold ml-0.5">✓ Tugma</span>
+                  ) : item.discrepancy != null ? (
+                    <span className="text-amber-700 dark:text-amber-400 font-medium ml-0.5">
+                      {item.discrepancy > 0 ? `+${item.discrepancy}` : item.discrepancy}
+                    </span>
+                  ) : null}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Mode Switcher: Today's Queue vs Full Backlog */}
+        <div className="flex items-center justify-between pt-1 text-[11px] text-muted-foreground border-t border-primary/10">
+          <span>
+            {showAllBacklog
+              ? 'Viewing full backlog mode'
+              : dailyProgress.isRestDay
+              ? 'No queue active today (Sunday)'
+              : `Focusing on today's ${dailyProgress.target}-product queue`}
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => onToggleShowAllBacklog(!showAllBacklog)}
+            className="h-6 px-2 text-[11px] gap-1 text-primary hover:text-primary hover:bg-primary/10"
+          >
+            {showAllBacklog ? (
+              <>
+                <RotateCcw className="h-3 w-3" /> Back to Today's Queue
+              </>
+            ) : (
+              <>
+                <ListFilter className="h-3 w-3" /> View All Backlog ({dailyProgress.totalBacklogCount})
+              </>
+            )}
+          </Button>
+        </div>
       </div>
-    </div>
+
+      <InventoryCountProgressModal
+        open={showProgressModal}
+        onOpenChange={setShowProgressModal}
+      />
+    </>
   );
 }
 
@@ -160,7 +201,11 @@ export function GoalCompletedModalView({
             </h3>
             <p className="text-xs text-muted-foreground max-w-sm mx-auto">
               {dailyProgress.assignedStaffName ? `${dailyProgress.assignedStaffName}` : 'Staff'} has successfully verified <strong>{dailyProgress.completedToday} of {dailyProgress.target} products</strong> today.
-              The remaining backlog ({dailyProgress.totalBacklogCount} items) is safely queued for upcoming days.
+              {dailyProgress.matchedToday != null && dailyProgress.matchedToday > 0 && (
+                <span className="block mt-1 text-emerald-700 dark:text-emerald-400 font-semibold">
+                  🎯 {dailyProgress.matchedToday} product(s) tumugma sa unallocated shelf stock! ({dailyProgress.accuracyRateToday}%)
+                </span>
+              )}
             </p>
           </>
         )}
@@ -173,9 +218,20 @@ export function GoalCompletedModalView({
             {dailyProgress.completedItems.map((item) => (
               <div key={item.id} className="flex items-center justify-between text-[11px]">
                 <span className="truncate max-w-[220px] text-muted-foreground">{item.productName}</span>
-                <Badge variant="outline" className="text-[10px] font-mono">
-                  {item.actorName}
-                </Badge>
+                <div className="flex items-center gap-1.5">
+                  {item.discrepancy === 0 ? (
+                    <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 text-[10px]">
+                      ✓ Tugma
+                    </Badge>
+                  ) : item.discrepancy != null ? (
+                    <span className="text-[10px] text-amber-700 font-mono">
+                      {item.discrepancy > 0 ? `+${item.discrepancy}` : item.discrepancy}
+                    </span>
+                  ) : null}
+                  <Badge variant="outline" className="text-[10px] font-mono">
+                    {item.actorName}
+                  </Badge>
+                </div>
               </div>
             ))}
           </div>

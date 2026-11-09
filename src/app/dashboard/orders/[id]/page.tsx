@@ -67,7 +67,7 @@ export default function OrderDetailPage() {
     supabase.from('expenses')
       .select('amount, category')
       .ilike('description', `%${orderId.substring(0, 7).toUpperCase()}%`)
-      .then(({ data }) => {
+      .then(({ data }: { data: { amount: number; category: string }[] | null }) => {
         if (data && data.length > 0) {
           let ship = 0;
           let proc = 0;

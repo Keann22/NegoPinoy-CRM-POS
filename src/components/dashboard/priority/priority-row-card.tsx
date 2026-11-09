@@ -24,6 +24,23 @@ const OWNER_STYLE: Record<PriorityOwner, string> = {
   none: 'bg-muted text-muted-foreground',
 };
 
+const ORDER_STATUS_STYLE: Record<string, string> = {
+  'Picked': 'bg-sky-100 text-sky-800 border-sky-300 dark:bg-sky-950 dark:text-sky-200 dark:border-sky-800',
+  'Picked (with issue)': 'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-950 dark:text-orange-200 dark:border-orange-800',
+  'Photo': 'bg-indigo-100 text-indigo-800 border-indigo-300 dark:bg-indigo-950 dark:text-indigo-200 dark:border-indigo-800',
+  'Packed': 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-950 dark:text-purple-200 dark:border-purple-800',
+  'For Shipping': 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-200 dark:border-emerald-800',
+  'For Pick-up': 'bg-teal-100 text-teal-800 border-teal-300 dark:bg-teal-950 dark:text-teal-200 dark:border-teal-800',
+  'Processing': 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950 dark:text-blue-200 dark:border-blue-800',
+  'Waiting for Stock': 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-200 dark:border-amber-800',
+  'Pending Payment': 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-950 dark:text-yellow-200 dark:border-yellow-800',
+  'On-Hold': 'bg-zinc-100 text-zinc-700 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700',
+  'Shipped': 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-200 dark:border-emerald-800',
+  'Completed': 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-200 dark:border-emerald-800',
+  'Cancelled': 'bg-red-100 text-red-800 border-red-300 dark:bg-red-950 dark:text-red-200 dark:border-red-800',
+  'Returned': 'bg-red-100 text-red-800 border-red-300 dark:bg-red-950 dark:text-red-200 dark:border-red-800',
+};
+
 const ITEM_STATE: Record<MissingState, string> = {
   decide: 'OS — waiting for sales to decide',
   remove_item: 'Remove it from the order',
@@ -109,11 +126,22 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
           )}
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <Link href={`/dashboard/orders/${row.id}`} className="font-semibold hover:underline">#{shortId}</Link>
+            {row.status && (
+              <Badge
+                variant="outline"
+                className={cn(
+                  'text-xs font-semibold px-2 py-0.5 border shrink-0',
+                  ORDER_STATUS_STYLE[row.status] || 'bg-muted text-muted-foreground border-border'
+                )}
+              >
+                {row.status}
+              </Badge>
+            )}
             <span className="truncate">{row.customerName || 'Unknown customer'}</span>
             <span className="text-sm text-muted-foreground">· {peso(row.totalAmount)} · {row.paymentMethod || '—'}</span>
           </div>
           <div className="text-xs text-muted-foreground">
-            {row.salesPersonName || 'No sales person'} · Status: {row.status}
+            {row.salesPersonName || 'No sales person'}
             {row.paidAt && <> · {isFullyPaid(row) ? 'Fully paid' : 'Ordered'} {shortDate(row.paidAt)}</>}
             {!isFullyPaid(row) && row.paymentMethod !== 'COD' && row.totalAmount > 0 && <> · {Math.round((row.amountPaid / row.totalAmount) * 100)}% paid</>}
             {row.itemCount > 1 && <> · <span className={cn(row.readyCount < row.itemCount && 'font-medium text-foreground')}>{row.readyCount} of {row.itemCount} items ready</span></>}

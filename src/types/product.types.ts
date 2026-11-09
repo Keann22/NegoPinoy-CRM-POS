@@ -11,6 +11,7 @@ export type Product = {
   name: string;
   sku?: string;
   description?: string;
+  category?: string;
   categoryId?: string;
   categoryName?: string;
   sellingPrice: number;

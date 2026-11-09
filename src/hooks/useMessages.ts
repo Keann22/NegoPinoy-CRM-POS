@@ -61,15 +61,15 @@ export function useMessages() {
     if (!supabase || !myId) return;
 
     supabase.getChannels()
-      .filter((c) => c.topic === 'realtime:messages-page-channel')
-      .forEach((c) => supabase.removeChannel(c));
+      .filter((c: any) => c.topic === 'realtime:messages-page-channel')
+      .forEach((c: any) => supabase.removeChannel(c));
 
     const channel = supabase
       .channel('messages-page-channel')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'order_issue_messages' },
-        (payload) => {
+        (payload: any) => {
           fetchThreads();
           if (payload.new.issue_id === selectedIdRef.current) {
             markRead(payload.new.issue_id);

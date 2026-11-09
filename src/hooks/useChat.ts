@@ -52,7 +52,7 @@ export function useChat() {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'conversation_logs' },
-        async (payload) => {
+        async (payload: any) => {
           const { data: enriched } = await supabase
             .from('conversation_logs')
             .select('*, customers(full_name, suki_tier, mobile_number)')
@@ -69,7 +69,7 @@ export function useChat() {
           }
         }
       )
-      .subscribe((status) => {
+      .subscribe((status: any) => {
         setIsRealtimeActive(status === 'SUBSCRIBED');
       });
 

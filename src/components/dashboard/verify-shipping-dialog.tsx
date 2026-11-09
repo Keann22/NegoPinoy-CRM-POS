@@ -53,7 +53,7 @@ export function VerifyShippingDialog({ order, open, onOpenChange, onSuccess }: V
     // Wait for the address list so the customer's saved address can be matched.
     if (open && order && supabase && isAddressLoaded) {
       // Fetch customer details
-      supabase.from('customers').select('*').eq('id', order.customerId).single().then(({ data }) => {
+      supabase.from('customers').select('*').eq('id', order.customerId).single().then(({ data }: { data: any }) => {
         if (data) {
           setShippingName(data.full_name || '');
           setShippingPhone(data.mobile_number || '');

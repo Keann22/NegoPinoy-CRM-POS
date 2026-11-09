@@ -27,6 +27,7 @@ export function usePurchasesReport() {
   // Per-row edits, keyed by item id, seeded from the server's suggestions.
   const [drafts, setDrafts] = useState<Record<string, { supplierId: string; unitCost: string; receivedQty: string; receivedAt: string }>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [savingAll, setSavingAll] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -111,6 +112,13 @@ export function usePurchasesReport() {
 
   const peso = (n: number) => `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+  const readyToRecordCount = useMemo(() => {
+    return unrecorded.filter(u => {
+      const draft = drafts[u.id];
+      return draft && Number(draft.unitCost) > 0 && draft.supplierId;
+    }).length;
+  }, [unrecorded, drafts]);
+
   const handleRecord = async (row: UnrecordedRow) => {
     const draft = drafts[row.id] || { supplierId: '', unitCost: '', receivedQty: String(row.receivedQty), receivedAt: '' };
     const cost = Number(draft.unitCost);
@@ -170,6 +178,60 @@ export function usePurchasesReport() {
     } finally {
       setSavingId(null);
     }
+  };
+
+  const handleRecordAllReady = async () => {
+    const readyItems = unrecorded.filter(u => {
+      const draft = drafts[u.id];
+      return draft && Number(draft.unitCost) > 0 && draft.supplierId;
+    });
+
+    if (readyItems.length === 0) {
+      toast({ title: 'No items ready', description: 'No unrecorded items have both a supplier and cost selected.' });
+      return;
+    }
+
+    if (!window.confirm(`Auto-save ${readyItems.length} items with their suggested suppliers and costs?`)) {
+      return;
+    }
+
+    setSavingAll(true);
+    let successCount = 0;
+    const errors: string[] = [];
+
+    for (const item of readyItems) {
+      const draft = drafts[item.id];
+      const cost = Number(draft.unitCost);
+      const qty = draft.receivedQty === '' ? null : Number(draft.receivedQty);
+      const qtyChanged = qty !== null && qty !== item.receivedQty;
+
+      try {
+        const res = await fetch('/api/reports/purchases/record', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            itemId: item.id,
+            supplierId: draft.supplierId || null,
+            unitCost: cost || null,
+            receivedQty: qtyChanged ? qty : null,
+            receivedAt: draft.receivedAt || null,
+          }),
+        });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || 'Failed to record');
+        successCount++;
+      } catch (err: any) {
+        errors.push(`${item.productName}: ${err.message}`);
+      }
+    }
+
+    setSavingAll(false);
+    toast({
+      title: `Recorded ${successCount} purchase${successCount === 1 ? '' : 's'}`,
+      description: errors.length > 0 ? `Failed for ${errors.length} items.` : 'All items saved and logged to inventory.',
+    });
+
+    setReloadKey(k => k + 1);
   };
 
   const handleExportExcel = () => {
@@ -265,10 +327,13 @@ export function usePurchasesReport() {
     drafts,
     setDrafts,
     savingId,
+    savingAll,
+    readyToRecordCount,
     totals,
     byProduct,
     bySupplier,
     handleRecord,
+    handleRecordAllReady,
     handleExportExcel,
     rangeLabel,
     peso

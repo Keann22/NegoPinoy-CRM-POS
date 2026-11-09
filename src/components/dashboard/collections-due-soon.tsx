@@ -46,7 +46,7 @@ export function CollectionsDueSoon() {
                 if (error) throw error;
 
                 if (ordersData && ordersData.length > 0) {
-                    const customerIds = Array.from(new Set(ordersData.map(o => o.customer_id)));
+                    const customerIds = Array.from(new Set((ordersData as { customer_id: string }[]).map(o => o.customer_id)));
                     const { data: customersData } = await supabase
                         .from('customers')
                         .select('id, full_name')
@@ -54,10 +54,10 @@ export function CollectionsDueSoon() {
                     
                     const customerMap = new Map();
                     if (customersData) {
-                        customersData.forEach(c => customerMap.set(c.id, c.full_name));
+                        (customersData as { id: string; full_name: string | null }[]).forEach(c => customerMap.set(c.id, c.full_name));
                     }
 
-                    const enriched = ordersData.map(o => ({
+                    const enriched = (ordersData as any[]).map(o => ({
                         ...o,
                         customerName: customerMap.get(o.customer_id) || 'Unknown Customer',
                     }));

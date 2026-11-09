@@ -206,7 +206,7 @@ export async function getGuardianDailyProgress(
 
     const { data: todayMemories, error } = await supabase
       .from('inventory_guardian_memory')
-      .select('id, product_id, action_type, physical_count, actor_name, actor_id, created_at, products(name)')
+      .select('id, product_id, action_type, physical_count, system_stock_before, system_stock_after, discrepancy, actor_name, actor_id, created_at, products(name)')
       .in('action_type', ['physical_count_audit', 'purchase_backfill'])
       .gte('created_at', todayMidnightUtc)
       .order('created_at', { ascending: false });
@@ -280,12 +280,17 @@ export async function getGuardianDailyProgress(
         actorName: m.actor_name || 'Staff',
         actionType: m.action_type,
         physicalCount: m.physical_count,
+        systemStockBefore: m.system_stock_before,
+        systemStockAfter: m.system_stock_after,
+        discrepancy: m.discrepancy,
         timestamp: m.created_at
       });
     }
 
     const completedToday = completedItems.length;
     const remainingToday = Math.max(0, target - completedToday);
+    const matchedToday = completedItems.filter((i) => i.discrepancy === 0).length;
+    const accuracyRateToday = completedToday > 0 ? Math.round((matchedToday / completedToday) * 100) : 0;
 
     return {
       baseTarget,
@@ -299,7 +304,9 @@ export async function getGuardianDailyProgress(
       totalBacklogCount,
       assignedStaffName,
       teamCompletedToday,
-      allAuditedProductIdsToday
+      allAuditedProductIdsToday,
+      matchedToday,
+      accuracyRateToday,
     };
   } catch (err) {
     console.error('Error fetching guardian daily progress:', err);

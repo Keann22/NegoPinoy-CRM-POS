@@ -114,7 +114,7 @@ export function useProductSubmit({
     setOpen(false);
     toast({ title: isEdit ? 'Updating Product...' : 'Adding Product...', description: `"${values.name}" is being ${isEdit ? 'updated' : 'added'}.` });
 
-    const { images: imageFiles, quantityOnHand, supplierPricing, hasVariations: _hv, variations, installmentPrice, isOnSale, salePrice, adsPrice, livePrice, assemblyRecipe, ...core } = values;
+    const { images: imageFiles, quantityOnHand, supplierPricing, hasVariations: _hv, variations, handoverIndex, installmentPrice, isOnSale, salePrice, adsPrice, livePrice, assemblyRecipe, ...core } = values;
     const effectiveSupplierId = supplierPricing?.find((sp: any) => sp.supplierId)?.supplierId || null;
 
     try {
@@ -127,6 +127,8 @@ export function useProductSubmit({
         const removedImageUrls = (displayProduct.images || []).filter(url => !existingImages.includes(url));
 
         const hasNoChildren = !displayProduct.children || displayProduct.children.length === 0;
+        let handoverNote = '';
+        let handoverFailed = '';
         const stockChanged = hasNoChildren && typeof quantityOnHand === 'number' && quantityOnHand !== displayProduct.quantityOnHand;
 
         // Prices are only written by price managers, and every change is logged.
@@ -222,6 +224,7 @@ export function useProductSubmit({
         }
 
         if (variations && variations.length > 0) {
+          const newVariantIds: string[] = [];
           const variantSupplierId = effectiveSupplierId || displayProduct.supplier_id || null;
           for (let i = 0; i < variations.length; i++) {
             const v = variations[i];
@@ -237,14 +240,37 @@ export function useProductSubmit({
               supplier_pricing: supplierPricing || [], stock_level: v.quantityOnHand, images: varImages,
             }).select().single();
             if (varErr) throw varErr;
+            newVariantIds.push(newVar.id);
             if (v.quantityOnHand > 0) {
               const cost = v.unitCost ?? supplierPricing?.[0]?.unitCost ?? 0;
               await supabase.from('inventory_movements').insert({ product_id: newVar.id, quantity_change: v.quantityOnHand, movement_type: 'initial_stock', timestamp: new Date().toISOString(), reason: 'Initial stock for new variation', supplier_name: supplierPricing?.[0]?.supplierName || 'Initial Stock', unit_cost: cost });
             }
           }
+
+          // First variations on a plain product: it becomes a parent, so its
+          // open orders, purchases and stock move to the chosen variation.
+          if (hasNoChildren) {
+            const idx = Math.min(handoverIndex ?? 0, newVariantIds.length - 1);
+            const target = variations[idx];
+            const res = await fetch('/api/products/handover', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ fromId: displayProduct.id, toId: newVariantIds[idx], actorName }),
+            });
+            const moved = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              handoverFailed = `Variations were added, but open orders and stock are still on "${core.name}" (${moved.error || 'unknown error'}). Ask an admin to move them.`;
+            } else if (moved.orderLines || moved.purchaseLines || moved.stock) {
+              handoverNote = ` Moved ${moved.orderLines} open order line(s), ${moved.purchaseLines} purchase line(s) and stock ${moved.stock} to "${target.nameSuffix}".`;
+            }
+          }
         }
 
-        toast({ title: 'Product Updated', description: `${values.name} has been successfully updated.` });
+        if (handoverFailed) {
+          toast({ variant: 'destructive', title: 'History not moved', description: handoverFailed });
+        } else {
+          toast({ title: 'Product Updated', description: `${values.name} has been successfully updated.${handoverNote}` });
+        }
         (props as EditProps).onSuccess?.();
 
       } else {

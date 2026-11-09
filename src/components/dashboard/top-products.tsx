@@ -67,7 +67,7 @@ export function TopProducts({ dateRange, salespersonId = 'all' }: TopProductsPro
                     return;
                 }
 
-                const validOrderIds = orders
+                const validOrderIds = (orders as any[])
                     .filter(o => o.status !== 'Cancelled' && o.status !== 'Returned')
                     .map(o => o.id);
 
@@ -88,7 +88,7 @@ export function TopProducts({ dateRange, salespersonId = 'all' }: TopProductsPro
                         .in('order_id', chunk);
 
                     if (orderItems) {
-                        orderItems.forEach(item => {
+                        (orderItems as any[]).forEach(item => {
                             if (item.product_id) {
                                 productTotals.set(item.product_id, (productTotals.get(item.product_id) || 0) + Number(item.quantity || 0));
                             }
@@ -116,7 +116,7 @@ export function TopProducts({ dateRange, salespersonId = 'all' }: TopProductsPro
                         .in('id', topProductIds);
 
                     if (!productsError && products) {
-                        products.forEach(p => {
+                        (products as any[]).forEach(p => {
                             productMap.set(p.id, {
                                 name: p.name || 'Unknown Product',
                                 sku: p.sku || 'No SKU',

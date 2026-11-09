@@ -45,6 +45,12 @@ export default function ProductsPage() {
     setSearchTerm,
     stockFilter,
     setStockFilter,
+    categoryFilter,
+    setCategoryFilter,
+    supplierFilter,
+    setSupplierFilter,
+    categories,
+    suppliers,
     expandedParents,
     setExpandedParents,
     viewingReservedProduct,
@@ -82,22 +88,22 @@ export default function ProductsPage() {
           )}
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <div className="flex flex-wrap items-center gap-2 flex-1">
                 <Input
-                placeholder="Search products by name..."
-                value={searchTerm}
-                onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    setCurrentPage(1);
-                }}
-                className="max-w-sm"
+                  placeholder="Search products by name..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      setCurrentPage(1);
+                  }}
+                  className="w-full sm:w-[220px]"
                 />
                 <Select value={stockFilter} onValueChange={(value) => {
                     setStockFilter(value);
                     setCurrentPage(1);
                 }}>
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-[150px]">
                         <SelectValue placeholder="Filter by stock" />
                     </SelectTrigger>
                     <SelectContent>
@@ -107,6 +113,56 @@ export default function ProductsPage() {
                         <SelectItem value="negative-stock">Negative Stock</SelectItem>
                     </SelectContent>
                 </Select>
+                <Select value={categoryFilter} onValueChange={(value) => {
+                    setCategoryFilter(value);
+                    setCurrentPage(1);
+                }}>
+                    <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Filter by category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Categories</SelectItem>
+                        {categories.map((c) => (
+                          <SelectItem key={String(c.id)} value={c.name}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="uncategorized">Uncategorized</SelectItem>
+                    </SelectContent>
+                </Select>
+                <Select value={supplierFilter} onValueChange={(value) => {
+                    setSupplierFilter(value);
+                    setCurrentPage(1);
+                }}>
+                    <SelectTrigger className="w-[190px]">
+                        <SelectValue placeholder="Filter by supplier" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Suppliers</SelectItem>
+                        {suppliers.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.name}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="no-supplier">No Supplier</SelectItem>
+                    </SelectContent>
+                </Select>
+                {(searchTerm || stockFilter !== 'all' || categoryFilter !== 'all' || supplierFilter !== 'all') && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSearchTerm('');
+                      setStockFilter('all');
+                      setCategoryFilter('all');
+                      setSupplierFilter('all');
+                      setCurrentPage(1);
+                    }}
+                    className="h-9 px-2.5 text-muted-foreground hover:text-foreground"
+                  >
+                    Reset
+                  </Button>
+                )}
             </div>
             {selectedProductIds.length > 0 && isManagement && (
                 <Button
@@ -153,7 +209,9 @@ export default function ProductsPage() {
               <div className="flex flex-col items-center justify-center text-center border-2 border-dashed rounded-lg p-12 mt-4">
                   <p className="text-lg font-semibold">No products found</p>
                   <p className="text-muted-foreground mt-2">
-                      {searchTerm ? `Your search for "${searchTerm}" did not match any products.` : (canManageProducts ? 'Click "Add Product" to get started.' : 'No products available.')}
+                      {searchTerm || stockFilter !== 'all' || categoryFilter !== 'all' || supplierFilter !== 'all'
+                        ? 'No products matched your current filters.'
+                        : (canManageProducts ? 'Click "Add Product" to get started.' : 'No products available.')}
                   </p>
               </div>
           )}

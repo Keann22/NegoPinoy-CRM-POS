@@ -72,7 +72,7 @@ export function TopCustomers({ dateRange, salespersonId = 'all' }: TopCustomersP
 
                 // Aggregate totals by customer
                 const customerTotals = new Map<string, number>();
-                orders.forEach(o => {
+                (orders as any[]).forEach(o => {
                     if (o.status !== 'Cancelled' && o.status !== 'Returned' && o.customer_id) {
                         customerTotals.set(o.customer_id, (customerTotals.get(o.customer_id) || 0) + Number(o.total_amount || 0));
                     }
@@ -98,7 +98,7 @@ export function TopCustomers({ dateRange, salespersonId = 'all' }: TopCustomersP
                         .in('id', topCustomerIds);
 
                     if (!customersError && customers) {
-                        customers.forEach(c => {
+                        (customers as any[]).forEach(c => {
                             customerMap.set(c.id, {
                                 name: c.full_name || 'Unknown Customer',
                                 email: c.email || '',

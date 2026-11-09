@@ -105,15 +105,15 @@ export function EscalationModal() {
     if (!supabase || !myId || !myName) return;
 
     supabase.getChannels()
-      .filter((c) => c.topic === 'realtime:escalation-channel')
-      .forEach((c) => supabase.removeChannel(c));
+      .filter((c: any) => c.topic === 'realtime:escalation-channel')
+      .forEach((c: any) => supabase.removeChannel(c));
 
     const channel = supabase
       .channel('escalation-channel')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'order_issue_messages' },
-        (payload) => {
+        (payload: any) => {
           const m = payload.new;
           const mentionsMe =
             Array.isArray(m.mentions) &&

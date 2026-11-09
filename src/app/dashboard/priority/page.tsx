@@ -54,6 +54,7 @@ export default function PriorityListPage() {
   const [noteRow, setNoteRow] = useState<PriorityRow | null>(null);
   const [owner, setOwner] = useState<'all' | PriorityOwner>('all');
   const [salesPerson, setSalesPerson] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [lateOnly, setLateOnly] = useState(false);
   const [urgentOnly, setUrgentOnly] = useState(false);
   const [search, setSearch] = useState('');
@@ -115,6 +116,11 @@ export default function PriorityListPage() {
     return byGroup;
   }, [rows]);
 
+  const availableStatuses = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.status).filter(Boolean) as string[])).sort(),
+    [rows]
+  );
+
   const salesPeople = useMemo(
     () => Array.from(new Set(rows.map((r) => r.salesPersonName).filter(Boolean) as string[])).sort(),
     [rows]
@@ -126,11 +132,12 @@ export default function PriorityListPage() {
     return (ranked.get(group) || []).filter(({ row }) =>
       (owner === 'all' || row.owner === owner) &&
       (salesPerson === 'all' || row.salesPersonName === salesPerson) &&
+      (statusFilter === 'all' || row.status === statusFilter) &&
       (!lateOnly || row.daysLate > 0) &&
       (!urgentOnly || !!row.urgent) &&
       (!q || row.id.toLowerCase().startsWith(q) || (row.customerName || '').toLowerCase().includes(q))
     );
-  }, [ranked, group, owner, salesPerson, lateOnly, urgentOnly, search]);
+  }, [ranked, group, owner, salesPerson, statusFilter, lateOnly, urgentOnly, search]);
 
   const lateCount = (g: PriorityGroup) => (ranked.get(g) || []).filter(({ row }) => row.daysLate > 0).length;
   const hint = group === 'to_follow' ? TO_FOLLOW_HINT : group === 'returns' ? RETURNS_HINT : GROUPS.find((g) => g.key === group)!.hint;
@@ -201,6 +208,13 @@ export default function PriorityListPage() {
           <SelectContent>
             <SelectItem value="all">All sales</SelectItem>
             {salesPeople.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[160px]"><SelectValue placeholder="All statuses" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            {availableStatuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
         </Select>
         <div className="flex items-center gap-2 px-1">

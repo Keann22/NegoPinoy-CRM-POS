@@ -33,7 +33,7 @@ export function useCustomerSearch(query: string) {
         const { data, error } = await q.limit(10);
         if (error) throw error;
 
-        setResults((data || []).map(doc => ({
+        setResults(((data as any[]) || []).map(doc => ({
           id: doc.id,
           ...doc,
           firstName: doc.full_name?.split(' ')[0] || '',

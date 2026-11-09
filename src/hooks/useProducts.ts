@@ -9,6 +9,8 @@ import { isOnSale, hasSaleDiscount, getEffectivePrice } from '@/lib/pricing';
 interface UseProductsParams {
   searchTerm: string;
   stockFilter: string;
+  categoryFilter?: string;
+  supplierFilter?: string;
   page: number;
   pageSize: number;
 }
@@ -51,7 +53,14 @@ function formatProduct(
  * Supabase's 1000-row default cap once the catalog grew past it (see
  * ARCHITECTURE.md, "The 1000-row query cap").
  */
-export function useProducts({ searchTerm, stockFilter, page, pageSize }: UseProductsParams) {
+export function useProducts({
+  searchTerm,
+  stockFilter,
+  categoryFilter = 'all',
+  supplierFilter = 'all',
+  page,
+  pageSize,
+}: UseProductsParams) {
   const supabase = useSupabase();
   const { user } = useUser();
 
@@ -82,6 +91,51 @@ export function useProducts({ searchTerm, stockFilter, page, pageSize }: UseProd
           query = query.eq('stock_level', 0);
         } else if (stockFilter === 'negative-stock') {
           query = query.lt('stock_level', 0);
+        }
+
+        if (categoryFilter && categoryFilter !== 'all') {
+          if (categoryFilter === 'uncategorized') {
+            query = query.or('category.is.null,category.eq."",category.eq.Uncategorized');
+          } else {
+            const { data: childMatches } = await supabase
+              .from('products')
+              .select('parent_id')
+              .eq('category', categoryFilter)
+              .not('parent_id', 'is', null);
+
+            const childParentIds = Array.from(
+              new Set((childMatches || []).map((c: any) => c.parent_id).filter(Boolean))
+            );
+
+            const safeCat = categoryFilter.replace(/"/g, '\\"');
+            if (childParentIds.length > 0) {
+              query = query.or(`category.eq."${safeCat}",id.in.(${childParentIds.join(',')})`);
+            } else {
+              query = query.eq('category', categoryFilter);
+            }
+          }
+        }
+
+        if (supplierFilter && supplierFilter !== 'all') {
+          if (supplierFilter === 'no-supplier') {
+            query = query.is('supplier_id', null);
+          } else {
+            const { data: childMatches } = await supabase
+              .from('products')
+              .select('parent_id')
+              .eq('supplier_id', supplierFilter)
+              .not('parent_id', 'is', null);
+
+            const childParentIds = Array.from(
+              new Set((childMatches || []).map((c: any) => c.parent_id).filter(Boolean))
+            );
+
+            if (childParentIds.length > 0) {
+              query = query.or(`supplier_id.eq.${supplierFilter},id.in.(${childParentIds.join(',')})`);
+            } else {
+              query = query.eq('supplier_id', supplierFilter);
+            }
+          }
         }
 
         const from = (page - 1) * pageSize;
@@ -169,7 +223,7 @@ export function useProducts({ searchTerm, stockFilter, page, pageSize }: UseProd
       }
     };
     fetchProducts();
-  }, [supabase, user, searchTerm, stockFilter, page, pageSize, refetchTrigger]);
+  }, [supabase, user, searchTerm, stockFilter, categoryFilter, supplierFilter, page, pageSize, refetchTrigger]);
 
   return { products, totalCount, isLoading, refetch };
 }

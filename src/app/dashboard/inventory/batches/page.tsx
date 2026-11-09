@@ -64,7 +64,7 @@ export default function BatchesPage() {
         const calculatedBatches: FlattenedBatch[] = [];
 
         for (const product of productsData) {
-           const productMovements = movementsData.filter(m => m.product_id === product.id);
+           const productMovements = (movementsData as any[]).filter(m => m.product_id === product.id);
            const productBatches: FlattenedBatch[] = [];
 
            for (const movement of productMovements) {

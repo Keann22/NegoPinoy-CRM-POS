@@ -63,15 +63,15 @@ export function MessagesDrawer() {
     // Mode's double-invoke in dev), which throws when .on() is called on a channel
     // that's already past .subscribe().
     supabase.getChannels()
-      .filter((c) => c.topic === 'realtime:messages-drawer-channel')
-      .forEach((c) => supabase.removeChannel(c));
+      .filter((c: any) => c.topic === 'realtime:messages-drawer-channel')
+      .forEach((c: any) => supabase.removeChannel(c));
 
     const channel = supabase
       .channel('messages-drawer-channel')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'order_issue_messages' },
-        async (payload) => {
+        async (payload: any) => {
           const msg = payload.new;
 
           // Always refresh the list/badge so counts stay live.

@@ -91,6 +91,9 @@ export interface CompletedDailyAuditItem {
   actorName: string;
   actionType: string;
   physicalCount?: number | null;
+  systemStockBefore?: number | null;
+  systemStockAfter?: number | null;
+  discrepancy?: number | null;
   timestamp: string;
 }
 
@@ -107,9 +110,58 @@ export interface GuardianDailyProgress {
   assignedStaffName?: string;
   teamCompletedToday?: number;
   allAuditedProductIdsToday?: string[];
+  matchedToday?: number;
+  accuracyRateToday?: number;
 }
 
+/** Single verified inventory count item with match/discrepancy details. */
+export interface InventoryCountProgressItem {
+  id: string;
+  productId: string;
+  productName: string;
+  sku: string | null;
+  variantName?: string | null;
+  physicalCount: number;
+  systemStockBefore: number | null;
+  systemStockAfter: number | null;
+  discrepancy: number;
+  actorName: string;
+  actorId?: string | null;
+  createdAt: string;
+  notes?: string | null;
+  actionType: string;
+}
 
+/** Aggregated daily counting accuracy metric for historical progress tracking. */
+export interface InventoryCountDailyStat {
+  date: string;
+  totalCounted: number;
+  matchedCount: number;
+  diffCount: number;
+  accuracyRate: number;
+}
+
+/** Breakdown of count accuracy by staff member. */
+export interface StaffCountAccuracy {
+  staffName: string;
+  totalCounted: number;
+  matchedCount: number;
+  accuracyRate: number;
+}
+
+/** Full summary of inventory counting effort and progress. */
+export interface InventoryCountProgressSummary {
+  today: {
+    date: string;
+    totalCounted: number;
+    matchedCount: number;
+    discrepancyCount: number;
+    accuracyRate: number;
+  };
+  staffBreakdown: StaffCountAccuracy[];
+  recentItems: InventoryCountProgressItem[];
+  history: InventoryCountDailyStat[];
+}
 
 /** Picker shelf guard: unallocated stock (both units) and Unit 2 reserve for one product. */
 export interface PickerShelfInfo {
@@ -143,6 +195,7 @@ export interface RecountPageRow extends RecountRequest {
   status: 'open' | 'done';
   countedUnit1: number | null;
   countedUnit2: number | null;
+  systemBefore?: number | null;
   doneByName: string | null;
   doneAt: string | null;
   dueDate: string | null;

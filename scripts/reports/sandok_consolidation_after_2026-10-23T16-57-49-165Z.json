@@ -1,0 +1,105 @@
+{
+  "products": [
+    {
+      "id": "1ffe674b-7ad1-4d12-9b35-500a82c0588d",
+      "name": "7pc Stainless Sandok Set - With Rack",
+      "variant_name": "With Rack",
+      "stock_level": -8
+    },
+    {
+      "id": "f7654ace-271a-4828-911e-0552658c1547",
+      "name": "7pc Stainless Sandok Set",
+      "variant_name": null,
+      "stock_level": 0
+    }
+  ],
+  "pws": [
+    {
+      "id": "7ef0bf3b-ab22-402d-89ae-5b7f93049a0c",
+      "product_id": "1ffe674b-7ad1-4d12-9b35-500a82c0588d",
+      "warehouse_id": "0a198669-28e4-48a7-912c-7930ab18ec07",
+      "stock_level": -15
+    },
+    {
+      "id": "4d7273b7-a152-451a-9e4e-f4547cef8a82",
+      "product_id": "1ffe674b-7ad1-4d12-9b35-500a82c0588d",
+      "warehouse_id": "20c1869b-9a2c-4f43-8a2d-932b5c419e85",
+      "stock_level": 7
+    },
+    {
+      "id": "205a4d75-fe60-4a47-81a5-9e84a58b8b77",
+      "product_id": "f7654ace-271a-4828-911e-0552658c1547",
+      "warehouse_id": "0a198669-28e4-48a7-912c-7930ab18ec07",
+      "stock_level": 0
+    },
+    {
+      "id": "664ce368-677a-4dd7-853e-3cb77633cf51",
+      "product_id": "f7654ace-271a-4828-911e-0552658c1547",
+      "warehouse_id": "20c1869b-9a2c-4f43-8a2d-932b5c419e85",
+      "stock_level": 0
+    }
+  ],
+  "orderItems": [
+    {
+      "id": "15041b99-097b-45d9-b47f-a54fb4cc5d53",
+      "order_id": "f42dd77c-e1dc-4ee2-bd55-f645994481ef",
+      "quantity": 1,
+      "is_packed": false,
+      "product_name": "7pc Stainless Sandok Set with Rack",
+      "orders": {
+        "status": "Completed"
+      }
+    }
+  ],
+  "issues": [],
+  "poItems": [
+    {
+      "id": "f91638b1-c57e-4757-ac2b-2963acd61ea7",
+      "product_id": "f7654ace-271a-4828-911e-0552658c1547",
+      "po_id": "3652b1c1-2b8a-4293-add7-bdae0da7d79f",
+      "expected_qty": 5,
+      "received_qty": 5,
+      "status": "received",
+      "purchase_orders": {
+        "notes": null,
+        "platform_order_no": "260924-656754613900138"
+      }
+    },
+    {
+      "id": "2dc43b65-d0d1-4617-a343-eb5675a2fc07",
+      "product_id": "f7654ace-271a-4828-911e-0552658c1547",
+      "po_id": "0f348dbc-fbbc-4a1e-bd23-72805d027644",
+      "expected_qty": 1,
+      "received_qty": 1,
+      "status": "received",
+      "purchase_orders": {
+        "notes": null,
+        "platform_order_no": "260923-598579617420138"
+      }
+    },
+    {
+      "id": "522b22df-f02e-4397-b174-66a5f767001e",
+      "product_id": "1ffe674b-7ad1-4d12-9b35-500a82c0588d",
+      "po_id": "ea38b753-f4b7-48c0-ba08-499e6bd24dca",
+      "expected_qty": 3,
+      "received_qty": 0,
+      "status": "pending_receipt",
+      "purchase_orders": {
+        "notes": "STAFF_DRAFT",
+        "platform_order_no": null
+      }
+    },
+    {
+      "id": "57319d77-eb10-42e8-b976-9d7eda7b6aa0",
+      "product_id": "1ffe674b-7ad1-4d12-9b35-500a82c0588d",
+      "po_id": "c617cbc2-7ab2-40c6-b0ff-55ecf2a69dcf",
+      "expected_qty": 10,
+      "received_qty": 1,
+      "status": "pending_receipt",
+      "purchase_orders": {
+        "notes": null,
+        "platform_order_no": "261022-447333025420138"
+      }
+    }
+  ]
+}

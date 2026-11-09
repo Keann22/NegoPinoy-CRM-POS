@@ -94,7 +94,7 @@ export function EarlySettlementDialog({ order, open, onOpenChange, onSuccess }: 
 
       let cashSubtotal = Number(data.subtotal) || 0;
       if (items && items.length > 0) {
-        cashSubtotal = items.reduce((sum, item: any) => {
+        cashSubtotal = (items as any[]).reduce((sum: number, item: any) => {
           const soldAt = Number(item.selling_price_at_sale) || 0;
           const installmentPrice = Number(item.products?.installment_price) || 0;
           const cashPrice = installmentPrice > 0 && Math.abs(soldAt - installmentPrice) < 0.01

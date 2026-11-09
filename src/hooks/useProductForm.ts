@@ -47,6 +47,9 @@ export const productSchema = z.object({
     quantityOnHand: z.coerce.number().int().min(0),
     images: z.custom<File[]>().optional(),
   })).optional().default([]),
+  // Which new variation takes over the open orders/purchases/stock when a
+  // plain product gets its first variations (index into `variations`).
+  handoverIndex: z.coerce.number().int().min(0).optional().default(0),
   assemblyRecipe: z.array(z.object({
     productId: z.string().min(1),
     productName: z.string(),

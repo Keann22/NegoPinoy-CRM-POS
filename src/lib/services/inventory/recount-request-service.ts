@@ -64,7 +64,7 @@ export async function listRecountPage(supabase: SupabaseClient): Promise<Recount
   if (batchIds.length === 0) return [];
   const { data, error } = await supabase
     .from('recount_requests')
-    .select('id, batch_id, product_id, message, requested_by_name, created_at, status, counted_unit1, counted_unit2, done_by_name, done_at, due_date, products(name, variant_name, sku)')
+    .select('id, batch_id, product_id, message, requested_by_name, created_at, status, counted_unit1, counted_unit2, done_by_name, done_at, due_date, system_before, products(name, variant_name, sku)')
     .in('batch_id', batchIds)
     .order('created_at');
   if (error) throw error;
@@ -82,6 +82,7 @@ export async function listRecountPage(supabase: SupabaseClient): Promise<Recount
       status: r.status === 'open' ? 'open' : 'done',
       countedUnit1: r.counted_unit1,
       countedUnit2: r.counted_unit2,
+      systemBefore: r.system_before,
       doneByName: r.done_by_name,
       doneAt: r.done_at,
       dueDate: r.due_date,

@@ -26,6 +26,32 @@ export function useProductsPage() {
     return '';
   });
   const [stockFilter, setStockFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return new URLSearchParams(window.location.search).get('category') || 'all';
+    }
+    return 'all';
+  });
+  const [supplierFilter, setSupplierFilter] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return new URLSearchParams(window.location.search).get('supplier') || 'all';
+    }
+    return 'all';
+  });
+  const [categories, setCategories] = useState<{ id: string | number; name: string }[]>([]);
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    if (!supabase || !userProfile) return;
+    const loadFilters = async () => {
+      const catRes: { data: { id: string | number; name: string }[] | null } = await supabase.from('categories').select('id, name').order('name');
+      if (catRes.data) setCategories(catRes.data);
+      const supRes: { data: { id: string; name: string }[] | null } = await supabase.from('suppliers').select('id, name').order('name');
+      if (supRes.data) setSuppliers(supRes.data);
+    };
+    loadFilters();
+  }, [supabase, userProfile]);
+
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
   const [viewingReservedProduct, setViewingReservedProduct] = useState<{ id: string; name: string } | null>(null);
   const [viewingPackedProduct, setViewingPackedProduct] = useState<{ id: string; name: string } | null>(null);
@@ -40,6 +66,8 @@ export function useProductsPage() {
   const { products: paginatedProducts, totalCount, isLoading, refetch } = useProducts({
     searchTerm: debouncedSearchTerm,
     stockFilter,
+    categoryFilter,
+    supplierFilter,
     page: currentPage,
     pageSize: rowsPerPage,
   });
@@ -209,6 +237,12 @@ export function useProductsPage() {
     setSearchTerm,
     stockFilter,
     setStockFilter,
+    categoryFilter,
+    setCategoryFilter,
+    supplierFilter,
+    setSupplierFilter,
+    categories,
+    suppliers,
     expandedParents,
     setExpandedParents,
     viewingReservedProduct,

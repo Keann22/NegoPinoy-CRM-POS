@@ -109,7 +109,7 @@ export default function PackedOrdersPage() {
         const { data, error } = await supabase.from('customers').select('id, full_name').in('id', customerIds);
         if (error) throw error;
         const map = new Map<string, string>();
-        if (data) data.forEach(c => map.set(c.id, c.full_name || 'Unknown'));
+        if (data) (data as { id: string; full_name: string | null }[]).forEach(c => map.set(c.id, c.full_name || 'Unknown'));
         setCustomerMap(map);
       } catch (err) {
         console.error('Error fetching customers:', err);

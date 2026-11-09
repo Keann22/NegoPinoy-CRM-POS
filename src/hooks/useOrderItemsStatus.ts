@@ -139,7 +139,7 @@ export function useOrderItemsStatus(
         const itemIssues: OpenOrderIssue[] = [];
         const recipe = item.productId ? recipeMap[item.productId] || [] : [];
 
-        rawIssues.forEach((issue) => {
+        (rawIssues as any[]).forEach((issue: any) => {
           if (!issue.product_id) return;
 
           // Direct match
@@ -168,7 +168,7 @@ export function useOrderItemsStatus(
         }
       });
 
-      const unassigned = rawIssues.filter(i => !matchedIssueIds.has(i.id)).length;
+      const unassigned = (rawIssues as any[]).filter((i: any) => !matchedIssueIds.has(i.id)).length;
       setIssuesByItem(mappedByItemId);
       setUnassignedIssuesCount(unassigned);
     } catch (err) {

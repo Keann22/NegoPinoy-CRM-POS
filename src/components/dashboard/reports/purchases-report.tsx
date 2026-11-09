@@ -7,12 +7,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Download, AlertTriangle, ChevronDown, Receipt } from 'lucide-react';
+import { Loader2, Download, Receipt } from 'lucide-react';
 import { ReportDateFilter } from '@/components/dashboard/reports/report-date-filter';
 import { format } from 'date-fns';
 import { usePurchasesReport } from '@/hooks/usePurchasesReport';
 import { useReceiptDrafts } from '@/hooks/useReceiptDrafts';
 import { SavedReceiptsDialog } from '@/components/dashboard/procurement/saved-receipts-dialog';
+import { UnrecordedPurchasesBanner } from '@/components/dashboard/reports/unrecorded-purchases-banner';
 
 export function PurchasesReport() {
   const router = useRouter();
@@ -32,10 +33,13 @@ export function PurchasesReport() {
     drafts,
     setDrafts,
     savingId,
+    savingAll,
+    readyToRecordCount,
     totals,
     byProduct,
     bySupplier,
     handleRecord,
+    handleRecordAllReady,
     handleExportExcel,
     rangeLabel,
     peso
@@ -86,137 +90,23 @@ export function PurchasesReport() {
           </div>
         )}
 
-        {!loading && unrecorded.length > 0 && (
-          <div className="rounded-md border border-amber-300 bg-amber-50 p-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600 mt-0.5" />
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-amber-900">
-                  {unrecorded.length} received {unrecorded.length === 1 ? 'item is' : 'items are'} missing a supplier or cost
-                </p>
-                <p className="text-sm text-amber-800 mt-1">
-                  {unrecorded.reduce((acc, u) => acc + u.receivedQty, 0).toLocaleString()} pcs were taken into stock without going
-                  through the Buy flow, so no supplier and no price was ever attached. They are counted as ₱0 in inventory and do not
-                  appear anywhere in this report. This list covers <span className="font-semibold">all dates</span>, not just the
-                  selected range.
-                </p>
-                <Button
-                  variant="link"
-                  size="sm"
-                  className="h-auto p-0 mt-2 text-amber-900"
-                  onClick={() => setShowUnrecorded(v => !v)}
-                >
-                  {showUnrecorded ? 'Hide' : 'Show'} the {unrecorded.length} {unrecorded.length === 1 ? 'item' : 'items'}
-                  <ChevronDown className={`ml-1 h-4 w-4 transition-transform ${showUnrecorded ? 'rotate-180' : ''}`} />
-                </Button>
-
-                {showUnrecorded && (
-                  // Native overflow rather than <ScrollArea>: that component pairs
-                  // overflow-hidden on the root with an h-full viewport, so a
-                  // max-h-* class clips the list instead of making it scrollable.
-                  <div className="max-h-[420px] overflow-y-auto overflow-x-auto mt-3 rounded-md border border-amber-200 bg-white">
-                    <Table>
-                      <TableHeader className="sticky top-0 bg-white z-10">
-                        <TableRow>
-                          <TableHead>Product</TableHead>
-                          <TableHead className="text-right">Received</TableHead>
-                          {canSeeSuppliers && <TableHead className="min-w-[180px]">Supplier</TableHead>}
-                          <TableHead className="w-[120px]">Unit Cost (₱)</TableHead>
-                          <TableHead className="w-[150px]">Received On</TableHead>
-                          <TableHead>Source</TableHead>
-                          <TableHead className="text-right">Action</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {unrecorded.map(u => {
-                          const draft = drafts[u.id] || { supplierId: '', unitCost: '' };
-                          return (
-                            <TableRow key={u.id}>
-                              <TableCell className="font-medium">
-                                {u.productName}
-                                {u.requestedByName && (
-                                  <span className="block text-xs text-muted-foreground">req. {u.requestedByName}</span>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                <input
-                                  type="number"
-                                  inputMode="numeric"
-                                  className={`w-[80px] border p-2 rounded-md text-sm text-right ${Number(draft.receivedQty) !== u.receivedQty ? 'border-blue-500 font-semibold' : u.receivedQty > u.expectedQty ? 'border-amber-400' : ''}`}
-                                  value={draft.receivedQty}
-                                  onChange={e => setDrafts(prev => ({ ...prev, [u.id]: { ...draft, receivedQty: e.target.value } }))}
-                                />
-                                {u.receivedQty > u.expectedQty && (
-                                  <span className="block text-xs text-amber-700 mt-1">
-                                    {u.expectedQty} expected
-                                  </span>
-                                )}
-                              </TableCell>
-                              {canSeeSuppliers && (
-                                <TableCell>
-                                  <select
-                                    className={`w-full border p-2 rounded-md bg-white text-sm ${u.missingSupplier && !draft.supplierId ? 'border-amber-400' : ''}`}
-                                    value={draft.supplierId}
-                                    onChange={e => setDrafts(prev => ({ ...prev, [u.id]: { ...draft, supplierId: e.target.value } }))}
-                                  >
-                                    <option value="">-- Select supplier --</option>
-                                    {supplierOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                  </select>
-                                </TableCell>
-                              )}
-                              <TableCell>
-                                <input
-                                  type="number"
-                                  inputMode="decimal"
-                                  placeholder="0.00"
-                                  className={`w-full border p-2 rounded-md text-sm ${u.missingCost && !(Number(draft.unitCost) > 0) ? 'border-amber-400' : ''}`}
-                                  value={draft.unitCost}
-                                  onChange={e => setDrafts(prev => ({ ...prev, [u.id]: { ...draft, unitCost: e.target.value } }))}
-                                />
-                                {/* costSource can name a supplier ("last bought from X"), so keep it off staff screens. */}
-                                {canSeeSuppliers && u.costSource && (
-                                  <span className="block text-xs text-muted-foreground mt-1">
-                                    {u.costSource}
-                                    {u.costSourceDate && ` · ${format(new Date(u.costSourceDate), 'MMM d')}`}
-                                  </span>
-                                )}
-                                {u.costConflict && (
-                                  <span className="block text-xs text-amber-700 mt-1">
-                                    price book says {peso(u.costConflict.bookCost)} — check which is right
-                                  </span>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                <input
-                                  type="date"
-                                  className={`w-full border p-2 rounded-md text-sm ${!draft.receivedAt ? 'border-amber-400' : ''}`}
-                                  value={draft.receivedAt}
-                                  onChange={e => setDrafts(prev => ({ ...prev, [u.id]: { ...draft, receivedAt: e.target.value } }))}
-                                />
-                                <span className="block text-xs text-muted-foreground mt-1">
-                                  {u.receivedAt ? 'from the stock receipt' : 'no receipt found — please set'}
-                                </span>
-                              </TableCell>
-                              <TableCell className="text-sm text-muted-foreground">{u.source}</TableCell>
-                              <TableCell className="text-right">
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleRecord(u)}
-                                  disabled={savingId === u.id}
-                                >
-                                  {savingId === u.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+        {!loading && (
+          <UnrecordedPurchasesBanner
+            unrecorded={unrecorded}
+            showUnrecorded={showUnrecorded}
+            setShowUnrecorded={setShowUnrecorded}
+            canSeeSuppliers={canSeeSuppliers}
+            canSeeCosts={canSeeCosts}
+            supplierOptions={supplierOptions}
+            drafts={drafts}
+            setDrafts={setDrafts}
+            savingId={savingId}
+            handleRecord={handleRecord}
+            peso={peso}
+            handleRecordAllReady={handleRecordAllReady}
+            savingAll={savingAll}
+            readyToRecordCount={readyToRecordCount}
+          />
         )}
 
         <div className={`grid grid-cols-2 gap-4 ${canSeeCosts ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
@@ -304,7 +194,6 @@ export function PurchasesReport() {
                   </div>
                 ))
               ) : (
-                // Staff view: a flat itemized list with no supplier dimension.
                 <div className="border rounded-md">
                   <Table>
                     <TableHeader>

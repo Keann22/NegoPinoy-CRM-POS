@@ -62,7 +62,7 @@ export default function OutOfStockAudit() {
   };
 
   useEffect(() => {
-    supabase.from("products").select("id, name, variant_name, stock_level").then(({ data }) => {
+    supabase.from("products").select("id, name, variant_name, stock_level").then(({ data }: { data: AuditProduct[] | null }) => {
       if (data) setProducts(data);
     });
   }, []);

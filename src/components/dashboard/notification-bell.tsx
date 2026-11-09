@@ -50,7 +50,7 @@ export function NotificationBell() {
     }
 
     setNotifications(data || []);
-    setUnreadCount(data?.filter(n => !n.is_read).length || 0);
+    setUnreadCount(data?.filter((n: any) => !n.is_read).length || 0);
   }, [supabase, userProfile]);
 
   useEffect(() => {
@@ -71,8 +71,8 @@ export function NotificationBell() {
     // Mode's double-invoke in dev), which throws when .on() is called on a channel
     // that's already past .subscribe().
     supabase.getChannels()
-      .filter(c => c.topic === 'realtime:notifications-channel')
-      .forEach(c => supabase.removeChannel(c));
+      .filter((c: any) => c.topic === 'realtime:notifications-channel')
+      .forEach((c: any) => supabase.removeChannel(c));
 
     const channel = supabase
       .channel('notifications-channel')
@@ -84,7 +84,7 @@ export function NotificationBell() {
           table: 'notifications',
           filter: `sales_person_name=eq.${fullName}`,
         },
-        (payload) => {
+        (payload: any) => {
           const newNotif = payload.new;
           
           setNotifications(prev => [newNotif, ...prev].slice(0, 20));
@@ -207,7 +207,7 @@ export function NotificationBell() {
     if (notif && !notif.is_read) {
         setUnreadCount(prev => Math.max(0, prev - 1));
     }
-    setNotifications(prev => prev.filter(n => n.id !== id));
+    setNotifications(prev => prev.filter((n: any) => n.id !== id));
     
     await supabase.from('notifications').delete().eq('id', id);
   };
