@@ -251,6 +251,27 @@ export function useOrderDialog(props: UseOrderDialogProps) {
             return;
         }
 
+        const productIds = values.orderItems.map((i) => i.productId);
+        if (productIds.length > 0) {
+            const { data: parentCheck } = await supabase
+                .from('products')
+                .select('parent_id')
+                .in('parent_id', productIds)
+                .not('name', 'ilike', '[DELETED]%');
+
+            if (parentCheck && parentCheck.length > 0) {
+                const parentIds = new Set(parentCheck.map((c: any) => c.parent_id));
+                const badItems = values.orderItems.filter((i) => parentIds.has(i.productId));
+                const names = badItems.map((i) => i.productName).join(', ');
+                toast({
+                    variant: 'destructive',
+                    title: 'Cannot order parent product',
+                    description: `The following item(s) have variants and cannot be ordered directly: ${names}. Please remove them and select the specific variant.`,
+                });
+                return;
+            }
+        }
+
         const addedCarryOvers = carryOverAdds;
         const urgent = urgentNote;
         handleOpenChange(false);
@@ -301,6 +322,27 @@ export function useOrderDialog(props: UseOrderDialogProps) {
         if (!userProfile || !supabase || !isEditing) {
             toast({ variant: "destructive", title: "Authentication or Database error", description: "Could not update order." });
             return;
+        }
+
+        const productIds = values.orderItems.map((i) => i.productId);
+        if (productIds.length > 0) {
+            const { data: parentCheck } = await supabase
+                .from('products')
+                .select('parent_id')
+                .in('parent_id', productIds)
+                .not('name', 'ilike', '[DELETED]%');
+
+            if (parentCheck && parentCheck.length > 0) {
+                const parentIds = new Set(parentCheck.map((c: any) => c.parent_id));
+                const badItems = values.orderItems.filter((i) => parentIds.has(i.productId));
+                const names = badItems.map((i) => i.productName).join(', ');
+                toast({
+                    variant: 'destructive',
+                    title: 'Cannot order parent product',
+                    description: `The following item(s) have variants and cannot be ordered directly: ${names}. Please remove them and select the specific variant.`,
+                });
+                return;
+            }
         }
 
         const order = props.order;

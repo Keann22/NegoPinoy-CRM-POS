@@ -18,7 +18,6 @@ interface VariantOption {
   live_price?: number | null;
   installment_price?: number | null;
   initial_unit_cost?: number;
-  stock_batches?: { unitCost: number }[];
 }
 
 interface VariantSelectionDialogProps {
@@ -60,12 +59,15 @@ export function VariantSelectionDialog({
                     description: `${v.variant_name} is already in this order. You can adjust the quantity above.`,
                   });
                 } else {
-                  const costPriceAtSale = v.stock_batches?.length ? v.stock_batches[0].unitCost : (v.initial_unit_cost || 0);
+                  const costPriceAtSale = v.initial_unit_cost || 0;
                   const priceList = buildPriceList(v);
                   const priceType = defaultPriceType(priceList);
+                  const displayName = (v.variant_name && !v.name.toLowerCase().includes(v.variant_name.toLowerCase()))
+                    ? `${v.name} (${v.variant_name})`
+                    : v.name;
                   onSelect({
                     productId: v.id,
-                    productName: v.name,
+                    productName: displayName,
                     quantity: 1,
                     costPriceAtSale,
                     sellingPriceAtSale: resolvePrice(priceList, priceType),

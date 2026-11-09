@@ -149,7 +149,7 @@ export function OrderDialog(props: OrderDialogProps) {
                 onProductSelect={async (p) => {
                   const { data: level1 } = await selectWithPriceColumns((priceColumns) => supabase
                     .from('products')
-                    .select(`id, name, variant_name, stock_level, ${priceColumns}, initial_unit_cost, stock_batches(*)`)
+                    .select(`id, name, variant_name, stock_level, ${priceColumns}, initial_unit_cost`)
                     .eq('parent_id', p.id)
                     .not('name', 'ilike', '[DELETED]%'));
 
@@ -157,7 +157,7 @@ export function OrderDialog(props: OrderDialogProps) {
                     const level1Ids = level1.map((v: any) => v.id);
                     const { data: level2 } = await selectWithPriceColumns((priceColumns) => supabase
                       .from('products')
-                      .select(`id, name, variant_name, stock_level, ${priceColumns}, initial_unit_cost, stock_batches(*)`)
+                      .select(`id, name, variant_name, stock_level, ${priceColumns}, initial_unit_cost`)
                       .in('parent_id', level1Ids)
                       .not('name', 'ilike', '[DELETED]%'));
 
@@ -169,6 +169,16 @@ export function OrderDialog(props: OrderDialogProps) {
 
                     setVariantSelectionProduct(p as any);
                     setVariantSelectionOptions(leafVariants);
+                    return;
+                  }
+
+                  if (p.hasVariants) {
+                    toast({
+                      variant: "destructive",
+                      title: "Cannot select parent product",
+                      description: `${p.name} has variants. Please choose one of its specific variants instead.`,
+                    });
+                    setProductSearch('');
                     return;
                   }
 

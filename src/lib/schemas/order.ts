@@ -69,4 +69,4 @@ export type StockBatch = {
   supplierName: string;
 }
 
-export type Product = { id: string; name: string; quantityOnHand: number; sellingPrice: number; stockBatches: StockBatch[]; [key: string]: any; };
+export type Product = { id: string; name: string; quantityOnHand: number; sellingPrice: number; stockBatches: StockBatch[]; hasVariants?: boolean; [key: string]: any; };

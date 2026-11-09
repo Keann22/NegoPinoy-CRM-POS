@@ -39,11 +39,27 @@ export function useProductSearch(query: string) {
         });
         if (error) throw error;
 
-        setResults((data || []).map(doc => {
+        const productRows: any[] = data || [];
+        const ids = productRows.map((doc: any) => doc.id);
+
+        let parentIdsWithVariants = new Set<string>();
+        if (ids.length > 0) {
+          const { data: childRows } = await supabase
+            .from('products')
+            .select('parent_id')
+            .in('parent_id', ids)
+            .not('name', 'ilike', '[DELETED]%');
+          if (childRows) {
+            parentIdsWithVariants = new Set(childRows.map((c: any) => c.parent_id));
+          }
+        }
+
+        setResults(productRows.map((doc: any) => {
           let displayName = doc.name;
           if (doc.variant_name && !doc.name.toLowerCase().includes(doc.variant_name.toLowerCase())) {
             displayName = `${doc.name} (${doc.variant_name})`;
           }
+          const hasVariants = parentIdsWithVariants.has(doc.id);
           return {
             id: doc.id,
             name: displayName,
@@ -54,6 +70,7 @@ export function useProductSearch(query: string) {
             installment_price: doc.installment_price,
             supplier_pricing: doc.supplier_pricing,
             stockBatches: [],
+            hasVariants,
           } as Product;
         }));
       } catch (err) {

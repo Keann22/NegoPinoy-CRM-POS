@@ -186,9 +186,22 @@ export function OrderItemsPanel({
                     key={p.id}
                     onSelect={() => onProductSelect(p)}
                   >
-                    <div className="flex justify-between w-full">
-                      <span>{p.name}</span>
-                      <span className="text-xs text-muted-foreground">Stock: {p.quantityOnHand}</span>
+                    <div className="flex justify-between w-full items-center">
+                      <div className="flex items-center gap-2 min-w-0 pr-2">
+                        <span className="truncate">{p.name}</span>
+                        {p.hasVariants && (
+                          <span className="text-[10px] font-semibold text-amber-700 bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800 shrink-0">
+                            Has Variants
+                          </span>
+                        )}
+                      </div>
+                      {p.hasVariants ? (
+                        <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400 shrink-0">
+                          Choose variant &rarr;
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground shrink-0">Stock: {p.quantityOnHand}</span>
+                      )}
                     </div>
                   </CommandItem>
                 ))}
