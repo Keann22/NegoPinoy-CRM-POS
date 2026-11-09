@@ -74,7 +74,7 @@ export async function POST(req: Request) {
     await recordGuardianMemory(supabase, {
       productId,
       actionType: 'physical_count_audit',
-      physicalCount: targetStockLevel,
+      physicalCount: desiredUnallocated,
       systemStockBefore: currentStock,
       systemStockAfter: targetStockLevel,
       discrepancy,
