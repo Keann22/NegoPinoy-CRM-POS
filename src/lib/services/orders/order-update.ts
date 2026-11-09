@@ -8,7 +8,7 @@ import {
   STATUSES_AFTER_PICKING,
   flagItemsAddedAfterPicking
 } from '../order-issues-service';
-import { computeOrderTotals, saveOrderItemPriceTypes } from './order-utils';
+import { computeOrderTotals, readOrderCarriedAmounts, saveOrderItemPriceTypes } from './order-utils';
 
 // ---------------------------------------------------------------------------
 // Cancellation stock effects
@@ -153,7 +153,13 @@ export async function editOrder(
     actualAmountPaid = values.amountPaid ?? 0;
   }
 
-  const totalAmount = subtotal - totalDiscount + insuranceFee;
+  // Keep the store credit used at creation and any bus shipping fee: the RPC
+  // recomputes the total from the items only.
+  const carried = await readOrderCarriedAmounts(supabase, context.orderId);
+  const beforeCredit = subtotal - totalDiscount + insuranceFee + carried.shippingFee;
+  const creditUsed = Math.min(carried.creditApplied, Math.max(0, beforeCredit));
+  const creditReturned = Math.round((carried.creditApplied - creditUsed) * 100) / 100;
+  const totalAmount = Math.round((beforeCredit - creditUsed) * 100) / 100;
   let balanceDue = totalAmount - actualAmountPaid;
   let overpayment = 0;
 
@@ -202,6 +208,31 @@ export async function editOrder(
   if (error) throw error;
 
   await saveOrderItemPriceTypes(supabase, context.orderId, values.orderItems);
+
+  // Items removed so the order costs less than the credit it used: give the
+  // unused credit back to the customer.
+  if (creditReturned > 0 && values.customerId) {
+    try {
+      const { data: cust } = await supabase
+        .from('customers')
+        .select('store_credit')
+        .eq('id', values.customerId)
+        .single();
+      const current = Number(cust?.store_credit) || 0;
+      await supabase
+        .from('customers')
+        .update({ store_credit: Math.round((current + creditReturned) * 100) / 100 })
+        .eq('id', values.customerId);
+      await supabase.from('order_logs').insert({
+        order_id: context.orderId,
+        status: 'Store credit returned',
+        user_name: context.userProfileName,
+        snapshot_data: { amount: creditReturned, reason: 'Order edited below the credit it used' },
+      });
+    } catch (e) {
+      console.error('Failed to return unused store credit:', e);
+    }
+  }
 
   // -- Auto-deduct from Procurement Sheet --
   const oldMap = new Map<string, number>();

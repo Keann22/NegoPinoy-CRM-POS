@@ -13,6 +13,7 @@ import { createOrder, editOrder } from "@/lib/services/order-service";
 import { buildPriceList, defaultPriceType, resolvePrice, selectWithPriceColumns, type PriceList } from "@/lib/pricing";
 import type { CarryOver } from "@/lib/services/carryover-service";
 import { closeAddedCarryOvers, openOsProductIds, recordToFollow } from "@/lib/services/carryover-client";
+import { readOrderCarriedAmounts, type OrderCarriedAmounts } from "@/lib/services/orders/order-utils";
 
 type UseOrderDialogProps = {
     mode: 'create' | 'edit';
@@ -47,6 +48,8 @@ export function useOrderDialog(props: UseOrderDialogProps) {
     const [toFollow, setToFollow] = useState<Record<string, boolean>>({});
     // "Nagmamadali" on a new order: null = not ticked, otherwise the note.
     const [urgentNote, setUrgentNote] = useState<string | null>(null);
+    // Edit: store credit used at creation and bus shipping fee, kept on the total.
+    const [carried, setCarried] = useState<OrderCarriedAmounts>({ creditApplied: 0, shippingFee: 0 });
 
     const [customerSearch, setCustomerSearch] = useState('');
     const [productSearch, setProductSearch] = useState('');
@@ -151,6 +154,10 @@ export function useOrderDialog(props: UseOrderDialogProps) {
                 }
             };
             fetchCust();
+
+            readOrderCarriedAmounts(supabase, order.id)
+                .then(setCarried)
+                .catch(() => setCarried({ creditApplied: 0, shippingFee: 0 }));
         }
     }, [isEditing && props.open, props.order, props.orderItems, form, supabase]);
 
@@ -224,10 +231,13 @@ export function useOrderDialog(props: UseOrderDialogProps) {
     const applyOverpayment = form.watch('applyOverpayment');
 
     const insuranceFee = includeInsurance ? (subtotal - totalDiscount) * 0.01 : 0;
-    const rawTotal = subtotal - totalDiscount + insuranceFee;
-    const overpaymentApplied = (!isEditing && applyOverpayment && selectedCustomer?.store_credit)
-        ? Math.min(selectedCustomer.store_credit, rawTotal)
-        : 0;
+    const shippingFee = isEditing ? carried.shippingFee : 0;
+    const rawTotal = subtotal - totalDiscount + insuranceFee + shippingFee;
+    const overpaymentApplied = isEditing
+        ? Math.min(carried.creditApplied, Math.max(0, rawTotal))
+        : (applyOverpayment && selectedCustomer?.store_credit)
+            ? Math.min(selectedCustomer.store_credit, rawTotal)
+            : 0;
     const totalAmount = rawTotal - overpaymentApplied;
 
     useEffect(() => {
@@ -424,6 +434,7 @@ export function useOrderDialog(props: UseOrderDialogProps) {
         subtotal,
         totalDiscount,
         insuranceFee,
+        shippingFee,
         rawTotal,
         overpaymentApplied,
         totalAmount,

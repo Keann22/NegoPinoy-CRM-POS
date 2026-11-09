@@ -31,6 +31,7 @@ interface OrderItemsPanelProps {
   insuranceFee: number;
   totalAmount: number;
   overpaymentApplied: number;
+  shippingFee?: number;
   selectedCustomerStoreCredit?: number;
 
   productSearch: string;
@@ -58,6 +59,7 @@ export function OrderItemsPanel({
   insuranceFee,
   totalAmount,
   overpaymentApplied,
+  shippingFee = 0,
   selectedCustomerStoreCredit,
   productSearch,
   onProductSearchChange,
@@ -239,7 +241,8 @@ export function OrderItemsPanel({
         <div className="flex justify-between"><p className="text-muted-foreground">Subtotal</p><p>₱{subtotal.toFixed(2)}</p></div>
         <div className="flex justify-between text-destructive"><p className="text-destructive">Discount</p><p>- ₱{totalDiscount.toFixed(2)}</p></div>
         {includeInsurance && <div className="flex justify-between text-muted-foreground"><p>Insurance Fee (1%)</p><p>+ ₱{insuranceFee.toFixed(2)}</p></div>}
-        {!isEditing && overpaymentApplied > 0 && <div className="flex justify-between text-green-600"><p>Overpayment Applied</p><p>- ₱{overpaymentApplied.toFixed(2)}</p></div>}
+        {shippingFee > 0 && <div className="flex justify-between text-muted-foreground"><p>Shipping Fee</p><p>+ ₱{shippingFee.toFixed(2)}</p></div>}
+        {overpaymentApplied > 0 && <div className="flex justify-between text-green-600"><p>{isEditing ? 'Store Credit Used' : 'Overpayment Applied'}</p><p>- ₱{overpaymentApplied.toFixed(2)}</p></div>}
         <div className="flex justify-between font-bold text-lg"><p>Total</p><p>₱{totalAmount.toFixed(2)}</p></div>
       </div>
 

@@ -19,6 +19,36 @@ export function computeOrderTotals(
 }
 
 /**
+ * Money on an order's total that doesn't come from its items, which an edit
+ * must keep:
+ * - creditApplied: store credit used when the order was created. It is only
+ *   recorded as a lower total_amount (found 2026-11-09, #11960CA: editing the
+ *   order dropped ₱4,398.55 of credit the customer had already spent).
+ * - shippingFee: a bus fee added to the total by Bus Shipping.
+ */
+export interface OrderCarriedAmounts {
+  creditApplied: number;
+  shippingFee: number;
+}
+
+export async function readOrderCarriedAmounts(
+  supabase: SupabaseClient,
+  orderId: string
+): Promise<OrderCarriedAmounts> {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('subtotal, total_discount, insurance_fee, shipping_fee, total_amount')
+    .eq('id', orderId)
+    .single();
+  if (error) throw error;
+  const shippingFee = Number(data.shipping_fee) || 0;
+  const itemsTotal =
+    (Number(data.subtotal) || 0) - (Number(data.total_discount) || 0) + (Number(data.insurance_fee) || 0);
+  const gap = Math.round((itemsTotal + shippingFee - (Number(data.total_amount) || 0)) * 100) / 100;
+  return { creditApplied: gap > 0.01 ? gap : 0, shippingFee };
+}
+
+/**
  * Saves which price type each line used. The `process_order_transaction` RPC
  * only knows the amount, and on edit it deletes and re-inserts every line, so
  * these columns are written right after it on both create and edit.

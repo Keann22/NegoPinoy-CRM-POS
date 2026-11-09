@@ -66,6 +66,7 @@ export function OrderDialog(props: OrderDialogProps) {
     subtotal,
     totalDiscount,
     insuranceFee,
+    shippingFee,
     overpaymentApplied,
     totalAmount,
     addCustomerOpen,
@@ -141,6 +142,7 @@ export function OrderDialog(props: OrderDialogProps) {
                 insuranceFee={insuranceFee}
                 totalAmount={totalAmount}
                 overpaymentApplied={overpaymentApplied}
+                shippingFee={shippingFee}
                 selectedCustomerStoreCredit={selectedCustomer?.store_credit}
                 productSearch={productSearch}
                 onProductSearchChange={setProductSearch}
