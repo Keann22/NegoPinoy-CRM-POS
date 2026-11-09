@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createWorker } from 'tesseract.js';
-import { afterReferenceRead } from '@/lib/services/payments/payment-reference-check';
+import { afterReferenceRead, checkReceiver } from '@/lib/services/payments/payment-reference-check';
 
 export const maxDuration = 60;
 
@@ -119,12 +119,14 @@ export async function POST(request: Request) {
     let referenceNumber = extractReferenceNumber(tesseractText);
     let ocrAmount = extractOcrAmount(tesseractText);
     let usedFallback = false;
+    let allText = tesseractText;
 
     if (!referenceNumber || ocrAmount === null) {
       console.log(`[OCR] Tesseract incomplete (ref=${referenceNumber}, amount=${ocrAmount}) for ${paymentId}, trying Google Vision fallback`);
       const visionText = await runGoogleVision(proofUrl);
       if (visionText) {
         usedFallback = true;
+        allText = `${tesseractText}\n${visionText}`;
         if (!referenceNumber) referenceNumber = extractReferenceNumber(visionText);
         if (ocrAmount === null) ocrAmount = extractOcrAmount(visionText);
       }
@@ -137,11 +139,16 @@ export async function POST(request: Request) {
       console.log(`[OCR] Found Amount: ${ocrAmount}${usedFallback ? ' (via Vision fallback)' : ''}`);
     }
 
-    if (referenceNumber || ocrAmount !== null) {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-      const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
+    // GCash must go to one of our two numbers; flag and tell the owners if not.
+    try {
+      await checkReceiver(supabase, paymentId, allText);
+    } catch (checkError) {
+      console.warn('[OCR] Receiver check failed:', checkError);
+    }
+
+    if (referenceNumber || ocrAmount !== null) {
       const updates: any = {};
       if (referenceNumber) updates.reference_number = referenceNumber;
       if (ocrAmount !== null) updates.ocr_amount = ocrAmount;

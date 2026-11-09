@@ -102,6 +102,56 @@ export async function afterReferenceRead(
   );
 }
 
+/** Our GCash numbers (owner, 2026-11-09): money must be sent to one of these. */
+const OUR_GCASH = ['9171869554', '9232902128'];
+const RECEIVER_MARK = '[Not sent to our GCash';
+
+/**
+ * GCash screenshots must show one of our two numbers as the receiver (owner,
+ * 2026-11-09). GCash-to-GCash shows the full number; from another wallet or bank
+ * it shows the customer's number and ours hidden ("•••• 9554"). Flags only when a
+ * PH mobile number is readable and none is ours; remittances and unreadable
+ * photos often show no number, so those aren't flagged. Tested on 170 screenshots
+ * on 2026-11-09: 147 ours, 23 no number, none wrongly flagged.
+ */
+export function readReceiver(text: string): { ours: boolean; others: string[] } {
+  const flat = text.replace(/\s+/g, ' ');
+  const phones = (flat.match(/(?:\+\s*63|\b63|\b0)[\s-]*9\d{2}[\s-]*\d{3}[\s-]*\d{4}\b/g) || [])
+    .map((p) => p.replace(/\D/g, '').slice(-10));
+  if (phones.some((p) => OUR_GCASH.includes(p))) return { ours: true, others: [] };
+  const lastFour = OUR_GCASH.map((n) => n.slice(-4)).join('|');
+  const masked = new RegExp(`[*•●·xk]{2,}[\\s*•●·xk]*(?:${lastFour})\\b(?![.,]\\d)`, 'i');
+  if (masked.test(flat)) return { ours: true, others: [] };
+  return { ours: false, others: Array.from(new Set(phones)) };
+}
+
+export async function checkReceiver(
+  supabase: SupabaseClient,
+  paymentId: string,
+  text: string,
+): Promise<void> {
+  const { data: payment } = await supabase
+    .from('payments')
+    .select('id, order_id, amount, payment_method')
+    .eq('id', paymentId)
+    .single();
+  if (!payment) return;
+  if (!/gcash|g-xchange/i.test(`${text} ${payment.payment_method || ''}`)) return;
+
+  const { ours, others } = readReceiver(text);
+  if (ours || others.length === 0) return;
+
+  const shown = others.slice(0, 2).map((n) => `0${n}`).join(', ');
+  const flagged = await markPayments(supabase, [payment.id], RECEIVER_MARK, `${RECEIVER_MARK}: screenshot shows ${shown}]`);
+  if (!flagged) return;
+  await notifyOwners(
+    supabase,
+    'GCash not sent to our number',
+    `Payment on #${shortId(payment.order_id)} (${peso(Number(payment.amount))}): the screenshot shows ${shown}, ` +
+      'not 0917 186 9554 or 0923 290 2128. Check the proof before counting this payment.',
+  );
+}
+
 const SPLIT_WINDOW_MS = 3 * 24 * 3600 * 1000;
 
 /**
