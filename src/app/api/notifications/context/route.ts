@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { UNFULFILLED_STATUSES } from '@/lib/services/procurement-service';
+import { createClient as createSessionClient } from '@/lib/supabase/server';
+import { isManagementUser } from '@/lib/services/purchase-summary-service';
+import {
+  PICKER_FOUND_MORE_TITLE,
+  getPickerCountFollowUp,
+  type PickerCountFollowUp,
+} from '@/lib/services/inventory/picker-count-followup-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,6 +57,8 @@ type NotificationContext = {
   order: OrderContext | null;
   product: ProductContext | null;
   thread: ThreadContext | null;
+  /** "Picker found more than the system expected": what happened after the count (owners only). */
+  pickerCount?: PickerCountFollowUp | null;
 };
 
 /**
@@ -278,6 +287,21 @@ export async function POST(req: Request) {
     const orderRef = extractOrderRef(notification);
     if (orderRef) {
       context.order = await loadOrderContext(orderRef);
+    }
+
+    // A picker's count that was higher than expected: what happened next.
+    if (notification.title === PICKER_FOUND_MORE_TITLE) {
+      const sessionClient = await createSessionClient();
+      const { data: { user } } = await sessionClient.auth.getUser();
+      if (user && isManagementUser(user)) {
+        const followUp = await getPickerCountFollowUp(supabase, notification);
+        if (followUp) {
+          // No product card: its "Stock" (free to sell) would sit next to the shelf number and confuse.
+          context.pickerCount = followUp;
+          if (followUp.order) context.order = await loadOrderContext({ kind: 'id', value: followUp.order.id });
+        }
+      }
+      return NextResponse.json({ context });
     }
 
     // 2. Otherwise, trace the messaging thread the notification came from.

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Package, ShoppingCart, MessageSquare, ExternalLink, AlertTriangle } from 'lucide-react';
+import { Package, ShoppingCart, MessageSquare, ExternalLink, AlertTriangle, History } from 'lucide-react';
 
 import {
   Dialog,
@@ -44,7 +44,97 @@ type NotificationContext = {
     status: string | null;
     messages: { senderName: string; senderRole: string | null; message: string; createdAt: string }[];
   } | null;
+  pickerCount?: PickerCountFollowUp | null;
 };
+
+type PickerCountFollowUp = {
+  productName: string;
+  pickerName: string;
+  counted: number;
+  expected: number;
+  countedAt: string;
+  order: { shortId: string; status: string; need: number; picked: number; os: number } | null;
+  events: { at: string; change: number; label: string }[];
+  shelfNow: number | null;
+  purchases: {
+    lastBeforeCount: { at: string; qty: number } | null;
+    sinceCount: { at: string; qty: number; received: number }[];
+  };
+};
+
+/** Database times are UTC; show them in Philippine time. */
+const pht = (iso: string) =>
+  new Date(iso).toLocaleString('en-PH', {
+    timeZone: 'Asia/Manila',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+
+function PickerCountDetails({ data }: { data: PickerCountFollowUp }) {
+  const { order, purchases } = data;
+  let orderLine: string | null = null;
+  if (order) {
+    if (order.picked > 0 && order.os > 0) orderLine = `${order.picked} Found, ${order.os} marked OS`;
+    else if (order.picked > 0) orderLine = `${order.picked} of ${order.need} Found`;
+    else if (order.os > 0) orderLine = `Marked OS (${order.os})`;
+    else orderLine = 'Not picked yet';
+  }
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 text-sm font-semibold">
+        <History className="h-4 w-4 text-muted-foreground" /> What happened next
+      </div>
+      <div className="rounded-md border p-3 text-sm space-y-2">
+        <div>
+          <span className="font-medium">Count saved.</span> {data.pickerName}&apos;s count replaced the system
+          number: shelf went from {data.expected} to {data.counted} ({pht(data.countedAt)}).
+        </div>
+        {order && (
+          <div>
+            <span className="font-medium">Order #{order.shortId}:</span> {orderLine} for this item. Order is now{' '}
+            <Badge variant="outline" className="font-normal">{order.status}</Badge>
+          </div>
+        )}
+        <div>
+          <span className="font-medium">Purchases of this item:</span>{' '}
+          {purchases.lastBeforeCount
+            ? `last one recorded before the count was ${pht(purchases.lastBeforeCount.at)} (${purchases.lastBeforeCount.qty} pcs).`
+            : 'none recorded before the count.'}{' '}
+          {purchases.sinceCount.length > 0
+            ? `Recorded since: ${purchases.sinceCount
+                .map((p) => `${pht(p.at)} (${p.qty} pcs, ${p.received} received)`)
+                .join('; ')}.`
+            : 'None recorded since.'}
+        </div>
+        <div className="border-t pt-2 space-y-1">
+          <div className="text-xs font-medium text-muted-foreground">Shelf changes since the count</div>
+          {data.events.length === 0 ? (
+            <div className="text-xs text-muted-foreground">No changes since.</div>
+          ) : (
+            data.events.map((e, i) => (
+              <div key={i} className="flex justify-between gap-2 text-xs">
+                <span className="truncate">
+                  <span className={e.change < 0 ? 'text-red-600' : 'text-green-600'}>
+                    {e.change > 0 ? `+${e.change}` : e.change}
+                  </span>{' '}
+                  {e.label}
+                </span>
+                <span className="text-muted-foreground whitespace-nowrap">{pht(e.at)}</span>
+              </div>
+            ))
+          )}
+          {data.shelfNow != null && (
+            <div className="pt-1">
+              <Badge variant="secondary" className="font-normal">On the shelf now: {data.shelfNow}</Badge>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface NotificationDetailsDialogProps {
   notification: any | null;
@@ -114,13 +204,13 @@ export function NotificationDetailsDialog({
 
   if (!notification) return null;
 
-  const { order, product, thread } = context || {};
+  const { order, product, thread, pickerCount } = context || {};
   // The bell message is truncated to 140 chars + '...'; the thread carries the
   // full text, so prefer the latest thread message when we have it.
   const fullMessage =
     thread?.messages?.length ? thread.messages[thread.messages.length - 1].message : notification.message;
   const sourceLabel = SOURCE_LABELS[notification.source] || notification.source || 'Notification';
-  const hasContext = !!(order || product || (thread && thread.messages.length));
+  const hasContext = !!(order || product || pickerCount || (thread && thread.messages.length));
   const rawLink = notification.link && notification.link !== '/dashboard' ? notification.link : null;
 
   return (
@@ -145,6 +235,8 @@ export function NotificationDetailsDialog({
             <Skeleton className="h-16 w-full" />
           </div>
         )}
+
+        {pickerCount && <PickerCountDetails data={pickerCount} />}
 
         {/* Product context (procurement / product notes) */}
         {product && (
