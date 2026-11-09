@@ -88,6 +88,9 @@ export default function DashboardLayout({
     }
 
     links.push({ href: '/dashboard/orders', label: 'Orders', icon: ShoppingCart });
+    if (isManagement || isSales) {
+      links.push({ href: '/dashboard/layaways', label: 'Lay-away Review', icon: Clock });
+    }
     links.push({ href: '/dashboard/messages', label: 'Messages', icon: MessageCircle });
     
     if (isManagement || isSales || isInventory) {
@@ -154,7 +157,6 @@ export default function DashboardLayout({
         setIsOpen: setOpenAccounting,
         subItems: [
           { href: '/dashboard/accounting/payments', label: 'Payments', icon: CreditCard },
-          { href: '/dashboard/accounting/layaways', label: 'Lay-away Review', icon: Clock },
           { href: '/dashboard/accounting/unpaid-shipped', label: 'Unpaid Shipped Orders', icon: AlertTriangle },
           { href: '/dashboard/accounting/remittances', label: 'SPX Remittances', icon: FileText },
           { href: '/dashboard/accounting/expenses', label: 'Expenses', icon: Wallet },
