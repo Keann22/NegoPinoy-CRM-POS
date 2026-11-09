@@ -100,11 +100,28 @@ export function EditUnallocatedStockDialog({ item, isOpen, onClose, onSuccess }:
 
         <form onSubmit={handleSubmit} className="space-y-4 py-2">
           {item.lastEditedAt ? (
-            <div className="flex items-center gap-2 text-xs text-slate-600 bg-slate-100/90 px-3 py-2 rounded-lg border border-slate-200">
-              <Clock className="w-4 h-4 text-indigo-600 shrink-0" />
+            <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg border ${
+              item.isVerifiedMatch
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                : 'text-slate-600 bg-slate-100/90 border-slate-200'
+            }`}>
+              {item.isVerifiedMatch ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              ) : (
+                <Clock className="w-4 h-4 text-indigo-600 shrink-0" />
+              )}
               <span>
-                Manually adjusted <strong className="text-slate-800 font-semibold">{item.manualAdjustmentCount ?? 1} {(item.manualAdjustmentCount ?? 1) === 1 ? 'time' : 'times'}</strong> · Last: <strong className="text-slate-800 font-semibold">{new Date(item.lastEditedAt).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}</strong>
-                {item.lastEditedBy ? <> by <strong className="text-slate-800 font-semibold">{item.lastEditedBy}</strong></> : ''}
+                {item.isVerifiedMatch ? (
+                  <>
+                    <strong className="text-emerald-900 font-semibold">Tugma sa Shelf (Confirmed Correct)</strong> · Verified: <strong className="text-emerald-900 font-semibold">{new Date(item.lastEditedAt).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}</strong>
+                    {item.lastEditedBy ? <> by <strong className="text-emerald-900 font-semibold">{item.lastEditedBy}</strong></> : ''}
+                  </>
+                ) : (
+                  <>
+                    Manually adjusted <strong className="text-slate-800 font-semibold">{item.manualAdjustmentCount ?? 1} {(item.manualAdjustmentCount ?? 1) === 1 ? 'time' : 'times'}</strong> · Last: <strong className="text-slate-800 font-semibold">{new Date(item.lastEditedAt).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}</strong>
+                    {item.lastEditedBy ? <> by <strong className="text-slate-800 font-semibold">{item.lastEditedBy}</strong></> : ''}
+                  </>
+                )}
               </span>
             </div>
           ) : (
@@ -173,7 +190,7 @@ export function EditUnallocatedStockDialog({ item, isOpen, onClose, onSuccess }:
 
           <div className="pt-2 border-t border-slate-200 space-y-2">
             <ReceiveHistoryTimeline productId={item.productId} />
-            <InventoryGuardianMemoryTimeline productId={item.productId} adjustmentsOnly />
+            <InventoryGuardianMemoryTimeline productId={item.productId} />
           </div>
 
           <DialogFooter className="pt-2">

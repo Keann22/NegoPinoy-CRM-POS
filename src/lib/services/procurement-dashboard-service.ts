@@ -121,7 +121,7 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
   }
 
   // 4.5 Fetch last stock edit metadata (guardian memory & inventory movements)
-  const lastEditMap = new Map<string, { editedAt: string; editedBy: string; count: number }>();
+  const lastEditMap = new Map<string, { editedAt: string; editedBy: string; count: number; isVerifiedMatch: boolean }>();
   if (productIdsToFetch.size > 0) {
     const pIdArray = Array.from(productIdsToFetch);
     // Guardian memory is the single source here (same as the audit timeline in the dialog).
@@ -139,8 +139,6 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
 
     if (memRes.data) {
       for (const m of memRes.data) {
-        // A count that matched the system (no change) is a verification, not an adjustment.
-        if (m.discrepancy === 0) continue;
         const existing = lastEditMap.get(m.product_id);
         if (existing) {
           existing.count += 1;
@@ -148,7 +146,8 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
           lastEditMap.set(m.product_id, {
             editedAt: m.created_at,
             editedBy: m.actor_name || 'Staff',
-            count: 1
+            count: 1,
+            isVerifiedMatch: m.discrepancy === 0,
           });
         }
       }
@@ -270,6 +269,7 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
       lastEditedAt: lastEdit ? lastEdit.editedAt : null,
       lastEditedBy: lastEdit ? lastEdit.editedBy : null,
       manualAdjustmentCount: lastEdit ? lastEdit.count : 0,
+      isVerifiedMatch: lastEdit ? lastEdit.isVerifiedMatch : false,
       staffRequestedQty: draft ? draft.expected_qty : null,
       requestedByName: draft ? draft.requested_by_name : null,
       requestedAt: draft ? draft.created_at : null,

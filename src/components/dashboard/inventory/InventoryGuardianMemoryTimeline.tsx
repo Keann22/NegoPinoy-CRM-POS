@@ -51,9 +51,15 @@ export function InventoryGuardianMemoryTimeline({ productId, adjustmentsOnly = f
     switch (entry.actionType) {
       case 'physical_count_audit':
         return (
-          <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 gap-1">
-            <CheckCircle className="h-2.5 w-2.5" />
-            Physical Count: {entry.physicalCount ?? 0}
+          <Badge variant="outline" className={`text-[10px] gap-1 ${
+            entry.discrepancy === 0
+              ? 'bg-emerald-100 text-emerald-800 border-emerald-300 font-semibold dark:bg-emerald-950 dark:text-emerald-300'
+              : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300'
+          }`}>
+            <CheckCircle className="h-2.5 w-2.5 text-emerald-600" />
+            {entry.discrepancy === 0
+              ? `Tugma sa Shelf: ${entry.physicalCount ?? 0} (Confirmed Correct)`
+              : `Physical Count: ${entry.physicalCount ?? 0} (${entry.discrepancy && entry.discrepancy > 0 ? `+${entry.discrepancy}` : entry.discrepancy})`}
           </Badge>
         );
       case 'purchase_backfill':
