@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { AddCustomerDialog } from '@/components/dashboard/add-customer-dialog';
 import { Pencil, Mail } from 'lucide-react';
+import { StoreCreditLedgerTable, type StoreCreditEntry } from '@/components/dashboard/customers/StoreCreditLedgerTable';
 
 type Customer = {
   id: string;
@@ -42,22 +43,11 @@ type Payment = {
 }
 
 const getStatusVariant = (status: Order['orderStatus']) => {
-    switch (status) {
-      case 'Shipped':
-      case 'Completed':
-      case 'Waiting for Stock':
-        return 'outline';
-      case 'Processing':
-      case 'On-Hold':
-        return 'secondary';
-      case 'Cancelled':
-      case 'Returned':
-          return 'destructive';
-      case 'Pending Payment':
-      default:
-        return 'default';
-    }
-  }
+  if (['Shipped', 'Completed', 'Waiting for Stock'].includes(status)) return 'outline';
+  if (['Processing', 'On-Hold'].includes(status)) return 'secondary';
+  if (['Cancelled', 'Returned'].includes(status)) return 'destructive';
+  return 'default';
+};
 
 export default function CustomerDetailPage() {
   const params = useParams();
@@ -71,6 +61,7 @@ export default function CustomerDetailPage() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [ledgerEntries, setLedgerEntries] = useState<StoreCreditEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const [refreshKey, setRefreshKey] = useState(0);
@@ -154,6 +145,14 @@ export default function CustomerDetailPage() {
         } else {
           setPayments([]);
         }
+
+        // 4. Fetch store credit ledger
+        const { data: ledgerData } = await supabase
+          .from('store_credit_entries')
+          .select('*')
+          .eq('customer_id', customerId)
+          .order('created_at', { ascending: false });
+        setLedgerEntries(ledgerData || []);
       } catch (err) {
         console.error('CustomerDetailPage fetch error:', err);
       } finally {
@@ -330,6 +329,9 @@ export default function CustomerDetailPage() {
             </Table>
           </CardContent>
         </Card>
+
+        {/* Store Credit Ledger Section */}
+        <StoreCreditLedgerTable entries={ledgerEntries} />
 
         {/* Payment History Section */}
         <Card>
