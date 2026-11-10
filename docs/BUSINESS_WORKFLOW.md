@@ -507,3 +507,4 @@ receipt). One save:
 - **Historical gap orders (18 orders):** Will be corrected after owners review the dry-run summary.
 - **Ledger table:** Approved; SQL script will be provided for owners to run in Supabase SQL editor.
 - **Order cancellations:** Kept as manual adjustment by staff for now.
+- **SPX shipping fee paid with store credit:** When a sender/OFW wants the receiver to pay ₱0 at delivery (Non-COD), staff use "Add SPX SF" on the Order Detail page. The SF is added to the order's shipping fee and total, deducted from the customer's store credit as a Verified Store Credit payment, and `shipping_payment_type` is set to `'free shipping'` so the SPX export/waybill collects ₱0 from the recipient. If store credit is less than the SF, the leftover credit covers part of the fee, and the remainder is added to the order's balance due for the customer to pay.

@@ -10,7 +10,9 @@ import { format } from 'date-fns';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, CheckCircle, Edit, FileText, Share2, Truck, Activity } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Edit, FileText, Share2, Truck, Activity, CreditCard } from 'lucide-react';
+import { LogPaymentDialog } from '@/components/dashboard/log-payment-dialog';
+import { AddSpxSfDialog } from '@/components/dashboard/orders/AddSpxSfDialog';
 import { ShareReceiptDialog } from '@/components/dashboard/share-receipt-dialog';
 import { EditOrderDialog } from '@/components/dashboard/order-dialog';
 import { MarkShippedDialog } from '@/components/dashboard/mark-shipped-dialog';
@@ -48,7 +50,7 @@ export default function OrderDetailPage() {
   const orderId = params.id as string;
   const supabase = useSupabase();
 
-  const { order, customer, orderItems: rawItems, payments: rawPayments, isLoading } = useOrderDetail(orderId);
+  const { order, customer, orderItems: rawItems, payments: rawPayments, isLoading, refetch } = useOrderDetail(orderId);
   const { userProfile } = useUserProfile();
 
   // Dialog state
@@ -57,6 +59,8 @@ export default function OrderDetailPage() {
   const [isMarkShippedOpen, setIsMarkShippedOpen] = useState(false);
   const [isWaybillOpen, setIsWaybillOpen] = useState(false);
   const [isTrailOpen, setIsTrailOpen] = useState(false);
+  const [isLogPaymentOpen, setIsLogPaymentOpen] = useState(false);
+  const [isAddSpxSfOpen, setIsAddSpxSfOpen] = useState(false);
 
   // Expenses (Shipping and Processing)
   const [shippingFee, setShippingFee] = useState<number>(0);
@@ -151,6 +155,16 @@ export default function OrderDetailPage() {
               {canEdit && (
                 <Button variant="outline" size="sm" onClick={() => setIsEditOpen(true)}>
                   <Edit className="mr-2 h-4 w-4" /> Edit Order
+                </Button>
+              )}
+              {canEdit && (
+                <Button variant="outline" size="sm" onClick={() => setIsLogPaymentOpen(true)}>
+                  <CreditCard className="mr-2 h-4 w-4" /> Log Payment
+                </Button>
+              )}
+              {canEdit && order.orderStatus !== 'Cancelled' && (
+                <Button variant="outline" size="sm" onClick={() => setIsAddSpxSfOpen(true)}>
+                  <Truck className="mr-2 h-4 w-4" /> Add SPX SF
                 </Button>
               )}
               {(order.orderStatus === 'For Pick-up' || order.orderStatus === 'Shipped' || order.orderStatus === 'Completed') && order.spx_sync_data && (
@@ -272,6 +286,18 @@ export default function OrderDetailPage() {
                 <span>+ ₱{order.insurance_fee.toFixed(2)}</span>
               </div>
             )}
+            {!!order.shipping_fee && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Shipping Fee</span>
+                <span>+ ₱{order.shipping_fee.toFixed(2)}</span>
+              </div>
+            )}
+            {order.shipping_payment_type && (
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Shipping Type</span>
+                <span className="capitalize font-medium text-foreground">{order.shipping_payment_type}</span>
+              </div>
+            )}
             <Separator />
             <div className="flex justify-between font-bold text-base">
               <span>Total</span>
@@ -333,6 +359,23 @@ export default function OrderDetailPage() {
       {order && <EditOrderDialog open={isEditOpen} onOpenChange={setIsEditOpen} order={order} orderItems={rawItems} />}
       {order && <WaybillSummaryDialog open={isWaybillOpen} onOpenChange={setIsWaybillOpen} order={order} />}
       {order && <OrderTrailDialog open={isTrailOpen} onOpenChange={setIsTrailOpen} orderId={order.id} />}
+      {order && (
+        <AddSpxSfDialog
+          open={isAddSpxSfOpen}
+          onOpenChange={setIsAddSpxSfOpen}
+          orderId={order.id}
+          orderShortId={order.id.substring(0, 7).toUpperCase()}
+          onSuccess={refetch}
+        />
+      )}
+      {order && (
+        <LogPaymentDialog
+          order={order}
+          open={isLogPaymentOpen}
+          onOpenChange={setIsLogPaymentOpen}
+          onSuccess={refetch}
+        />
+      )}
     </div>
   );
 }

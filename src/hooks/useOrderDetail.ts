@@ -66,6 +66,8 @@ export function useOrderDetail(orderId: string) {
             monthlyPayment: data.monthly_payment,
             salesPersonName: data.sales_person_name,
             insurance_fee: data.insurance_fee,
+            shipping_fee: data.shipping_fee,
+            shipping_payment_type: data.shipping_payment_type,
             tracking_number: data.tracking_number,
             spx_sync_data: data.spx_sync_data,
             notes: data.notes,

@@ -5,6 +5,7 @@ import { serviceClient } from '@/lib/services/payments/payment-discrepancy-servi
 import {
   StoreCreditError,
   applyStoreCredit,
+  applySpxShippingFeeFromStoreCredit,
   getCustomerCreditInfo,
 } from '@/lib/services/payments/store-credit-service';
 
@@ -46,15 +47,30 @@ export async function GET(request: Request) {
   }
 }
 
-/** POST { orderId, amount, note? } : applies store credit to the order */
+/**
+ * POST handler:
+ * - { action: 'spx_sf', orderId, shippingFee, creditToUse?, note? }: adds SPX SF paid from credit
+ * - { orderId, amount, note? }: standard store credit payment towards order balance
+ */
 export async function POST(request: Request) {
   try {
     const caller = await getCaller();
     if (!caller) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
 
     const body = await request.json();
-    const { orderId, amount, note } = body;
 
+    if (body.action === 'spx_sf') {
+      const result = await applySpxShippingFeeFromStoreCredit(serviceClient(), {
+        orderId: body.orderId,
+        shippingFee: Number(body.shippingFee),
+        creditToUse: body.creditToUse != null ? Number(body.creditToUse) : undefined,
+        actorName: caller.name,
+        note: body.note,
+      });
+      return NextResponse.json(result);
+    }
+
+    const { orderId, amount, note } = body;
     const result = await applyStoreCredit(serviceClient(), {
       orderId,
       amount: Number(amount),

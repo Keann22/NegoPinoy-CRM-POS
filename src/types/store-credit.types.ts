@@ -22,3 +22,23 @@ export interface CustomerCreditInfo {
   balanceDue: number;
   hasPendingPayment: boolean;
 }
+
+export interface ApplySpxShippingFeeInput {
+  orderId: string;
+  shippingFee: number;
+  creditToUse?: number;
+  actorName: string;
+  note?: string;
+}
+
+export interface ApplySpxShippingFeeResult {
+  paymentId: string;
+  orderId: string;
+  shippingFee: number;
+  creditUsed: number;
+  newTotal: number;
+  newBalanceDue: number;
+  creditLeft: number;
+  remainingFeeToPay: number;
+}
+

@@ -12,6 +12,8 @@ export class StoreCreditError extends Error {
   }
 }
 
+export { applySpxShippingFeeFromStoreCredit } from './store-credit-spx-service';
+
 interface OrderRow {
   id: string;
   customer_id: string | null;

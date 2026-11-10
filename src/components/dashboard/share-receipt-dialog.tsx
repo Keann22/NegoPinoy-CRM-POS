@@ -146,6 +146,13 @@ export function ShareReceiptDialog({ open, onOpenChange, order, customer, orderI
                         </div>
                     ) : null}
 
+                    {order.shipping_fee ? (
+                        <div className="flex justify-between">
+                            <span className="text-gray-500">Shipping Fee</span>
+                            <span>+₱{order.shipping_fee.toFixed(2)}</span>
+                        </div>
+                    ) : null}
+
                     {/* Historical gap line for old orders whose total was lowered by store credit */}
                     {(() => {
                         const itemsExpected = (order.subtotal ?? 0) - (order.totalDiscount ?? 0) + (order.insurance_fee ?? 0) + (order.shipping_fee ?? 0);
