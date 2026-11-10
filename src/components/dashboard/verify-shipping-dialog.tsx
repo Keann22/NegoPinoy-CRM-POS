@@ -11,6 +11,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Order } from '@/app/dashboard/orders/page';
 import { useAddressData } from '@/lib/address-data';
 import { Checkbox } from '@/components/ui/checkbox';
+import { VerifyShippingBoxes } from './verify-shipping-boxes';
+import { collectsItemCod, suggestedItemCod } from '@/lib/services/shipping/courier-cod';
 
 interface VerifyShippingDialogProps {
   order: Order | null;
@@ -93,27 +95,18 @@ export function VerifyShippingDialog({ order, open, onOpenChange, onSuccess }: V
         }
       });
       // Replacement orders from Customer Returns come with the owner's choice already set.
-      setPaymentType(order.shipping_payment_type || 'sf only');
+      const defaultType = order.shipping_payment_type || 'sf only';
+      setPaymentType(defaultType);
       setShippingAmount('0');
-      
-      let expectedCod = order.balanceDue || 0;
-      if (order.amountPaid === 0) {
-         if (order.paymentType === 'Installment' || order.paymentType === 'Lay-away') {
-           expectedCod = order.totalAmount - ((order.monthlyPayment || 0) * (order.installmentMonths || 0));
-         } else {
-           expectedCod = order.totalAmount;
-         }
-      } else if (order.amountPaid < order.totalAmount && order.paymentType !== 'Installment' && order.paymentType !== 'Lay-away') {
-         expectedCod = order.totalAmount - order.amountPaid;
-      }
-      expectedCod = expectedCod > 0 ? expectedCod : 0;
-      
-      setBalanceDue(expectedCod.toString());
-      
+
+      const expectedCod = suggestedItemCod(order);
+      const codValue = collectsItemCod(defaultType) ? expectedCod : 0;
+      setBalanceDue(codValue.toString());
+
       if (order.boxes_config && Array.isArray(order.boxes_config) && order.boxes_config.length > 1) {
           const amounts: Record<string, string> = {};
           order.boxes_config.forEach((b: any, index: number) => {
-              amounts[b.id] = b.cod_amount?.toString() || (index === 0 ? expectedCod.toString() : '0');
+              amounts[b.id] = collectsItemCod(defaultType) ? (b.cod_amount?.toString() || (index === 0 ? expectedCod.toString() : '0')) : '0';
           });
           setBoxCodAmounts(amounts);
       } else {
@@ -123,6 +116,32 @@ export function VerifyShippingDialog({ order, open, onOpenChange, onSuccess }: V
       setDeliveryInstructions('Kuya wag nyo po sabihin na galing Shopee! Sabihin nyo po galing ng Negosyanteng Pinoy. Thankyou po! :)');
     }
   }, [open, order, supabase, isAddressLoaded, addressData]);
+
+  const handlePaymentTypeChange = (newType: string) => {
+    setPaymentType(newType);
+    if (!order) return;
+    // Only re-fill when switching between "no item COD" and "collect item COD",
+    // so an amount staff typed isn't lost when they change who pays the SF.
+    if (collectsItemCod(newType) === collectsItemCod(paymentType)) return;
+    if (!collectsItemCod(newType)) {
+      setBalanceDue('0');
+      if (order.boxes_config && Array.isArray(order.boxes_config)) {
+        const amounts: Record<string, string> = {};
+        order.boxes_config.forEach((b: any) => { amounts[b.id] = '0'; });
+        setBoxCodAmounts(amounts);
+      }
+    } else {
+      const expected = suggestedItemCod(order);
+      setBalanceDue(expected.toString());
+      if (order.boxes_config && Array.isArray(order.boxes_config) && order.boxes_config.length > 1) {
+        const amounts: Record<string, string> = {};
+        order.boxes_config.forEach((b: any, index: number) => {
+          amounts[b.id] = index === 0 ? expected.toString() : '0';
+        });
+        setBoxCodAmounts(amounts);
+      }
+    }
+  };
 
   const handleSubmit = async () => {
     if (!order || !supabase) return;
@@ -147,6 +166,19 @@ export function VerifyShippingDialog({ order, open, onOpenChange, onSuccess }: V
         address_line: addressLine
       };
 
+      const isCod = collectsItemCod(paymentType);
+      const boxes = Array.isArray(order.boxes_config) && order.boxes_config.length > 0
+        ? order.boxes_config
+        : [{ id: 'box-1', name: 'Box 1', items: [], width: 10, height: 10, length: 10, weight: 1 }];
+
+      const newBoxesConfig = boxes.map((b: any) => ({
+        ...b,
+        cod_amount: isCod
+          ? (isMultiBox ? (parseFloat(boxCodAmounts[b.id] || '0') || 0) : (parseFloat(balanceDue) || 0))
+          : 0,
+      }));
+
+      // NOTE: Do not overwrite balance_due! balance_due tracks what the customer owes the store.
       const updateData: any = {
           status: 'For Shipping',
           shipping_verified: true,
@@ -155,19 +187,10 @@ export function VerifyShippingDialog({ order, open, onOpenChange, onSuccess }: V
           shipping_phone: shippingPhone,
           shipping_payment_type: paymentType,
           shipping_amount: parseFloat(shippingAmount) || 0,
-          balance_due: parseFloat(balanceDue) || 0,
+          boxes_config: newBoxesConfig,
           shipping_address: shippingAddressJson,
           delivery_instructions: deliveryInstructions
       };
-
-      if (isMultiBox) {
-         const newBoxesConfig = order.boxes_config.map((b: any) => ({
-            ...b,
-            cod_amount: parseFloat(boxCodAmounts[b.id] || '0') || 0
-         }));
-         updateData.boxes_config = newBoxesConfig;
-         updateData.balance_due = newBoxesConfig.reduce((acc: number, b: any) => acc + b.cod_amount, 0);
-      }
 
       // 1. Update Order
       const { error: orderError } = await supabase
@@ -279,7 +302,7 @@ export function VerifyShippingDialog({ order, open, onOpenChange, onSuccess }: V
 
             <div className="space-y-2">
               <Label>Shipping Type</Label>
-              <Select value={paymentType} onValueChange={setPaymentType}>
+              <Select value={paymentType} onValueChange={handlePaymentTypeChange}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="sf only">SF Only</SelectItem>
@@ -295,35 +318,26 @@ export function VerifyShippingDialog({ order, open, onOpenChange, onSuccess }: V
             </div>
             
             {isMultiBox ? (
-              <div className="space-y-3 col-span-2 border p-3 rounded-md bg-slate-50">
-                <Label className="text-base font-semibold">Amount to Collect for Items (Multi-Box)</Label>
-                <p className="text-xs text-muted-foreground mb-2">Assign how much COD should be collected per box.</p>
-                {order.boxes_config.map((box: any) => (
-                   <div key={box.id} className="flex flex-col gap-2 bg-white p-3 rounded border">
-                      <div className="flex items-center gap-3">
-                        <Label className="w-24 text-sm font-semibold">{box.name}: ₱</Label>
-                        <Input 
-                          type="number" 
-                          value={boxCodAmounts[box.id] || ''} 
-                          onChange={e => setBoxCodAmounts({...boxCodAmounts, [box.id]: e.target.value})} 
-                        />
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                         <span className="font-semibold block mb-1">Contents:</span>
-                         <ul className="list-disc pl-4">
-                            {box.items && box.items.length > 0 ? box.items.map((item: any, idx: number) => (
-                               <li key={idx}>{item.quantity}x {item.product_name}</li>
-                            )) : <li>Empty box</li>}
-                         </ul>
-                      </div>
-                   </div>
-                ))}
-              </div>
+              <VerifyShippingBoxes
+                boxes={order.boxes_config}
+                paymentType={paymentType}
+                boxCodAmounts={boxCodAmounts}
+                onBoxCodChange={(boxId, amount) => setBoxCodAmounts(prev => ({ ...prev, [boxId]: amount }))}
+              />
             ) : (
               <div className="space-y-2 col-span-2">
-                <Label>Amount to Collect for Items (Balance Due) (₱)</Label>
-                <Input type="number" value={balanceDue} onChange={e => setBalanceDue(e.target.value)} />
-                <p className="text-xs text-muted-foreground">The Courier will collect this amount + shipping fee (if applicable).</p>
+                <Label>Amount to Collect for Items (Courier COD) (₱)</Label>
+                <Input 
+                  type="number" 
+                  disabled={!collectsItemCod(paymentType)}
+                  value={collectsItemCod(paymentType) ? balanceDue : '0'}
+                  onChange={e => setBalanceDue(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {collectsItemCod(paymentType)
+                    ? 'The courier collects this for the items (plus the shipping fee if the customer pays it). Put 0 if the items are already paid. This does not change what the customer owes us.'
+                    : 'Items already paid: the courier collects nothing for the items.'}
+                </p>
               </div>
             )}
 

@@ -55,6 +55,8 @@ export type Order = {
   subtotal?: number;
   totalDiscount?: number;
   insurance_fee?: number;
+  shipping_fee?: number;
+  shippingFee?: number;
   trackingNumber?: string;
   tracking_number?: string;
   shippingDetails?: string;
