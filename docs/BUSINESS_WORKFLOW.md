@@ -498,3 +498,12 @@ receipt). One save:
 - Blind counting: staff see product names only, not bought quantities; the
   system compares their count with the receipt and asks for a recount on
   mismatches.
+
+## Store credit (owner, 2026-11-10)
+
+- **Who can use store credit:** Sales agents and owners (everyone who can log payments). Customers order through Messenger, so sales agents apply it on their behalf.
+- **Credit from unverified/pending payments:** Allowed. When used, the app shows a warning badge ("Credit came from a payment not yet verified by owners") and sends a bell notification to owners so they can verify the source payment.
+- **Leftover credit on SPX orders:** SPX orders should not have leftover credit put on the order as shipping fee; any remaining credit stays untouched in the customer's store credit balance.
+- **Historical gap orders (18 orders):** Will be corrected after owners review the dry-run summary.
+- **Ledger table:** Approved; SQL script will be provided for owners to run in Supabase SQL editor.
+- **Order cancellations:** Kept as manual adjustment by staff for now.

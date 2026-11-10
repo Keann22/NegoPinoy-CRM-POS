@@ -242,18 +242,24 @@ export function OrderItemsPanel({
         <div className="flex justify-between text-destructive"><p className="text-destructive">Discount</p><p>- ₱{totalDiscount.toFixed(2)}</p></div>
         {includeInsurance && <div className="flex justify-between text-muted-foreground"><p>Insurance Fee (1%)</p><p>+ ₱{insuranceFee.toFixed(2)}</p></div>}
         {shippingFee > 0 && <div className="flex justify-between text-muted-foreground"><p>Shipping Fee</p><p>+ ₱{shippingFee.toFixed(2)}</p></div>}
-        {overpaymentApplied > 0 && <div className="flex justify-between text-green-600"><p>{isEditing ? 'Store Credit Used' : 'Overpayment Applied'}</p><p>- ₱{overpaymentApplied.toFixed(2)}</p></div>}
+        {isEditing && overpaymentApplied > 0 && <div className="flex justify-between text-green-600"><p>Store Credit Used</p><p>- ₱{overpaymentApplied.toFixed(2)}</p></div>}
         <div className="flex justify-between font-bold text-lg"><p>Total</p><p>₱{totalAmount.toFixed(2)}</p></div>
+        {!isEditing && overpaymentApplied > 0 && (
+          <div className="flex justify-between text-green-600 text-sm pt-1 border-t border-dashed">
+            <p>Paid with store credit</p>
+            <p>₱{overpaymentApplied.toFixed(2)}</p>
+          </div>
+        )}
       </div>
 
-      {/* Apply overpayment — create mode only, when customer has store credit */}
+      {/* Apply store credit — create mode only, when customer has store credit */}
       {!isEditing && (selectedCustomerStoreCredit ?? 0) > 0 && (
         <FormField control={control} name="applyOverpayment" render={({ field }) => (
           <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 border-green-500/30 bg-green-500/5">
             <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
             <div className="space-y-1 leading-none">
-              <FormLabel className="text-green-700">Apply Overpayment Balance (₱{(selectedCustomerStoreCredit ?? 0).toFixed(2)})</FormLabel>
-              <p className="text-xs text-muted-foreground">Use the customer&apos;s existing balance to reduce the total.</p>
+              <FormLabel className="text-green-700">Apply Store Credit (₱{(selectedCustomerStoreCredit ?? 0).toFixed(2)} available)</FormLabel>
+              <p className="text-xs text-muted-foreground">Use the customer&apos;s store credit to pay for this order.</p>
             </div>
           </FormItem>
         )} />

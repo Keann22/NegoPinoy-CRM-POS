@@ -46,7 +46,8 @@ export function CashFlowReport({ date: externalDate, setDate: externalSetDate }:
                     fetchAllPages(() => supabase.from('expenses').select('id, amount, created_at, category, description').order('id')),
                 ]);
 
-                setAllPayments(paymentsData.map((p: any) => ({
+                // Store credit payments are not new cash in (the cash was counted when the overpayment came in).
+                setAllPayments(paymentsData.filter((p: any) => p.payment_method !== 'Store Credit').map((p: any) => ({
                     amount: Number(p.amount) || 0,
                     paymentDate: p.payment_date || p.created_at,
                     method: p.payment_method || 'Unknown',

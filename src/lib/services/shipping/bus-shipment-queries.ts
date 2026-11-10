@@ -26,11 +26,11 @@ interface ShipmentRow {
   sf_extra: number | string;
   balance_after: number | string | null;
   ask_again_at: string | null;
-  customers: { full_name: string | null } | null;
+  customers: { full_name: string | null; store_credit?: number | string | null } | null;
   bus_shipment_orders: { order_id: string }[] | null;
 }
 
-const SELECT = '*, customers(full_name), bus_shipment_orders(order_id)';
+const SELECT = '*, customers(full_name, store_credit), bus_shipment_orders(order_id)';
 const numOrNull = (v: unknown) => (v == null || v === '' ? null : Number(v));
 
 /** Every recorded trip, newest first (a few a week, so all of them fit). */
@@ -97,6 +97,8 @@ export async function listBusSfPrompts(
         kind: owed > 0.009 ? 'owed' as const : 'extra' as const,
         amount: owed > 0.009 ? owed : Number(r.sf_extra),
         customerName: r.customers?.full_name || 'Customer',
+        customerId: r.customer_id,
+        storeCredit: Number(r.customers?.store_credit || 0),
         orderIds: (r.bus_shipment_orders || []).map((o) => o.order_id),
         busCompany: r.bus_company,
         destination: r.destination,

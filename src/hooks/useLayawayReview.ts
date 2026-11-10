@@ -137,6 +137,7 @@ export function useLayawayReview() {
         const { data: paymentsData } = await supabase
           .from('payments')
           .select('order_id, payment_date, amount, payment_method')
+          .neq('payment_method', 'Store Credit')
           .in('order_id', chunk)
           .order('payment_date', { ascending: false });
 

@@ -135,6 +135,8 @@ export interface BusSfPrompt {
   kind: 'owed' | 'extra';
   amount: number;
   customerName: string;
+  customerId?: string | null;
+  storeCredit?: number;
   orderIds: string[];
   busCompany: string;
   destination: string;

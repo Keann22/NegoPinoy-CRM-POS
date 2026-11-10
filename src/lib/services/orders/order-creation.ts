@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { OrderFormValues } from '@/lib/schemas/order';
 import { computeOrderTotals, saveOrderItemPriceTypes, uploadProofOfPayment } from './order-utils';
+import { applyStoreCredit } from '@/lib/services/payments/store-credit-service';
 
 export interface CreateOrderContext {
   userId: string;
@@ -29,12 +30,8 @@ export async function createOrder(
     actualAmountPaid = 0;
   }
 
-  const rawTotal = subtotal - totalDiscount + insuranceFee;
-  const overpaymentApplied =
-    values.applyOverpayment && context.selectedCustomerStoreCredit
-      ? Math.min(context.selectedCustomerStoreCredit, rawTotal)
-      : 0;
-  const totalAmount = rawTotal - overpaymentApplied;
+  // Order total is the full price of goods + insurance (not lowered by store credit)
+  const totalAmount = subtotal - totalDiscount + insuranceFee;
   const balanceDue = totalAmount - actualAmountPaid;
 
   // Upload proof of payment if present
@@ -43,7 +40,7 @@ export async function createOrder(
     proofUrl = await uploadProofOfPayment(supabase, values.proofOfPayment[0]);
   }
 
-  // Construct payload for RPC
+  // Construct payload for RPC: overpayment on create is 0 (handled via Store Credit payment)
   const payload = {
     isEdit: false,
     customerId: values.customerId,
@@ -65,13 +62,43 @@ export async function createOrder(
     amountPaid: actualAmountPaid,
     proofUrl,
     orderItems: values.orderItems,
-    overpayment: overpaymentApplied
+    overpayment: 0,
   };
 
   const { data: orderId, error } = await supabase.rpc('process_order_transaction', { payload });
   if (error) throw error;
 
   await saveOrderItemPriceTypes(supabase, orderId, values.orderItems);
+
+  // If customer asked to apply store credit, apply it as a Store Credit payment
+  const storeCreditAvailable = Number(context.selectedCustomerStoreCredit || 0);
+  if (values.applyOverpayment && storeCreditAvailable > 0.009) {
+    const creditToApply = Math.round(Math.min(storeCreditAvailable, balanceDue) * 100) / 100;
+    if (creditToApply > 0) {
+      if (typeof window !== 'undefined') {
+        const res = await fetch('/api/payments/store-credit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId,
+            amount: creditToApply,
+            note: 'Store credit applied at order creation',
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          console.error('Failed to apply store credit at order creation:', err);
+        }
+      } else {
+        await applyStoreCredit(supabase, {
+          orderId,
+          amount: creditToApply,
+          actorName: context.salesPersonName,
+          note: 'Store credit applied at order creation',
+        });
+      }
+    }
+  }
 
   // Trigger OCR in background (fire-and-forget). The RPC inserts the payment row
   // server-side and only returns the order id, so look up the payment id it created.

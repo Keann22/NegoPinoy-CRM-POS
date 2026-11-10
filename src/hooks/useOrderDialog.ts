@@ -238,7 +238,8 @@ export function useOrderDialog(props: UseOrderDialogProps) {
         : (applyOverpayment && selectedCustomer?.store_credit)
             ? Math.min(selectedCustomer.store_credit, rawTotal)
             : 0;
-    const totalAmount = rawTotal - overpaymentApplied;
+    // New orders keep the full price as total_amount; edit preserves the gap on old orders
+    const totalAmount = isEditing ? rawTotal - overpaymentApplied : rawTotal;
 
     useEffect(() => {
         const pType = form.watch('paymentType');

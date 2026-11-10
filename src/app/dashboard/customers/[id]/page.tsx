@@ -38,6 +38,7 @@ type Payment = {
   paymentDate: string;
   amount: number;
   paymentMethod: string;
+  notes?: string;
 }
 
 const getStatusVariant = (status: Order['orderStatus']) => {
@@ -148,6 +149,7 @@ export default function CustomerDetailPage() {
             paymentDate: p.payment_date,
             amount: p.amount,
             paymentMethod: p.payment_method,
+            notes: p.notes,
           })));
         } else {
           setPayments([]);
@@ -228,7 +230,7 @@ export default function CustomerDetailPage() {
               </CardDescription>
               {customer.storeCredit && Number(customer.storeCredit) > 0 ? (
                 <CardDescription className="text-base mt-1 text-green-600 font-semibold">
-                  Store Credit (Overpayment): ₱{Number(customer.storeCredit || 0).toFixed(2)}
+                  Store credit: ₱{Number(customer.storeCredit || 0).toFixed(2)}
                 </CardDescription>
               ) : null}
             </div>
@@ -340,6 +342,7 @@ export default function CustomerDetailPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Payment Date</TableHead>
+                  <TableHead>Order</TableHead>
                   <TableHead>Method</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
                 </TableRow>
@@ -348,11 +351,20 @@ export default function CustomerDetailPage() {
                 {payments && payments.length > 0 ? payments.map(payment => (
                   <TableRow key={payment.id}>
                     <TableCell>{payment.paymentDate ? format(new Date(payment.paymentDate), 'PPP p') : 'N/A'}</TableCell>
-                    <TableCell>{payment.paymentMethod}</TableCell>
+                    <TableCell>
+                      <Link href={`/dashboard/orders/${payment.orderId}`} className="font-mono text-xs text-primary hover:underline">
+                        #{payment.orderId.slice(0, 7).toUpperCase()}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={payment.paymentMethod === 'Store Credit' ? 'secondary' : 'outline'}>
+                        {payment.paymentMethod}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-right font-medium">₱{Number(payment.amount || 0).toFixed(2)}</TableCell>
                   </TableRow>
                 )) : (
-                   <TableRow><TableCell colSpan={3} className="h-24 text-center">No payments recorded.</TableCell></TableRow>
+                   <TableRow><TableCell colSpan={4} className="h-24 text-center">No payments recorded.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>

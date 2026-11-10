@@ -328,7 +328,7 @@ export default function OrderDetailPage() {
 
       <OrderActivityCard orderId={order.id} />
 
-      {order && <ShareReceiptDialog open={isShareReceiptOpen} onOpenChange={setIsShareReceiptOpen} order={order} customer={customer ? { fullName: customer.fullName, address: customer.address } : null} orderItems={rawItems} />}
+      {order && <ShareReceiptDialog open={isShareReceiptOpen} onOpenChange={setIsShareReceiptOpen} order={order} customer={customer ? { fullName: customer.fullName, address: customer.address } : null} orderItems={rawItems} payments={payments} />}
       {order && <MarkShippedDialog open={isMarkShippedOpen} onOpenChange={setIsMarkShippedOpen} orderId={order.id} currentTrackingNumber={order.tracking_number || ''} onSuccess={() => setIsMarkShippedOpen(false)} />}
       {order && <EditOrderDialog open={isEditOpen} onOpenChange={setIsEditOpen} order={order} orderItems={rawItems} />}
       {order && <WaybillSummaryDialog open={isWaybillOpen} onOpenChange={setIsWaybillOpen} order={order} />}

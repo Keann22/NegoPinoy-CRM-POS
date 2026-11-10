@@ -14,9 +14,10 @@ interface ShareReceiptDialogProps {
   order: Order | null;
   customer: { firstName: string; lastName: string; address?: string } | { fullName: string; address?: string } | null;
   orderItems: any[];
+  payments?: { paymentMethod?: string | null; amount?: number | null }[];
 }
 
-export function ShareReceiptDialog({ open, onOpenChange, order, customer, orderItems }: ShareReceiptDialogProps) {
+export function ShareReceiptDialog({ open, onOpenChange, order, customer, orderItems, payments }: ShareReceiptDialogProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const receiptRef = useRef<HTMLDivElement>(null);
 
@@ -144,6 +145,21 @@ export function ShareReceiptDialog({ open, onOpenChange, order, customer, orderI
                             <span>+₱{order.insurance_fee.toFixed(2)}</span>
                         </div>
                     ) : null}
+
+                    {/* Historical gap line for old orders whose total was lowered by store credit */}
+                    {(() => {
+                        const itemsExpected = (order.subtotal ?? 0) - (order.totalDiscount ?? 0) + (order.insurance_fee ?? 0) + (order.shipping_fee ?? 0);
+                        const gap = Math.round((itemsExpected - order.totalAmount) * 100) / 100;
+                        if (gap > 0.01) {
+                            return (
+                                <div className="flex justify-between text-emerald-600">
+                                    <span className="text-gray-500">Store Credit Used</span>
+                                    <span>-₱{gap.toFixed(2)}</span>
+                                </div>
+                            );
+                        }
+                        return null;
+                    })()}
                 </>
             )}
 
@@ -173,10 +189,35 @@ export function ShareReceiptDialog({ open, onOpenChange, order, customer, orderI
                     )}
                 </>
             ) : null}
-            <div className="flex justify-between pt-2 mt-2 border-t border-gray-200">
-                <span className="text-gray-500">Amount Paid:</span>
-                <span>₱{order.amountPaid.toFixed(2)}</span>
-            </div>
+            {(() => {
+                const storeCreditPaid = (payments || [])
+                    .filter(p => p.paymentMethod === 'Store Credit')
+                    .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+                const otherPaid = (payments || [])
+                    .filter(p => p.paymentMethod !== 'Store Credit')
+                    .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+                if (storeCreditPaid > 0.009) {
+                    return (
+                        <>
+                            <div className="flex justify-between pt-2 mt-2 border-t border-gray-200 text-emerald-700">
+                                <span className="text-gray-500">Paid with Store Credit:</span>
+                                <span>₱{storeCreditPaid.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-500">Other Payments:</span>
+                                <span>₱{otherPaid.toFixed(2)}</span>
+                            </div>
+                        </>
+                    );
+                }
+                return (
+                    <div className="flex justify-between pt-2 mt-2 border-t border-gray-200">
+                        <span className="text-gray-500">Amount Paid:</span>
+                        <span>₱{order.amountPaid.toFixed(2)}</span>
+                    </div>
+                );
+            })()}
             <div className="flex justify-between">
                 <span className="text-gray-500">Balance Due:</span>
                 <span className="font-bold">₱{order.balanceDue.toFixed(2)}</span>

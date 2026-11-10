@@ -68,6 +68,7 @@ export function StaleReservationsReport() {
           const { data: payments, error: payErr } = await supabase
             .from('payments')
             .select('order_id, payment_date, created_at')
+            .neq('payment_method', 'Store Credit')
             .in('order_id', chunk);
           if (payErr) throw payErr;
           for (const p of payments || []) {

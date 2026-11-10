@@ -60,6 +60,54 @@ export function BusSfPopup() {
     }
   };
 
+  const useCredit = async (p: BusSfPrompt) => {
+    setBusyId(p.id);
+    try {
+      let creditToUse = Math.min(Number(p.storeCredit || 0), p.amount);
+      if (creditToUse <= 0.009) return;
+
+      let appliedTotal = 0;
+      for (const orderId of p.orderIds) {
+        if (creditToUse <= 0.009) break;
+        const checkRes = await fetch(`/api/payments/store-credit?orderId=${encodeURIComponent(orderId)}`);
+        const checkData = await checkRes.json();
+        if (!checkRes.ok) continue;
+        const toPay = Math.min(creditToUse, Number(checkData.balanceDue || 0));
+        if (toPay <= 0.009) continue;
+
+        const payRes = await fetch('/api/payments/store-credit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId,
+            amount: toPay,
+            note: 'Paid bus shipping fee with store credit',
+          }),
+        });
+        const payData = await payRes.json();
+        if (!payRes.ok) {
+          throw new Error(payData.error || 'Failed to apply store credit');
+        }
+        creditToUse -= toPay;
+        appliedTotal += toPay;
+      }
+
+      toast({
+        title: 'Store credit applied',
+        description: `Applied ${peso(appliedTotal)} store credit to bus SF for ${p.customerName}.`,
+      });
+      await load();
+    } catch (e) {
+      toast({
+        title: 'Could not apply credit',
+        description: e instanceof Error ? e.message : String(e),
+        variant: 'destructive',
+      });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   if (minimized) {
     return (
       <button
@@ -116,6 +164,12 @@ export function BusSfPopup() {
                     <Button size="sm" asChild>
                       <Link href={`/dashboard/orders/${p.orderIds[0]}`}>Open order to log payment</Link>
                     </Button>
+                    {p.storeCredit && p.storeCredit > 0.009 ? (
+                      <Button size="sm" variant="secondary" disabled={busyId === p.id} onClick={() => useCredit(p)}>
+                        {busyId === p.id && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+                        Use store credit ({peso(Math.min(p.storeCredit, p.amount))} available)
+                      </Button>
+                    ) : null}
                     <Button size="sm" variant="ghost" disabled={busyId === p.id} onClick={() => answer(p, 'waiting')}>
                       {busyId === p.id && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}Asked customer, waiting
                     </Button>

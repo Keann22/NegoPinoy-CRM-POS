@@ -63,6 +63,7 @@ async function lastPayments(supabase: SupabaseClient, orderIds: string[]): Promi
   const { data, error } = await supabase
     .from('payments')
     .select('order_id, amount, payment_date')
+    .neq('payment_method', 'Store Credit')
     .in('order_id', orderIds)
     .order('payment_date', { ascending: false });
   if (error) throw error;
