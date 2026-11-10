@@ -2,7 +2,7 @@ import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { format } from 'date-fns';
 import type { ShippingOrder } from '../useForShipping';
-import { exportItemCod } from '@/lib/services/shipping/courier-cod';
+import { exportBoxCods, freeShippingNote, owedNow } from '@/lib/services/shipping/courier-cod';
 
 export const fixMetroManilaCity = (city: string) => {
     let c = city.trim();
@@ -61,6 +61,10 @@ export function useShippingExport(orders: ShippingOrder[], setLoading: (val: boo
       orders.forEach(order => {
         const items = order.items.length > 0 ? order.items : [{ product_name: 'Item', quantity: 1, selling_price_at_sale: order.totalAmount, discount: 0 }];
         // order.paymentType here is the Shipping Type picked at Verify Shipping.
+        const boxList: any[] = Array.isArray(order.boxesConfig) ? order.boxesConfig : [];
+        const cods = exportBoxCods(order.paymentType, boxList, order.balanceDue || 0, owedNow(order));
+        const instructionFor = (cod: number) =>
+          [freeShippingNote(order.paymentType, cod), order.deliveryInstructions || ''].filter(Boolean).join(' ');
 
         const addr = order.shippingAddress || {};
         const detailedAddress = addr.address_line || addr.street_address || 'N/A';
@@ -72,7 +76,7 @@ export function useShippingExport(orders: ShippingOrder[], setLoading: (val: boo
                 const itemNames = (box.items || []).map((i: any) => `${i.quantity}x ${i.product_name}`).join(', ');
                 const totalQuantity = (box.items || []).reduce((acc: number, i: any) => acc + (Number(i.quantity) || 1), 0);
                 const consolidatedName = itemNames.length > 100 ? itemNames.substring(0, 97) + '...' : itemNames;
-                const codAmount = exportItemCod(order.paymentType, box, 0);
+                const codAmount = cods[index] ?? 0;
                 
                 const rowData = [
                   `${order.orderId}-B${index + 1}`,
@@ -94,7 +98,7 @@ export function useShippingExport(orders: ShippingOrder[], setLoading: (val: boo
                   box.height || 10,
                   `ORDER #${order.orderId}-B${index + 1}`,
                   'Sender Pay',
-                  order.deliveryInstructions || '',
+                  instructionFor(codAmount),
                   codAmount > 0 ? 'Y' : 'N',
                   codAmount,
                   order.totalAmount
@@ -106,8 +110,7 @@ export function useShippingExport(orders: ShippingOrder[], setLoading: (val: boo
             const totalQuantity = items.reduce((acc: number, i: any) => acc + (Number(i.quantity) || 1), 0);
             const consolidatedName = itemNames.length > 100 ? itemNames.substring(0, 97) + '...' : itemNames;
 
-            const firstBox = Array.isArray(order.boxesConfig) ? order.boxesConfig[0] : null;
-            const codAmount = exportItemCod(order.paymentType, firstBox, order.balanceDue || 0);
+            const codAmount = cods[0] ?? 0;
             const isCOD = codAmount > 0;
 
             const rowData = [
@@ -130,7 +133,7 @@ export function useShippingExport(orders: ShippingOrder[], setLoading: (val: boo
               order.height || 10,
               `ORDER #${order.orderId}`,
               'Sender Pay',
-              order.deliveryInstructions || '',
+              instructionFor(codAmount),
               isCOD ? 'Y' : 'N',
               codAmount,
               order.totalAmount

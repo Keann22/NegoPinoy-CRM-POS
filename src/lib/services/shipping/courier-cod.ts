@@ -39,17 +39,64 @@ export function suggestedItemCod(order: CodOrder): number {
   return round2(Math.max(0, total - paid));
 }
 
+/** What the customer still owes on the order right now. */
+export function owedNow(order: { totalAmount?: number | null; amountPaid?: number | null }): number {
+  return round2(Math.max(0, Number(order.totalAmount || 0) - Number(order.amountPaid || 0)));
+}
+
 /**
- * COD for the SPX file. Uses the amount saved at Verify Shipping (boxes_config
- * cod_amount). Orders verified before 2026-11-10 have no cod_amount; back then
- * Verify Shipping saved the COD amount into balance_due, so fall back to that.
+ * COD for each SPX row (one per box). Uses the amount saved at Verify Shipping
+ * (boxes_config cod_amount). Orders verified before 2026-11-10 have no
+ * cod_amount; back then Verify Shipping saved the COD amount into balance_due,
+ * so fall back to that.
+ *
+ * Never more than the customer still owes: a payment logged after Verify
+ * Shipping (GCash, store credit) doesn't change the saved amount, so the cap
+ * stops the courier from collecting money that was already paid. Boxes take
+ * the cap in order.
  */
-export function exportItemCod(
+export function exportBoxCods(
   shippingType: string | null | undefined,
-  box: { cod_amount?: unknown } | null | undefined,
+  boxes: ({ cod_amount?: unknown } | null | undefined)[],
   legacyBalanceDue: number,
-): number {
-  if (!collectsItemCod(shippingType)) return 0;
-  if (box && box.cod_amount !== undefined && box.cod_amount !== null) return round2(Number(box.cod_amount) || 0);
-  return round2(Math.max(0, Number(legacyBalanceDue) || 0));
+  owed: number,
+): number[] {
+  const rows = boxes.length > 0 ? boxes : [null];
+  if (!collectsItemCod(shippingType)) return rows.map(() => 0);
+  const saved = rows.map((b) => (b && b.cod_amount !== undefined && b.cod_amount !== null ? Number(b.cod_amount) || 0 : null));
+  const anySaved = saved.some((v) => v !== null);
+  let left = round2(Math.max(0, owed));
+  return rows.map((_, i) => {
+    const want = anySaved ? Math.max(0, saved[i] ?? 0) : i === 0 ? Math.max(0, Number(legacyBalanceDue) || 0) : 0;
+    const cod = round2(Math.min(want, left));
+    left = round2(left - cod);
+    return cod;
+  });
+}
+
+const SHIPPED_STATUSES = ['Shipped', 'Completed', 'Payment Received (COD)', 'For Pick-up', 'Returned', 'Cancelled'];
+
+/**
+ * "Add SPX SF" (shipping fee paid from store credit) only once, and only before
+ * the order ships: after that the waybill is done and a second SF would charge
+ * the customer twice. Used by the server and the Order Detail button.
+ */
+export function canAddSpxSf(order: { status?: string | null; shipping_fee?: number | string | null }): boolean {
+  return !SHIPPED_STATUSES.includes(order.status || '') && Number(order.shipping_fee || 0) <= 0.009;
+}
+
+/** Free shipping = the receiver pays no shipping fee (we or the sender already did). */
+export const isFreeShipping = (shippingType: string | null | undefined) =>
+  (shippingType || '').trim().toLowerCase() === 'free shipping';
+
+/**
+ * Line for the SPX delivery instruction. SPX bookings add the shipping fee to
+ * the COD after our file is uploaded (2026-11-10: a paid lay-away sent with
+ * ₱0 COD was collected ₱410), so free-shipping parcels say so in the file.
+ */
+export function freeShippingNote(shippingType: string | null | undefined, cod: number): string {
+  if (!isFreeShipping(shippingType)) return '';
+  return cod > 0
+    ? `FREE SHIPPING: SF already paid. Collect only ₱${cod.toFixed(2)}, do not add SF.`
+    : 'FREE SHIPPING: SF already paid. Receiver pays ₱0, do not add SF.';
 }

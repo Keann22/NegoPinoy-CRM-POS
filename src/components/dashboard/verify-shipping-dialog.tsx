@@ -13,6 +13,7 @@ import { useAddressData } from '@/lib/address-data';
 import { Checkbox } from '@/components/ui/checkbox';
 import { VerifyShippingBoxes } from './verify-shipping-boxes';
 import { collectsItemCod, suggestedItemCod } from '@/lib/services/shipping/courier-cod';
+import { SfPaidWarning } from './verify-shipping-sf-warning';
 
 interface VerifyShippingDialogProps {
   order: Order | null;
@@ -311,6 +312,7 @@ export function VerifyShippingDialog({ order, open, onOpenChange, onSuccess }: V
                   <SelectItem value="free shipping">Free Shipping</SelectItem>
                 </SelectContent>
               </Select>
+              {order && <SfPaidWarning order={order} shippingType={paymentType} />}
             </div>
             <div className="space-y-2">
               <Label>Shipping Amount (₱)</Label>

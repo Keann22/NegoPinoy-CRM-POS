@@ -162,6 +162,9 @@ export function AddSpxSfDialog({
               onChange={(e) => setShippingFee(e.target.value)}
               disabled={isSubmitting || isLoading}
             />
+            <p className="text-[11px] text-muted-foreground">
+              Use SPX&apos;s quote for this parcel if you have it. Can only be added once, before the order ships.
+            </p>
           </div>
 
           {numFee > 0 && (
@@ -195,10 +198,11 @@ export function AddSpxSfDialog({
             <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 p-3 space-y-1 text-xs">
               <div className="flex items-center gap-1.5 font-semibold text-emerald-700 dark:text-emerald-300">
                 <CheckCircle2 className="h-4 w-4 shrink-0" />
-                Delivery Waybill: Free Shipping (₱0 COD)
+                Shipping Type becomes Free Shipping
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Receiver will pay ₱0 upon delivery. Shopee will bill NegoPinoy for this shipping fee.
+                SPX bills us for the SF. The SPX file will say &quot;FREE SHIPPING: SF already paid, do not add SF&quot;.
+                Whoever books the parcel in SPX must not add the SF to the COD.
               </p>
               <div className="pt-2 border-t border-emerald-200 dark:border-emerald-800 space-y-1">
                 <div className="flex justify-between">
@@ -206,10 +210,16 @@ export function AddSpxSfDialog({
                   <span className="font-semibold">₱{creditLeftAfter.toFixed(2)}</span>
                 </div>
                 {unpaidFee > 0.009 && (
-                  <div className="flex justify-between text-amber-700 dark:text-amber-300 font-semibold">
-                    <span>Added to Order Balance:</span>
-                    <span>₱{unpaidFee.toFixed(2)}</span>
-                  </div>
+                  <>
+                    <div className="flex justify-between text-amber-700 dark:text-amber-300 font-semibold">
+                      <span>Added to Order Balance:</span>
+                      <span>₱{unpaidFee.toFixed(2)}</span>
+                    </div>
+                    <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                      Ask the customer to send ₱{unpaidFee.toFixed(2)} by GCash before Verify Shipping. If it&apos;s
+                      still unpaid then, the courier collects it from the receiver.
+                    </p>
+                  </>
                 )}
               </div>
             </div>

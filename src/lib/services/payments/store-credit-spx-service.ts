@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { round2 } from './order-payment-rules';
+import { canAddSpxSf } from '@/lib/services/shipping/courier-cod';
 import { notifyOwners } from '@/lib/services/customer-returns/customer-return-service';
 import type { ApplySpxShippingFeeInput, ApplySpxShippingFeeResult } from '@/types/store-credit.types';
 import {
@@ -63,6 +64,16 @@ export async function applySpxShippingFeeFromStoreCredit(
   }
   if (!order.customer_id) {
     throw new StoreCreditError('Order does not have a linked customer', 400);
+  }
+  // Once the parcel is with the courier the waybill is done, and a second SF
+  // would charge the customer twice (2026-11-10).
+  if (!canAddSpxSf(order)) {
+    throw new StoreCreditError(
+      Number(order.shipping_fee || 0) > 0.009
+        ? `This order already has a shipping fee (₱${Number(order.shipping_fee).toFixed(2)}).`
+        : `This order is already ${order.status}; the SF can only be added before it ships.`,
+      409
+    );
   }
 
   // 2. Read Customer

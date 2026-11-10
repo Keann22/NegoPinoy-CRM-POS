@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, CheckCircle, Edit, FileText, Share2, Truck, Activity, CreditCard } from 'lucide-react';
 import { LogPaymentDialog } from '@/components/dashboard/log-payment-dialog';
 import { AddSpxSfDialog } from '@/components/dashboard/orders/AddSpxSfDialog';
+import { canAddSpxSf } from '@/lib/services/shipping/courier-cod';
 import { ShareReceiptDialog } from '@/components/dashboard/share-receipt-dialog';
 import { EditOrderDialog } from '@/components/dashboard/order-dialog';
 import { MarkShippedDialog } from '@/components/dashboard/mark-shipped-dialog';
@@ -162,7 +163,7 @@ export default function OrderDetailPage() {
                   <CreditCard className="mr-2 h-4 w-4" /> Log Payment
                 </Button>
               )}
-              {canEdit && order.orderStatus !== 'Cancelled' && (
+              {canEdit && canAddSpxSf({ status: order.orderStatus, shipping_fee: order.shipping_fee }) && (
                 <Button variant="outline" size="sm" onClick={() => setIsAddSpxSfOpen(true)}>
                   <Truck className="mr-2 h-4 w-4" /> Add SPX SF
                 </Button>
