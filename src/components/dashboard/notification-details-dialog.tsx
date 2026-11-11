@@ -16,6 +16,8 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { HeldPickerCountCard } from '@/components/dashboard/held-picker-count-card';
+import type { HeldPickerCount } from '@/types/inventory-guardian.types';
 
 type NotificationContext = {
   order: {
@@ -45,6 +47,7 @@ type NotificationContext = {
     messages: { senderName: string; senderRole: string | null; message: string; createdAt: string }[];
   } | null;
   pickerCount?: PickerCountFollowUp | null;
+  heldCount?: HeldPickerCount | null;
 };
 
 type PickerCountFollowUp = {
@@ -204,13 +207,13 @@ export function NotificationDetailsDialog({
 
   if (!notification) return null;
 
-  const { order, product, thread, pickerCount } = context || {};
+  const { order, product, thread, pickerCount, heldCount } = context || {};
   // The bell message is truncated to 140 chars + '...'; the thread carries the
   // full text, so prefer the latest thread message when we have it.
   const fullMessage =
     thread?.messages?.length ? thread.messages[thread.messages.length - 1].message : notification.message;
   const sourceLabel = SOURCE_LABELS[notification.source] || notification.source || 'Notification';
-  const hasContext = !!(order || product || pickerCount || (thread && thread.messages.length));
+  const hasContext = !!(order || product || pickerCount || heldCount || (thread && thread.messages.length));
   const rawLink = notification.link && notification.link !== '/dashboard' ? notification.link : null;
 
   return (
@@ -237,6 +240,7 @@ export function NotificationDetailsDialog({
         )}
 
         {pickerCount && <PickerCountDetails data={pickerCount} />}
+        {heldCount && <HeldPickerCountCard key={heldCount.id} initial={heldCount} />}
 
         {/* Product context (procurement / product notes) */}
         {product && (

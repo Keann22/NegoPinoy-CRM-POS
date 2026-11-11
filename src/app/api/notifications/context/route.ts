@@ -8,6 +8,12 @@ import {
   getPickerCountFollowUp,
   type PickerCountFollowUp,
 } from '@/lib/services/inventory/picker-count-followup-service';
+import {
+  getHeldPickerCount,
+  heldCountIdFromLink,
+  PICKER_COUNT_HELD_TITLE,
+} from '@/lib/services/inventory/held-picker-count-service';
+import type { HeldPickerCount } from '@/types/inventory-guardian.types';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,6 +65,8 @@ type NotificationContext = {
   thread: ThreadContext | null;
   /** "Picker found more than the system expected": what happened after the count (owners only). */
   pickerCount?: PickerCountFollowUp | null;
+  /** "Picker counted more: not added yet": the held count and the owners' choices (owners only). */
+  heldCount?: HeldPickerCount | null;
 };
 
 /**
@@ -287,6 +295,21 @@ export async function POST(req: Request) {
     const orderRef = extractOrderRef(notification);
     if (orderRef) {
       context.order = await loadOrderContext(orderRef);
+    }
+
+    // A picker's count higher than the shelf number, held for the owners.
+    if (notification.title === PICKER_COUNT_HELD_TITLE) {
+      const sessionClient = await createSessionClient();
+      const { data: { user } } = await sessionClient.auth.getUser();
+      const id = heldCountIdFromLink(notification.link);
+      if (user && isManagementUser(user) && id) {
+        const held = await getHeldPickerCount(supabase, id);
+        if (held) {
+          context.heldCount = held;
+          if (held.order) context.order = await loadOrderContext({ kind: 'id', value: held.order.id });
+        }
+      }
+      return NextResponse.json({ context });
     }
 
     // A picker's count that was higher than expected: what happened next.

@@ -9,6 +9,7 @@ import { createClient as createSessionClient } from '@/lib/supabase/server';
 import { insertLinkedMovement, editorFromUser } from '@/lib/services/receipt-correction-service';
 import { checkReceiptGate, logReceiptOverrides } from '@/lib/services/receipt-gate-service';
 import { getRecentPickerCounts } from '@/lib/services/inventory/picker-shelf-guard-service';
+import { getOpenHeldCounts } from '@/lib/services/inventory/held-picker-count-service';
 import { getReservations } from '@/lib/services/inventory/reservation-service';
 import { leafVariantsOf, splitLineOntoVariants } from '@/lib/services/variant-receive-service';
 
@@ -65,12 +66,14 @@ export async function GET() {
     const STAFF_REQUEST_SORT_KEY = '0000-00-00';
     // A picker count in the last 2 days may already include pieces from this delivery.
     const lineProductIds = Array.from(new Set(filteredItems.map((i: any) => i.product_id)));
-    const [pickerCounts, reservations, variantsOf] = await Promise.all([
+    const [pickerCounts, reservations, variantsOf, heldCounts] = await Promise.all([
       getRecentPickerCounts(supabase, lineProductIds),
       // Pieces sales reserved for a replacement: staff tag them and set them aside.
       getReservations(supabase, { productIds: lineProductIds as string[] }),
       // Bought as the main product: staff count each variant (TM1, TM2...).
       leafVariantsOf(supabase, lineProductIds as string[]),
+      // A picker found pieces the system didn't have (held, not added): they're waiting for this delivery.
+      getOpenHeldCounts(supabase, lineProductIds as string[]),
     ]);
 
     const mapped = filteredItems.map((i: any) => {
@@ -102,6 +105,7 @@ export async function GET() {
         shipping: shippingFor(i.purchase_orders),
         pickerCount: pickerCounts.get(i.product_id) || null,
         reservedFor: reservations.get(i.product_id) || null,
+        heldCount: heldCounts.get(i.product_id) || null,
         variants: variantsOf.get(i.product_id) || null,
       };
     });

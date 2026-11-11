@@ -1,6 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { bundleQtyPerUnit, getUnpickedQtyForProduct, PICKED_WITH_ISSUE, unallocatedFromStockLevel } from './shelf-stock-service';
 import { applyPhysicalShelfCount } from './inventory-guardian-action-service';
+import { holdPickerCount } from './held-picker-count-service';
 import type { PickerShelfInfo, WaitingOrder } from '@/types/inventory-guardian.types';
 
 /*
@@ -9,6 +10,8 @@ import type { PickerShelfInfo, WaitingOrder } from '@/types/inventory-guardian.t
  *
  *   - A picker can't tap Found for more than unallocated stock without counting
  *     the Unit 1 shelf; the count is saved like a Guardian count.
+ *   - A count HIGHER than the shelf number isn't added: it is held for the owners
+ *     (record the purchase or approve it). Owner 2026-11-12.
  *   - A picker can't borrow while unallocated stock is above 0 until they
  *     confirm Unit 1 and Unit 2 are both empty (saved as a count of 0).
  *
@@ -166,8 +169,8 @@ async function zeroUnit2(supabase: SupabaseClient, productId: string, why: strin
  */
 export async function savePickerShelfCount(
   supabase: SupabaseClient,
-  input: { productId: string; unit1Count?: number; bothEmpty?: boolean; unit2Empty?: boolean; orderId?: string | null; actorName: string }
-): Promise<{ before: number; after: number }> {
+  input: { productId: string; unit1Count?: number; bothEmpty?: boolean; unit2Empty?: boolean; orderId?: string | null; actorName: string; isManagement?: boolean }
+): Promise<{ before: number; after: number; held: number }> {
   const { productId, actorName } = input;
   const orderTag = input.orderId ? ` #${input.orderId.slice(0, 8).toUpperCase()}` : '';
   const before = (await getShelfForProducts(supabase, [productId]))[productId];
@@ -175,16 +178,18 @@ export async function savePickerShelfCount(
 
   let total: number;
   let note: string;
+  let unit2Why: string | null = null;
+  let n: number | null = null;
   if (input.bothEmpty) {
-    await zeroUnit2(supabase, productId, `Picker checked Unit 2 before borrowing${orderTag}`, actorName);
+    unit2Why = `Picker checked Unit 2 before borrowing${orderTag}`;
     total = 0;
     note = `Picker checked Unit 1 and Unit 2 before borrowing${orderTag}: both empty.`;
   } else {
-    const n = Math.round(Number(input.unit1Count));
+    n = Math.round(Number(input.unit1Count));
     if (!(n >= 0) || n > 100000) throw new Error('Enter how many are on the shelf.');
     if (input.unit2Empty) {
       // Tapped OS: the system said there should be some, the picker looked in both units.
-      await zeroUnit2(supabase, productId, `Picker checked Unit 2 after tapping OS${orderTag}`, actorName);
+      unit2Why = `Picker checked Unit 2 after tapping OS${orderTag}`;
       total = n;
       note = `Counted by picker ${actorName} while picking${orderTag} (tapped OS): Unit 1 ${n}, Unit 2 empty${before.unit2 ? ` (was ${before.unit2})` : ''}.`;
     } else {
@@ -192,6 +197,18 @@ export async function savePickerShelfCount(
       note = `Counted by picker ${actorName} while picking${orderTag}: Unit 1 ${n}${before.unit2 ? ` + Unit 2 ${before.unit2} (kept)` : ''}.`;
     }
   }
+
+  // More than the shelf number: the extra is held for the owners, not added
+  // (owner 2026-11-12, held-picker-count-service.ts). Owners' own counts go through.
+  if (total > before.unallocated && !input.isManagement) {
+    await holdPickerCount(supabase, {
+      productId, counted: total, systemHad: before.unallocated, unit1Count: n,
+      unit2Empty: !!input.unit2Empty, orderId: input.orderId || null, actorName, note,
+    });
+    return { before: before.unallocated, after: before.unallocated, held: total - before.unallocated };
+  }
+
+  if (unit2Why) await zeroUnit2(supabase, productId, unit2Why, actorName);
   await applyPhysicalShelfCount(supabase, { productId, physicalShelfCount: total, notes: note, actorName });
 
   if (total > before.unallocated) {
@@ -199,7 +216,7 @@ export async function savePickerShelfCount(
     await notifyOwners(supabase, 'Picker found more than the system expected',
       `${p?.name || 'An item'}: ${actorName} counted ${total} while picking${orderTag}; the system expected ${before.unallocated}. A purchase may not be recorded.`);
   }
-  return { before: before.unallocated, after: total };
+  return { before: before.unallocated, after: total, held: 0 };
 }
 
 /** Order statuses a picker still picks for (a lay-away still being paid isn't picked yet). */

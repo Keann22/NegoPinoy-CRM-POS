@@ -106,7 +106,8 @@ export function OsShelfCheck({ prompt, saving, onSave, onFindOrders, onGiveAway,
           <Label htmlFor="os-count" className="font-semibold">Found some, or none? Count them</Label>
           <p className="text-xs text-muted-foreground">
             How many did you find in total? Count the ones in your hand, on the Unit 1 shelf, in nearby bins and in Unit 2.
-            Type 0 if there are none. This fixes the system&apos;s number.
+            Type 0 if there are none. This fixes the system&apos;s number (if you find more than the system has, the extra
+            waits for the owners to record the purchase).
           </p>
           {needsUnit2 && (
             <label className="flex items-start gap-2 rounded-md bg-blue-50 p-2 text-xs text-blue-950">

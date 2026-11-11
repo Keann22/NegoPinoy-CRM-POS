@@ -88,8 +88,16 @@ Receipts:
   - Or say it came from a **delivery that isn't recorded yet**: blocked, mark OS,
     note it on Receiving and message the owners (receipt-first).
   - Or **check again**: it may be the wrong variant.
-- A count higher than the system expected usually means a purchase wasn't
-  recorded: the owners get a bell notification to check Purchases & Receipts.
+- **A count higher than the system is held, not added (owner, 2026-11-12).**
+  Extra pieces usually mean a purchase wasn't recorded. Found 2026-11-11: Jas
+  counted 1 Acacia Wood Chopping Board 33×20 (never bought in the system) and the
+  count added it; in 30 days, 30 of 74 picker counts added 132 pieces this way.
+  Now the extra isn't added: the line goes OS for it, the picker sets the pieces
+  aside, and the owners get a bell ("Picker counted more: not added yet") with
+  **Record purchase / Snap receipt** (Receiving then counts it in and the order is
+  picked), **the system was wrong: add N** (added to what's on the shelf now), or
+  **ignore** (wrong item). Receiving shows the held pieces on the matching line.
+  Only picker counts; owners' own counts and Guardian/Pabilang counts still save.
 - **Don't count a delivery twice** (found 2026-10-31: 4 of the first 5 picker
   counts included goods from that day's buying trip, which Receiving then added
   again). The count asks pickers to leave out anything not received yet, and

@@ -82,6 +82,7 @@ export async function POST(req: Request) {
       unit2Empty: !!body.unit2Empty,
       orderId: body.orderId || null,
       actorName: caller.name,
+      isManagement: caller.isManagement,
     });
     return NextResponse.json(result);
   } catch (e) {

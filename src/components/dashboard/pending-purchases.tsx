@@ -170,6 +170,13 @@ export function PendingPurchases({ onReceiveComplete, refreshKey = 0 }: { onRece
                                       If pieces from this delivery were already on the shelf then, receive only the rest.
                                   </div>
                               )}
+                              {item.heldCount && (
+                                  <div className="mt-1 rounded-md border border-sky-300 bg-sky-50 px-2 py-1 text-[11px] font-medium text-sky-900">
+                                      {item.heldCount.byName} found {item.heldCount.extra} more than the system had while picking
+                                      {item.heldCount.orderId ? ` #${String(item.heldCount.orderId).slice(0, 8).toUpperCase()}` : ''} (not added to stock).
+                                      If they came from this delivery, count them in here; then the order can be picked.
+                                  </div>
+                              )}
                               {item.reservedFor && (
                                   <div className="mt-1 rounded-md border border-violet-300 bg-violet-50 px-2 py-1 text-[11px] font-medium text-violet-900">
                                       🔒 {item.reservedFor.qty} pc{item.reservedFor.qty === 1 ? ' is' : 's are'} reserved for a replacement:{' '}

@@ -25,8 +25,12 @@ export type ShelfPrompt =
   | { kind: 'borrow'; rowKey: string; productId: string; productName: string; available: number; unit2: number }
   | { kind: 'reserved'; rowKey: string; productId: string; productName: string; needed: number; free: number; orders: ReservedOrder[] };
 
-/** What a saved count led to (for the picker's message). */
-export type CountOutcome = 'found' | 'os' | 'reserved';
+/**
+ * What a saved count led to (for the picker's message). 'held': the count was
+ * higher than the shelf number, so the extra waits for the owners (not added) and
+ * the rest is OS. Owner 2026-11-12.
+ */
+export type CountOutcome = 'found' | 'os' | 'reserved' | 'held';
 
 interface Marks {
   markFound: (rowKey: string) => void;
@@ -120,7 +124,7 @@ export function useShelfGuard(orderId: string | null, rows: PickRow[], marks: Ma
     const res = await fetch('/api/picker/shelf', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, orderId }) });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(json.error || 'Could not save the count');
-    return json as { before: number; after: number };
+    return json as { before: number; after: number; held?: number };
   };
 
   /**
@@ -131,7 +135,7 @@ export function useShelfGuard(orderId: string | null, rows: PickRow[], marks: Ma
     if (prompt?.kind !== 'count' && prompt?.kind !== 'os') return;
     const { rowKey, needed } = prompt;
     const row = rows.find((r) => r.key === rowKey);
-    const { after } = await post({ productId: prompt.productId, unit1Count, unit2Empty: !!opts.unit2Empty });
+    const { after, held } = await post({ productId: prompt.productId, unit1Count, unit2Empty: !!opts.unit2Empty });
     const usable = Math.max(0, after - reservedQty(prompt.productId));
     if (usable >= needed) {
       marks.markFound(rowKey);
@@ -150,7 +154,7 @@ export function useShelfGuard(orderId: string | null, rows: PickRow[], marks: Ma
     }
     setPrompt(null);
     await load();
-    return 'os';
+    return held ? 'held' : 'os';
   };
 
   /** Leave the reserved pieces: the line is OS for what the free pieces don't cover. */

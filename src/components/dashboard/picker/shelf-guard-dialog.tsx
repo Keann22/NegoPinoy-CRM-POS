@@ -24,6 +24,14 @@ interface Props {
   onClose: () => void;
 }
 
+/** The count was higher than the shelf number: the extra waits for the owners (owner 2026-11-12). */
+const HELD_TOAST = {
+  title: 'Sent to the owners: not added yet',
+  description: "You counted more than the system has. The extra pieces can't be picked until the owners record the purchase. "
+    + 'Marked OS: set the pieces aside with the order number and message the owners.',
+  duration: 15000,
+};
+
 /**
  * Asked when a picker taps Found for more than the shelf has, OS while the
  * shelf should still have some, or Borrow while the shelf still has stock.
@@ -56,6 +64,7 @@ export function ShelfGuardDialog({ prompt, onCount, onNotReceived, onBothEmpty, 
     if (count.trim() === '' || !(n >= 0)) throw new Error('Type how many you counted.');
     const outcome = await onCount(n);
     if (outcome === 'reserved') return; // the "reserved for a replacement" dialog takes over
+    if (outcome === 'held') return toast(HELD_TOAST);
     toast({
       title: 'Count saved',
       description: outcome === 'found' ? 'Marked Found.' : 'Not enough on the shelf: the rest is marked OS.',
@@ -67,6 +76,7 @@ export function ShelfGuardDialog({ prompt, onCount, onNotReceived, onBothEmpty, 
     const needed = prompt?.kind === 'os' ? prompt.needed : 0;
     const outcome = await onCount(n, { unit2Empty: true });
     if (outcome === 'reserved') return;
+    if (outcome === 'held') return toast(HELD_TOAST);
     toast({
       title: 'Count saved',
       description: outcome === 'found' ? 'You counted enough for this order: take it from the shelf. Marked Found.'
@@ -110,6 +120,7 @@ export function ShelfGuardDialog({ prompt, onCount, onNotReceived, onBothEmpty, 
                 <Label htmlFor="sg-count" className="font-semibold">It&apos;s on the shelf: count it</Label>
                 <p className="text-xs text-muted-foreground">
                   How many are on the Unit 1 shelf now, including the ones in your hand? Leave out anything from a delivery that isn&apos;t received yet.
+                  If you count more than the system has, the extra isn&apos;t added until the owners record the purchase.
                   {prompt.unit2 > 0 && ` Unit 2 reserve is recorded with ${prompt.unit2}: check there too, but leave those out of this count.`}
                 </p>
                 <div className="flex gap-2">

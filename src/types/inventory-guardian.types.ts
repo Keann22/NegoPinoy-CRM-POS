@@ -205,3 +205,36 @@ export interface RecountPageRow extends RecountRequest {
   doneAt: string | null;
   dueDate: string | null;
 }
+
+/**
+ * A picker count higher than the shelf number, held for the owners instead of
+ * added (owner 2026-11-12). No supplier or cost.
+ */
+export type HeldCountStatus = 'open' | 'purchase_recorded' | 'approved' | 'dismissed';
+
+export interface HeldPickerCount {
+  id: string;
+  productId: string;
+  productName: string;
+  pickerName: string;
+  counted: number;
+  systemHad: number;
+  extra: number;
+  countedAt: string;
+  status: HeldCountStatus;
+  resolvedBy: string | null;
+  resolvedAt: string | null;
+  order: { id: string; shortId: string; status: string } | null;
+  /** Purchases of this product recorded after the count. */
+  purchasesSince: { at: string; qty: number; received: number }[];
+  shelfNow: number | null;
+}
+
+/** An open held count, shown on the matching Receiving line. */
+export interface OpenHeldCount {
+  id: string;
+  at: string;
+  extra: number;
+  byName: string;
+  orderId: string | null;
+}
