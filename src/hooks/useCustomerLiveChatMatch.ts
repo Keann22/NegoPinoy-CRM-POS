@@ -3,6 +3,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSupabase } from '@/lib/supabase/hooks';
 import { useToast } from '@/hooks/use-toast';
+import {
+  chatLinkErrorMessage,
+  dismissChatMatch,
+  linkChatToCustomerWithConfirm,
+  unlinkChatFromCustomer,
+} from '@/lib/services/chat-link-service';
 import type { ConversationLog, MatchedChatCandidate } from '@/types';
 
 interface UseCustomerLiveChatMatchProps {
@@ -11,11 +17,6 @@ interface UseCustomerLiveChatMatchProps {
   mobileNumber?: string | null;
   psid?: string | null;
   onLinked?: (psid: string) => void;
-}
-
-function isDismissedPair(psid: string, customerId: string): boolean {
-  if (typeof window === 'undefined') return false;
-  return localStorage.getItem(`negopinoy_dismiss_match_${psid}_${customerId}`) === '1';
 }
 
 export function useCustomerLiveChatMatch({
@@ -35,10 +36,38 @@ export function useCustomerLiveChatMatch({
   const [connectingPsid, setConnectingPsid] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<MatchedChatCandidate[]>([]);
   const [isSearchingChats, setIsSearchingChats] = useState(false);
+  // Phone on file, read from the database (callers like the order form don't always pass it)
+  const [dbMobile, setDbMobile] = useState<string | null>(null);
+  const [linkReady, setLinkReady] = useState(false);
 
+  // The customer's real Messenger link comes from the database, not from props:
+  // the order form passes a customer object without psid, which used to make a
+  // linked customer look unlinked and offer to connect another chat.
   useEffect(() => {
     setLinkedPsid(psid || null);
-  }, [psid, customerId]);
+    setDbMobile(null);
+    setLinkReady(false);
+    if (!supabase || !customerId) return;
+    let isCancelled = false;
+    supabase
+      .from('customers')
+      .select('psid, mobile_number')
+      .eq('id', customerId)
+      .maybeSingle()
+      .then(({ data }: { data: { psid: string | null; mobile_number: string | null } | null }) => {
+        if (isCancelled) return;
+        if (data) {
+          setLinkedPsid(data.psid || null);
+          setDbMobile(data.mobile_number || null);
+        }
+        setLinkReady(true);
+      });
+    return () => {
+      isCancelled = true;
+    };
+  }, [supabase, psid, customerId]);
+
+  const phoneForMatch = mobileNumber || dbMobile;
 
   // If customer already has a linked PSID, fetch their recent Messenger conversation preview
   useEffect(() => {
@@ -69,7 +98,7 @@ export function useCustomerLiveChatMatch({
 
   // If customer does NOT have a linked PSID yet, check Live Chat for matching customer names/phones
   useEffect(() => {
-    if (!supabase || !customerId || linkedPsid || (!fullName && !mobileNumber)) {
+    if (!supabase || !customerId || !linkReady || linkedPsid || (!fullName && !phoneForMatch)) {
       setChatMatches([]);
       return;
     }
@@ -82,16 +111,14 @@ export function useCustomerLiveChatMatch({
         const { data, error } = await supabase.rpc('find_matching_chats_for_customer', {
           p_customer_id: customerId,
           p_name: fullName || null,
-          p_phone: mobileNumber || null,
+          p_phone: phoneForMatch || null,
         });
 
         if (error) throw error;
 
+        // "Not the same person" pairs are already left out by the database
         if (!isCancelled && Array.isArray(data)) {
-          const filtered = (data as MatchedChatCandidate[]).filter(
-            (m) => !isDismissedPair(m.psid, customerId)
-          );
-          setChatMatches(filtered);
+          setChatMatches(data as MatchedChatCandidate[]);
         }
       } catch (err) {
         console.error('Failed to check Live Chat matches for customer:', err);
@@ -104,19 +131,17 @@ export function useCustomerLiveChatMatch({
     return () => {
       isCancelled = true;
     };
-  }, [supabase, customerId, linkedPsid, fullName, mobileNumber]);
+  }, [supabase, customerId, linkReady, linkedPsid, fullName, phoneForMatch]);
 
   const connectChatPsid = useCallback(
     async (targetPsid: string) => {
       if (!supabase || !customerId || !targetPsid) return false;
       setConnectingPsid(targetPsid);
       try {
-        const { error } = await supabase.rpc('link_chat_psid_to_customer', {
-          p_psid: targetPsid,
-          p_customer_id: customerId,
-        });
-
-        if (error) throw error;
+        const result = await linkChatToCustomerWithConfirm(supabase, targetPsid, customerId, fullName ?? null);
+        if (result.status !== 'linked') {
+          throw new Error(chatLinkErrorMessage(result) || 'Failed to connect Live Chat.');
+        }
 
         setLinkedPsid(targetPsid);
         setChatMatches([]);
@@ -143,14 +168,46 @@ export function useCustomerLiveChatMatch({
 
   const dismissMatch = useCallback(
     (targetPsid: string) => {
-      if (!customerId) return;
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(`negopinoy_dismiss_match_${targetPsid}_${customerId}`, '1');
-      }
+      if (!customerId || !supabase) return;
       setChatMatches((prev) => prev.filter((m) => m.psid !== targetPsid));
+      dismissChatMatch(supabase, targetPsid, customerId).catch((err) => {
+        console.error('Failed to save "not the same person":', err);
+      });
     },
-    [customerId]
+    [customerId, supabase]
   );
+
+  const disconnectChat = useCallback(async () => {
+    if (!supabase || !customerId || !linkedPsid) return false;
+    if (
+      typeof window !== 'undefined' &&
+      !window.confirm(
+        `Disconnect the Messenger chat from ${fullName || 'this customer'}?
+
+Anything the link moved goes back to the chat's own record.`
+      )
+    ) {
+      return false;
+    }
+    setConnectingPsid(linkedPsid);
+    try {
+      const result = await unlinkChatFromCustomer(supabase, customerId);
+      if (!result.ok) throw new Error(result.message);
+      setLinkedPsid(null);
+      setRecentMessages([]);
+      toast({ title: 'Chat disconnected', description: 'The Messenger chat is no longer linked to this account.' });
+      return true;
+    } catch (err: unknown) {
+      toast({
+        variant: 'destructive',
+        title: 'Disconnect failed',
+        description: err instanceof Error ? err.message : 'Could not disconnect the chat.',
+      });
+      return false;
+    } finally {
+      setConnectingPsid(null);
+    }
+  }, [supabase, customerId, linkedPsid, fullName, toast]);
 
   const searchLiveChats = useCallback(
     async (query: string) => {
@@ -163,8 +220,9 @@ export function useCustomerLiveChatMatch({
         const q = query.trim();
         const { data } = await supabase
           .from('customers')
-          .select('id, psid, full_name, mobile_number, location_city')
+          .select('id, psid, full_name, mobile_number, location_city, store_credit, orders(count)')
           .not('psid', 'is', null)
+          .neq('id', customerId || '00000000-0000-0000-0000-000000000000')
           .ilike('full_name', `%${q}%`)
           .limit(8);
 
@@ -177,6 +235,8 @@ export function useCustomerLiveChatMatch({
             mobile_number: (row.mobile_number as string) || null,
             location_city: (row.location_city as string) || null,
             match_type: 'manual',
+            chat_order_count: Number((row.orders as { count?: number }[] | undefined)?.[0]?.count ?? 0),
+            chat_store_credit: Number(row.store_credit ?? 0),
           }));
 
         setSearchResults(list);
@@ -186,7 +246,7 @@ export function useCustomerLiveChatMatch({
         setIsSearchingChats(false);
       }
     },
-    [supabase]
+    [supabase, customerId]
   );
 
   return {
@@ -197,6 +257,7 @@ export function useCustomerLiveChatMatch({
     connectingPsid,
     connectChatPsid,
     dismissMatch,
+    disconnectChat,
     searchResults,
     isSearchingChats,
     searchLiveChats,

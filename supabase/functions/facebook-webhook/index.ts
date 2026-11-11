@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { syncRecentConversations, autoLinkChatCustomerIfExactMatch } from "./sync.ts";
+import { syncRecentConversations, autoLinkChatCustomerIfExactMatch, fillMissingCustomerDetails } from "./sync.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -97,7 +97,7 @@ Deno.serve(async (req: Request) => {
         }
 
         if (body.action === "sync_messages") {
-          const syncResult = await syncRecentConversations(supabase, pageToken);
+          const syncResult = await syncRecentConversations(supabase, pageToken, body.psid);
           return new Response(JSON.stringify({ success: true, ...syncResult }), {
             status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -418,11 +418,12 @@ async function extractAndUpdateCRM(psid: string, message: string) {
     if (message.toLowerCase().includes(city.toLowerCase())) { updates.location_city = city; break; }
   }
 
-  if (Object.keys(updates).length > 0) {
-    console.log(`Applying CRM auto-updates for PSID ${psid}:`, JSON.stringify(updates));
-    await supabase.from("customers").update(updates).eq("psid", psid).throwOnError();
-    if (updates.mobile_number) {
-      await autoLinkChatCustomerIfExactMatch(supabase, psid, null, updates.mobile_number);
-    }
+  // Only fills empty fields: a number typed in chat may be the receiver's (OFWs)
+  const applied = await fillMissingCustomerDetails(supabase, psid, updates);
+  if (Object.keys(applied).length > 0) {
+    console.log(`Applied CRM auto-updates for PSID ${psid}:`, JSON.stringify(applied));
+  }
+  if (applied.mobile_number) {
+    await autoLinkChatCustomerIfExactMatch(supabase, psid, null, applied.mobile_number);
   }
 }

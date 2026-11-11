@@ -14,6 +14,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { CalendarIcon, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { LiveChatMatchCard } from '@/components/dashboard/customers/LiveChatMatchCard';
 
 interface OrderLeftPanelProps {
   control: Control<OrderFormValues>;
@@ -59,9 +60,18 @@ export function OrderLeftPanel({
           <FormItem className="flex flex-col">
             <FormLabel>Customer</FormLabel>
             {selectedCustomer ? (
-              <div className="flex items-center justify-between rounded-md border border-input bg-background p-2 text-sm h-10">
-                <p>{selectedCustomer.firstName} {selectedCustomer.lastName}</p>
-                <Button type="button" variant="ghost" size="sm" onClick={onClearCustomer}>Change</Button>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between rounded-md border border-input bg-background p-2 text-sm h-10">
+                  <p>{selectedCustomer.firstName} {selectedCustomer.lastName}</p>
+                  <Button type="button" variant="ghost" size="sm" onClick={onClearCustomer}>Change</Button>
+                </div>
+                <LiveChatMatchCard
+                  customerId={selectedCustomer.id}
+                  fullName={`${selectedCustomer.firstName || ''} ${selectedCustomer.lastName || ''}`.trim()}
+                  mobileNumber={(selectedCustomer as unknown as Record<string, string | null>).mobile_number}
+                  psid={(selectedCustomer as unknown as Record<string, string | null>).psid}
+                  mode="compact"
+                />
               </div>
             ) : (
               <Command className="rounded-lg border h-auto" shouldFilter={false}>

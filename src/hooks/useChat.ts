@@ -55,8 +55,12 @@ export function useChat(initialPsid?: string | null) {
     if (!supabase) return;
     let isCancelled = false;
 
+    // Backstop only: new messages arrive in real time through the webhook + realtime
+    // channel. Polling Facebook every few seconds from every open tab risked
+    // rate-limiting the page token (which would also block replies).
     const runSync = async () => {
       if (isSyncInFlight) return;
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       isSyncInFlight = true;
       try {
         const { data } = await supabase.functions.invoke('facebook-webhook', {
@@ -73,7 +77,7 @@ export function useChat(initialPsid?: string | null) {
     };
 
     runSync();
-    const interval = setInterval(runSync, 4000);
+    const interval = setInterval(runSync, 30000);
     return () => {
       isCancelled = true;
       clearInterval(interval);

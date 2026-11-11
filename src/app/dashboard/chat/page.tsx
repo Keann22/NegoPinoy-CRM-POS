@@ -36,6 +36,7 @@ function ChatHistoryContent() {
     saveCustomerNotes,
     updateCustomer,
     linkToCustomerAccount,
+    unlinkAccount,
     dismissCandidate,
     reloadDossier,
     sendReply,
@@ -125,6 +126,7 @@ function ChatHistoryContent() {
           onSaveNotes={saveCustomerNotes}
           onUpdateCustomer={updateCustomer}
           onLinkToCustomerAccount={linkToCustomerAccount}
+          onUnlinkAccount={unlinkAccount}
           onDismissCandidate={dismissCandidate}
           onReloadDossier={reloadDossier}
         />

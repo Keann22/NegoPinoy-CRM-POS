@@ -3,6 +3,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSupabase } from '@/lib/supabase/hooks';
 import { useToast } from '@/hooks/use-toast';
+import {
+  chatLinkErrorMessage,
+  dismissChatMatch,
+  isAutoLinkSafe,
+  linkChatToCustomer,
+  linkChatToCustomerWithConfirm,
+  unlinkChatFromCustomer,
+} from '@/lib/services/chat-link-service';
 import type {
   CustomerDossier,
   CustomerOrderSummary,
@@ -13,11 +21,6 @@ interface UseChatCustomerDossierProps {
   selectedPsid: string | null;
   threadName?: string | null;
   onLogsRefresh: (silent?: boolean) => Promise<void>;
-}
-
-function isDismissedPair(psid: string, customerId: string): boolean {
-  if (typeof window === 'undefined') return false;
-  return localStorage.getItem(`negopinoy_dismiss_match_${psid}_${customerId}`) === '1';
 }
 
 export function useChatCustomerDossier({
@@ -101,27 +104,21 @@ export function useChatCustomerDossier({
           });
 
           if (!isCancelled && Array.isArray(matches) && matches.length > 0) {
-            const typedMatches = (matches as MatchedCustomerCandidate[]).filter(
-              (m) => !isDismissedPair(selectedPsid, m.id)
-            );
+            // "Not the same person" pairs are already left out by the database
+            const typedMatches = matches as MatchedCustomerCandidate[];
 
-            const exactUnlinked = typedMatches.filter(
-              (m) => m.match_type === 'exact' && !m.psid
-            );
+            // Auto-link only when phone AND name agree, and only one account does.
+            // Name-only or phone-only matches are shown for staff to confirm.
+            const safeMatches = typedMatches.filter((m) => !m.psid && isAutoLinkSafe(m));
 
-            // Auto-attach PSID when there is a single unambiguous exact match on file
-            if (exactUnlinked.length === 1) {
-              const target = exactUnlinked[0];
-              const { data: mergedCust, error: mergeErr } = await supabase.rpc(
-                'link_chat_psid_to_customer',
-                {
-                  p_psid: selectedPsid,
-                  p_customer_id: target.id,
-                }
-              );
+            if (safeMatches.length === 1) {
+              const target = safeMatches[0];
+              const linked = await linkChatToCustomer(supabase, selectedPsid, target.id, {
+                method: 'auto_phone_name',
+              });
 
-              if (!mergeErr && mergedCust && !isCancelled) {
-                cust = mergedCust as CustomerDossier;
+              if (linked.status === 'linked' && !isCancelled) {
+                cust = linked.customer as unknown as CustomerDossier;
                 ordersList = cust.id ? await fetchOrdersForCustomer(cust.id) : [];
                 setMatchedCandidates(
                   typedMatches.filter((m) => m.id !== target.id)
@@ -163,16 +160,15 @@ export function useChatCustomerDossier({
       if (!selectedPsid || !supabase) return false;
       setLinkingAccount(true);
       try {
-        const { data: merged, error } = await supabase.rpc('link_chat_psid_to_customer', {
-          p_psid: selectedPsid,
-          p_customer_id: customerId,
-        });
-
-        if (error) throw error;
+        const targetName = matchedCandidates.find((c) => c.id === customerId)?.full_name ?? null;
+        const result = await linkChatToCustomerWithConfirm(supabase, selectedPsid, customerId, targetName);
+        const failure = chatLinkErrorMessage(result);
+        if (result.status !== 'linked') throw new Error(failure || 'Could not link customer account.');
+        const merged = result.customer as unknown as CustomerDossier;
 
         toast({
           title: 'Customer Account Connected',
-          description: `Live chat is now linked to ${(merged as CustomerDossier)?.full_name || 'the customer account'}.`,
+          description: `Live chat is now linked to ${merged?.full_name || 'the customer account'}.`,
         });
 
         setMatchedCandidates((prev) => prev.filter((c) => c.id !== customerId));
@@ -192,18 +188,49 @@ export function useChatCustomerDossier({
         setLinkingAccount(false);
       }
     },
-    [selectedPsid, supabase, toast, reloadDossier, onLogsRefresh]
+    [selectedPsid, supabase, toast, reloadDossier, onLogsRefresh, matchedCandidates]
   );
+
+  const unlinkAccount = useCallback(async () => {
+    if (!supabase || !customerDetail?.id) return false;
+    const name = customerDetail.full_name || 'this account';
+    if (
+      typeof window !== 'undefined' &&
+      !window.confirm(`Disconnect this Messenger chat from ${name}?
+
+Anything the link moved goes back to the chat's own record.`)
+    ) {
+      return false;
+    }
+    setLinkingAccount(true);
+    try {
+      const result = await unlinkChatFromCustomer(supabase, customerDetail.id);
+      if (!result.ok) throw new Error(result.message);
+      toast({ title: 'Chat disconnected', description: `Messenger chat is no longer linked to ${name}.` });
+      reloadDossier();
+      await onLogsRefresh(true);
+      return true;
+    } catch (err: unknown) {
+      toast({
+        variant: 'destructive',
+        title: 'Disconnect failed',
+        description: err instanceof Error ? err.message : 'Could not disconnect the chat.',
+      });
+      return false;
+    } finally {
+      setLinkingAccount(false);
+    }
+  }, [supabase, customerDetail?.id, customerDetail?.full_name, toast, reloadDossier, onLogsRefresh]);
 
   const dismissCandidate = useCallback(
     (customerId: string) => {
-      if (!selectedPsid) return;
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(`negopinoy_dismiss_match_${selectedPsid}_${customerId}`, '1');
-      }
+      if (!selectedPsid || !supabase) return;
       setMatchedCandidates((prev) => prev.filter((c) => c.id !== customerId));
+      dismissChatMatch(supabase, selectedPsid, customerId).catch((err) => {
+        console.error('Failed to save "not the same person":', err);
+      });
     },
-    [selectedPsid]
+    [selectedPsid, supabase]
   );
 
   const saveCustomerNotes = useCallback(
@@ -271,6 +298,7 @@ export function useChatCustomerDossier({
     saveCustomerNotes,
     updateCustomer,
     linkToCustomerAccount,
+    unlinkAccount,
     dismissCandidate,
     reloadDossier,
   };

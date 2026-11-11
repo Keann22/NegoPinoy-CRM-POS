@@ -2,6 +2,13 @@ import { SupabaseClient } from "jsr:@supabase/supabase-js@2";
 
 const PAGE_ID = "101058226004061";
 
+/**
+ * Connect a Messenger contact to a customer account automatically ONLY when the
+ * phone number AND the name both agree with exactly one account that has no chat
+ * yet, and the Messenger record has no orders / store credit of its own.
+ * Everything less certain is left for staff to confirm in Live Chat.
+ * Pairs staff marked "not the same person" are excluded by the database.
+ */
 export async function autoLinkChatCustomerIfExactMatch(
   supabase: SupabaseClient,
   psid: string,
@@ -11,18 +18,24 @@ export async function autoLinkChatCustomerIfExactMatch(
   try {
     const { data: currentCust } = await supabase
       .from("customers")
-      .select("id, address_line, city, mobile_number, full_name")
+      .select("id, address_line, city, mobile_number, full_name, store_credit, orders(count)")
       .eq("psid", psid)
       .maybeSingle();
 
-    // Already linked to a complete POS customer account
-    if (currentCust?.address_line || currentCust?.city) {
+    // Already a real account (address, orders or credit): never merge it automatically
+    const orderCount = Number((currentCust as any)?.orders?.[0]?.count ?? 0);
+    if (
+      currentCust?.address_line || currentCust?.city || orderCount > 0 ||
+      Math.abs(Number(currentCust?.store_credit ?? 0)) > 0.009
+    ) {
       return;
     }
 
     const nameToMatch = fullName || currentCust?.full_name || null;
     const phoneToMatch = mobileNumber || currentCust?.mobile_number || null;
-    if (!nameToMatch && !phoneToMatch) return;
+    // Both are needed: a name alone (common names) or a phone alone (OFWs send the
+    // receiver's number) is not enough to merge without asking.
+    if (!nameToMatch || !phoneToMatch || nameToMatch.startsWith("Customer-")) return;
 
     const { data: matches } = await supabase.rpc("find_matching_customers_for_chat", {
       p_psid: psid,
@@ -32,24 +45,89 @@ export async function autoLinkChatCustomerIfExactMatch(
 
     if (!matches || !Array.isArray(matches)) return;
 
-    const exactUnlinkedMatches = matches.filter(
-      (m: any) => m.match_type === "exact" && !m.psid
+    const safe = matches.filter(
+      (m: any) => !m.psid && m.phone_match === true && (m.name_match === "exact" || m.name_match === "similar")
     );
 
-    // Auto-merge only when there is a single unambiguous exact match on file
-    if (exactUnlinkedMatches.length === 1) {
-      await supabase.rpc("link_chat_psid_to_customer", {
+    if (safe.length === 1) {
+      const { error } = await supabase.rpc("link_chat_psid_to_customer", {
         p_psid: psid,
-        p_customer_id: exactUnlinkedMatches[0].id,
+        p_customer_id: safe[0].id,
+        p_merge_accounts: false,
+        p_method: "auto_phone_name",
       });
+      if (error) console.warn("Auto-link skipped:", error.message);
     }
   } catch (err) {
     console.warn("Non-fatal autoLinkChatCustomerIfExactMatch warning:", err);
   }
 }
 
-export async function syncRecentConversations(supabase: SupabaseClient, pageToken: string) {
-  const url = `https://graph.facebook.com/v19.0/me/conversations?fields=participants,messages.limit(6){message,from,created_time,id}&limit=8&access_token=${encodeURIComponent(pageToken)}`;
+/**
+ * Make sure a customers row exists for this PSID. The Facebook name only fills an
+ * empty or placeholder name: once a chat is linked to an account, the account's
+ * real name (used on shipping labels) must not be replaced by the Facebook name.
+ */
+export async function ensureChatCustomer(supabase: SupabaseClient, psid: string, fullName: string | null) {
+  const { data: existing } = await supabase
+    .from("customers")
+    .select("id, full_name")
+    .eq("psid", psid)
+    .maybeSingle();
+
+  if (!existing) {
+    await supabase
+      .from("customers")
+      .upsert(fullName ? { psid, full_name: fullName } : { psid }, { onConflict: "psid", ignoreDuplicates: true });
+    return;
+  }
+  const current = (existing.full_name || "").trim();
+  if (fullName && (!current || current.startsWith("Customer-"))) {
+    await supabase.from("customers").update({ full_name: fullName }).eq("id", existing.id);
+  }
+}
+
+/**
+ * Phone and city read from a chat message only fill EMPTY fields. A number typed in chat is
+ * often the receiver's (OFWs), so it must never replace the number on an account.
+ */
+export async function fillMissingCustomerDetails(
+  supabase: SupabaseClient,
+  psid: string,
+  updates: Record<string, string>
+): Promise<Record<string, string>> {
+  if (Object.keys(updates).length === 0) return {};
+  const { data: current } = await supabase
+    .from("customers")
+    .select("mobile_number, location_city")
+    .eq("psid", psid)
+    .maybeSingle();
+  const fillOnly = new Set(["mobile_number", "location_city"]);
+  const toApply: Record<string, string> = {};
+  for (const [key, value] of Object.entries(updates)) {
+    const existing = (current as Record<string, unknown> | null)?.[key];
+    if (!fillOnly.has(key) || existing === null || existing === undefined || String(existing).trim() === "") {
+      toApply[key] = value;
+    }
+  }
+  if (Object.keys(toApply).length > 0) {
+    const { error } = await supabase.from("customers").update(toApply).eq("psid", psid);
+    if (error) {
+      console.warn("fillMissingCustomerDetails skipped:", error.message);
+      return {};
+    }
+  }
+  return toApply;
+}
+
+export async function syncRecentConversations(
+  supabase: SupabaseClient,
+  pageToken: string,
+  targetPsid?: string
+) {
+  const msgLimit = targetPsid ? 100 : 50;
+  const userFilter = targetPsid ? `user_id=${encodeURIComponent(targetPsid)}&` : "limit=15&";
+  const url = `https://graph.facebook.com/v19.0/me/conversations?${userFilter}fields=participants,messages.limit(${msgLimit}){message,from,created_time,id,attachments{id,mime_type,name,image_data,video_data,file_url},sticker}&access_token=${encodeURIComponent(pageToken)}`;
   const res = await fetch(url);
   const data = await res.json();
   if (!res.ok || data.error) {
@@ -67,12 +145,10 @@ export async function syncRecentConversations(supabase: SupabaseClient, pageToke
     const psid: string = customer.id;
     const fullName: string | null = customer.name ?? null;
 
-    // 1. Upsert customer with real Facebook name
-    const upsertData: Record<string, any> = { psid };
-    if (fullName) upsertData.full_name = fullName;
-    await supabase.from("customers").upsert(upsertData, { onConflict: "psid" });
+    // 1. Make sure the customer row exists (Facebook name only fills a missing name)
+    await ensureChatCustomer(supabase, psid, fullName);
 
-    // 1b. Auto-link to existing POS customer account if there is a single exact name/phone match
+    // 1b. Auto-link only when phone AND name match one account
     await autoLinkChatCustomerIfExactMatch(supabase, psid, fullName, null);
 
     // 2. Backfill missing or placeholder customer_name in conversation_logs for this PSID
@@ -90,10 +166,27 @@ export async function syncRecentConversations(supabase: SupabaseClient, pageToke
       .select("id, message_text, created_at, metadata")
       .eq("customer_psid", psid)
       .order("created_at", { ascending: false })
-      .limit(25);
+      .limit(200);
 
     const existingList = existingLogs ?? [];
-    const messages = [...(conv.messages?.data ?? [])].reverse();
+    const allRawMessages = [...(conv.messages?.data ?? [])];
+
+    // If syncing a specific customer thread, paginate up to 3 pages (300 messages) from the start
+    let nextUrl: string | undefined = targetPsid ? conv.messages?.paging?.next : undefined;
+    let pageCount = 0;
+    while (nextUrl && pageCount < 3) {
+      pageCount++;
+      const nextRes = await fetch(nextUrl);
+      const nextData = await nextRes.json();
+      if (nextData?.data?.length) {
+        allRawMessages.push(...nextData.data);
+        nextUrl = nextData.paging?.next;
+      } else {
+        break;
+      }
+    }
+
+    const messages = allRawMessages.reverse();
 
     for (const msg of messages) {
       const text = msg.message?.trim();
@@ -170,12 +263,9 @@ async function extractCustomerDetailsFromSync(
       if (message.toLowerCase().includes(city.toLowerCase())) { updates.location_city = city; break; }
     }
 
-    if (Object.keys(updates).length > 0) {
-      await supabase.from("customers").update(updates).eq("psid", psid);
-    }
-
-    if (updates.mobile_number) {
-      await autoLinkChatCustomerIfExactMatch(supabase, psid, fullName, updates.mobile_number);
+    const applied = await fillMissingCustomerDetails(supabase, psid, updates);
+    if (applied.mobile_number) {
+      await autoLinkChatCustomerIfExactMatch(supabase, psid, fullName, applied.mobile_number);
     }
   } catch {
     // Non-fatal if mobile number already exists on another record

@@ -95,6 +95,10 @@ export interface MatchedCustomerCandidate {
   order_count: number;
   total_spent: number;
   match_type: 'exact' | 'similar' | string;
+  /** Phone numbers agree (last 10 digits). */
+  phone_match?: boolean;
+  /** How the names compare: 'exact', 'similar' or null. */
+  name_match?: 'exact' | 'similar' | null;
 }
 
 export interface MatchedChatCandidate {
@@ -106,4 +110,24 @@ export interface MatchedChatCandidate {
   last_message?: string | null;
   last_message_at?: string | null;
   match_type: 'exact' | 'similar' | string;
+  phone_match?: boolean;
+  name_match?: 'exact' | 'similar' | null;
+  /** Orders already on the Messenger contact's record: linking merges two accounts. */
+  chat_order_count?: number;
+  chat_store_credit?: number;
 }
+
+/** What a merge would move when the Messenger contact already has its own account. */
+export interface AccountMergeDetail {
+  name: string | null;
+  orders: number;
+  store_credit: number;
+  carryovers: number;
+  bus_shipments: number;
+}
+
+export type ChatLinkResult =
+  | { status: 'linked'; customer: Record<string, unknown> }
+  | { status: 'needs_merge'; detail: AccountMergeDetail }
+  | { status: 'has_other_chat'; message: string }
+  | { status: 'error'; message: string };

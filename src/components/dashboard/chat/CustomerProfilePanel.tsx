@@ -1,18 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   User,
-  Phone,
-  MapPin,
-  Flame,
-  Users,
-  CreditCard,
-  Tag,
-  FileText,
-  Save,
-  CheckCircle2,
   Package,
   Pencil,
   Check,
@@ -20,10 +11,10 @@ import {
   Link2,
   ExternalLink,
   UserPlus,
-  Wallet,
 } from 'lucide-react';
 import { ChatAvatar } from './ChatSidebar';
 import { CustomerMatchBanner, LinkCustomerAccountDialog } from './CustomerMatchBanner';
+import { CustomerInfoTab } from './CustomerInfoTab';
 import { CustomerOrdersTab } from './CustomerOrdersTab';
 import { AddCustomerDialog } from '@/components/dashboard/add-customer-dialog';
 import type {
@@ -44,6 +35,7 @@ interface CustomerProfilePanelProps {
   onSaveNotes: (notes: string) => Promise<void>;
   onUpdateCustomer?: (updates: Partial<CustomerDossier>) => Promise<void>;
   onLinkToCustomerAccount?: (customerId: string) => Promise<boolean>;
+  onUnlinkAccount?: () => Promise<boolean>;
   onDismissCandidate?: (customerId: string) => void;
   onReloadDossier?: () => void;
   onCreateOrder?: () => void;
@@ -61,54 +53,27 @@ export function CustomerProfilePanel({
   onSaveNotes,
   onUpdateCustomer,
   onLinkToCustomerAccount,
+  onUnlinkAccount,
   onDismissCandidate,
   onReloadDossier,
   onCreateOrder,
 }: CustomerProfilePanelProps) {
   const [activeTab, setActiveTab] = useState<'profile' | 'orders'>('profile');
-  const [noteDraft, setNoteDraft] = useState('');
-  const [savedSuccess, setSavedSuccess] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [editAccountOpen, setEditAccountOpen] = useState(false);
 
   useEffect(() => {
-    setNoteDraft(customerDetail?.ai_summary_notes || '');
-  }, [customerDetail?.ai_summary_notes, psid]);
-
-  useEffect(() => {
     setNameDraft(customerDetail?.full_name || threadName || '');
     setIsEditingName(false);
   }, [customerDetail?.full_name, threadName, psid]);
-
-  const handleSaveNotes = async () => {
-    await onSaveNotes(noteDraft);
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 2000);
-  };
 
   const handleSaveName = async () => {
     if (!nameDraft.trim() || !onUpdateCustomer) return;
     await onUpdateCustomer({ full_name: nameDraft.trim() });
     setIsEditingName(false);
   };
-
-  const painTags = useMemo(() => {
-    if (!customerDetail?.pain_points) return [];
-    try {
-      if (typeof customerDetail.pain_points === 'string') {
-        const parsed = JSON.parse(customerDetail.pain_points);
-        return Array.isArray(parsed) ? parsed : Object.keys(parsed);
-      }
-      if (typeof customerDetail.pain_points === 'object') {
-        return Object.keys(customerDetail.pain_points);
-      }
-      return [];
-    } catch {
-      return [];
-    }
-  }, [customerDetail?.pain_points]);
 
   if (!psid) {
     return (
@@ -243,7 +208,7 @@ export function CustomerProfilePanel({
             <UserPlus className="w-3 h-3 text-blue-500" />
             <span>{isFullPosAccount ? 'Edit Account' : 'Complete Account'}</span>
           </button>
-          {onLinkToCustomerAccount && (
+          {onLinkToCustomerAccount && !isFullPosAccount && (
             <button
               type="button"
               onClick={() => setLinkDialogOpen(true)}
@@ -251,7 +216,19 @@ export function CustomerProfilePanel({
               title="Link this chat to an existing POS customer account"
             >
               <Link2 className="w-3 h-3 text-emerald-500" />
-              <span>{isFullPosAccount ? 'Re-link' : 'Link to Account'}</span>
+              <span>Link to Account</span>
+            </button>
+          )}
+          {onUnlinkAccount && isFullPosAccount && customerDetail?.id && (
+            <button
+              type="button"
+              onClick={() => onUnlinkAccount()}
+              disabled={linkingAccount}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-background hover:bg-muted border border-border text-muted-foreground text-[11px] font-semibold transition-all disabled:opacity-50"
+              title="Wrong person? Disconnect this chat from the account"
+            >
+              <X className="w-3 h-3 text-red-500" />
+              <span>Disconnect chat</span>
             </button>
           )}
         </div>
@@ -293,7 +270,6 @@ export function CustomerProfilePanel({
           </div>
         ) : (
           <>
-            {/* Possible Match on File Prompt */}
             {onLinkToCustomerAccount && onDismissCandidate && (
               <CustomerMatchBanner
                 chatName={name}
@@ -305,128 +281,14 @@ export function CustomerProfilePanel({
             )}
 
             {activeTab === 'profile' ? (
-              <>
-                {/* Lifetime Spend & Store Credit Card */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-2xl">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
-                      Lifetime Spend
-                    </span>
-                    <div className="text-base font-bold text-blue-700 dark:text-blue-300 mt-0.5">
-                      ₱{lifetimeSpend.toLocaleString()}
-                    </div>
-                  </div>
-                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                      <Wallet className="w-3 h-3" /> Store Credit
-                    </span>
-                    <div className="text-base font-bold text-emerald-700 dark:text-emerald-300 mt-0.5">
-                      ₱{Number(customerDetail?.store_credit || 0).toLocaleString()}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Contact Details */}
-                <div className="space-y-2">
-                  <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                    Contact & Address
-                  </div>
-                  <div className="bg-background border border-border/60 rounded-xl p-3 space-y-2 text-xs">
-                    <div className="flex items-center gap-2 text-foreground">
-                      <Phone className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                      <span className="truncate">
-                        {customerDetail?.mobile_number || 'No phone recorded'}
-                      </span>
-                    </div>
-                    <div className="flex items-start gap-2 text-foreground">
-                      <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
-                      <span className="leading-snug">{displayAddress}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-foreground">
-                      <CreditCard className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                      <span>{customerDetail?.preferred_payment || 'COD / GCash'}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Kitchen Profile */}
-                <div className="space-y-2">
-                  <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                    Kitchen Profile
-                  </div>
-                  <div className="bg-background border border-border/60 rounded-xl p-3 space-y-2 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground flex items-center gap-1.5">
-                        <Flame className="w-3.5 h-3.5 text-amber-500" />
-                        Stove Type:
-                      </span>
-                      <span className="font-semibold">
-                        {customerDetail?.stove_type || 'Unspecified'}
-                      </span>
-                    </div>
-                    {customerDetail?.family_size && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground flex items-center gap-1.5">
-                          <Users className="w-3.5 h-3.5 text-blue-500" />
-                          Household:
-                        </span>
-                        <span className="font-semibold">
-                          {customerDetail.family_size} Members
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Tags / Pain Points */}
-                {painTags.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                      <Tag className="w-3 h-3" /> Tags & Preferences
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {painTags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="text-[10px] font-semibold px-2 py-0.5 bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/20 rounded-full"
-                        >
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Internal Staff Notes */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                      <FileText className="w-3 h-3" /> Staff Internal Notes
-                    </span>
-                    {savedSuccess && (
-                      <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1 animate-fade-in">
-                        <CheckCircle2 className="w-3 h-3" /> Saved!
-                      </span>
-                    )}
-                  </div>
-                  <textarea
-                    value={noteDraft}
-                    onChange={(e) => setNoteDraft(e.target.value)}
-                    placeholder="Type customer notes here (e.g. wants morning delivery, suki customer)..."
-                    rows={3}
-                    className="w-full text-xs bg-background border border-input rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none text-foreground placeholder:text-muted-foreground/60"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleSaveNotes}
-                    disabled={savingNotes}
-                    className="w-full py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white dark:text-slate-900 text-white text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs disabled:opacity-50"
-                  >
-                    <Save className="w-3.5 h-3.5" />
-                    <span>{savingNotes ? 'Saving...' : 'Save Notes'}</span>
-                  </button>
-                </div>
-              </>
+              <CustomerInfoTab
+                psid={psid}
+                customerDetail={customerDetail}
+                lifetimeSpend={lifetimeSpend}
+                displayAddress={displayAddress}
+                savingNotes={savingNotes}
+                onSaveNotes={onSaveNotes}
+              />
             ) : (
               <CustomerOrdersTab
                 customerName={name}
@@ -438,7 +300,6 @@ export function CustomerProfilePanel({
         )}
       </div>
 
-      {/* Link to Existing Customer Account Modal */}
       {onLinkToCustomerAccount && (
         <LinkCustomerAccountDialog
           open={linkDialogOpen}
@@ -450,7 +311,6 @@ export function CustomerProfilePanel({
         />
       )}
 
-      {/* Complete / Edit Customer Account Dialog */}
       {editAccountOpen && (
         <AddCustomerDialog
           open={editAccountOpen}

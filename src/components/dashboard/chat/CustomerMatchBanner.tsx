@@ -188,6 +188,7 @@ export function LinkCustomerAccountDialog({
                 const city = (raw.city as string) || (raw.location_city as string) || '';
                 const province = (raw.province as string) || '';
                 const addressLine = (raw.address_line as string) || '';
+                const otherChat = Boolean(raw.psid) && raw.psid !== psid;
 
                 return (
                   <div
@@ -212,10 +213,15 @@ export function LinkCustomerAccountDialog({
                           </span>
                         </div>
                       )}
+                      {otherChat && (
+                        <div className="text-[11px] text-amber-600 dark:text-amber-400">
+                          Already connected to another Messenger chat
+                        </div>
+                      )}
                     </div>
                     <Button
                       size="sm"
-                      disabled={linking}
+                      disabled={linking || otherChat}
                       onClick={() => handleConnect(cust.id)}
                       className="shrink-0 h-8 text-xs"
                     >

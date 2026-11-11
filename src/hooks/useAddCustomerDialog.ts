@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { isAutoLinkSafe, linkChatToCustomer } from '@/lib/services/chat-link-service';
+import type { MatchedChatCandidate } from '@/types';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -168,51 +170,87 @@ export function useAddCustomerDialog(props: UseAddCustomerDialogProps) {
     try {
       let data, error;
 
+      const fullName = `${values.firstName} ${values.lastName}`.trim();
+      const customerPayload = {
+        full_name: fullName,
+        email: values.email || null,
+        mobile_number: values.phoneNumber || null,
+        address_line: addressLine,
+        region: regionName,
+        province: values.province,
+        city: values.city,
+        barangay: values.barangay,
+        postal_code: values.postalCode,
+        street_address: values.streetAddress,
+        facebook_profile_link: values.facebookProfileLink || null,
+      };
+
       if (props.customerToEdit) {
         const result = await supabase
           .from('customers')
-          .update({
-            full_name: `${values.firstName} ${values.lastName}`.trim(),
-            email: values.email || null,
-            mobile_number: values.phoneNumber || null,
-            address_line: addressLine,
-            region: regionName,
-            province: values.province,
-            city: values.city,
-            barangay: values.barangay,
-            postal_code: values.postalCode,
-            street_address: values.streetAddress,
-            facebook_profile_link: values.facebookProfileLink || null,
-          })
+          .update(customerPayload)
           .eq('id', props.customerToEdit.id)
           .select()
           .single();
         data = result.data;
         error = result.error;
       } else {
-        const result = await supabase
-          .from('customers')
-          .insert({
-            full_name: `${values.firstName} ${values.lastName}`.trim(),
-            email: values.email || null,
-            mobile_number: values.phoneNumber || null,
-            address_line: addressLine,
-            region: regionName,
-            province: values.province,
-            city: values.city,
-            barangay: values.barangay,
-            postal_code: values.postalCode,
-            street_address: values.streetAddress,
-            facebook_profile_link: values.facebookProfileLink || null,
-            suki_tier: 'NEWBIE'
-          })
-          .select()
-          .single();
-        data = result.data;
-        error = result.error;
+        // Check if a Messenger-only stub already holds this mobile number so we can upgrade it directly
+        let existingChatStubId: string | null = null;
+        if (values.phoneNumber?.trim()) {
+          const { data: stubByPhone } = await supabase
+            .from('customers')
+            .select('id, psid, address_line')
+            .eq('mobile_number', values.phoneNumber.trim())
+            .maybeSingle();
+          if (stubByPhone?.id && stubByPhone.psid && !stubByPhone.address_line) {
+            existingChatStubId = stubByPhone.id;
+          }
+        }
+
+        if (existingChatStubId) {
+          const result = await supabase
+            .from('customers')
+            .update(customerPayload)
+            .eq('id', existingChatStubId)
+            .select()
+            .single();
+          data = result.data;
+          error = result.error;
+        } else {
+          const result = await supabase
+            .from('customers')
+            .insert({
+              ...customerPayload,
+              suki_tier: 'NEWBIE',
+            })
+            .select()
+            .single();
+          data = result.data;
+          error = result.error;
+        }
       }
-        
+
       if (error) throw error;
+
+      // New customer only (never on edit): connect their Messenger chat when exactly one
+      // chat has the same phone AND name and has no orders of its own. Anything less
+      // certain is offered on the customer page / order form for staff to confirm.
+      if (!props.customerToEdit && data?.id && !data?.psid && values.phoneNumber?.trim()) {
+        const { data: matches } = await supabase.rpc('find_matching_chats_for_customer', {
+          p_customer_id: data.id,
+          p_name: fullName,
+          p_phone: values.phoneNumber.trim(),
+        });
+        const safe = Array.isArray(matches)
+          ? (matches as MatchedChatCandidate[]).filter(
+              (m) => isAutoLinkSafe(m) && Number(m.chat_order_count || 0) === 0 && Math.abs(Number(m.chat_store_credit || 0)) < 0.01
+            )
+          : [];
+        if (safe.length === 1) {
+          await linkChatToCustomer(supabase, safe[0].psid, data.id, { method: 'new_customer' });
+        }
+      }
       
       toast({
           title: props.customerToEdit ? "Customer Updated" : "Customer Added",
