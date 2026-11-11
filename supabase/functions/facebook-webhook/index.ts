@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { syncRecentConversations, autoLinkChatCustomerIfExactMatch } from "./sync.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -11,6 +12,12 @@ const PAGE_TOKEN = () => Deno.env.get("META_PAGE_ACCESS_TOKEN")!;
 const VERIFY_TOKEN = () => Deno.env.get("META_VERIFY_TOKEN")!;
 const OWNER_PSID = () => Deno.env.get("OWNER_PSID") ?? "";
 const APP_SECRET = () => Deno.env.get("META_APP_SECRET") ?? "";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+};
 
 // Facebook signs every webhook POST with the app secret (X-Hub-Signature-256).
 // Without this check anyone could post fake messages here, and this function writes to
@@ -36,6 +43,10 @@ async function hasValidSignature(rawBody: Uint8Array, header: string | null): Pr
 }
 
 Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
   const url = new URL(req.url);
 
   if (req.method === "GET") {
@@ -51,13 +62,110 @@ Deno.serve(async (req: Request) => {
 
   if (req.method === "POST") {
     try {
-      // Read the exact bytes Facebook signed, check the signature, then parse.
       const rawBody = new Uint8Array(await req.arrayBuffer());
+      const bodyText = new TextDecoder().decode(rawBody);
+      const body = JSON.parse(bodyText);
+
+      // --- 1. CRM ACTIONS (send_reply / sync_messages) ---
+      if (body.action === "send_reply" || body.action === "sync_messages") {
+        // Require a valid logged-in staff JWT or service role key
+        const authHeader = req.headers.get("Authorization");
+        if (!authHeader) {
+          return new Response(JSON.stringify({ error: "Missing authorization header" }), {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const token = authHeader.replace(/^Bearer\s+/i, "");
+        const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        if (token !== serviceKey) {
+          const { data: userData, error: authErr } = await supabase.auth.getUser(token);
+          if (authErr || !userData?.user) {
+            return new Response(JSON.stringify({ error: "Unauthorized user" }), {
+              status: 401,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+        }
+
+        const pageToken = PAGE_TOKEN();
+        if (!pageToken) {
+          return new Response(JSON.stringify({ error: "META_PAGE_ACCESS_TOKEN not configured" }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        if (body.action === "sync_messages") {
+          const syncResult = await syncRecentConversations(supabase, pageToken);
+          return new Response(JSON.stringify({ success: true, ...syncResult }), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const { psid, text } = body;
+        if (!psid || !text?.trim()) {
+          return new Response(JSON.stringify({ error: "Missing psid or text" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const graphUrl = `https://graph.facebook.com/v19.0/me/messages?access_token=${encodeURIComponent(pageToken)}`;
+        let fbRes = await fetch(graphUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recipient: { id: psid },
+            messaging_type: "RESPONSE",
+            message: { text: text.trim() },
+          }),
+        });
+        let fbData = await fbRes.json();
+
+        // If Meta Business Suite AI Agent owns the thread (code 10 / subcode 2018300), send with HUMAN_AGENT tag
+        if (!fbRes.ok || fbData.error) {
+          console.log("Retrying send_reply with HUMAN_AGENT tag after RESPONSE error:", fbData.error?.message);
+          fbRes = await fetch(graphUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              recipient: { id: psid },
+              messaging_type: "MESSAGE_TAG",
+              tag: "HUMAN_AGENT",
+              message: { text: text.trim() },
+            }),
+          });
+          fbData = await fbRes.json();
+        }
+
+        if (!fbRes.ok || fbData.error) {
+          console.error("Facebook Send API error:", fbData);
+          return new Response(
+            JSON.stringify({
+              error: fbData.error?.message || "Failed to send via Facebook Graph API",
+              fbError: fbData.error,
+            }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        return new Response(JSON.stringify({ success: true, fbData }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // --- 2. INCOMING FACEBOOK WEBHOOK ---
+      // Read the exact bytes Facebook signed, check the signature, then process.
       if (!(await hasValidSignature(rawBody, req.headers.get("x-hub-signature-256")))) {
         console.warn("Rejected webhook POST with a missing or wrong signature.");
         return new Response("Forbidden", { status: 403 });
       }
-      const body = JSON.parse(new TextDecoder().decode(rawBody));
       console.log("Incoming Webhook Payload:", JSON.stringify(body, null, 2));
       
       if (body.object !== "page") {
@@ -96,9 +204,18 @@ async function processWebhookBody(body: any) {
       }
       
       let text = event.message.text;
-      if (!text && event.message.attachments?.length > 0) {
-        const type = event.message.attachments[0].type;
-        text = `[Sent an attachment: ${type}]`;
+      let imageUrl: string | null = null;
+      if (event.message.attachments?.length > 0) {
+        const att = event.message.attachments[0];
+        if (att.type === "image" && att.payload?.url) {
+          imageUrl = att.payload.url;
+        }
+        if (!text) {
+          text = att.type === "image" ? "[Sent a photo]" : `[Sent an attachment: ${att.type}]`;
+        }
+      }
+      if (!text && event.message.admin_text) {
+        text = `[System] ${event.message.admin_text}`;
       }
       
       if (!text) {
@@ -118,12 +235,19 @@ async function processWebhookBody(body: any) {
 
       try {
         console.log(`Handling message for PSID: ${psid}, isEcho: ${isEcho}, text: "${text}"`);
-        await handleMessage(psid, text, senderName, isEcho);
+        await handleMessage(psid, text, senderName, isEcho, imageUrl);
         console.log(`Successfully processed message for PSID: ${psid}`);
       } catch (err) {
         console.error(`handleMessage execution error for PSID ${psid}:`, err);
       }
     }
+  }
+
+  // Also sync recent conversations from Graph API whenever any webhook fires (catches AI-handled customer messages 24/7)
+  try {
+    await syncRecentConversations(supabase, PAGE_TOKEN());
+  } catch (syncErr) {
+    console.error("Background conversation sync warning:", syncErr);
   }
 }
 
@@ -157,7 +281,7 @@ async function fetchFacebookName(psid: string): Promise<string | null> {
   }
 }
 
-async function handleMessage(psid: string, messageText: string, senderName: string | null, isEcho: boolean = false) {
+async function handleMessage(psid: string, messageText: string, senderName: string | null, isEcho: boolean = false, imageUrl: string | null = null) {
   // 1. ALWAYS ensure the customer record exists first to satisfy foreign key constraints!
   const { data: existingCust, error: fetchErr } = await supabase
     .from("customers")
@@ -171,7 +295,7 @@ async function handleMessage(psid: string, messageText: string, senderName: stri
 
   // Resolve the best available customer name
   let customerName: string | null = existingCust?.full_name ?? null;
-  if (!customerName && !isEcho) {
+  if (!customerName) {
     if (senderName) {
       customerName = senderName;
     } else {
@@ -193,73 +317,83 @@ async function handleMessage(psid: string, messageText: string, senderName: stri
     .upsert(upsertPayload, { onConflict: "psid", ignoreDuplicates: false })
     .throwOnError();
 
+  await autoLinkChatCustomerIfExactMatch(supabase, psid, customerName, existingCust?.mobile_number ?? null);
+
   // --- ADMIN/AGENT REPLIES ---
   if (isEcho) {
+    // Dedup check: if an agent already inserted this reply from the CRM within the last 15 seconds, skip duplicate
+    const fifteenSecsAgo = new Date(Date.now() - 15000).toISOString();
+    const { data: recentReply } = await supabase
+      .from("conversation_logs")
+      .select("id")
+      .eq("customer_psid", psid)
+      .eq("sender_type", "agent")
+      .eq("message_text", messageText)
+      .gte("created_at", fifteenSecsAgo)
+      .limit(1);
+
+    if (recentReply && recentReply.length > 0) {
+      console.log(`Skipping duplicate echo for CRM-sent reply to PSID ${psid}.`);
+      return;
+    }
+
     console.log(`Logging Admin/Agent reply to conversation_logs for PSID ${psid}...`);
     await supabase.from("conversation_logs").insert([
       { 
         customer_psid: psid, 
         customer_name: customerName ?? existingCust?.full_name ?? null, 
         message_text: messageText, 
-        sender_type: "agent" 
+        sender_type: "agent",
+        metadata: imageUrl ? { image_url: imageUrl } : null
       },
     ]).throwOnError();
     return; // Stop processing further AI/CRM extraction for admin outgoing messages
   }
 
-  // --- CUSTOMER MESSAGES ---
-  // Re-fetch fully consolidated customer record
-  const { data: cust } = await supabase
-    .from("customers")
-    .select("*")
-    .eq("psid", psid)
-    .single()
-    .throwOnError();
-
-  // Run Product FTS Search
-  const searchTerm = messageText.trim().replace(/[^a-zA-Z0-9\u00C0-\u024F\s]/g, " ");
-  const { data: products } = await supabase
-    .from("products")
-    .select("name, price, description, category, is_induction_ready")
-    .textSearch("search_vector", searchTerm, { type: "websearch", config: "english" })
-    .limit(5);
-
-  // Search FAQ / Gold Standard Knowledge
-  const { data: knowledgeRows } = await supabase
-    .from("gold_standard_knowledge")
-    .select("question, answer")
-    .textSearch("question", searchTerm, { type: "websearch" })
-    .eq("is_verified", true)
-    .limit(3);
-
-  // Detect Price inquiries without matching products
-  const priceKeywords = ["magkano", "hm", "presyo", "price", "how much", "halaga", "cost", "bayad"];
-  const isPriceQuery = priceKeywords.some(k => messageText.toLowerCase().includes(k));
-  const noProductFound = !products || products.length === 0;
-
-  if (isPriceQuery && noProductFound) {
-    console.log(`Triggering Price Not Found owner alert for query: "${messageText}"`);
-    await supabase.from("owner_alerts").insert({
-      alert_type: "price_not_found",
-      customer_psid: psid,
-      original_query: messageText,
-    }).throwOnError();
-  }
-
-  // Extract CRM context dynamically
-  await extractAndUpdateCRM(psid, messageText);
-
-  // Log incoming customer message safely with throwOnError
-  const resolvedName = cust?.full_name ?? customerName ?? null;
+  // Log incoming customer message FIRST so that even if FTS or CRM extraction fails, the message is ALWAYS saved!
+  const resolvedName = customerName ?? existingCust?.full_name ?? null;
   console.log(`Inserting incoming customer message into conversation_logs for ${resolvedName ?? psid}...`);
   await supabase.from("conversation_logs").insert([
     { 
       customer_psid: psid, 
       customer_name: resolvedName, 
       message_text: messageText, 
-      sender_type: "customer" 
+      sender_type: "customer",
+      metadata: imageUrl ? { image_url: imageUrl } : null
     },
   ]).throwOnError();
+
+  // Extract CRM context dynamically (non-blocking)
+  try {
+    await extractAndUpdateCRM(psid, messageText);
+  } catch (crmErr) {
+    console.error(`Non-fatal CRM extraction error for PSID ${psid}:`, crmErr);
+  }
+
+  // Run Product FTS Search & Price Alert (non-blocking)
+  try {
+    const searchTerm = messageText.trim().replace(/[^a-zA-Z0-9\u00C0-\u024F\s]/g, " ");
+    const { data: products } = await supabase
+      .from("products")
+      .select("name, price, description, category, is_induction_ready")
+      .textSearch("search_vector", searchTerm, { type: "websearch", config: "english" })
+      .limit(5);
+
+    const priceKeywords = ["magkano", "hm", "presyo", "price", "how much", "halaga", "cost", "bayad"];
+    const isPriceQuery = priceKeywords.some(k => messageText.toLowerCase().includes(k));
+    const noProductFound = !products || products.length === 0;
+
+    if (isPriceQuery && noProductFound) {
+      console.log(`Triggering Price Not Found owner alert for query: "${messageText}"`);
+      await supabase.from("owner_alerts").insert({
+        alert_type: "price_not_found",
+        customer_psid: psid,
+        original_query: messageText,
+      });
+    }
+  } catch (searchErr) {
+    console.error(`Non-fatal product search error for PSID ${psid}:`, searchErr);
+  }
 }
 
 async function extractAndUpdateCRM(psid: string, message: string) {
@@ -287,5 +421,8 @@ async function extractAndUpdateCRM(psid: string, message: string) {
   if (Object.keys(updates).length > 0) {
     console.log(`Applying CRM auto-updates for PSID ${psid}:`, JSON.stringify(updates));
     await supabase.from("customers").update(updates).eq("psid", psid).throwOnError();
+    if (updates.mobile_number) {
+      await autoLinkChatCustomerIfExactMatch(supabase, psid, null, updates.mobile_number);
+    }
   }
 }

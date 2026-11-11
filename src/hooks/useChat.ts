@@ -1,47 +1,84 @@
+'use client';
+
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSupabase } from '@/lib/supabase/hooks';
-import type { ConversationLog, ChatThread, CustomerDossier, CustomerOrderSummary } from '@/types';
+import { useChatCustomerDossier } from './useChatCustomerDossier';
+import type { ConversationLog, ChatThread } from '@/types';
 
 export type ChatFilterTab = 'all' | 'unread' | 'vip' | 'orders';
 
-export function useChat() {
+let isSyncInFlight = false;
+
+export function useChat(initialPsid?: string | null) {
   const supabase = useSupabase();
   const [chatLogs, setChatLogs] = useState<ConversationLog[]>([]);
   const [loadingChats, setLoadingChats] = useState(true);
-  const [selectedPsid, setSelectedPsid] = useState<string | null>(null);
+  const [selectedPsid, setSelectedPsid] = useState<string | null>(initialPsid || null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTab, setFilterTab] = useState<ChatFilterTab>('all');
   const [newMsgPsids, setNewMsgPsids] = useState<Set<string>>(new Set());
-
-  const [customerDetail, setCustomerDetail] = useState<CustomerDossier | null>(null);
-  const [customerOrders, setCustomerOrders] = useState<CustomerOrderSummary[]>([]);
-  const [loadingCustomer, setLoadingCustomer] = useState(false);
-  const [savingNotes, setSavingNotes] = useState(false);
   const [isRealtimeActive, setIsRealtimeActive] = useState(false);
 
-  // Fetch initial batch of conversation logs
-  const fetchLogs = useCallback(async (silent = false) => {
-    if (!supabase) return;
-    if (!silent) setLoadingChats(true);
-    try {
-      const { data, error } = await supabase
-        .from('conversation_logs')
-        .select('*, customers(full_name, suki_tier, mobile_number)')
-        .order('created_at', { ascending: false })
-        .limit(2500);
-
-      if (error) throw error;
-      setChatLogs(data || []);
-    } catch (err) {
-      console.error('Failed to fetch conversation logs:', err);
-    } finally {
-      if (!silent) setLoadingChats(false);
+  // Sync selectedPsid if initialPsid from URL query changes
+  useEffect(() => {
+    if (initialPsid) {
+      setSelectedPsid(initialPsid);
     }
-  }, [supabase]);
+  }, [initialPsid]);
 
+  // Fetch initial batch of conversation logs
+  const fetchLogs = useCallback(
+    async (silent = false) => {
+      if (!supabase) return;
+      if (!silent) setLoadingChats(true);
+      try {
+        const { data, error } = await supabase
+          .from('conversation_logs')
+          .select('*, customers(id, full_name, suki_tier, mobile_number, address_line, city)')
+          .order('created_at', { ascending: false })
+          .limit(2500);
+
+        if (error) throw error;
+        setChatLogs(data || []);
+      } catch (err) {
+        console.error('Failed to fetch conversation logs:', err);
+      } finally {
+        if (!silent) setLoadingChats(false);
+      }
+    },
+    [supabase]
+  );
+
+  // Fetch logs on mount and periodically sync recent Facebook conversations
   useEffect(() => {
     fetchLogs();
-  }, [fetchLogs]);
+    if (!supabase) return;
+    let isCancelled = false;
+
+    const runSync = async () => {
+      if (isSyncInFlight) return;
+      isSyncInFlight = true;
+      try {
+        const { data } = await supabase.functions.invoke('facebook-webhook', {
+          body: { action: 'sync_messages' },
+        });
+        if (!isCancelled && data?.insertedCount > 0) {
+          fetchLogs(true);
+        }
+      } catch {
+        // Ignore transient background sync errors
+      } finally {
+        isSyncInFlight = false;
+      }
+    };
+
+    runSync();
+    const interval = setInterval(runSync, 4000);
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+    };
+  }, [supabase, fetchLogs]);
 
   // Realtime subscription for live conversation messages & replies
   useEffect(() => {
@@ -52,24 +89,23 @@ export function useChat() {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'conversation_logs' },
-        async (payload: any) => {
+        async (payload: { new: ConversationLog }) => {
           const { data: enriched } = await supabase
             .from('conversation_logs')
-            .select('*, customers(full_name, suki_tier, mobile_number)')
+            .select('*, customers(id, full_name, suki_tier, mobile_number, address_line, city)')
             .eq('id', payload.new.id)
             .maybeSingle();
 
-          const log: ConversationLog = enriched || (payload.new as ConversationLog);
+          const log: ConversationLog = (enriched as ConversationLog) || payload.new;
 
           setChatLogs((prev) => [log, ...prev.filter((l) => l.id !== log.id)]);
 
-          // If incoming customer message and not currently viewing, mark as unread
           if (log.sender_type === 'customer' && log.customer_psid !== selectedPsid) {
             setNewMsgPsids((prev) => new Set([...prev, log.customer_psid]));
           }
         }
       )
-      .subscribe((status: any) => {
+      .subscribe((status: string) => {
         setIsRealtimeActive(status === 'SUBSCRIBED');
       });
 
@@ -82,19 +118,34 @@ export function useChat() {
   const threads = useMemo<ChatThread[]>(() => {
     if (!chatLogs || !Array.isArray(chatLogs)) return [];
 
-    const nameMap = new Map<string, { name: string; tier?: string | null }>();
+    const nameMap = new Map<
+      string,
+      { name: string; tier?: string | null; isLinked?: boolean }
+    >();
+
     chatLogs.forEach((l) => {
       const psid = l.customer_psid;
       if (psid && !nameMap.has(psid)) {
-        let resolvedName = l.customers?.full_name || l.customer_name;
+        const candidateName =
+          l.customers?.full_name ||
+          (l.customer_name && !l.customer_name.startsWith('Customer-')
+            ? l.customer_name
+            : null);
+        let resolvedName = candidateName;
         if (!resolvedName && l.message_text) {
-          const match = l.message_text.match(/(?:complete\s*name|name|pangalan)\s*[:=-]\s*([^\n\r,]+)/i);
+          const match = l.message_text.match(
+            /(?:complete\s*name|name|pangalan)\s*[:=-]\s*([^\n\r,]+)/i
+          );
           if (match && match[1]?.trim()) {
             resolvedName = match[1].trim();
           }
         }
         if (resolvedName) {
-          nameMap.set(psid, { name: resolvedName, tier: l.customers?.suki_tier });
+          nameMap.set(psid, {
+            name: resolvedName,
+            tier: l.customers?.suki_tier,
+            isLinked: Boolean(l.customers?.address_line || l.customers?.city),
+          });
         }
       }
     });
@@ -107,7 +158,9 @@ export function useChat() {
         let resolvedName = customerInfo?.name;
 
         if (!resolvedName && l.message_text) {
-          const match = l.message_text.match(/(?:complete\s*name|name|pangalan)\s*[:=-]\s*([^\n\r,]+)/i);
+          const match = l.message_text.match(
+            /(?:complete\s*name|name|pangalan)\s*[:=-]\s*([^\n\r,]+)/i
+          );
           if (match && match[1]?.trim()) {
             resolvedName = match[1].trim();
           }
@@ -125,6 +178,9 @@ export function useChat() {
           lastDate: l.created_at ? new Date(l.created_at) : new Date(),
           lastSender: l.sender_type,
           unread: newMsgPsids.has(psid),
+          isLinkedAccount:
+            customerInfo?.isLinked ||
+            Boolean(l.customers?.address_line || l.customers?.city),
         });
       }
     });
@@ -162,20 +218,33 @@ export function useChat() {
     }
   }, [filteredThreads, selectedPsid]);
 
-  // Active messages for the selected customer thread
+  // Active messages for the selected customer thread (deduplicated)
   const activeMessages = useMemo(() => {
     if (!selectedPsid || !chatLogs) return [];
-    return chatLogs
+    const sorted = chatLogs
       .filter((l) => String(l.customer_psid) === String(selectedPsid))
       .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+    const deduped: ConversationLog[] = [];
+    for (const msg of sorted) {
+      const prev = deduped[deduped.length - 1];
+      if (
+        prev &&
+        prev.message_text === msg.message_text &&
+        Math.abs(new Date(msg.created_at).getTime() - new Date(prev.created_at).getTime()) <
+          30000
+      ) {
+        continue;
+      }
+      deduped.push(msg);
+    }
+    return deduped;
   }, [chatLogs, selectedPsid]);
 
-  // Active thread summary
   const activeThread = useMemo(() => {
     return threads.find((t) => t.psid === selectedPsid) || null;
   }, [threads, selectedPsid]);
 
-  // Select a conversation and clear unread flag
   const selectConversation = useCallback((psid: string) => {
     setSelectedPsid(psid);
     setNewMsgPsids((prev) => {
@@ -185,90 +254,23 @@ export function useChat() {
     });
   }, []);
 
-  // Fetch full customer dossier & past orders when selectedPsid changes
-  useEffect(() => {
-    if (!selectedPsid || !supabase) {
-      setCustomerDetail(null);
-      setCustomerOrders([]);
-      return;
-    }
-
-    let isCancelled = false;
-    setLoadingCustomer(true);
-
-    const loadCustomerData = async () => {
-      try {
-        // 1. Fetch customer details
-        const { data: cust } = await supabase
-          .from('customers')
-          .select('*')
-          .eq('psid', selectedPsid)
-          .maybeSingle();
-
-        if (isCancelled) return;
-        setCustomerDetail(cust || null);
-
-        // 2. Fetch customer orders if customer record exists
-        if (cust?.id) {
-          const { data: orders } = await supabase
-            .from('orders')
-            .select('id, order_number, status, total_amount, payment_method, created_at, order_items(product_name, quantity, unit_price)')
-            .eq('customer_id', cust.id)
-            .order('created_at', { ascending: false })
-            .limit(10);
-
-          if (!isCancelled) {
-            setCustomerOrders((orders as unknown as CustomerOrderSummary[]) || []);
-          }
-        } else {
-          setCustomerOrders([]);
-        }
-      } catch (err) {
-        console.error('Error fetching customer dossier:', err);
-      } finally {
-        if (!isCancelled) setLoadingCustomer(false);
-      }
-    };
-
-    loadCustomerData();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [selectedPsid, supabase]);
-
-  // Save internal staff notes
-  const saveCustomerNotes = useCallback(
-    async (notes: string) => {
-      if (!customerDetail?.id || !supabase) return;
-      setSavingNotes(true);
-      try {
-        const { error } = await supabase
-          .from('customers')
-          .update({ ai_summary_notes: notes })
-          .eq('id', customerDetail.id);
-
-        if (error) throw error;
-        setCustomerDetail((prev) => (prev ? { ...prev, ai_summary_notes: notes } : null));
-      } catch (err) {
-        console.error('Failed to save customer notes:', err);
-      } finally {
-        setSavingNotes(false);
-      }
-    },
-    [customerDetail?.id, supabase]
-  );
+  const dossier = useChatCustomerDossier({
+    selectedPsid,
+    threadName: activeThread?.fullName,
+    onLogsRefresh: fetchLogs,
+  });
 
   // Send a manual reply from CRM
   const sendReply = useCallback(
     async (messageText: string) => {
       if (!selectedPsid || !messageText.trim() || !supabase) return;
+      const trimmedText = messageText.trim();
 
       try {
         const payload = {
           customer_psid: selectedPsid,
-          customer_name: customerDetail?.full_name || activeThread?.fullName || null,
-          message_text: messageText.trim(),
+          customer_name: dossier.customerDetail?.full_name || activeThread?.fullName || null,
+          message_text: trimmedText,
           sender_type: 'agent',
         };
 
@@ -283,45 +285,23 @@ export function useChat() {
         if (data) {
           setChatLogs((prev) => [data as ConversationLog, ...prev]);
         }
+
+        const { error: fnError } = await supabase.functions.invoke('facebook-webhook', {
+          body: {
+            action: 'send_reply',
+            psid: selectedPsid,
+            text: trimmedText,
+          },
+        });
+
+        if (fnError) {
+          console.warn('Facebook Messenger delivery warning:', fnError);
+        }
       } catch (err) {
         console.error('Failed to send reply:', err);
       }
     },
-    [selectedPsid, customerDetail?.full_name, activeThread?.fullName, supabase]
-  );
-
-  // Update customer details (name, phone, address, etc.)
-  const updateCustomer = useCallback(
-    async (updates: Partial<CustomerDossier>) => {
-      if (!selectedPsid || !supabase) return;
-      try {
-        if (customerDetail?.id) {
-          const { error } = await supabase
-            .from('customers')
-            .update(updates)
-            .eq('id', customerDetail.id);
-          if (error) throw error;
-        } else {
-          const { error } = await supabase
-            .from('customers')
-            .upsert({ psid: selectedPsid, ...updates }, { onConflict: 'psid' });
-          if (error) throw error;
-        }
-
-        if (updates.full_name) {
-          await supabase
-            .from('conversation_logs')
-            .update({ customer_name: updates.full_name })
-            .eq('customer_psid', selectedPsid);
-        }
-
-        setCustomerDetail((prev) => ({ ...prev, ...updates }));
-        fetchLogs(true);
-      } catch (err) {
-        console.error('Failed to update customer:', err);
-      }
-    },
-    [selectedPsid, customerDetail?.id, supabase, fetchLogs]
+    [selectedPsid, dossier.customerDetail?.full_name, activeThread?.fullName, supabase]
   );
 
   return {
@@ -338,13 +318,7 @@ export function useChat() {
     loadingChats,
     refreshChats: fetchLogs,
     isRealtimeActive,
-    customerDetail,
-    customerOrders,
-    loadingCustomer,
-    savingNotes,
-    saveCustomerNotes,
-    updateCustomer,
     sendReply,
+    ...dossier,
   };
 }
-

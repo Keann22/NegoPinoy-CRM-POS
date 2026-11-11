@@ -97,7 +97,12 @@ export function ChatMessageThread({
             const isCustomer = senderType === 'customer';
             const isBot = senderType === 'bot';
             const isAdmin = senderType === 'agent' || senderType === 'admin';
-            const isAttachment = msg.message_text?.startsWith('[Sent an attachment:');
+            const isAttachment =
+              msg.message_text?.startsWith('[Sent an attachment:') ||
+              msg.message_text === '[Sent a photo]' ||
+              msg.message_text === '[Sent a video]';
+            const imageUrl = msg.metadata?.image_url as string | undefined;
+            const videoUrl = msg.metadata?.video_url as string | undefined;
 
             const timeStr = msg.created_at
               ? new Date(msg.created_at).toLocaleTimeString([], {
@@ -152,16 +157,39 @@ export function ChatMessageThread({
                   </div>
 
                   {/* Bubble Content */}
-                  {isAttachment ? (
+                  {imageUrl && (
+                    <a
+                      href={imageUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block my-1.5 overflow-hidden rounded-xl border border-border/40 hover:opacity-95 transition-opacity"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={imageUrl}
+                        alt="Chat attachment"
+                        className="max-h-64 w-auto object-contain rounded-xl bg-black/5"
+                        loading="lazy"
+                      />
+                    </a>
+                  )}
+                  {videoUrl && (
+                    <video
+                      src={videoUrl}
+                      controls
+                      className="max-h-64 w-auto rounded-xl my-1.5"
+                    />
+                  )}
+                  {isAttachment && !imageUrl && !videoUrl ? (
                     <div className="flex items-center gap-2 py-1 italic opacity-90">
                       <ImageIcon className="w-4 h-4" />
                       <span>{msg.message_text}</span>
                     </div>
-                  ) : (
+                  ) : !isAttachment ? (
                     <p className="whitespace-pre-wrap leading-relaxed select-text">
                       {msg.message_text}
                     </p>
-                  )}
+                  ) : null}
                 </div>
 
                 {!isCustomer && (

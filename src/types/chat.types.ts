@@ -10,11 +10,14 @@ export interface ConversationLog {
   message_text: string;
   sender_type: 'customer' | 'bot' | 'agent' | 'admin' | string;
   created_at: string;
-  metadata?: Record<string, any> | null;
+  metadata?: Record<string, unknown> | null;
   customers?: {
+    id?: string | null;
     full_name?: string | null;
     suki_tier?: string | null;
     mobile_number?: string | null;
+    address_line?: string | null;
+    city?: string | null;
   } | null;
 }
 
@@ -26,18 +29,27 @@ export interface ChatThread {
   lastDate: Date;
   lastSender: string;
   unread?: boolean;
+  isLinkedAccount?: boolean;
 }
 
 export interface CustomerDossier {
   id?: string;
-  psid?: string;
+  psid?: string | null;
   full_name?: string | null;
   mobile_number?: string | null;
   location_city?: string | null;
   location_barangay?: string | null;
   location_province?: string | null;
+  address_line?: string | null;
+  region?: string | null;
+  province?: string | null;
+  city?: string | null;
+  barangay?: string | null;
+  postal_code?: string | null;
   street_address?: string | null;
   email?: string | null;
+  facebook_profile_link?: string | null;
+  store_credit?: number | null;
   stove_type?: string | null;
   family_size?: number | string | null;
   specialty_cuisine?: string | null;
@@ -46,21 +58,52 @@ export interface CustomerDossier {
   suki_tier?: string | null;
   total_lifetime_spend?: number | null;
   ai_summary_notes?: string | null;
-  pain_points?: string | Record<string, any> | null;
+  pain_points?: string | Record<string, unknown> | null;
 }
 
 export interface CustomerOrderItem {
   product_name: string;
   quantity: number;
-  unit_price: number;
+  unit_price?: number | null;
+  selling_price_at_sale?: number | null;
 }
 
 export interface CustomerOrderSummary {
   id: string;
-  order_number?: string;
   status: string;
   total_amount: number;
-  payment_method?: string;
+  balance_due?: number | null;
+  amount_paid?: number | null;
+  payment_method?: string | null;
+  payment_type?: string | null;
+  order_date?: string | null;
   created_at: string;
   order_items?: CustomerOrderItem[];
+}
+
+export interface MatchedCustomerCandidate {
+  id: string;
+  psid?: string | null;
+  full_name: string;
+  mobile_number?: string | null;
+  address_line?: string | null;
+  city?: string | null;
+  province?: string | null;
+  barangay?: string | null;
+  suki_tier?: string | null;
+  store_credit?: number | null;
+  order_count: number;
+  total_spent: number;
+  match_type: 'exact' | 'similar' | string;
+}
+
+export interface MatchedChatCandidate {
+  psid: string;
+  chat_customer_id: string;
+  chat_customer_name: string;
+  mobile_number?: string | null;
+  location_city?: string | null;
+  last_message?: string | null;
+  last_message_at?: string | null;
+  match_type: 'exact' | 'similar' | string;
 }
