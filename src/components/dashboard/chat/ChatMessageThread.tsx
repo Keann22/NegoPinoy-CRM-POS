@@ -103,6 +103,9 @@ export function ChatMessageThread({
               msg.message_text === '[Sent a video]';
             const imageUrl = msg.metadata?.image_url as string | undefined;
             const videoUrl = msg.metadata?.video_url as string | undefined;
+            // A CRM reply Facebook refused: the customer never got it
+            const notDelivered = isAdmin && msg.metadata?.delivery === 'failed';
+            const deliveryError = msg.metadata?.delivery_error as string | undefined;
 
             const timeStr = msg.created_at
               ? new Date(msg.created_at).toLocaleTimeString([], {
@@ -126,13 +129,15 @@ export function ChatMessageThread({
                       ? 'bg-card border border-border text-foreground rounded-bl-xs'
                       : isBot
                       ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 rounded-br-xs font-mono'
+                      : notDelivered
+                      ? 'bg-red-500/10 border-2 border-red-500/60 text-foreground rounded-br-xs'
                       : 'bg-blue-600 text-white rounded-br-xs'
                   }`}
                 >
                   {/* Bubble Header */}
                   <div
                     className={`flex items-center justify-between gap-4 mb-1 text-[10px] ${
-                      isAdmin ? 'text-white/80' : 'text-muted-foreground'
+                      isAdmin && !notDelivered ? 'text-white/80' : 'text-muted-foreground'
                     }`}
                   >
                     <span className="font-bold uppercase tracking-wider flex items-center gap-1">
@@ -190,6 +195,14 @@ export function ChatMessageThread({
                       {msg.message_text}
                     </p>
                   ) : null}
+                  {notDelivered && (
+                    <div className="mt-1.5 pt-1.5 border-t border-red-500/30 text-[10px] font-semibold text-red-600 dark:text-red-400">
+                      ⚠ Not sent to Messenger: the customer did not get this. Send it from Messenger / Business Suite.
+                      {deliveryError && (
+                        <span className="block font-normal opacity-80">{deliveryError}</span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {!isCustomer && (

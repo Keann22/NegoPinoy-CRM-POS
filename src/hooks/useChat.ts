@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSupabase } from '@/lib/supabase/hooks';
+import { useToast } from '@/hooks/use-toast';
 import { useChatCustomerDossier } from './useChatCustomerDossier';
 import type { ConversationLog, ChatThread } from '@/types';
 
@@ -9,8 +10,23 @@ export type ChatFilterTab = 'all' | 'unread' | 'vip' | 'orders';
 
 let isSyncInFlight = false;
 
+/** The reason an edge function call failed: its JSON `error` when it sent one. */
+async function readFunctionError(error: { message: string; context?: unknown }): Promise<string> {
+  const ctx = error.context as Response | undefined;
+  if (ctx && typeof ctx.json === 'function') {
+    try {
+      const body = (await ctx.clone().json()) as { error?: string };
+      if (body?.error) return body.error;
+    } catch {
+      // not JSON
+    }
+  }
+  return error.message;
+}
+
 export function useChat(initialPsid?: string | null) {
   const supabase = useSupabase();
+  const { toast } = useToast();
   const [chatLogs, setChatLogs] = useState<ConversationLog[]>([]);
   const [loadingChats, setLoadingChats] = useState(true);
   const [selectedPsid, setSelectedPsid] = useState<string | null>(initialPsid || null);
@@ -68,12 +84,7 @@ export function useChat(initialPsid?: string | null) {
         });
         if (error) {
           // Background sync is a backstop; log why it failed instead of failing silently
-          let reason = error.message;
-          const ctx = (error as { context?: Response }).context;
-          if (ctx && typeof ctx.json === 'function') {
-            reason = await ctx.json().then((b: { error?: string }) => b?.error || reason).catch(() => reason);
-          }
-          console.warn('Messenger background sync failed:', reason);
+          console.warn('Messenger background sync failed:', await readFunctionError(error));
         }
         if (!isCancelled && data?.insertedCount > 0) {
           fetchLogs(true);
@@ -299,7 +310,7 @@ export function useChat(initialPsid?: string | null) {
           setChatLogs((prev) => [data as ConversationLog, ...prev]);
         }
 
-        const { error: fnError } = await supabase.functions.invoke('facebook-webhook', {
+        const { data: sendData, error: fnError } = await supabase.functions.invoke('facebook-webhook', {
           body: {
             action: 'send_reply',
             psid: selectedPsid,
@@ -307,14 +318,42 @@ export function useChat(initialPsid?: string | null) {
           },
         });
 
+        // Record whether Facebook actually delivered it, so a refused reply never looks sent
+        const logRow = data as ConversationLog | null;
+        const metadata: Record<string, unknown> = { ...(logRow?.metadata ?? {}) };
         if (fnError) {
-          console.warn('Facebook Messenger delivery warning:', fnError);
+          const reason = await readFunctionError(fnError);
+          metadata.delivery = 'failed';
+          metadata.delivery_error = reason;
+          toast({
+            variant: 'destructive',
+            title: 'Not sent to Messenger',
+            description: `The customer did not get this reply. Send it from Messenger / Business Suite instead. (${reason})`,
+            duration: 15000,
+          });
+        } else {
+          metadata.delivery = 'sent';
+          const mid = (sendData as { fbData?: { message_id?: string } } | null)?.fbData?.message_id;
+          if (mid) metadata.fb_mid = mid;
+        }
+        if (logRow?.id) {
+          setChatLogs((prev) => prev.map((l) => (l.id === logRow.id ? { ...l, metadata } : l)));
+          const { error: markErr } = await supabase
+            .from('conversation_logs')
+            .update({ metadata })
+            .eq('id', logRow.id);
+          if (markErr) console.warn('Could not save delivery status:', markErr.message);
         }
       } catch (err) {
         console.error('Failed to send reply:', err);
+        toast({
+          variant: 'destructive',
+          title: 'Reply not sent',
+          description: err instanceof Error ? err.message : 'Could not send the reply.',
+        });
       }
     },
-    [selectedPsid, dossier.customerDetail?.full_name, activeThread?.fullName, supabase]
+    [selectedPsid, dossier.customerDetail?.full_name, activeThread?.fullName, supabase, toast]
   );
 
   return {
