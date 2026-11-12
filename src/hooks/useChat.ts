@@ -63,9 +63,18 @@ export function useChat(initialPsid?: string | null) {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       isSyncInFlight = true;
       try {
-        const { data } = await supabase.functions.invoke('facebook-webhook', {
+        const { data, error } = await supabase.functions.invoke('facebook-webhook', {
           body: { action: 'sync_messages' },
         });
+        if (error) {
+          // Background sync is a backstop; log why it failed instead of failing silently
+          let reason = error.message;
+          const ctx = (error as { context?: Response }).context;
+          if (ctx && typeof ctx.json === 'function') {
+            reason = await ctx.json().then((b: { error?: string }) => b?.error || reason).catch(() => reason);
+          }
+          console.warn('Messenger background sync failed:', reason);
+        }
         if (!isCancelled && data?.insertedCount > 0) {
           fetchLogs(true);
         }
