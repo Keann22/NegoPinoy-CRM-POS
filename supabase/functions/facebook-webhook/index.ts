@@ -97,11 +97,21 @@ Deno.serve(async (req: Request) => {
         }
 
         if (body.action === "sync_messages") {
-          const syncResult = await syncRecentConversations(supabase, pageToken, body.psid);
-          return new Response(JSON.stringify({ success: true, ...syncResult }), {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
+          try {
+            const syncResult = await syncRecentConversations(supabase, pageToken, body.psid);
+            return new Response(JSON.stringify({ success: true, ...syncResult }), {
+              status: 200,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          } catch (syncErr) {
+            // Return the real reason (with CORS headers) instead of a bare 400 the browser can't read
+            const message = syncErr instanceof Error ? syncErr.message : String(syncErr);
+            console.error("sync_messages failed:", message);
+            return new Response(JSON.stringify({ success: false, error: message }), {
+              status: 502,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
         }
 
         const { psid, text } = body;
@@ -180,7 +190,7 @@ Deno.serve(async (req: Request) => {
       return new Response("EVENT_RECEIVED", { status: 200 });
     } catch (err) {
       console.error("Error parsing webhook POST body:", err);
-      return new Response("Bad Request", { status: 400 });
+      return new Response("Bad Request", { status: 400, headers: corsHeaders });
     }
   }
 

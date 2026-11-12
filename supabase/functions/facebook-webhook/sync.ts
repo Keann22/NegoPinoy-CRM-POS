@@ -125,12 +125,16 @@ export async function syncRecentConversations(
   pageToken: string,
   targetPsid?: string
 ) {
-  const msgLimit = targetPsid ? 100 : 50;
-  const userFilter = targetPsid ? `user_id=${encodeURIComponent(targetPsid)}&` : "limit=15&";
-  const url = `https://graph.facebook.com/v19.0/me/conversations?${userFilter}fields=participants,messages.limit(${msgLimit}){message,from,created_time,id,attachments{id,mime_type,name,image_data,video_data,file_url},sticker}&access_token=${encodeURIComponent(pageToken)}`;
+  // Background sync is a backstop for the webhook: keep it small (8 chats x 6 messages,
+  // the sizes that worked before 2026-11-12). Asking for 15 x 50 with attachment fields
+  // made every background sync fail. Only text is saved here, so no attachment fields.
+  const msgLimit = targetPsid ? 100 : 6;
+  const userFilter = targetPsid ? `user_id=${encodeURIComponent(targetPsid)}&` : "limit=8&";
+  const url = `https://graph.facebook.com/v19.0/me/conversations?${userFilter}fields=participants,messages.limit(${msgLimit}){message,from,created_time,id}&access_token=${encodeURIComponent(pageToken)}`;
   const res = await fetch(url);
   const data = await res.json();
   if (!res.ok || data.error) {
+    console.error("Graph API conversations error:", JSON.stringify(data.error ?? { status: res.status }));
     throw new Error(data.error?.message || "Failed to fetch conversations from Graph API");
   }
 

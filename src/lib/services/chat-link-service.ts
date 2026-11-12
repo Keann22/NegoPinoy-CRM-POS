@@ -66,7 +66,7 @@ export async function linkChatToCustomer(
 export function describeAccountMerge(detail: AccountMergeDetail, targetName: string | null): string {
   const parts: string[] = [];
   if (detail.orders > 0) parts.push(`${detail.orders} order${detail.orders === 1 ? '' : 's'}`);
-  if (Math.abs(detail.store_credit) > 0.009) parts.push(`₱${detail.store_credit.toLocaleString('en-PH')} store credit`);
+  if (Math.abs(detail.store_credit) > 0.009) parts.push(`₱${detail.store_credit.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} store credit`);
   if (detail.carryovers > 0) parts.push(`${detail.carryovers} carryover${detail.carryovers === 1 ? '' : 's'}`);
   if (detail.bus_shipments > 0) parts.push(`${detail.bus_shipments} bus shipment${detail.bus_shipments === 1 ? '' : 's'}`);
   const who = detail.name || 'This Messenger contact';

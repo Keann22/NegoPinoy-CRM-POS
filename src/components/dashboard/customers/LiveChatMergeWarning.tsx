@@ -10,7 +10,7 @@ export function MergeWarning({ match }: { match: MatchedChatCandidate }) {
   if (orders <= 0 && Math.abs(credit) < 0.01) return null;
   const parts = [
     orders > 0 ? `${orders} order${orders === 1 ? '' : 's'}` : null,
-    Math.abs(credit) >= 0.01 ? `₱${credit.toLocaleString('en-PH')} store credit` : null,
+    Math.abs(credit) >= 0.01 ? `₱${credit.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} store credit` : null,
   ].filter(Boolean);
   return (
     <div className="text-[11px] font-semibold text-red-600 dark:text-red-400">

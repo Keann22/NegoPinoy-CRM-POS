@@ -58,7 +58,7 @@ export function useChatCustomerDossier({
       const { data: orders, error } = await supabase
         .from('orders')
         .select(
-          'id, status, total_amount, balance_due, amount_paid, payment_method, payment_type, order_date, created_at, order_items(product_name, quantity, unit_price, selling_price_at_sale)'
+          'id, status, total_amount, balance_due, amount_paid, payment_method, order_date, created_at, order_items(product_name, quantity, unit_price, selling_price_at_sale)'
         )
         .eq('customer_id', customerId)
         .order('created_at', { ascending: false })
