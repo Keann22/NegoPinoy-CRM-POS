@@ -71,9 +71,9 @@ export function useChat(initialPsid?: string | null) {
     if (!supabase) return;
     let isCancelled = false;
 
-    // Backstop only: new messages arrive in real time through the webhook + realtime
-    // channel. Polling Facebook every few seconds from every open tab risked
-    // rate-limiting the page token (which would also block replies).
+    // Pulls recent Facebook conversations (and real customer names) every 4s, as the
+    // owners want. Skipped in hidden tabs and while a sync is already running so
+    // open tabs don't pile up calls on the page token.
     const runSync = async () => {
       if (isSyncInFlight) return;
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
@@ -97,7 +97,7 @@ export function useChat(initialPsid?: string | null) {
     };
 
     runSync();
-    const interval = setInterval(runSync, 30000);
+    const interval = setInterval(runSync, 4000);
     return () => {
       isCancelled = true;
       clearInterval(interval);
