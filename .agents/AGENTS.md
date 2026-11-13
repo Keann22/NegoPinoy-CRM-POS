@@ -21,10 +21,13 @@ actually buys, receives, and counts, and what must stay confidential.
 - All shared types must be defined in `src/types/`, not inline inside component files.
 
 ### Locked business formulas
-- **Unallocated stock** (what is on the shelf, ready to pick) is fixed by the owner:
-  `max(0, stock_level + unpicked)`, in `src/lib/services/inventory/shelf-stock-service.ts`.
-  Do not change it or compute it anywhere else. See architecture.md, "Unallocated Stock =
-  What Is on the Shelf (LOCKED)".
+- **Unallocated stock** (what is on the shelf, ready to pick) is fixed by the owner.
+  Since 2026-11-13 screens show the **stored** number `products.shelf_stock` via
+  `shelfNumberOf()` in `src/lib/services/inventory/shelf-stock-service.ts`; the formula
+  `max(0, stock_level + unpicked)` is only the fallback. Do not compute it anywhere else.
+  Any code that changes `stock_level` outside orders, receipts and counts must also update
+  `shelf_stock` (`change_shelf_stock` / `set_shelf_stock`). See architecture.md, "Unallocated
+  Stock = What Is on the Shelf (LOCKED)".
 
 ### Security (2026-11-01)
 - **Staff roles come only from `app_metadata`**, via `src/lib/auth/staff-roles.ts`

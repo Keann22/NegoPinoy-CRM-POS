@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { bundleQtyPerUnit, getUnpickedQtyForProduct, PICKED_WITH_ISSUE, unallocatedFromStockLevel } from './shelf-stock-service';
+import { bundleQtyPerUnit, getUnpickedQtyForProduct, PICKED_WITH_ISSUE, shelfNumberOf } from './shelf-stock-service';
 import { applyPhysicalShelfCount } from './inventory-guardian-action-service';
 import { holdPickerCount } from './held-picker-count-service';
 import type { PickerShelfInfo, WaitingOrder } from '@/types/inventory-guardian.types';
@@ -48,13 +48,14 @@ async function unit2Stock(supabase: SupabaseClient, productIds: string[]): Promi
 export async function getShelfForProducts(supabase: SupabaseClient, productIds: string[]): Promise<Record<string, ShelfInfo>> {
   const ids = Array.from(new Set(productIds.filter(Boolean))).slice(0, 60);
   const [{ data: products }, u2] = await Promise.all([
-    supabase.from('products').select('id, stock_level').in('id', ids),
+    supabase.from('products').select('id, stock_level, shelf_stock').in('id', ids),
     unit2Stock(supabase, ids),
   ]);
   const out: Record<string, ShelfInfo> = {};
   await Promise.all((products || []).map(async (p: any) => {
     const unpicked = await getUnpickedQtyForProduct(supabase, p.id);
-    const unallocated = unallocatedFromStockLevel(p.stock_level, unpicked.qty);
+    // Stored shelf number (since 2026-11-13); formula only if the product has none.
+    const unallocated = shelfNumberOf(p, unpicked.qty);
     // Unit 2 is part of the shelf total, so it can't be more than it.
     out[p.id] = { unallocated, unit2: Math.min(u2.get(p.id) || 0, unallocated) };
   }));

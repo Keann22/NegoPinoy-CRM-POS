@@ -189,10 +189,15 @@ Receipts:
 - The receipt still gets checked on **Purchases & Receipts** (admin only):
   scan each supplier's receipt against what was received.
 
-## Planned: unallocated stock is kept and counted, not calculated (owner, 2026-10-30)
+## Unallocated stock is kept and counted, not calculated (owner, 2026-10-30; on screens 2026-11-13)
 
-Not built yet. Owner's direction; design and rollout in architecture.md,
-"Planned: Stored Shelf Stock and Physical Stock".
+**Live on every screen since 2026-11-13** (owner approved after the two-week
+trial: 2,908 of 2,920 products matched, 0 errors). The Procurement Sheet,
+Inventory List, Guardian, picker checks and Pabilang show the **stored** shelf
+number; the formula is only a fallback for products without one and a nightly
+drift check. Design: architecture.md, "Stored Shelf Stock and Physical Stock".
+Not built yet: the physical stock breakdown (On the shelf → Picked → Packed →
+Total).
 
 - **What staff count is unallocated stock** (the Guardian asks three staff to
   count 5 products a day). So unallocated stock is the number the system keeps,

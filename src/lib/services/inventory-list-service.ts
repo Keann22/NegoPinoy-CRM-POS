@@ -1,6 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { calculateProcurementDemand, fetchAllPages, getSingleProductProcurementDemand } from './procurement-demand-service';
-import { getUnpickedQtyForProduct, getUnpickedQtyMap, unallocatedFromStockLevel } from './inventory/shelf-stock-service';
+import { getUnpickedQtyForProduct, getUnpickedQtyMap, shelfNumberOf } from './inventory/shelf-stock-service';
 
 export interface InventoryListStockInfo {
   unallocatedStock: number;
@@ -22,7 +22,7 @@ export async function getInventoryListStockInfo(
   const products = await fetchAllPages<any>((from, to) =>
     supabase
       .from('products')
-      .select('id, stock_level, assembly_recipe')
+      .select('id, stock_level, shelf_stock, assembly_recipe')
       .not('name', 'ilike', '[DELETED]%')
       .order('id')
       .range(from, to)
@@ -85,7 +85,7 @@ export async function getSingleProductStockInfo(
   productId: string
 ): Promise<InventoryListStockInfo | null> {
   const [{ data: product }, demand, unpicked, { data: memories, count }] = await Promise.all([
-    supabase.from('products').select('id, stock_level, assembly_recipe').eq('id', productId).single(),
+    supabase.from('products').select('id, stock_level, shelf_stock, assembly_recipe').eq('id', productId).single(),
     getSingleProductProcurementDemand(supabase, productId),
     getUnpickedQtyForProduct(supabase, productId),
     supabase
@@ -107,13 +107,14 @@ export async function getSingleProductStockInfo(
 }
 
 function buildStockInfo(
-  p: { stock_level: number | null; assembly_recipe: any },
+  p: { stock_level: number | null; shelf_stock?: number | null; assembly_recipe: any },
   unscannedLayawayQty: number,
   unpickedQty: number,
   lastEdit: { editedAt: string; editedBy: string; count: number } | undefined
 ): InventoryListStockInfo {
   return {
-    unallocatedStock: unallocatedFromStockLevel(p.stock_level, unpickedQty),
+    // Stored shelf number (since 2026-11-13); formula only if the product has none.
+    unallocatedStock: shelfNumberOf(p, unpickedQty),
     unscannedLayawayQty,
     isBundle: Array.isArray(p.assembly_recipe) && p.assembly_recipe.length > 0,
     lastEditedAt: lastEdit ? lastEdit.editedAt : null,

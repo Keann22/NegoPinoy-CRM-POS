@@ -27,6 +27,13 @@ import { fetchAllPages } from '../procurement-demand-service';
  *
  * Every screen that shows unallocated stock and every edit that writes it must
  * go through this file.
+ *
+ * SINCE 2026-11-13 (owner approved after the 2-week trial): screens show the
+ * STORED shelf number, products.shelf_stock, through shelfNumberOf(). It is kept
+ * by the database (+ receive/return, − pick, + put back, = count; see
+ * architecture.md "Stored Shelf Stock"). The meaning above is unchanged; the
+ * formula is now only the fallback for products with no stored number yet
+ * (bundles, products never received) and the nightly drift check.
  */
 
 export const UNPICKED_STATUSES = ['Pending Payment', 'Processing', 'Waiting for Stock', 'On-Hold'];
@@ -35,6 +42,20 @@ export const PICKED_WITH_ISSUE = 'Picked (with issue)';
 /** The locked formula: shelf stock from stock_level and the unpicked qty. */
 export function unallocatedFromStockLevel(stockLevel: number | null | undefined, unpickedQty: number): number {
   return Math.max(0, (stockLevel ?? 0) + unpickedQty);
+}
+
+/**
+ * What every screen shows as unallocated (on the shelf, ready to pick): the
+ * stored shelf number, never below 0. A negative stored number means more was
+ * picked than the system had; it shows as 0 like the formula did. Falls back to
+ * the formula when the product has no stored number (shelf_stock is null).
+ */
+export function shelfNumberOf(
+  product: { shelf_stock?: number | null; stock_level?: number | null },
+  unpickedQty: number
+): number {
+  if (product.shelf_stock != null) return Math.max(0, Number(product.shelf_stock));
+  return unallocatedFromStockLevel(product.stock_level, unpickedQty);
 }
 
 /** The same formula backwards: the stock_level that makes unallocated equal a shelf count. */

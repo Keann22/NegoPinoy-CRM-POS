@@ -2,7 +2,7 @@ import { getItemPriorities, priorityRank } from './procurement-priority-service'
 import { SupabaseClient } from '@supabase/supabase-js';
 import { migrateLeakedBundleDrafts, autoCleanupStaffDrafts } from './procurement-service';
 import { calculateProcurementDemand, fetchAllPages } from './procurement-demand-service';
-import { getUnpickedQtyMap, unallocatedFromStockLevel } from './inventory/shelf-stock-service';
+import { getUnpickedQtyMap, shelfNumberOf } from './inventory/shelf-stock-service';
 import { scoreShelfCount } from './inventory/count-match';
 import { getNegativeStockReconciliationItems } from './procurement-reconciliation-service';
 import { getOwedReplacements } from './supplier-return-service';
@@ -86,7 +86,7 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
   const [{ data: liveOS, error: lErr }, unpickedMap, owedMap] = await Promise.all([
     supabase
       .from('products')
-      .select('id, name, variant_name, stock_level, supplier_id, initial_unit_cost, supplier_pricing, parent_id')
+      .select('id, name, variant_name, stock_level, shelf_stock, supplier_id, initial_unit_cost, supplier_pricing, parent_id')
       .in('id', Array.from(productIdsToFetch)),
     getUnpickedQtyMap(supabase),
     // Replacements suppliers still owe (Supplier Returns): shown so nobody buys twice.
@@ -253,8 +253,8 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
     }
 
     const unscannedLayawayQty = unscannedLayawayMap.get(p.id) || 0;
-    // LOCKED formula (shelf-stock-service.ts): what is on the shelf, ready to pick.
-    const physicalStock = unallocatedFromStockLevel(p.stock_level, unpickedMap.get(p.id) || 0);
+    // What is on the shelf, ready to pick: the stored shelf number (since 2026-11-13), shelf-stock-service.ts.
+    const physicalStock = shelfNumberOf(p, unpickedMap.get(p.id) || 0);
     const totalOpenDemandQty = totalOpenDemandMap.get(p.id) || 0;
     const needToBuyQty = needToBuyMap.get(p.id) || 0;
     const openUnscannedQty = openUnscannedMap.get(p.id) || 0;
