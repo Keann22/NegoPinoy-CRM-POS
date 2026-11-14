@@ -1,0 +1,106 @@
+[
+  {
+    "id": "2113ae1f-4b3e-4695-a776-3c486584067a",
+    "name": "Stainless Steamer/Casserole with Wide Glass Cover - 28cm",
+    "shelf_stock": 9,
+    "stock_level": 3,
+    "unit1_row": 3,
+    "unit2_row": 0
+  },
+  {
+    "id": "1ff00146-457e-4a39-9519-10ce1bd63367",
+    "name": "Stainless Steamer/Casserole with Wide Glass Cover - 30cm",
+    "shelf_stock": 1,
+    "stock_level": -1,
+    "unit1_row": -1,
+    "unit2_row": 0
+  },
+  {
+    "id": "2725d874-a3f1-4a0f-b527-df0d1f1a5ef4",
+    "name": "Stainless Steamer/Casserole with Wide Glass Cover-32cm",
+    "shelf_stock": 8,
+    "stock_level": 2,
+    "unit1_row": 2,
+    "unit2_row": 0
+  },
+  {
+    "id": "af6de63c-1c76-4bfb-8326-cf44cc8bc90c",
+    "name": "Stainless Steamer/Casserole with Wide Glass Cover 34CM",
+    "shelf_stock": 7,
+    "stock_level": 2,
+    "unit1_row": 2,
+    "unit2_row": 0
+  },
+  {
+    "id": "35060b9c-5f01-4ac8-aa11-1a478735ecb0",
+    "name": "Stainless Steamer/Casserole with Wide Glass Cover-36cm",
+    "shelf_stock": 11,
+    "stock_level": 3,
+    "unit1_row": 3,
+    "unit2_row": 0
+  },
+  {
+    "id": "c4b5bf04-35f2-489e-b805-bc5c1ec7a1c2",
+    "name": "Pressure cooker 3 valve - 8L",
+    "shelf_stock": 12,
+    "stock_level": 4,
+    "unit1_row": 4,
+    "unit2_row": 0
+  },
+  {
+    "id": "b289e5ed-e243-4663-b341-1951b89b700b",
+    "name": "Pressure cooker 3 valve - 6L",
+    "shelf_stock": 13,
+    "stock_level": 4,
+    "unit1_row": 4,
+    "unit2_row": 0
+  },
+  {
+    "id": "f510dce6-86c9-4c6f-afee-c9a7838bdc02",
+    "name": "Pressure cooker 3 valve - 10L",
+    "shelf_stock": 3,
+    "stock_level": -2,
+    "unit1_row": -2,
+    "unit2_row": 0
+  },
+  {
+    "id": "5f2ddba9-e44c-4cc2-a8ee-5ec7469f8615",
+    "name": "Pressure cooker 3 valve - 12L",
+    "shelf_stock": 5,
+    "stock_level": 4,
+    "unit1_row": 4,
+    "unit2_row": 0
+  },
+  {
+    "id": "83426a3c-6a22-4f6b-a267-e98b2ec3ed57",
+    "name": "Stainless rice barrel - 25kg",
+    "shelf_stock": 21,
+    "stock_level": 3,
+    "unit1_row": 3,
+    "unit2_row": 0
+  },
+  {
+    "id": "006444b5-b9d1-437b-a483-c883242fe7b2",
+    "name": "Stainless rice barrel - 43kg SLIM",
+    "shelf_stock": 7,
+    "stock_level": 2,
+    "unit1_row": 2,
+    "unit2_row": 0
+  },
+  {
+    "id": "63775c7f-8520-432a-9df4-ac929102b74f",
+    "name": "Stainless rice barrel - 8kg",
+    "shelf_stock": 0,
+    "stock_level": -1,
+    "unit1_row": -1,
+    "unit2_row": 0
+  },
+  {
+    "id": "4f50ca2b-835b-4ba3-85a9-ec4d33b9cf96",
+    "name": "Stainless rice barrel - 15kg",
+    "shelf_stock": 3,
+    "stock_level": -2,
+    "unit1_row": -2,
+    "unit2_row": 0
+  }
+]
