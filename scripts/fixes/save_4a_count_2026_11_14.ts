@@ -9,7 +9,8 @@ import { createClient } from '@supabase/supabase-js';
 import { applyPhysicalShelfCount } from '../../src/lib/services/inventory/inventory-guardian-action-service';
 import { getUnpickedQtyForProduct } from '../../src/lib/services/inventory/shelf-stock-service';
 
-const COUNTS: [string, number][] = [
+const SET = process.argv.filter((a) => a.startsWith('--set=')).map((a) => a.slice(6).split('=')).map(([id, n]) => [id, Number(n)] as [string, number]);
+const ALL: [string, number][] = [
   ['2113ae1f-4b3e-4695-a776-3c486584067a', 8],  // Steamer/Casserole 28cm
   ['1ff00146-457e-4a39-9519-10ce1bd63367', 5],  // 30cm
   ['2725d874-a3f1-4a0f-b527-df0d1f1a5ef4', 7],  // 32cm
@@ -23,7 +24,10 @@ const COUNTS: [string, number][] = [
   ['006444b5-b9d1-437b-a483-c883242fe7b2', 4],  // 43kg SLIM
   ['63775c7f-8520-432a-9df4-ac929102b74f', 2],  // 8kg
   ['4f50ca2b-835b-4ba3-85a9-ec4d33b9cf96', 2],  // 15kg
+  // Added later: Stainless Charcoal Stove 1 (cab4e798-63bf-4857-b35f-abe11905bc65), run with --set=<id>=1
 ];
+// --set=<productId>=<count> saves only those (backup gets its own file).
+const COUNTS = SET.length ? SET : ALL;
 const ACTOR = 'Owner (4A count 2026-11-14)';
 const NOTE = '4A counted by staff, 3C empty (owner, 2026-11-14): 4A';
 
@@ -53,6 +57,6 @@ const apply = process.argv.includes('--apply');
     });
     await applyPhysicalShelfCount(sb as any, { productId: id, physicalShelfCount: count, notes: `${NOTE} ${count}, 3C 0. ${ACTOR}`, actorName: ACTOR });
   }
-  if (apply) fs.writeFileSync('scripts/reports/4a_count_2026_11_14_before.json', JSON.stringify(backup, null, 2));
-  console.log(apply ? 'APPLIED (backup scripts/reports/4a_count_2026_11_14_before.json)' : 'dry run');
+  if (apply) fs.writeFileSync(SET.length ? `scripts/reports/4a_count_2026_11_14_before_${SET.map(([id]) => id.slice(0, 8)).join('_')}.json` : 'scripts/reports/4a_count_2026_11_14_before.json', JSON.stringify(backup, null, 2));
+  console.log(apply ? 'APPLIED (backup in scripts/reports)' : 'dry run');
 })();
