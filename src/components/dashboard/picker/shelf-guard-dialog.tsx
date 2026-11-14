@@ -119,9 +119,9 @@ export function ShelfGuardDialog({ prompt, onCount, onNotReceived, onBothEmpty, 
               <div className="space-y-2 rounded-md border p-3">
                 <Label htmlFor="sg-count" className="font-semibold">It&apos;s on the shelf: count it</Label>
                 <p className="text-xs text-muted-foreground">
-                  How many are on the Unit 1 shelf now, including the ones in your hand? Leave out anything from a delivery that isn&apos;t received yet.
+                  How many are on the 3C shelf now, including the ones in your hand? Leave out anything from a delivery that isn&apos;t received yet.
                   If you count more than the system has, the extra isn&apos;t added until the owners record the purchase.
-                  {prompt.unit2 > 0 && ` Unit 2 reserve is recorded with ${prompt.unit2}: check there too, but leave those out of this count.`}
+                  {prompt.unit2 > 0 && ` 4A reserve is recorded with ${prompt.unit2}: check there too, but leave those out of this count.`}
                 </p>
                 <div className="flex gap-2">
                   <Input id="sg-count" type="number" inputMode="numeric" min={0} value={count} onChange={(e) => setCount(e.target.value)} className="w-28" />
@@ -145,14 +145,14 @@ export function ShelfGuardDialog({ prompt, onCount, onNotReceived, onBothEmpty, 
               <DialogTitle>Check the shelf before borrowing</DialogTitle>
               <DialogDescription>
                 The system says there are still {prompt.available} of {prompt.productName} available.
-                Look on the Unit 1 shelf{prompt.unit2 > 0 ? ` and in Unit 2 reserve (${prompt.unit2} there)` : ' and in Unit 2 reserve'} first.
-                Unit 2 stock is free to take; borrowing takes another customer&apos;s item.
+                Look on the 3C shelf{prompt.unit2 > 0 ? ` and in the 4A reserve (${prompt.unit2} there)` : ' and in the 4A reserve'} first.
+                4A stock is free to take; borrowing takes another customer&apos;s item.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-2">
               <Button className="w-full" disabled={saving} onClick={onClose}>Found it: go back and tap Found</Button>
               <Button variant="outline" className="w-full whitespace-normal h-auto py-2" disabled={saving} onClick={() => run(onBothEmpty)}>
-                {saving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}I checked Unit 1 and Unit 2: none there → borrow
+                {saving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}I checked 3C and 4A: none there → borrow
               </Button>
               <p className="text-xs text-muted-foreground">This is saved as a shelf count of 0.</p>
             </div>

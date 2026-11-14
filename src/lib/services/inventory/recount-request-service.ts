@@ -110,7 +110,7 @@ export async function completeRecount(
   input: { id: string; unit1: number; actorName: string }
 ) {
   const unit1 = Math.round(Number(input.unit1));
-  if (!(unit1 >= 0)) throw new RecountError('Ilagay ang bilang sa Unit 1 (0 kung wala).');
+  if (!(unit1 >= 0)) throw new RecountError('Ilagay ang bilang sa 3C (0 kung wala).');
 
   const { data: req, error } = await supabase.from('recount_requests').select('*').eq('id', input.id).single();
   if (error || !req) throw new RecountError('Request not found.');
@@ -131,7 +131,7 @@ export async function completeRecount(
     await applyPhysicalShelfCount(supabase, {
       productId: req.product_id,
       physicalShelfCount: unit1 + unit2Kept,
-      notes: `Recount requested by ${req.requested_by_name || 'owner'}: Unit 1 ${unit1}${unit2Kept ? ` + Unit 2 ${unit2Kept} (kept, not counted)` : ''}. Counted by ${input.actorName}.`,
+      notes: `Recount requested by ${req.requested_by_name || 'owner'}: 3C ${unit1}${unit2Kept ? ` + 4A ${unit2Kept} (kept, not counted)` : ''}. Counted by ${input.actorName}.`,
       actorName: input.actorName,
     });
   } catch (e) {
@@ -182,7 +182,7 @@ export async function notifyIfBatchDone(supabase: SupabaseClient, batchId: strin
     const before = r.system_before;
     const diff = before == null ? null : before - total;
     const verdict = diff == null ? '' : diff > 0 ? `, sobra ng ${diff} ang system` : diff < 0 ? `, kulang ng ${-diff} ang system` : ', tama ang system';
-    const counted = unit1Only ? `Unit 1 <b>${total}</b>` : `<b>${total}</b> (Unit 1 ${r.counted_unit1}, Unit 2 ${r.counted_unit2})`;
+    const counted = unit1Only ? `3C <b>${total}</b>` : `<b>${total}</b> (3C ${r.counted_unit1}, 4A ${r.counted_unit2})`;
     return `✅ ${esc(r.productName)}: ${counted}` +
       `${before != null ? `, dati ${before}` : ''}${verdict} — ${esc(r.done_by_name || 'Jas')}, ${phTime(r.done_at)}`;
   });

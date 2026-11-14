@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { ArrowRight, History } from 'lucide-react';
 import type { StockTransfer } from '@/types';
+import { warehouseLabel } from '@/lib/warehouse-labels';
 
 interface TransferHistoryProps {
   transfers: StockTransfer[];
@@ -16,7 +17,7 @@ export function TransferHistory({ transfers }: TransferHistoryProps) {
       <div className="flex flex-col items-center justify-center p-8 border rounded-lg bg-card text-center text-muted-foreground">
         <History className="h-10 w-10 text-muted-foreground/50 mb-2" />
         <p className="font-medium text-foreground">No transfer history recorded yet.</p>
-        <p className="text-xs">Internal movements between Unit 1 and Unit 2 will appear here.</p>
+        <p className="text-xs">Movements between 3C and 4A will appear here.</p>
       </div>
     );
   }
@@ -47,9 +48,9 @@ export function TransferHistory({ transfers }: TransferHistoryProps) {
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1.5 text-xs font-medium">
-                    <span className="text-muted-foreground">{tr.from_warehouse?.name || 'Unit 2'}</span>
+                    <span className="text-muted-foreground">{warehouseLabel(tr.from_warehouse?.code, tr.from_warehouse?.name) || '4A'}</span>
                     <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-foreground">{tr.to_warehouse?.name || 'Unit 1'}</span>
+                    <span className="text-foreground">{warehouseLabel(tr.to_warehouse?.code, tr.to_warehouse?.name) || '3C'}</span>
                   </div>
                 </TableCell>
                 <TableCell>

@@ -112,7 +112,7 @@ export async function getRecentPickerCounts(supabase: SupabaseClient, productIds
   (data || []).forEach((m: any) => {
     if (out.has(m.product_id)) return;
     const reason = String(m.reason || '');
-    const unit1 = reason.match(/Unit 1 (\d+)/);
+    const unit1 = reason.match(/(?:Unit 1|3C) (\d+)/);
     const by = reason.match(/Counted by picker (.+?) while picking/);
     out.set(m.product_id, { at: m.timestamp, unit1: unit1 ? Number(unit1[1]) : null, byName: by ? by[1] : null });
   });
@@ -182,20 +182,20 @@ export async function savePickerShelfCount(
   let unit2Why: string | null = null;
   let n: number | null = null;
   if (input.bothEmpty) {
-    unit2Why = `Picker checked Unit 2 before borrowing${orderTag}`;
+    unit2Why = `Picker checked 4A before borrowing${orderTag}`;
     total = 0;
-    note = `Picker checked Unit 1 and Unit 2 before borrowing${orderTag}: both empty.`;
+    note = `Picker checked 3C and 4A before borrowing${orderTag}: both empty.`;
   } else {
     n = Math.round(Number(input.unit1Count));
     if (!(n >= 0) || n > 100000) throw new Error('Enter how many are on the shelf.');
     if (input.unit2Empty) {
       // Tapped OS: the system said there should be some, the picker looked in both units.
-      unit2Why = `Picker checked Unit 2 after tapping OS${orderTag}`;
+      unit2Why = `Picker checked 4A after tapping OS${orderTag}`;
       total = n;
-      note = `Counted by picker ${actorName} while picking${orderTag} (tapped OS): Unit 1 ${n}, Unit 2 empty${before.unit2 ? ` (was ${before.unit2})` : ''}.`;
+      note = `Counted by picker ${actorName} while picking${orderTag} (tapped OS): 3C ${n}, 4A empty${before.unit2 ? ` (was ${before.unit2})` : ''}.`;
     } else {
       total = n + before.unit2;
-      note = `Counted by picker ${actorName} while picking${orderTag}: Unit 1 ${n}${before.unit2 ? ` + Unit 2 ${before.unit2} (kept)` : ''}.`;
+      note = `Counted by picker ${actorName} while picking${orderTag}: 3C ${n}${before.unit2 ? ` + 4A ${before.unit2} (kept)` : ''}.`;
     }
   }
 
@@ -295,7 +295,7 @@ export async function syncUnit2AfterPick(
     p_from_warehouse_id: u2,
     p_to_warehouse_id: u1,
     p_items: items,
-    p_notes: `Picked from Unit 2${orderTag}: Unit 2 was recorded with more than the whole shelf`,
+    p_notes: `Picked from 4A${orderTag}: 4A was recorded with more than the whole shelf`,
     p_created_by: actorName,
   });
   if (error) throw error;

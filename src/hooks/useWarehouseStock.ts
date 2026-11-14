@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSupabase, useUser } from '@/lib/supabase/hooks';
 import type { Warehouse, StockTransfer, ReplenishmentSuggestion } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { getUnitShelfForProducts } from '@/lib/services/inventory/unit-shelf-service';
 
 export function useWarehouseStock() {
   const supabase = useSupabase();
@@ -35,7 +36,7 @@ export function useWarehouseStock() {
     }
   }, [supabase]);
 
-  // Fetch replenishment suggestions (Unit 1 low, Unit 2 has reserve)
+  // Fetch replenishment suggestions (3C low, 4A has reserve)
   const fetchReplenishmentSuggestions = useCallback(async () => {
     if (!supabase) return;
     setLoading(true);
@@ -73,12 +74,22 @@ export function useWarehouseStock() {
 
       const u1Map = new Map((u1Stock || []).map((row: any) => [row.product_id, row]));
 
+      // Pieces physically in each unit: the shelf number split into 3C / 4A.
+      // The 3C row's stock_level has unpicked orders taken off, so it can't say
+      // whether the shelf is low.
+      const { data: shelfRows } = await supabase
+        .from('products')
+        .select('id, stock_level, shelf_stock')
+        .in('id', productIds);
+      const shelfMap = await getUnitShelfForProducts(supabase, shelfRows || [], unit2.id);
+
       const results: ReplenishmentSuggestion[] = [];
       for (const row of u2Stock as any[]) {
         const u1: any = u1Map.get(row.product_id);
-        const u1Level = u1?.stock_level ?? 0;
+        const shelf = shelfMap.get(row.product_id);
+        const u1Level = shelf?.unit1 ?? 0;
         const threshold = u1?.reorder_threshold ?? 5;
-        const u2Level = row.stock_level ?? 0;
+        const u2Level = shelf?.unit2 ?? 0;
 
         // If Unit 1 is low or empty
         const prod: any = row.products;

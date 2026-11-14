@@ -300,6 +300,10 @@ The system supports multi-warehouse inventory tracking with **Strategy A**:
 - **Unit 1 (`UNIT1`) — Fulfillment Hub**: Active pick & pack, courier dispatch (SPX staging), fast-moving items on accessible picking shelves.
 - **Unit 2 (`UNIT2`) — Reserve & Inbound**: Unopened master cartons, bulk reserve, and supplier delivery receiving.
 
+**Renamed 2026-11-14 (owner): Unit 1 = "3C", Unit 2 = "4A".** `warehouses.name` is now `3C` / `4A`; the codes stay `UNIT1` / `UNIT2` (code relies on them). Screen text uses `UNIT1_LABEL` / `UNIT2_LABEL` / `warehouseLabel()` from `src/lib/warehouse-labels.ts`. Movement notes written from then on say "3C N" instead of "Unit 1 N"; `getRecentPickerCounts` reads both.
+
+**Per-unit numbers on screens = shelf pieces (2026-11-14).** `product_warehouse_stock.stock_level` is still "system stock": every new order takes its pieces off the 3C row before it is picked, so that row went negative while the pieces were on the shelf (2026-11-14: 334 products, −1,135; 319 of them fully explained by unpicked orders). Screens now show `unit-shelf-service.ts`: **4A = recorded 4A, capped at the shelf total, never below 0; 3C = shelf number (`shelfNumberOf`) − 4A; total = shelf number**, so 3C + 4A = unallocated everywhere. The old number is shown only as "Free to sell". Used by Transfers (Warehouse overview totals and table, Quick Transfer "available", Runner Sheet low check) and the product details pop-up. The stored rows and how orders deduct from them are unchanged.
+
 #### Bi-Directional Total Synchronization (Zero Breakage Guarantee)
 To guarantee 100% backward compatibility with POS orders, P&L reports, and the separate `/website` e-commerce app:
 1. `products.stock_level` is always the **Total Catalog Stock** across all warehouses.

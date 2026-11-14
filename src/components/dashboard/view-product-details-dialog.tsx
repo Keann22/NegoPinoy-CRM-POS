@@ -5,6 +5,8 @@ import { ZoomableImage } from "@/components/ui/zoomable-image";
 import { useSupabase } from "@/lib/supabase/hooks";
 import { useState, useEffect } from "react";
 import { useRoleCheck } from "@/hooks/useRoleCheck";
+import { getUnitShelfForProduct } from "@/lib/services/inventory/unit-shelf-service";
+import { warehouseLabel } from "@/lib/warehouse-labels";
 
 interface ViewProductDetailsDialogProps {
   product: FormattedProduct | null;
@@ -16,19 +18,31 @@ export function ViewProductDetailsDialog({ product, open, onOpenChange }: ViewPr
   const supabase = useSupabase();
   const { isManagement } = useRoleCheck();
   const [warehouseStock, setWarehouseStock] = useState<any[]>([]);
+  const [shelfTotal, setShelfTotal] = useState<number | null>(null);
 
   useEffect(() => {
     if (!product?.id || !open || !supabase) return;
+    setShelfTotal(null);
     const loadStock = async () => {
       try {
-        const { data } = await supabase
-          .from('product_warehouse_stock')
-          .select('stock_level, shelf_location, warehouse:warehouses(name, code, is_fulfillment_hub)')
-          .eq('product_id', product.id);
+        const [{ data }, shelf] = await Promise.all([
+          supabase
+            .from('product_warehouse_stock')
+            .select('stock_level, shelf_location, warehouse:warehouses(name, code, is_fulfillment_hub)')
+            .eq('product_id', product.id),
+          getUnitShelfForProduct(supabase, product.id),
+        ]);
+        setShelfTotal(shelf?.total ?? null);
         if (data) {
+          // Pieces physically in each unit (shelf number split into 3C / 4A),
+          // not the system stock that unpicked orders were taken off.
+          const rows = data.map((ws: any) => ({
+            ...ws,
+            pieces: ws.warehouse?.code === 'UNIT2' ? shelf?.unit2 ?? 0 : shelf?.unit1 ?? 0,
+          }));
           // Sort fulfillment hub first
-          data.sort((a: any, b: any) => (b.warehouse?.is_fulfillment_hub ? 1 : 0) - (a.warehouse?.is_fulfillment_hub ? 1 : 0));
-          setWarehouseStock(data);
+          rows.sort((a: any, b: any) => (b.warehouse?.is_fulfillment_hub ? 1 : 0) - (a.warehouse?.is_fulfillment_hub ? 1 : 0));
+          setWarehouseStock(rows);
         }
       } catch (err) {
         console.error('Failed to load warehouse stock:', err);
@@ -102,8 +116,9 @@ export function ViewProductDetailsDialog({ product, open, onOpenChange }: ViewPr
                   )}
               </div>
               <div>
-                  <h4 className="text-sm font-medium text-muted-foreground">Total Stock</h4>
-                  <p className="text-sm font-semibold mt-1">{product.quantityOnHand} pcs</p>
+                  <h4 className="text-sm font-medium text-muted-foreground">Total on hand</h4>
+                  <p className="text-sm font-semibold mt-1">{shelfTotal ?? Math.max(0, product.quantityOnHand)} pcs</p>
+                  <p className="text-[11px] text-muted-foreground">Free to sell: {product.quantityOnHand}</p>
               </div>
           </div>
 
@@ -115,13 +130,13 @@ export function ViewProductDetailsDialog({ product, open, onOpenChange }: ViewPr
                 {warehouseStock.map((ws, i) => (
                   <div key={i} className="border rounded-lg p-3 bg-muted/20 flex flex-col justify-between">
                     <div className="flex items-center justify-between gap-1">
-                      <span className="text-xs font-semibold text-foreground">{ws.warehouse?.name}</span>
+                      <span className="text-xs font-semibold text-foreground">{warehouseLabel(ws.warehouse?.code, ws.warehouse?.name)}</span>
                       <Badge variant={ws.warehouse?.is_fulfillment_hub ? 'default' : 'secondary'} className="text-[10px] px-1.5 py-0">
-                        {ws.warehouse?.code}
+                        {ws.warehouse?.is_fulfillment_hub ? 'Main shelf' : 'Reserve'}
                       </Badge>
                     </div>
                     <div className="mt-2.5 flex items-baseline justify-between">
-                      <span className="text-xl font-bold">{ws.stock_level} pcs</span>
+                      <span className="text-xl font-bold">{ws.pieces} pcs</span>
                       <span className="text-xs font-mono text-muted-foreground">
                         {ws.shelf_location ? `Shelf: ${ws.shelf_location}` : 'No shelf'}
                       </span>

@@ -60,7 +60,7 @@ export function ReplenishmentTable({
         <div>
           <h3 className="text-lg font-semibold">Replenishment Runner Sheet</h3>
           <p className="text-sm text-muted-foreground">
-            Products that are low or empty on Unit 1 picking shelves, but have stock available in Unit 2 Reserve.
+            Products that are low or empty on the 3C shelf, but have pieces in the 4A reserve.
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={onRefresh} disabled={loading}>
@@ -72,8 +72,8 @@ export function ReplenishmentTable({
       {suggestions.length === 0 ? (
         <div className="flex flex-col items-center justify-center p-8 border rounded-lg bg-card text-center text-muted-foreground">
           <CheckCircle className="h-10 w-10 text-emerald-500 mb-2" />
-          <p className="font-medium text-foreground">Unit 1 picking shelves are well-stocked!</p>
-          <p className="text-xs">No products currently require replenishment from Unit 2.</p>
+          <p className="font-medium text-foreground">The 3C shelf is well-stocked!</p>
+          <p className="text-xs">Nothing needs to be brought over from 4A.</p>
         </div>
       ) : (
         <div className="border rounded-lg overflow-hidden bg-card">
@@ -81,9 +81,9 @@ export function ReplenishmentTable({
             <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead className="w-[35%]">Product</TableHead>
-                <TableHead className="text-center">Unit 1 Shelf</TableHead>
-                <TableHead className="text-center">Unit 1 (Active)</TableHead>
-                <TableHead className="text-center">Unit 2 (Reserve)</TableHead>
+                <TableHead className="text-center">3C Shelf</TableHead>
+                <TableHead className="text-center">3C</TableHead>
+                <TableHead className="text-center">4A</TableHead>
                 <TableHead className="text-center w-[120px]">Transfer Qty</TableHead>
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
@@ -140,7 +140,7 @@ export function ReplenishmentTable({
                         ) : (
                           <ArrowRight className="h-4 w-4 mr-1" />
                         )}
-                        Transfer to Unit 1
+                        Transfer to 3C
                       </Button>
                     </TableCell>
                   </TableRow>

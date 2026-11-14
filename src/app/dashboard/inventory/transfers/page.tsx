@@ -30,7 +30,7 @@ export default function StockTransfersPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Multi-Warehouse & Stock Transfers</h1>
           <p className="text-muted-foreground text-sm">
-            Overview of Unit 1 (Fulfillment Hub) vs Unit 2 (Reserve Storage) inventory and replenishment.
+            What is on the 3C shelf vs the 4A reserve, and what to move.
           </p>
         </div>
       </div>
@@ -94,7 +94,7 @@ export default function StockTransfersPage() {
             <CardHeader>
               <CardTitle className="text-lg font-semibold">Transfer History</CardTitle>
               <CardDescription>
-                Recent movements between Unit 1 and Unit 2 storage units.
+                Recent movements between 3C and 4A.
               </CardDescription>
             </CardHeader>
             <CardContent>

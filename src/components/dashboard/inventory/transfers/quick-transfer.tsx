@@ -10,6 +10,7 @@ import { ProductSearch } from '@/components/dashboard/inventory/product-search';
 import { ArrowRightLeft, Loader2, PackageCheck } from 'lucide-react';
 import type { Warehouse } from '@/types';
 import { useSupabase } from '@/lib/supabase/hooks';
+import { getUnitShelfForProduct } from '@/lib/services/inventory/unit-shelf-service';
 
 interface QuickTransferProps {
   warehouses: Warehouse[];
@@ -40,14 +41,10 @@ export function QuickTransfer({ warehouses, isTransferring, onTransfer }: QuickT
     if (!supabase || !productId || !whId) return;
     setLoadingStock(true);
     try {
-      const { data } = await supabase
-        .from('product_warehouse_stock')
-        .select('stock_level')
-        .eq('product_id', productId)
-        .eq('warehouse_id', whId)
-        .maybeSingle();
-
-      setFromStock(data?.stock_level ?? 0);
+      // Pieces physically in that unit (shelf number split into 3C / 4A), not
+      // the system stock that unpicked orders have already been taken off.
+      const shelf = await getUnitShelfForProduct(supabase, productId);
+      setFromStock(whId === unit2?.id ? shelf?.unit2 ?? 0 : shelf?.unit1 ?? 0);
     } catch {
       setFromStock(0);
     } finally {
@@ -106,7 +103,7 @@ export function QuickTransfer({ warehouses, isTransferring, onTransfer }: QuickT
           Quick Stock Transfer
         </CardTitle>
         <CardDescription>
-          Move items between Unit 2 (Reserve) and Unit 1 (Fulfillment Hub).
+          Move items between 4A (reserve) and 3C (main shelf).
         </CardDescription>
       </CardHeader>
       <CardContent>

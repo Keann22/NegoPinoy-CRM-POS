@@ -88,7 +88,7 @@ export function OsShelfCheck({ prompt, saving, onSave, onFindOrders, onGiveAway,
       <DialogHeader>
         <DialogTitle>The system says this should be on the shelf</DialogTitle>
         <DialogDescription>
-          {prompt.productName}: before marking OS, look again on the Unit 1 shelf, in nearby bins and in Unit 2 reserve.
+          {prompt.productName}: before marking OS, look again on the 3C shelf, in nearby bins and in the 4A reserve.
           Check the size and color too: it may be the wrong variant.
         </DialogDescription>
       </DialogHeader>
@@ -105,7 +105,7 @@ export function OsShelfCheck({ prompt, saving, onSave, onFindOrders, onGiveAway,
         <div className="space-y-2 rounded-md border p-3">
           <Label htmlFor="os-count" className="font-semibold">Found some, or none? Count them</Label>
           <p className="text-xs text-muted-foreground">
-            How many did you find in total? Count the ones in your hand, on the Unit 1 shelf, in nearby bins and in Unit 2.
+            How many did you find in total? Count the ones in your hand, on the 3C shelf, in nearby bins and in 4A.
             Type 0 if there are none. This fixes the system&apos;s number (if you find more than the system has, the extra
             waits for the owners to record the purchase).
           </p>
@@ -113,7 +113,7 @@ export function OsShelfCheck({ prompt, saving, onSave, onFindOrders, onGiveAway,
             <label className="flex items-start gap-2 rounded-md bg-blue-50 p-2 text-xs text-blue-950">
               <input type="checkbox" className="mt-0.5 h-4 w-4" checked={unit2Checked} onChange={(e) => setUnit2Checked(e.target.checked)} />
               <span>
-                Unit 2 reserve is recorded with {prompt.unit2}. <strong>I checked Unit 2 too</strong> (any pieces there are in my count).
+                4A reserve is recorded with {prompt.unit2}. <strong>I checked 4A too</strong> (any pieces there are in my count).
               </span>
             </label>
           )}

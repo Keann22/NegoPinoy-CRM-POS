@@ -129,6 +129,13 @@ Receipts:
   kept in Unit 2 (none right now). Receiving had put every delivery into Unit 2
   by default, so on 2026-11-07 all Unit 2 numbers (4,068 pieces, 550 products)
   were moved to Unit 1 and Receiving now defaults to Unit 1.
+- **Unit 1 is called 3C and Unit 2 is called 4A (owner, 2026-11-14).** Every
+  screen says 3C / 4A now.
+- **3C and 4A show what's physically there (owner, 2026-11-14).** 3C + 4A =
+  unallocated stock. The 3C number used to be "free to sell" (shelf minus orders
+  not picked yet), so 334 products looked negative while the pieces were on the
+  shelf (e.g. Ha130 Food Warmer 37cm: 40 on the shelf, shown as −21). The old
+  number is still shown as "Free to sell".
 - **Unit 2 reserve is free stock, not borrowing.** If unallocated stock is above
   zero, the picker can't borrow from another order until they confirm **both
   Unit 1 and Unit 2 are empty**; that confirmation is saved as a count of 0.

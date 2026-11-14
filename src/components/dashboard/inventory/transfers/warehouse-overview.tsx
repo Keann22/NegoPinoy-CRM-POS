@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Building2, Warehouse, Search, Loader2, ArrowRight } from 'lucide-react';
 import { useSupabase } from '@/lib/supabase/hooks';
 import type { Warehouse as WarehouseType } from '@/types';
+import { getUnitShelfForProducts, getUnitShelfTotals } from '@/lib/services/inventory/unit-shelf-service';
+import { UNIT1_LABEL, UNIT2_LABEL } from '@/lib/warehouse-labels';
 
 interface WarehouseOverviewProps {
   warehouses: WarehouseType[];
@@ -35,31 +37,19 @@ export function WarehouseOverview({ warehouses, onTransferClick }: WarehouseOver
     setLoading(true);
 
     try {
-      // 1. Fetch total counts per warehouse
-      const { data: totalsData } = await supabase
-        .from('product_warehouse_stock')
-        .select('warehouse_id, stock_level');
+      // Shelf pieces per unit (stored shelf number split into 3C / 4A), not the
+      // order-reduced system stock. See unit-shelf-service.ts.
+      const totalsPromise = getUnitShelfTotals(supabase, unit2.id);
 
-      if (totalsData) {
-        let u1Sum = 0;
-        let u2Sum = 0;
-        for (const row of totalsData) {
-          if (row.warehouse_id === unit1.id) u1Sum += row.stock_level || 0;
-          if (row.warehouse_id === unit2.id) u2Sum += row.stock_level || 0;
-        }
-        setUnit1Total(u1Sum);
-        setUnit2Total(u2Sum);
-      }
-
-      // 2. Fetch product catalog with warehouse stock rows
+      // Product catalog, most on the shelf first
       let query = supabase
         .from('products')
         .select(`
-          id, name, sku, stock_level, shelf_location,
-          warehouse_stocks:product_warehouse_stock(warehouse_id, stock_level, shelf_location)
+          id, name, sku, stock_level, shelf_stock, shelf_location,
+          warehouse_stocks:product_warehouse_stock(warehouse_id, shelf_location)
         `)
         .not('name', 'ilike', '[DELETED]%')
-        .order('stock_level', { ascending: false });
+        .order('shelf_stock', { ascending: false, nullsFirst: false });
 
       if (searchTerm.trim()) {
         query = query.or(`name.ilike.%${searchTerm}%,sku.ilike.%${searchTerm}%`);
@@ -69,19 +59,28 @@ export function WarehouseOverview({ warehouses, onTransferClick }: WarehouseOver
 
       if (error) throw error;
 
+      const [totals, shelfMap] = await Promise.all([
+        totalsPromise,
+        getUnitShelfForProducts(supabase, prodData || [], unit2.id),
+      ]);
+      setUnit1Total(totals.unit1);
+      setUnit2Total(totals.unit2);
+
       if (prodData) {
         const mapped = prodData.map((p: any) => {
           const u1Row = p.warehouse_stocks?.find((w: any) => w.warehouse_id === unit1.id);
           const u2Row = p.warehouse_stocks?.find((w: any) => w.warehouse_id === unit2.id);
+          const shelf = shelfMap.get(p.id);
 
           return {
             id: p.id,
             name: p.name,
             sku: p.sku,
-            totalStock: p.stock_level ?? 0,
-            unit1Stock: u1Row?.stock_level ?? 0,
+            totalStock: shelf?.total ?? 0,
+            freeToSell: shelf?.freeToSell ?? p.stock_level ?? 0,
+            unit1Stock: shelf?.unit1 ?? 0,
             unit1Shelf: u1Row?.shelf_location || p.shelf_location || null,
-            unit2Stock: u2Row?.stock_level ?? 0,
+            unit2Stock: shelf?.unit2 ?? 0,
             unit2Shelf: u2Row?.shelf_location || null,
           };
         });
@@ -133,9 +132,9 @@ export function WarehouseOverview({ warehouses, onTransferClick }: WarehouseOver
         <Card className="border-indigo-200 bg-indigo-50/40">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs font-medium text-indigo-700">Unit 1 — Fulfillment Hub</p>
+              <p className="text-xs font-medium text-indigo-700">{UNIT1_LABEL} — Main shelf</p>
               <p className="text-2xl font-bold text-indigo-950 mt-1">{unit1Total.toLocaleString()} pcs</p>
-              <p className="text-[11px] text-indigo-600 mt-0.5">Active Pick & Pack Shelves</p>
+              <p className="text-[11px] text-indigo-600 mt-0.5">On the shelf, ready to pick</p>
             </div>
             <div className="h-10 w-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700">
               <Building2 className="h-5 w-5" />
@@ -146,9 +145,9 @@ export function WarehouseOverview({ warehouses, onTransferClick }: WarehouseOver
         <Card className="border-blue-200 bg-blue-50/40">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs font-medium text-blue-700">Unit 2 — Reserve Storage</p>
+              <p className="text-xs font-medium text-blue-700">{UNIT2_LABEL} — Reserve</p>
               <p className="text-2xl font-bold text-blue-950 mt-1">{unit2Total.toLocaleString()} pcs</p>
-              <p className="text-[11px] text-blue-600 mt-0.5">Bulk Cartons & Supplier Receiving</p>
+              <p className="text-[11px] text-blue-600 mt-0.5">Kept aside, not on the pick shelf</p>
             </div>
             <div className="h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-700">
               <Warehouse className="h-5 w-5" />
@@ -159,11 +158,11 @@ export function WarehouseOverview({ warehouses, onTransferClick }: WarehouseOver
         <Card className="border-slate-200 bg-slate-50/60">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs font-medium text-slate-600">Total System Stock</p>
+              <p className="text-xs font-medium text-slate-600">Total on hand (unallocated)</p>
               <p className="text-2xl font-bold text-slate-900 mt-1">
                 {(unit1Total + unit2Total).toLocaleString()} pcs
               </p>
-              <p className="text-[11px] text-slate-500 mt-0.5">Combined Inventory (Both Units)</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">{UNIT1_LABEL} + {UNIT2_LABEL}, not counting picked or packed orders</p>
             </div>
             <div className="h-10 w-10 bg-slate-200 rounded-full flex items-center justify-center text-slate-700">
               <span className="font-bold text-sm">∑</span>
@@ -192,8 +191,8 @@ export function WarehouseOverview({ warehouses, onTransferClick }: WarehouseOver
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">All Locations (Combined)</SelectItem>
-              <SelectItem value="UNIT1">Unit 1 (Active Hub Only)</SelectItem>
-              <SelectItem value="UNIT2">Unit 2 (Reserve Only)</SelectItem>
+              <SelectItem value="UNIT1">{UNIT1_LABEL} only</SelectItem>
+              <SelectItem value="UNIT2">{UNIT2_LABEL} only</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -215,9 +214,10 @@ export function WarehouseOverview({ warehouses, onTransferClick }: WarehouseOver
             <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead className="w-[40%]">Product Name</TableHead>
-                <TableHead className="text-center">Unit 1 Stock (Active)</TableHead>
-                <TableHead className="text-center">Unit 2 Stock (Reserve)</TableHead>
-                <TableHead className="text-center">Total Inventory</TableHead>
+                <TableHead className="text-center">{UNIT1_LABEL}</TableHead>
+                <TableHead className="text-center">{UNIT2_LABEL}</TableHead>
+                <TableHead className="text-center">Total on hand</TableHead>
+                <TableHead className="text-center" title="On hand minus orders not picked yet. Negative = sold more than we have.">Free to sell</TableHead>
                 {onTransferClick && <TableHead className="text-right">Action</TableHead>}
               </TableRow>
             </TableHeader>
@@ -232,7 +232,7 @@ export function WarehouseOverview({ warehouses, onTransferClick }: WarehouseOver
                   <TableCell className="text-center">
                     <div className="flex flex-col items-center gap-0.5">
                       <Badge
-                        variant={item.unit1Stock < 0 ? 'destructive' : item.unit1Stock === 0 ? 'secondary' : 'default'}
+                        variant={item.unit1Stock === 0 ? 'secondary' : 'default'}
                         className="font-bold px-2 py-0.5"
                       >
                         {item.unit1Stock} pcs
@@ -267,6 +267,12 @@ export function WarehouseOverview({ warehouses, onTransferClick }: WarehouseOver
 
                   <TableCell className="text-center font-bold text-foreground">
                     {item.totalStock} pcs
+                  </TableCell>
+
+                  <TableCell
+                    className={`text-center text-xs ${item.freeToSell < 0 ? 'text-red-600' : 'text-muted-foreground'}`}
+                  >
+                    {item.freeToSell}
                   </TableCell>
 
                   {onTransferClick && (

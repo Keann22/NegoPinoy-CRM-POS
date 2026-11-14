@@ -1,7 +1,7 @@
 /**
  * warehouse.types.ts
  * Centralized type definitions for multi-warehouse tracking.
- * Used for Unit 1 (Fulfillment Hub) and Unit 2 (Reserve & Inbound).
+ * Used for 3C (code UNIT1, main shelf) and 4A (code UNIT2, reserve).
  */
 
 export interface Warehouse {

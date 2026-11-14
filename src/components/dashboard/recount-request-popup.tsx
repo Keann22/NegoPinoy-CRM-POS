@@ -83,7 +83,7 @@ export function RecountRequestPopup() {
               </DialogDescription>
             </DialogHeader>
             <p className="text-xs text-muted-foreground">
-              Bilangin ang nasa Unit 1 (shelf). Ilagay 0 kung wala.
+              Bilangin ang nasa 3C (shelf). Ilagay 0 kung wala.
             </p>
             <div className="space-y-3">
               {batch.map((r) => <RecountLine key={r.id} row={r} onSave={save} />)}
