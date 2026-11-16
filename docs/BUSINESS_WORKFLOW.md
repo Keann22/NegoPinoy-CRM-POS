@@ -170,6 +170,24 @@ Receipts:
   due date (not on Sundays). No work Nov 1, holiday Nov 2 (2026): the first
   batch is due Tuesday, Nov 3.
 
+## Products with variants (owner, 2026-11-16)
+
+- An order must be on the **variant** (color, size, design), never on the main
+  product: the picker can't match a main product to the shelf. New Order and
+  Edit Order block the main product since 2026-11-09.
+- **Cash / installment is not a variant.** Codes like "CASH BASIS" and
+  "INSTALLMENT" under a product are old leftovers; the price type is picked on
+  the order. Archived 2026-11-16 on 18L Kaisa Villa Air fryer Oven and
+  Stainless Steamer/Casserole.
+- 2026-11-16 cleanup: 36 open orders from before the block were on a main
+  product. 15 were switched (plus one line of #9E3C443) where the variant was
+  certain from the price charged, the saved item name, the chat or only one
+  choice, and 4 air fryer orders were fixed by archiving the old codes. Backup:
+  scripts/reports/2026-11-16-parent-variant-fix-backup.json. The rest wait for
+  sales (colors). Two wait for the owners: the 6-layer 120cm rack has a
+  5-layer rack filed under it (#A435801), and HK Bank has no plain variant
+  (#DD58459).
+
 ## Devices
 
 - Owners use **iPhone and Huawei** phones. Anything mobile must work on both,
