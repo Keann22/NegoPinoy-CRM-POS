@@ -136,7 +136,7 @@ BEGIN
     SELECT COALESCE(ARRAY_AGG(id), '{}') INTO v_carry FROM public.customer_carryovers WHERE customer_id = v_chat.id;
     SELECT COALESCE(ARRAY_AGG(id), '{}') INTO v_emails FROM public.customer_email_logs WHERE customer_id = v_chat.id;
     SELECT COALESCE(ARRAY_AGG(id), '{}') INTO v_bus FROM public.bus_shipments WHERE customer_id = v_chat.id;
-    SELECT COALESCE(ARRAY_AGG(id), '{}') INTO v_bus_req FROM public.bus_ship_requests WHERE customer_id = v_chat.id;
+    SELECT COALESCE(ARRAY_AGG(order_id), '{}') INTO v_bus_req FROM public.bus_ship_requests WHERE customer_id = v_chat.id;
     v_chat_credit := COALESCE(v_chat.store_credit, 0);
     v_chat_legacy := COALESCE(v_chat.legacy_spend, 0);
 
@@ -161,7 +161,7 @@ BEGIN
     UPDATE public.customer_carryovers SET customer_id = p_customer_id WHERE id = ANY(v_carry);
     UPDATE public.customer_email_logs SET customer_id = p_customer_id WHERE id = ANY(v_emails);
     UPDATE public.bus_shipments SET customer_id = p_customer_id WHERE id = ANY(v_bus);
-    UPDATE public.bus_ship_requests SET customer_id = p_customer_id WHERE id = ANY(v_bus_req);
+    UPDATE public.bus_ship_requests SET customer_id = p_customer_id WHERE order_id = ANY(v_bus_req);
 
     -- conversation_logs.customer_psid references customers.psid: detach, move the PSID, reattach
     SELECT COALESCE(ARRAY_AGG(id), '{}') INTO v_log_ids FROM public.conversation_logs WHERE customer_psid = p_psid;
@@ -378,7 +378,7 @@ BEGIN
     UPDATE public.bus_shipments SET customer_id = sb.id
       WHERE customer_id = p_customer_id AND id IN (SELECT jsonb_array_elements_text(v_merge.moved->'bus_shipments')::uuid);
     UPDATE public.bus_ship_requests SET customer_id = sb.id
-      WHERE customer_id = p_customer_id AND id IN (SELECT jsonb_array_elements_text(v_merge.moved->'bus_ship_requests')::uuid);
+      WHERE customer_id = p_customer_id AND order_id IN (SELECT jsonb_array_elements_text(v_merge.moved->'bus_ship_requests')::uuid);
 
     IF ABS(v_credit) > 0.009 THEN
       INSERT INTO public.store_credit_entries (customer_id, amount, balance_after, reason, created_by_name)
