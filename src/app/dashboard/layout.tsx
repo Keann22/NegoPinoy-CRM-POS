@@ -35,6 +35,7 @@ import { SendTodayReminder } from '@/components/dashboard/priority/send-today-re
 import { RecountRequestPopup } from '@/components/dashboard/recount-request-popup';
 import { RtsDecisionPopup } from '@/components/dashboard/customer-returns/rts-decision-popup';
 import { BusSfPopup } from '@/components/dashboard/bus-shipping/bus-sf-popup';
+import { SupplierStockPopup } from '@/components/dashboard/supplier-stock/supplier-stock-popup';
 import { Bus } from 'lucide-react';
 import { InventoryGuardianAlertModal } from '@/components/dashboard/inventory/InventoryGuardianAlertModal';
 import { InventoryGuardianTrigger } from '@/components/dashboard/inventory/InventoryGuardianTrigger';
@@ -125,7 +126,8 @@ export default function DashboardLayout({
         { href: '/dashboard/inventory/batches', label: 'Stock Batch List', icon: ListChecks },
         { href: '/dashboard/inventory/movements', label: 'Inventory History', icon: History },
         { href: '/dashboard/inventory/returns', label: 'Returns', icon: Undo2 },
-        { href: '/dashboard/inventory/supplier-returns', label: 'Supplier Returns', icon: PackageX }
+        { href: '/dashboard/inventory/supplier-returns', label: 'Supplier Returns', icon: PackageX },
+        { href: '/dashboard/inventory/supplier-stock', label: 'Wala sa Supplier', icon: PackageX }
       ];
 
       if (isManagement) {
@@ -289,6 +291,7 @@ export default function DashboardLayout({
       <RecountRequestPopup />
       <RtsDecisionPopup />
       <BusSfPopup />
+      <SupplierStockPopup />
       <InventoryGuardianAlertModal />
       <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr] print:block">
         <div className="hidden border-r bg-sidebar md:block print:hidden">

@@ -2,6 +2,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { backfillOrderItemCosts } from './cost-backfill-service';
 import { splitStaffDraftLine } from './procurement-service';
 import { assertNoDuplicateOrderLines, updatePoTracking, type TrackingInput } from './online-order-tracking-service';
+import { clearFlagOnPurchase } from './supplier-stock/supplier-flag-service';
 
 export async function processProcurementPurchases(
   supabase: SupabaseClient,
@@ -196,6 +197,9 @@ async function recordPurchaseLine(supabase: SupabaseClient, poId: string, p: any
   if (parsedCost > 0) {
     await backfillOrderItemCosts(supabase, p.productId, Number(p.qty) || 0, parsedCost);
   }
+
+  // Bought: it isn't out at the supplier anymore (agents waiting are told).
+  await clearFlagOnPurchase(supabase, p.productId);
 
   const { data: issues } = await supabase
     .from('procurement_issues')

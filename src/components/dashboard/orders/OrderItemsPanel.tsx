@@ -11,6 +11,10 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Trash2, PlusCircle } from 'lucide-react';
 import { PRICE_TYPE_LABELS, resolvePrice, selectablePriceTypes, type PriceList, type PriceType } from '@/lib/pricing';
+import { useSupplierFlagMap } from '@/hooks/useSupplierFlags';
+import { addedQtyByProduct } from '@/lib/supplier-stock/order-flag-check';
+import { SupplierFlagLineNotice } from '@/components/dashboard/supplier-stock/supplier-flag-line-notice';
+import { SupplierFlagBadge } from '@/components/dashboard/supplier-stock/supplier-flag-badge';
 
 interface OrderItemsPanelProps {
   control: Control<OrderFormValues>;
@@ -41,6 +45,8 @@ interface OrderItemsPanelProps {
   onProductSelect: (product: Product) => Promise<void>;
   onAddProductClick: () => void;
   canAddProduct?: boolean;
+  /** Edit Order: the lines as saved, so only added pieces need the out-at-supplier tick. */
+  originalItems?: { productId: string; quantity: number }[];
 }
 
 export function OrderItemsPanel({
@@ -68,8 +74,12 @@ export function OrderItemsPanel({
   onProductSelect,
   onAddProductClick,
   canAddProduct = true,
+  originalItems = [],
 }: OrderItemsPanelProps) {
   const includeInsurance = watch('includeInsurance');
+  // Items out at the supplier (owner, 2026-11-20): warn and ask for the customer's OK.
+  const { flags: supplierFlags } = useSupplierFlagMap();
+  const addedQty = addedQtyByProduct(watch('orderItems') || [], originalItems);
 
   return (
     <div className="md:col-span-2 space-y-4">
@@ -155,6 +165,14 @@ export function OrderItemsPanel({
                 </Button>
               </div>
             </div>
+            {supplierFlags[field.productId] && (
+              <SupplierFlagLineNotice
+                flag={supplierFlags[field.productId]}
+                addedQty={Math.max(0, addedQty.get(field.productId) || 0)}
+                checked={!!watch(`orderItems.${index}.supplierFlagAck`)}
+                onCheckedChange={(v) => setValue(`orderItems.${index}.supplierFlagAck`, v)}
+              />
+            )}
             {priceType === 'custom' && (
               <FormField control={control} name={`orderItems.${index}.priceOverrideReason`} render={({ field: f }) => (
                 <FormItem className="mt-1">
@@ -191,6 +209,7 @@ export function OrderItemsPanel({
                     <div className="flex justify-between w-full items-center">
                       <div className="flex items-center gap-2 min-w-0 pr-2">
                         <span className="truncate">{p.name}</span>
+                        {supplierFlags[p.id] && <SupplierFlagBadge flag={supplierFlags[p.id]} />}
                         {p.hasVariants && (
                           <span className="text-[10px] font-semibold text-amber-700 bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800 shrink-0">
                             Has Variants

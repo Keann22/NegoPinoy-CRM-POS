@@ -5,7 +5,8 @@ import { SingleBuyDialog } from "@/components/dashboard/procurement/single-buy-d
 import { BulkBuyDialog } from "@/components/dashboard/procurement/bulk-buy-dialog";
 import { ViewProductDetailsDialog } from "@/components/dashboard/view-product-details-dialog";
 import { AddMissingItemDialog } from "@/components/dashboard/procurement/add-missing-item-dialog";
-import { ReportIssueDialog } from "@/components/dashboard/procurement/report-issue-dialog";
+import { SupplierFlagDialog } from "@/components/dashboard/supplier-stock/supplier-flag-dialog";
+import type { SupplierFlag } from "@/types/supplier-stock.types";
 import { ScanReceiptDialog } from "@/components/dashboard/procurement/scan-receipt-dialog";
 import { SavedReceiptsDialog } from "@/components/dashboard/procurement/saved-receipts-dialog";
 import { TodaysPurchasesDialog } from "@/components/dashboard/procurement/todays-purchases-dialog";
@@ -47,6 +48,9 @@ interface ProcurementDialogsProps {
   setIssueDialogOpen: (open: boolean) => void;
   issueProduct: any;
   setIssueProduct: (p: any) => void;
+  /** Active "out at the supplier" statuses by product id. */
+  supplierFlags: Record<string, SupplierFlag>;
+  onSupplierFlagSaved: () => void;
 
   // Scan receipt
   scanDialogOpen: boolean;
@@ -116,6 +120,8 @@ export function ProcurementDialogs({
   setIssueDialogOpen,
   issueProduct,
   setIssueProduct,
+  supplierFlags,
+  onSupplierFlagSaved,
   scanDialogOpen,
   setScanDialogOpen,
   scanGroup,
@@ -187,14 +193,12 @@ export function ProcurementDialogs({
         onBuy={onBuyMissingItem}
       />
 
-      <ReportIssueDialog
+      <SupplierFlagDialog
         open={issueDialogOpen}
-        onOpenChange={setIssueDialogOpen}
-        issueProduct={issueProduct}
-        onSuccess={() => {
-          setIssueDialogOpen(false);
-          setIssueProduct(null);
-        }}
+        onOpenChange={(o) => { setIssueDialogOpen(o); if (!o) setIssueProduct(null); }}
+        product={issueProduct ? { id: issueProduct.productId, name: issueProduct.productName } : null}
+        current={issueProduct ? supplierFlags[issueProduct.productId] || null : null}
+        onSaved={onSupplierFlagSaved}
       />
 
       {scanGroup && (

@@ -14,6 +14,7 @@ import { buildPriceList, defaultPriceType, resolvePrice, selectWithPriceColumns,
 import type { CarryOver } from "@/lib/services/carryover-service";
 import { closeAddedCarryOvers, openOsProductIds, recordToFollow } from "@/lib/services/carryover-client";
 import { readOrderCarriedAmounts, type OrderCarriedAmounts } from "@/lib/services/orders/order-utils";
+import { checkSupplierFlagsBeforeSave, recordAgreedOnOrder } from "@/hooks/useSupplierFlags";
 
 type UseOrderDialogProps = {
     mode: 'create' | 'edit';
@@ -283,6 +284,13 @@ export function useOrderDialog(props: UseOrderDialogProps) {
             }
         }
 
+        // Items out at the supplier: the customer must know (or, if we stopped selling it, only what's left).
+        const flagCheck = await checkSupplierFlagsBeforeSave(values.orderItems, []);
+        if (flagCheck.error) {
+            toast({ variant: 'destructive', title: 'Wala sa supplier', description: flagCheck.error });
+            return;
+        }
+
         const addedCarryOvers = carryOverAdds;
         const urgent = urgentNote;
         handleOpenChange(false);
@@ -301,6 +309,8 @@ export function useOrderDialog(props: UseOrderDialogProps) {
                 title: "Order Created",
                 description: "The new order has been successfully saved and inventory updated.",
             });
+
+            await recordAgreedOnOrder(newOrderId, flagCheck.agreedProductIds).catch(() => {});
 
             await closeAddedCarryOvers(addedCarryOvers, values.orderItems, newOrderId).catch((e) =>
                 toast({ variant: 'destructive', title: 'Order saved, but the to-follow list was not updated', description: e.message }));
@@ -356,6 +366,12 @@ export function useOrderDialog(props: UseOrderDialogProps) {
             }
         }
 
+        const flagCheck = await checkSupplierFlagsBeforeSave(values.orderItems, props.orderItems || []);
+        if (flagCheck.error) {
+            toast({ variant: 'destructive', title: 'Wala sa supplier', description: flagCheck.error });
+            return;
+        }
+
         const order = props.order;
         const ticked = toFollow;
         if (props.onOpenChange) props.onOpenChange(false);
@@ -377,6 +393,8 @@ export function useOrderDialog(props: UseOrderDialogProps) {
                 title: "Order Updated",
                 description: "The order has been successfully edited and inventory re-adjusted.",
             });
+
+            await recordAgreedOnOrder(order.id, flagCheck.agreedProductIds).catch(() => {});
 
             await recordToFollow(order.id, props.orderItems || [], values.orderItems, ticked, osProductIds).catch((e) =>
                 toast({ variant: 'destructive', title: 'Order saved, but the to-follow items were not', description: e.message }));

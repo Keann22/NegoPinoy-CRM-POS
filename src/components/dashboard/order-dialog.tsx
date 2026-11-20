@@ -144,6 +144,7 @@ export function OrderDialog(props: OrderDialogProps) {
                 overpaymentApplied={overpaymentApplied}
                 shippingFee={shippingFee}
                 selectedCustomerStoreCredit={selectedCustomer?.store_credit}
+                originalItems={props.mode === 'edit' ? (props.orderItems || []).map((i: any) => ({ productId: i.productId, quantity: Number(i.quantity) || 0 })) : []}
                 productSearch={productSearch}
                 onProductSearchChange={setProductSearch}
                 productResults={productResults}

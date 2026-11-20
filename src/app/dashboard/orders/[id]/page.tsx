@@ -92,6 +92,11 @@ export default function OrderDetailPage() {
       setIsShareReceiptOpen(true);
       window.history.replaceState(null, '', `/dashboard/orders/${order.id}`);
     }
+    // ?edit=1: from the "out at the supplier" pop-up (change or remove the item).
+    if (searchParams.get('edit') === '1' && order) {
+      setIsEditOpen(true);
+      window.history.replaceState(null, '', `/dashboard/orders/${order.id}`);
+    }
   }, [searchParams, order]);
 
   // Sorted payments

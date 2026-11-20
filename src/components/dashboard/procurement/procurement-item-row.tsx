@@ -9,6 +9,8 @@ import { ProcurementUnallocatedStockCell } from "./procurement-unallocated-stock
 import { InTransitChip } from "./in-transit-chip";
 import { SupplierOwedChip } from "./supplier-owed-chip";
 import { ProcurementPriorityChips } from "./procurement-priority-chips";
+import { SupplierFlagBadge } from "@/components/dashboard/supplier-stock/supplier-flag-badge";
+import type { SupplierFlag } from "@/types/supplier-stock.types";
 
 export function ProcurementItemRow({
   item,
@@ -30,6 +32,7 @@ export function ProcurementItemRow({
   onViewAllocated,
   onRefreshData,
   onOpenTracking,
+  supplierFlag,
 }: {
   item: any;
   groupId: string | null;
@@ -50,6 +53,8 @@ export function ProcurementItemRow({
   onViewAllocated: (item: { id: string; name: string; context: 'total' | 'needToBuy' }) => void;
   onRefreshData?: () => void;
   onOpenTracking?: (poIds: string[], title: string) => void;
+  /** Out at the supplier (shown here once its check-again date comes). */
+  supplierFlag?: SupplierFlag | null;
 }) {
   const [showReassign, setShowReassign] = useState(false);
   const [staffRequestOpen, setStaffRequestOpen] = useState(false);
@@ -97,6 +102,7 @@ export function ProcurementItemRow({
           {item.productName}
         </button>
         <ProcurementPriorityChips priority={item.priority} />
+        {supplierFlag && <div className="mt-1"><SupplierFlagBadge flag={supplierFlag} showCheck /></div>}
         {isEditingCode ? (
           <div className="flex items-center gap-1.5 mt-1">
             <input
@@ -310,8 +316,8 @@ export function ProcurementItemRow({
       <td className="p-3 text-center flex flex-col gap-1 items-center justify-center">
         <button 
           onClick={onReportIssue}
-          className="text-slate-400 hover:text-amber-500 transition-colors p-1"
-          title="Report issue / Cannot purchase"
+          className={`${supplierFlag ? "text-amber-600" : "text-slate-400"} hover:text-amber-500 transition-colors p-1`}
+          title="Can't buy it? Wala sa supplier / stop selling"
         >
           <Flag className="w-5 h-5" />
         </button>

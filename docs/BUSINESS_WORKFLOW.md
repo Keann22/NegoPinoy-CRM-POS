@@ -515,6 +515,65 @@ receipt). One save:
 - Sales and commission reports leave out the shipping fee (it passes through to
   the bus company). Profit & Loss keeps it in sales and in expenses, so it nets out.
 
+## Out of stock at the supplier (owner, 2026-11-20; built 2026-11-20)
+
+- We run **lean**: we usually buy only after a customer orders.
+- Sometimes the supplier has none. Usually we **wait until the supplier gets
+  stock**; sometimes we **stop selling** the item.
+- Often sales already took the order, and sometimes the customer **already
+  paid**, so sales must go back to the customer and tell us what they decided.
+- Today the buyer taps **Report Procurement Issue** on the Procurement Sheet
+  (free text). It sends a bell to admins, Jas and the agents with a waiting
+  order. **Sales usually do nothing with it.**
+- Checked 2026-11-20: 24 reports since June, **none answered by sales**, 12
+  still open. The Egg Pan was reported 3 times because nothing on the product
+  remembers it. The 8in1 Can Opener (reported 2026-11-19) has 5 orders
+  waiting, 3 of them paid (₱3,440 to ₱7,622).
+  The Priority List's OS buttons (wait / send the rest / remove) were never used.
+- What the reports say besides "no stock": only another color or size, price
+  went up, bad quality (don't sell), supplier doesn't know when.
+- Owner wants sales to be **reminded when they place a new order** for a
+  flagged item.
+
+Owner decisions (2026-11-20):
+
+- **Owners and Jas** set the status (it never shows the supplier or the cost).
+- It means **we can't get it anywhere for now** (Divisoria, Shopee, Pinduoduo),
+  not just one supplier.
+- Statuses: **Wala sa supplier: hintayin** (waiting for restock), **Ibang
+  kulay/size lang ang meron** (pick the variant to offer), **Tumaas ang presyo**
+  (its own status, optional new selling price), **Hindi na ibebenta** (stop
+  selling).
+- **Check again after 7 days** by default (the date can be changed).
+- **Stop selling** still allows selling what's left (free to sell).
+- Sales **change the item or remove it**; if the order is paid, they choose
+  **store credit or refund** (refund: owners are told and pay it out).
+
+How it works (built 2026-11-20):
+
+- Set it from the Procurement Sheet (the flag button on each row) or left menu
+  → Inventory Management → **Wala sa Supplier** (search any variant). The old
+  free-text reports are listed there to turn into a status or close.
+- **Sales pop-up** (like returned parcels) for each order the shelf can't
+  cover, paid orders first: Customer will wait / Change or remove the item
+  (opens Edit Order) / Cancel the order / Asked customer, waiting (back in 4
+  hours). Owners see it too after 3 days with no answer. "Customer will wait"
+  is asked again after 14 days if the item is still out. Price up: "Customer
+  agrees" tells owners and Jas to update the price on the order (sales can't
+  change prices).
+- Orders the shelf still covers (oldest first) are **not** asked.
+- After a paid line is removed, the extra money is already in store credit
+  (Edit Order does that); the pop-up asks **keep as store credit or refund**.
+  A cancelled paid order asks **put in store credit, refund, or already done**.
+- **New / Edit Order**: badge in the product search and a warning under the
+  line. Adding a flagged item needs the tick **"Customer knows and agrees"**; a
+  stopped item is blocked above what's left. Lines already on the order are
+  left to the pop-up.
+- **Procurement Sheet**: flagged items leave Need to Buy (section "Wala sa
+  supplier") and come back on the check-again date with a badge.
+- **May stock na** (or recording a purchase of it) clears the status; agents
+  whose customers were asked or agreed to wait get a bell.
+
 ## Being decided (not built yet)
 
 - **Customer purchase planner (owner, 2026-11-01)**: a premium feature on the

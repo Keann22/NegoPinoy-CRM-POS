@@ -27,7 +27,8 @@ export function SupplierGroupCard({
   handleDeleteDraftItem,
   setViewingAllocatedItem,
   onRefreshData,
-  onOpenTracking
+  onOpenTracking,
+  supplierFlags
 }: any) {
   return (
     <div className="border rounded-lg overflow-hidden shadow-sm">
@@ -108,6 +109,7 @@ export function SupplierGroupCard({
               onViewAllocated={setViewingAllocatedItem}
               onRefreshData={onRefreshData}
               onOpenTracking={onOpenTracking}
+              supplierFlag={supplierFlags?.[item.productId] || null}
             />
           ))}
         </tbody>

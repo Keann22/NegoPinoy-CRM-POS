@@ -9,6 +9,9 @@ import { ProcurementDialogs } from "@/components/dashboard/procurement/procureme
 import { useReceiptDrafts } from "@/hooks/useReceiptDrafts";
 import type { ReceiptScanDraft } from "@/types";
 import { useRoleCheck } from "@/hooks/useRoleCheck";
+import { useSupplierFlagMap } from "@/hooks/useSupplierFlags";
+import { splitFlaggedItems } from "@/lib/supplier-stock/split-flagged-items";
+import { SupplierFlaggedSection } from "@/components/dashboard/supplier-stock/supplier-flagged-section";
 
 // Logged-in session client: the public key alone has no database access.
 const supabase = createClient();
@@ -39,6 +42,9 @@ export default function ProcurementSheet() {
 
   const [issueDialogOpen, setIssueDialogOpen] = useState(false);
   const [issueProduct, setIssueProduct] = useState<any>(null);
+  // Items out at the supplier leave Need to Buy until their check-again date.
+  const { flags: supplierFlags, reload: reloadSupplierFlags } = useSupplierFlagMap(!roleLoading && isManagement);
+  const { groups: needToBuyGroups, flagged: flaggedItems } = splitFlaggedItems(groupedItems, supplierFlags);
 
   const [onlineOrderOpen, setOnlineOrderOpen] = useState(false);
   const [searchOrdersOpen, setSearchOrdersOpen] = useState(false);
@@ -339,16 +345,19 @@ export default function ProcurementSheet() {
         />
       </div>
 
-      {groupedItems.length === 0 ? (
+      <SupplierFlaggedSection items={flaggedItems} onEdit={(item) => { setIssueProduct(item); setIssueDialogOpen(true); }} />
+
+      {needToBuyGroups.length === 0 ? (
         <div className="p-8 text-center bg-slate-50 border rounded-lg text-slate-500">
           No items currently out of stock or requested!
         </div>
       ) : (
         <div className="space-y-10">
-          {groupedItems.map(group => (
+          {needToBuyGroups.map(group => (
             <SupplierGroupCard
               key={group.id || 'unassigned'}
               group={group}
+              supplierFlags={supplierFlags}
               selectedItems={selectedItems}
               toggleItemSelection={toggleItemSelection}
               toggleGroupSelection={toggleGroupSelection}
@@ -407,6 +416,8 @@ export default function ProcurementSheet() {
         setIssueDialogOpen={setIssueDialogOpen}
         issueProduct={issueProduct}
         setIssueProduct={setIssueProduct}
+        supplierFlags={supplierFlags}
+        onSupplierFlagSaved={reloadSupplierFlags}
         scanDialogOpen={scanDialogOpen}
         setScanDialogOpen={setScanDialogOpen}
         scanGroup={scanGroup}

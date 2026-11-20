@@ -12,6 +12,8 @@ export const orderItemSchema = z.object({
   priceType: z.enum(["regular", "sale", "ads", "live", "installment", "custom"]).nullable().optional(),
   priceOverrideReason: z.string().nullable().optional(),
   priceOverrideBy: z.string().nullable().optional(),
+  // Item out at the supplier: the agent ticked "customer knows and agrees" (not saved on the line).
+  supplierFlagAck: z.boolean().optional(),
 }).refine(data => (data.discount || 0) <= data.sellingPriceAtSale, {
     message: "Discount cannot be greater than the selling price.",
     path: ["discount"],
