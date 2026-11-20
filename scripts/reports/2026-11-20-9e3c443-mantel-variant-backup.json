@@ -1,0 +1,85 @@
+[
+ {
+  "b": {
+   "made_at": "2026-11-20T03:35:12.309538+00:00",
+   "note": "#9E3C443 RUBBERIZED MANTEL line moved from main product to DESIGN #5 (2 received by Jas 2026-11-14)",
+   "order_items": [
+    {
+     "id": "66057219-2a3b-494c-88c4-0f5c7c33b7a7",
+     "order_id": "9e3c443d-1548-45cc-ae16-68496b068454",
+     "product_name": "RUBBERIZED MANTEL",
+     "quantity": 2,
+     "unit_price": 180,
+     "product_id": "4253b2ef-bfc6-4b43-8afd-d9e9f2ebce54",
+     "cost_price_at_sale": 105,
+     "selling_price_at_sale": 180,
+     "discount": 0,
+     "is_packed": false,
+     "price_type": null,
+     "price_override_reason": null,
+     "price_override_by": null
+    }
+   ],
+   "order_issues": [
+    {
+     "id": "a58a3ee1-379d-4045-8bae-cab44ed271bd",
+     "order_id": "9e3c443d-1548-45cc-ae16-68496b068454",
+     "product_id": "4253b2ef-bfc6-4b43-8afd-d9e9f2ebce54",
+     "status": "resolved",
+     "reported_by_name": "Tess Ong",
+     "created_at": "2026-11-06T02:07:36.950802+00:00",
+     "updated_at": "2026-11-06T02:07:36.950802+00:00",
+     "out_of_stock_qty": 2,
+     "issue_type": "order",
+     "po_id": null
+    },
+    {
+     "id": "bdbae6ec-2ecd-49d4-8234-d20880522a03",
+     "order_id": "9e3c443d-1548-45cc-ae16-68496b068454",
+     "product_id": "4253b2ef-bfc6-4b43-8afd-d9e9f2ebce54",
+     "status": "resolved",
+     "reported_by_name": "Tess Ong",
+     "created_at": "2026-11-06T06:02:00.826815+00:00",
+     "updated_at": "2026-11-06T06:02:00.826815+00:00",
+     "out_of_stock_qty": 2,
+     "issue_type": "order",
+     "po_id": null
+    },
+    {
+     "id": "90ced52b-3ff7-468f-8ba6-acce6600ddcf",
+     "order_id": "9e3c443d-1548-45cc-ae16-68496b068454",
+     "product_id": "4253b2ef-bfc6-4b43-8afd-d9e9f2ebce54",
+     "status": "open",
+     "reported_by_name": "Tess Ong",
+     "created_at": "2026-11-07T02:10:07.860285+00:00",
+     "updated_at": "2026-11-07T02:10:07.860285+00:00",
+     "out_of_stock_qty": 2,
+     "issue_type": "order",
+     "po_id": null
+    }
+   ],
+   "shelf_picks": [
+    {
+     "order_id": "9e3c443d-1548-45cc-ae16-68496b068454",
+     "product_id": "4253b2ef-bfc6-4b43-8afd-d9e9f2ebce54",
+     "picked_qty": 0,
+     "updated_at": "2026-11-07T02:10:07.860285+00:00"
+    }
+   ],
+   "products": [
+    {
+     "id": "4253b2ef-bfc6-4b43-8afd-d9e9f2ebce54",
+     "name": "RUBBERIZED MANTEL",
+     "stock_level": -2,
+     "shelf_stock": 0
+    },
+    {
+     "id": "483b1c8e-ca28-4e4c-8e0d-2095a59433d7",
+     "name": "RUBBERIZED MANTEL - DESIGN #5",
+     "stock_level": 2,
+     "shelf_stock": 2
+    }
+   ]
+  }
+ }
+]
