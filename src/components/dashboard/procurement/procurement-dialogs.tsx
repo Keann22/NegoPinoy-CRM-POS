@@ -273,6 +273,8 @@ export function ProcurementDialogs({
             : ["Pending Payment", "Processing", "Picked (with issue)", "On-Hold", "Waiting for Stock"]
         }
         excludeLayaway={viewingAllocatedItem?.context === "needToBuy"}
+        includeVariants={false}
+        showMissingQty={viewingAllocatedItem?.context === "needToBuy"}
         title={viewingAllocatedItem?.context === "needToBuy" ? "Orders Needing This Item" : "Total Open Demand"}
       />
     </>

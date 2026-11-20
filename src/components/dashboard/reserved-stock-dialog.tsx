@@ -27,6 +27,14 @@ interface ReservedStockDialogProps {
    * handled.
    */
   packedOnly?: boolean;
+  /**
+   * Include orders on this product's variants (default). The Procurement Sheet
+   * passes false: each variant has its own row there, so a main product's row
+   * listed its variants' orders too (2026-11-20, Orocan pitcher).
+   */
+  includeVariants?: boolean;
+  /** For a short line (Picked with issue), show only the pieces still missing. */
+  showMissingQty?: boolean;
 }
 
 type ReservedOrder = {
@@ -44,7 +52,7 @@ type ReservedOrder = {
   pickerReportedBy: string | null;
 };
 
-export function ReservedStockDialog({ productId, productName, isOpen, onClose, statusFilter = ['Pending Payment', 'Processing'], excludeLayaway = false, title = "Reserved Stock Details", packedOnly = false }: ReservedStockDialogProps) {
+export function ReservedStockDialog({ productId, productName, isOpen, onClose, statusFilter = ['Pending Payment', 'Processing'], excludeLayaway = false, title = "Reserved Stock Details", packedOnly = false, includeVariants = true, showMissingQty = false }: ReservedStockDialogProps) {
   const supabase = useSupabase();
   const [loading, setLoading] = useState(false);
   const [reservedOrders, setReservedOrders] = useState<ReservedOrder[]>([]);
@@ -58,12 +66,14 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose, s
       setLoading(true);
       try {
         // 1. Get the product and any of its children if it's a parent
-        const { data: family } = await supabase
-          .from('products')
-          .select('id')
-          .or(`id.eq.${productId},parent_id.eq.${productId}`);
-        
-        const targetProductIds = ((family as any[]) || []).map(f => f.id);
+        let targetProductIds: string[] = [productId];
+        if (includeVariants) {
+          const { data: family } = await supabase
+            .from('products')
+            .select('id')
+            .or(`id.eq.${productId},parent_id.eq.${productId}`);
+          targetProductIds = ((family as any[]) || []).map(f => f.id);
+        }
 
         if (targetProductIds.length === 0) {
             setReservedOrders([]);
@@ -123,6 +133,8 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose, s
         );
 
         let openIssueKeys = new Set<string>();
+        // Pieces still missing per order + product (open issues), used once per order.
+        const missingLeft = new Map<string, number>();
         // Map key: `${order_id}-${product_id}` -> { createdAt: string; reportedByName?: string }
         const itemPickerReportMap = new Map<string, { createdAt: string; reportedByName?: string }>();
         // Map key: `order_id` -> { createdAt: string; reportedByName?: string }
@@ -131,14 +143,16 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose, s
         if (orderIds.length > 0) {
           const { data: issuesData } = await supabase
             .from('order_issues')
-            .select('order_id, product_id, status, created_at, reported_by_name')
+            .select('order_id, product_id, status, created_at, reported_by_name, out_of_stock_qty')
             .in('order_id', orderIds)
             .order('created_at', { ascending: false });
 
           if (issuesData) {
             issuesData.forEach((issue: any) => {
               if (issue.status === 'open') {
-                openIssueKeys.add(`${issue.order_id}-${issue.product_id}`);
+                const k = `${issue.order_id}-${issue.product_id}`;
+                openIssueKeys.add(k);
+                missingLeft.set(k, Math.max(missingLeft.get(k) || 0, Number(issue.out_of_stock_qty) || 1));
               }
               const key = `${issue.order_id}-${issue.product_id}`;
               if (!itemPickerReportMap.has(key)) {
@@ -220,6 +234,17 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose, s
               report = orderPickerReportMap.get(item.orders.id);
             }
 
+            let quantity = item.quantity * (bundle?.qtyPerBundle || 1);
+            if (showMissingQty && item.orders.status === 'Picked (with issue)') {
+              const key = `${item.orders.id}-${item.product_id}`;
+              const left = missingLeft.get(key);
+              if (left != null) {
+                const take = Math.min(item.quantity, left);
+                missingLeft.set(key, left - take);
+                quantity = take * (bundle?.qtyPerBundle || 1);
+              }
+            }
+
             return {
               id: item.id,
               orderId: item.orders.id.split('-')[0].toUpperCase(), // Short ID
@@ -227,7 +252,7 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose, s
               customerId: item.orders.customer_id || null,
               customerName: item.orders.customers?.full_name || 'Unknown',
               paymentType: item.orders.payment_method || 'Unknown',
-              quantity: item.quantity * (bundle?.qtyPerBundle || 1),
+              quantity,
               orderDate: item.orders.order_date,
               status: item.orders.status,
               viaBundleName: bundle?.name || null,
@@ -251,7 +276,7 @@ export function ReservedStockDialog({ productId, productName, isOpen, onClose, s
     }
 
     fetchReservedOrders();
-  }, [isOpen, productId, supabase, packedOnly, statusFilterKey, excludeLayaway]);
+  }, [isOpen, productId, supabase, packedOnly, statusFilterKey, excludeLayaway, includeVariants, showMissingQty]);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>

@@ -135,7 +135,7 @@ export async function calculateProcurementDemand(
       fetchAllPages<any>((from, to) =>
         supabase
           .from('order_issues')
-          .select('order_id, product_id')
+          .select('order_id, product_id, out_of_stock_qty')
           .eq('status', 'open')
           .in('product_id', chunk)
           .range(from, to)
@@ -146,16 +146,40 @@ export async function calculateProcurementDemand(
   }
 
   const openIssueKeys = new Set(openIssues?.map((i: any) => `${i.order_id}-${i.product_id}`));
+  // Pieces still missing per order + product. A line of 2 where the picker found 1
+  // needs 1 bought, not 2 (found 2026-11-20: #9A913A04 pitcher counted as 2).
+  // Shared across lines of the same product on one order, so it is used once.
+  const missingLeft = new Map<string, number>();
+  openIssues?.forEach((i: any) => {
+    const key = `${i.order_id}-${i.product_id}`;
+    missingLeft.set(key, Math.max(missingLeft.get(key) || 0, Number(i.out_of_stock_qty) || 1));
+  });
+  /** How many of `qty` (in target units) are still missing on a short line. */
+  const takeMissing = (row: any, targetProductId: string, qty: number, unitsPerLine: number): number => {
+    const own = `${row.orders.id}-${targetProductId}`;
+    const line = `${row.orders.id}-${row.product_id}`;
+    const key = missingLeft.has(own) ? own : line;
+    const left = missingLeft.get(key);
+    if (left == null) return qty;
+    // An issue on the ordered (bundle) product counts bundles; on the component, pieces.
+    const leftInTarget = key === own ? left : left * unitsPerLine;
+    const take = Math.min(qty, leftInTarget);
+    const usedInKeyUnits = key === own ? take : Math.ceil(take / unitsPerLine);
+    missingLeft.set(key, Math.max(0, left - usedInKeyUnits));
+    return take;
+  };
 
   const totalOpenDemandMap = new Map<string, number>();
   const needToBuyMap = new Map<string, number>();
   const unscannedLayawayMap = new Map<string, number>();
-  const addDemand = (productId: string, quantity: number, isUnfulfilled: boolean) => {
+  const addDemand = (productId: string, quantity: number, isUnfulfilled: boolean, toBuy: number = quantity) => {
     totalOpenDemandMap.set(productId, (totalOpenDemandMap.get(productId) || 0) + quantity);
-    if (isUnfulfilled) {
-      needToBuyMap.set(productId, (needToBuyMap.get(productId) || 0) + quantity);
+    if (isUnfulfilled && toBuy > 0) {
+      needToBuyMap.set(productId, (needToBuyMap.get(productId) || 0) + toBuy);
     }
   };
+  const toBuyFor = (row: any, targetProductId: string, qty: number, unitsPerLine: number): number =>
+    row.orders.status === 'Picked (with issue)' ? takeMissing(row, targetProductId, qty, unitsPerLine) : qty;
   const addLayawayDemand = (productId: string, quantity: number) => {
     unscannedLayawayMap.set(productId, (unscannedLayawayMap.get(productId) || 0) + quantity);
   };
@@ -198,7 +222,7 @@ export async function calculateProcurementDemand(
     const isLayawayOnShelf = isUnscannedLayaway(row);
     if (candidateIds.has(row.product_id)) {
       const unfulfilled = isUnfulfilledFor(row, row.product_id);
-      addDemand(row.product_id, row.quantity, unfulfilled);
+      addDemand(row.product_id, row.quantity, unfulfilled, unfulfilled ? toBuyFor(row, row.product_id, row.quantity, 1) : 0);
       if (unfulfilled) notePaidLayaway(row.product_id, row);
       if (isLayawayOnShelf) {
         addLayawayDemand(row.product_id, row.quantity);
@@ -208,7 +232,7 @@ export async function calculateProcurementDemand(
     components?.forEach((c) => {
       const compQty = row.quantity * c.qtyPerBundle;
       const unfulfilled = isUnfulfilledFor(row, c.componentId);
-      addDemand(c.componentId, compQty, unfulfilled);
+      addDemand(c.componentId, compQty, unfulfilled, unfulfilled ? toBuyFor(row, c.componentId, compQty, c.qtyPerBundle) : 0);
       if (unfulfilled) notePaidLayaway(c.componentId, row);
       if (isLayawayOnShelf) {
         addLayawayDemand(c.componentId, compQty);
