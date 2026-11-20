@@ -265,6 +265,7 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
     osMap.set(p.id, {
       productId: p.id,
       productName: displayName,
+      parentId: p.parent_id || null,
       supplierCode: matchedSupplierCode || null,
       neededQty: draft ? draft.expected_qty : systemQty,
       systemQty: systemQty,
@@ -323,8 +324,32 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
     }
   }
 
+  // Variants of the same main product sit together (owner, 2026-11-20). The
+  // family moves up as one, to where its most urgent variant would be; inside
+  // it, urgent/paid variants still come first, then by name.
+  const byName = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true });
   for (const g of Object.values(grouped)) {
-    g.items.sort((a: any, b: any) => priorityRank(a.priority) - priorityRank(b.priority));
+    const families = new Map<string, { rank: number; name: string }>();
+    for (const item of g.items) {
+      const key = item.parentId || item.productId;
+      const rank = priorityRank(item.priority);
+      const fam = families.get(key);
+      if (!fam) families.set(key, { rank, name: item.productName || '' });
+      else {
+        fam.rank = Math.min(fam.rank, rank);
+        if (byName(item.productName || '', fam.name) < 0) fam.name = item.productName || '';
+      }
+    }
+    g.items.sort((a: any, b: any) => {
+      const ka = a.parentId || a.productId;
+      const kb = b.parentId || b.productId;
+      if (ka !== kb) {
+        const fa = families.get(ka)!;
+        const fb = families.get(kb)!;
+        return (fa.rank - fb.rank) || byName(fa.name, fb.name) || (ka < kb ? -1 : 1);
+      }
+      return (priorityRank(a.priority) - priorityRank(b.priority)) || byName(a.productName || '', b.productName || '');
+    });
   }
   const result = Object.values(grouped).filter((g) => g.items.length > 0 || g.id === null);
 
