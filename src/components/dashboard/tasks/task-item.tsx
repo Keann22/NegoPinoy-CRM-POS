@@ -1,12 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { CheckCircle2, Clock, Eye, EyeOff, Package, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, Eye, EyeOff, Hammer, Package, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { dueLabel, phtWhen } from '@/lib/services/staff-tasks/task-dates';
-import type { StaffTask } from '@/types/staff-tasks.types';
+import type { StaffTask, StaffTaskProgress } from '@/types/staff-tasks.types';
 
 interface Props {
   task: StaffTask;
@@ -14,11 +14,13 @@ interface Props {
   view: 'staff' | 'owner';
   busy?: boolean;
   onSeen?: (t: StaffTask) => void;
+  onProgress?: (t: StaffTask, progress: StaffTaskProgress) => void;
   onDone?: (t: StaffTask) => void;
   onCancel?: (t: StaffTask) => void;
   onOpenOrder?: () => void;
 }
 
+/** Where the task stands: Not seen yet → Seen → Working on it / Problem → Done. */
 function Progress({ task }: { task: StaffTask }) {
   if (task.status === 'cancelled') return <span className="flex items-center gap-1 text-muted-foreground"><XCircle className="h-3.5 w-3.5" />Cancelled</span>;
   if (task.status === 'done' && task.doneAt) {
@@ -28,16 +30,28 @@ function Progress({ task }: { task: StaffTask }) {
       </span>
     );
   }
+  if (task.progress === 'problem' && task.progressAt) {
+    return <span className="flex items-center gap-1 font-medium text-orange-700 dark:text-orange-400"><AlertTriangle className="h-3.5 w-3.5" />Problem {phtWhen(task.progressAt)}</span>;
+  }
+  if (task.progress === 'working' && task.progressAt) {
+    return <span className="flex items-center gap-1 text-sky-700 dark:text-sky-400"><Hammer className="h-3.5 w-3.5" />Working on it since {phtWhen(task.progressAt)}</span>;
+  }
   if (task.seenAt) return <span className="flex items-center gap-1 text-sky-700 dark:text-sky-400"><Eye className="h-3.5 w-3.5" />Seen {phtWhen(task.seenAt)}</span>;
   return <span className="flex items-center gap-1 text-amber-700 dark:text-amber-400"><EyeOff className="h-3.5 w-3.5" />Not seen yet</span>;
 }
 
-/** One task: what to do, the order it's about, the deadline, and its buttons. */
-export function TaskItem({ task, view, busy, onSeen, onDone, onCancel, onOpenOrder }: Props) {
+/** One task: what to do, the order it's about, the deadline, where it stands, and its buttons. */
+export function TaskItem({ task, view, busy, onSeen, onProgress, onDone, onCancel, onOpenOrder }: Props) {
   const due = task.dueAt && task.status === 'open' ? dueLabel(task.dueAt) : null;
   const open = task.status === 'open';
+  const problem = open && task.progress === 'problem';
   return (
-    <div className={cn('space-y-2 rounded-lg border p-3', due?.late && 'border-red-300 bg-red-50/60 dark:border-red-900 dark:bg-red-950/30', !open && 'opacity-75')}>
+    <div className={cn(
+      'space-y-2 rounded-lg border p-3',
+      due?.late && 'border-red-300 bg-red-50/60 dark:border-red-900 dark:bg-red-950/30',
+      problem && 'border-orange-300 bg-orange-50/60 dark:border-orange-900 dark:bg-orange-950/30',
+      !open && 'opacity-75'
+    )}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <p className="whitespace-pre-wrap font-medium">{task.message}</p>
         {due && (
@@ -64,9 +78,17 @@ export function TaskItem({ task, view, busy, onSeen, onDone, onCancel, onOpenOrd
         {view === 'owner'
           ? <span>For <span className="font-medium text-foreground">{task.assigneeName}</span> · from {task.assignedByName} · {phtWhen(task.createdAt)}</span>
           : <span>From {task.assignedByName} · {phtWhen(task.createdAt)}</span>}
-        {view === 'owner' && <Progress task={task} />}
-        {view === 'staff' && !open && <Progress task={task} />}
+        {(view === 'owner' || !open || task.progress) && <Progress task={task} />}
       </div>
+
+      {open && task.progress && task.progressNote && (
+        <p className={cn(
+          'whitespace-pre-wrap rounded-md p-2 text-sm',
+          task.progress === 'problem' ? 'bg-orange-100 text-orange-900 dark:bg-orange-950/60 dark:text-orange-200' : 'bg-sky-50 dark:bg-sky-950/40'
+        )}>
+          {view === 'owner' && task.progressByName ? `${task.progressByName}: ` : ''}&ldquo;{task.progressNote}&rdquo;
+        </p>
+      )}
 
       {task.status === 'done' && (task.doneNote || task.donePhotoUrl) && (
         <div className="flex items-start gap-2 rounded-md bg-emerald-50 p-2 text-sm dark:bg-emerald-950/40">
@@ -80,11 +102,21 @@ export function TaskItem({ task, view, busy, onSeen, onDone, onCancel, onOpenOrd
         </div>
       )}
 
-      {open && (onSeen || onDone || onCancel) && (
+      {open && (onSeen || onProgress || onDone || onCancel) && (
         <div className="flex flex-wrap gap-2 pt-1">
           {onSeen && !task.seenAt && (
             <Button size="sm" variant="outline" disabled={busy} onClick={() => onSeen(task)}>
               <Eye className="mr-1.5 h-4 w-4" />Nakita ko
+            </Button>
+          )}
+          {onProgress && task.progress !== 'working' && (
+            <Button size="sm" variant="outline" disabled={busy} className="border-sky-300 text-sky-800 dark:text-sky-300" onClick={() => onProgress(task, 'working')}>
+              <Hammer className="mr-1.5 h-4 w-4" />Ginagawa na
+            </Button>
+          )}
+          {onProgress && task.progress !== 'problem' && (
+            <Button size="sm" variant="outline" disabled={busy} className="border-orange-300 text-orange-800 dark:text-orange-300" onClick={() => onProgress(task, 'problem')}>
+              <AlertTriangle className="mr-1.5 h-4 w-4" />May problema
             </Button>
           )}
           {onDone && (

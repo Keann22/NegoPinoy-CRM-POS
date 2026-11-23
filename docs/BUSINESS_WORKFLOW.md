@@ -615,6 +615,11 @@ How it works (built 2026-11-20):
   now, late ones in red; owners can cancel one. The order page lists its tasks.
 - **One person, several accounts:** a task for Jas shows on all three of her
   accounts; accounts with the same name count as one person.
+- **Progress (owner, 2026-11-23):** between Seen and Done, staff tap **Ginagawa
+  na** (working on it, optional note like "ipapadala mamayang hapon") or **May
+  problema** (can't do it, reason required). A problem sends the owner a bell
+  ("Task problem"), shows in orange at the top of the Tasks page, and stops the
+  late pop-up (they're waiting on the owners). Staff can still tap Tapos na later.
 
 ## Being decided (not built yet)
 

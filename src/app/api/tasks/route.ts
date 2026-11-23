@@ -4,7 +4,7 @@ import { createClient as createSessionClient } from '@/lib/supabase/server';
 import { isStaffUser } from '@/lib/auth/staff-roles';
 import { isManagementUser } from '@/lib/services/purchase-summary-service';
 import {
-  cancelTask, createTask, listAllTasks, listMyTasks, listOrderTasks, listPeople, markDone, markSeen,
+  cancelTask, createTask, listAllTasks, listMyTasks, listOrderTasks, listPeople, markDone, markSeen, setProgress,
   TaskError, type TaskCaller,
 } from '@/lib/services/staff-tasks/staff-task-service';
 
@@ -70,7 +70,7 @@ export async function POST(req: Request) {
   }
 }
 
-// { id, action: 'seen' | 'done' | 'cancel', note?, photoUrl? }
+// { id, action: 'seen' | 'working' | 'problem' | 'done' | 'cancel', note?, photoUrl? }
 export async function PATCH(req: Request) {
   try {
     const caller = await getCaller();
@@ -78,6 +78,7 @@ export async function PATCH(req: Request) {
     const body = await req.json();
     const id = String(body.id || '');
     if (body.action === 'seen') await markSeen(supabase, id, caller);
+    else if (body.action === 'working' || body.action === 'problem') await setProgress(supabase, id, caller, body.action, body.note);
     else if (body.action === 'done') await markDone(supabase, id, caller, { note: body.note, photoUrl: body.photoUrl });
     else if (body.action === 'cancel') await cancelTask(supabase, id, caller);
     else return NextResponse.json({ error: 'Unknown action' }, { status: 400 });

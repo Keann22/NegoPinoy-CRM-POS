@@ -18,7 +18,7 @@ const SAME_PERSON: { label: string; emails: string[] }[] = [
   { label: 'Jas', emails: ['jas@gmail.com', 'jas@usares.com', 'jassy@gmail.com'] },
 ];
 
-const SELECT = 'id, message, order_id, assignee_name, assigned_by_name, due_at, status, seen_at, seen_by_name, done_at, done_by_name, done_note, done_photo_url, created_at, orders(status, customers(full_name))';
+const SELECT = 'id, message, order_id, assignee_name, assigned_by_name, due_at, status, seen_at, seen_by_name, progress, progress_note, progress_at, progress_by_name, done_at, done_by_name, done_note, done_photo_url, created_at, orders(status, customers(full_name))';
 
 interface AuthUser {
   id: string;
@@ -75,6 +75,7 @@ export async function listPeople(supabase: SupabaseClient): Promise<TaskPerson[]
 interface TaskRow {
   id: string; message: string; order_id: string | null; assignee_name: string; assigned_by_name: string;
   due_at: string | null; status: StaffTask['status']; seen_at: string | null; seen_by_name: string | null;
+  progress: StaffTask['progress']; progress_note: string | null; progress_at: string | null; progress_by_name: string | null;
   done_at: string | null; done_by_name: string | null; done_note: string | null; done_photo_url: string | null;
   created_at: string;
   orders?: OrderJoin | OrderJoin[] | null;
@@ -97,6 +98,10 @@ function toTask(r: TaskRow): StaffTask {
     status: r.status,
     seenAt: r.seen_at,
     seenByName: r.seen_by_name,
+    progress: r.progress,
+    progressNote: r.progress_note,
+    progressAt: r.progress_at,
+    progressByName: r.progress_by_name,
     doneAt: r.done_at,
     doneByName: r.done_by_name,
     doneNote: r.done_note,
@@ -200,6 +205,53 @@ export async function markSeen(supabase: SupabaseClient, id: string, caller: Tas
   if (error) throw error;
 }
 
+async function bellOwner(supabase: SupabaseClient, row: { id: string; message: string; order_id: string | null; assigned_by_name: string }, caller: TaskCaller, title: string, note: string | null) {
+  // Someone else acting for them (an owner): no bell to themselves.
+  if (!row.assigned_by_name || row.assigned_by_name === caller.name) return;
+  const order = row.order_id ? ` (#${String(row.order_id).slice(0, 7).toUpperCase()})` : '';
+  const text = `${caller.name}${order}: ${row.message}${note ? ` — "${note}"` : ''}`;
+  await supabase.from('notifications').insert({
+    sales_person_name: row.assigned_by_name,
+    title,
+    message: text.length > 240 ? `${text.slice(0, 237)}...` : text,
+    link: `${TASKS_PAGE}?task=${row.id}`,
+    is_read: false,
+  });
+}
+
+/**
+ * "Ginagawa na" (working on it, optional note) or "May problema" (can't do it,
+ * reason required). A problem sends the owner who assigned it a bell.
+ */
+export async function setProgress(
+  supabase: SupabaseClient,
+  id: string,
+  caller: TaskCaller,
+  progress: 'working' | 'problem',
+  noteIn?: string | null
+): Promise<void> {
+  const row = await getRow(supabase, id);
+  if (!row.assignee_ids.includes(caller.id)) throw new TaskError('This task is not yours');
+  if (row.status !== 'open') throw new TaskError(row.status === 'done' ? 'Already done' : 'This task was cancelled');
+  const note = String(noteIn || '').trim().slice(0, 1000) || null;
+  if (progress === 'problem' && !note) throw new TaskError('Write what the problem is');
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from('staff_tasks')
+    .update({
+      progress,
+      progress_note: note,
+      progress_at: now,
+      progress_by_name: caller.name,
+      seen_at: row.seen_at || now,
+      seen_by_name: row.seen_at ? undefined : caller.name,
+    })
+    .eq('id', id)
+    .eq('status', 'open');
+  if (error) throw error;
+  if (progress === 'problem') await bellOwner(supabase, row, caller, 'Task problem', note);
+}
+
 /** Done, with an optional note / photo. The owner who assigned it gets a bell. */
 export async function markDone(
   supabase: SupabaseClient,
@@ -227,18 +279,7 @@ export async function markDone(
     .eq('status', 'open');
   if (error) throw error;
 
-  // Someone else marking it done for them (an owner): no bell to themselves.
-  if (row.assigned_by_name && row.assigned_by_name !== caller.name) {
-    const order = row.order_id ? ` (#${String(row.order_id).slice(0, 7).toUpperCase()})` : '';
-    const text = `${caller.name}${order}: ${row.message}${note ? ` — "${note}"` : ''}`;
-    await supabase.from('notifications').insert({
-      sales_person_name: row.assigned_by_name,
-      title: 'Task done',
-      message: text.length > 240 ? `${text.slice(0, 237)}...` : text,
-      link: `${TASKS_PAGE}?task=${id}`,
-      is_read: false,
-    });
-  }
+  await bellOwner(supabase, row, caller, 'Task done', note);
 }
 
 /** Owners take a task back (wrong person, not needed anymore). */

@@ -1,46 +1,31 @@
 'use client';
 
-import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { ClipboardCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { useToast } from '@/hooks/use-toast';
 import { usePopupSnooze } from '@/hooks/usePopupSnooze';
 import { actOnTask, useMyTasks } from '@/hooks/useStaffTasks';
+import { useTaskActions } from '@/hooks/useTaskActions';
 import { isLate } from '@/lib/services/staff-tasks/task-dates';
 import { TASKS_PAGE_PATH } from './tasks-nav-badge';
 import { TaskItem } from './task-item';
-import { TaskDoneDialog } from './task-done-dialog';
-import type { StaffTask } from '@/types/staff-tasks.types';
 
 /**
  * A task from the owners (owner, 2026-11-23): pops up until the staff member taps
  * "Nakita ko", then it stays on their dashboard until Done. A task past its
- * deadline pops up again. "Later" hides it for 30 minutes.
+ * deadline pops up again, unless they reported a problem (they're waiting on
+ * the owners). "Later" hides it for 30 minutes.
  */
 export function StaffTaskPopup() {
   const pathname = usePathname();
-  const { toast } = useToast();
   const { open, reload } = useMyTasks();
   const { minimized, setMinimized } = usePopupSnooze('staff-tasks', reload);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [doneTask, setDoneTask] = useState<StaffTask | null>(null);
+  const { busyId, handlers, dialogs, dialogOpen } = useTaskActions();
 
-  const shown = open.filter((t) => !t.seenAt || isLate(t.dueAt));
+  const shown = open.filter((t) => !t.seenAt || (isLate(t.dueAt) && t.progress !== 'problem'));
 
-  const seen = async (t: StaffTask) => {
-    setBusyId(t.id);
-    try {
-      await actOnTask(t.id, 'seen');
-    } catch (e) {
-      toast({ variant: 'destructive', title: 'Not saved', description: e instanceof Error ? e.message : String(e) });
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  if (doneTask) return <TaskDoneDialog task={doneTask} onOpenChange={(o) => { if (!o) setDoneTask(null); }} />;
+  if (dialogOpen) return dialogs;
   if (shown.length === 0 || minimized || pathname?.startsWith(TASKS_PAGE_PATH)) return null;
 
   const anyLate = shown.some((t) => t.seenAt && isLate(t.dueAt));
@@ -58,7 +43,7 @@ export function StaffTaskPopup() {
           </DialogTitle>
           <DialogDescription>
             Tap <b>Nakita ko</b> so the owners know you saw it. It stays on your dashboard until you tap <b>Tapos na</b>.
-            {anyLate && ' Some are past the deadline.'}
+            {anyLate && ' Some are past the deadline: tap Tapos na, or May problema if you can\'t do it.'}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
@@ -68,8 +53,7 @@ export function StaffTaskPopup() {
               task={t}
               view="staff"
               busy={busyId === t.id}
-              onSeen={seen}
-              onDone={setDoneTask}
+              {...handlers}
               // Opening the order counts as seeing the task.
               onOpenOrder={() => { if (!t.seenAt) void actOnTask(t.id, 'seen').catch(() => undefined); setMinimized(true); }}
             />

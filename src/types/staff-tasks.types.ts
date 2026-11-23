@@ -1,5 +1,7 @@
 /** A task an owner gave a staff member (table staff_tasks, owner 2026-11-23). */
 export type StaffTaskStatus = 'open' | 'done' | 'cancelled';
+/** Between Seen and Done: "Ginagawa na" or "May problema". */
+export type StaffTaskProgress = 'working' | 'problem';
 
 export interface StaffTask {
   id: string;
@@ -16,6 +18,10 @@ export interface StaffTask {
   status: StaffTaskStatus;
   seenAt: string | null;
   seenByName: string | null;
+  progress: StaffTaskProgress | null;
+  progressNote: string | null;
+  progressAt: string | null;
+  progressByName: string | null;
   doneAt: string | null;
   doneByName: string | null;
   doneNote: string | null;
@@ -37,4 +43,4 @@ export interface NewStaffTask {
   dueAt?: string | null;
 }
 
-export type StaffTaskAction = 'seen' | 'done' | 'cancel';
+export type StaffTaskAction = 'seen' | 'working' | 'problem' | 'done' | 'cancel';

@@ -5,7 +5,7 @@ import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { actOnTask, useAllTasks } from '@/hooks/useStaffTasks';
+import { actOnTask, TASKS_CHANGED_EVENT, useAllTasks } from '@/hooks/useStaffTasks';
 import { isLate } from '@/lib/services/staff-tasks/task-dates';
 import { cn } from '@/lib/utils';
 import { AssignTaskDialog } from './assign-task-dialog';
@@ -30,8 +30,17 @@ export function OwnerTasksList({ highlightId }: { highlightId: string | null }) 
 
   const people = useMemo(() => Array.from(new Set(tasks.map((t) => t.assigneeName))).sort(), [tasks]);
   const open = tasks.filter((t) => t.status === 'open');
-  const shown = tasks.filter((t) =>
-    (filter === 'all' || t.status === filter) && (!person || t.assigneeName === person));
+  const problems = open.filter((t) => t.progress === 'problem').length;
+  // Problems first: the staff member is waiting on the owners.
+  const shown = tasks
+    .filter((t) => (filter === 'all' || t.status === filter) && (!person || t.assigneeName === person))
+    .sort((a, b) => Number(b.status === 'open' && b.progress === 'problem') - Number(a.status === 'open' && a.progress === 'problem'));
+
+  useEffect(() => {
+    const onChange = () => { void reload().catch(() => undefined); };
+    window.addEventListener(TASKS_CHANGED_EVENT, onChange);
+    return () => window.removeEventListener(TASKS_CHANGED_EVENT, onChange);
+  }, [reload]);
 
   useEffect(() => {
     if (!highlightId || tasks.length === 0) return;
@@ -43,7 +52,6 @@ export function OwnerTasksList({ highlightId }: { highlightId: string | null }) 
     setBusyId(t.id);
     try {
       await actOnTask(t.id, 'cancel');
-      await reload();
     } catch (e) {
       toast({ variant: 'destructive', title: 'Not cancelled', description: e instanceof Error ? e.message : String(e) });
     } finally {
@@ -57,7 +65,8 @@ export function OwnerTasksList({ highlightId }: { highlightId: string | null }) 
         <div className="space-y-1">
           <CardTitle>Tasks for staff</CardTitle>
           <CardDescription>
-            {open.length} open · {open.filter((t) => !t.seenAt).length} not seen yet · {open.filter((t) => isLate(t.dueAt)).length} late
+            {open.length} open · {open.filter((t) => !t.seenAt).length} not seen yet · {open.filter((t) => t.progress === 'working').length} working on it · {open.filter((t) => isLate(t.dueAt)).length} late
+            {problems > 0 && <span className="font-semibold text-orange-700 dark:text-orange-400"> · {problems} with a problem</span>}
           </CardDescription>
         </div>
         <Button onClick={() => setAssignOpen(true)}><Plus className="mr-1.5 h-4 w-4" />New task</Button>

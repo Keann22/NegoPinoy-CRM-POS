@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import type { NewStaffTask, StaffTask, StaffTaskAction, TaskPerson } from '@/types/staff-tasks.types';
 
 const API = '/api/tasks';
+/** Fired after any task change, so lists that load their own copy can reload. */
+export const TASKS_CHANGED_EVENT = 'staff-tasks-changed';
 const POLL_MS = 3 * 60 * 1000;
 
 async function call<T>(init: RequestInit & { query?: string } = {}): Promise<T> {
@@ -61,6 +63,8 @@ const EMPTY: StaffTask[] = [];
 export async function actOnTask(id: string, action: StaffTaskAction, extra: { note?: string; photoUrl?: string | null } = {}) {
   await call({ method: 'PATCH', body: JSON.stringify({ id, action, ...extra }) });
   await loadMine();
+  // Owner list and order page reload on this.
+  window.dispatchEvent(new Event(TASKS_CHANGED_EVENT));
 }
 
 export async function uploadTaskPhoto(file: File): Promise<string> {
@@ -129,5 +133,6 @@ export function useTaskPeople(enabled: boolean) {
 export async function createStaffTask(input: NewStaffTask): Promise<string> {
   const json = await call<{ id: string }>({ method: 'POST', body: JSON.stringify(input) });
   await loadMine();
+  window.dispatchEvent(new Event(TASKS_CHANGED_EVENT));
   return json.id;
 }
