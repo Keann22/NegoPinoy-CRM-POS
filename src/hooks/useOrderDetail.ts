@@ -3,6 +3,25 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSupabase } from '@/lib/supabase/hooks';
 import type { Order, OrderItem } from '@/types';
+import {
+  REFUND_EXPENSE_CATEGORY,
+  REFUND_STORE_CREDIT_EXPENSE_CATEGORY,
+  REFUND_VOIDED_SALE_EXPENSE_CATEGORY,
+} from '@/types/customer-returns.types';
+
+export type OrderExpensesSummary = {
+  shippingFee: number;
+  processingFee: number;
+  storeCreditIssued: number;
+  refundedAmount: number;
+};
+
+const EMPTY_EXPENSES: OrderExpensesSummary = {
+  shippingFee: 0,
+  processingFee: 0,
+  storeCreditIssued: 0,
+  refundedAmount: 0,
+};
 
 type OrderDetailCustomer = {
   id: string;
@@ -33,6 +52,7 @@ export function useOrderDetail(orderId: string) {
   const [customer, setCustomer] = useState<OrderDetailCustomer | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [payments, setPayments] = useState<OrderDetailPayment[]>([]);
+  const [expenses, setExpenses] = useState<OrderExpensesSummary>(EMPTY_EXPENSES);
 
   const [isLoadingOrder, setIsLoadingOrder] = useState(true);
   const [isLoadingCustomer, setIsLoadingCustomer] = useState(false);
@@ -179,5 +199,50 @@ export function useOrderDetail(orderId: string) {
 
   const isLoading = isLoadingOrder || isLoadingCustomer || isLoadingItems || isLoadingPayments;
 
-  return { order, customer, orderItems, payments, isLoading, refetch };
+  // Fetch order-linked expenses (shipping, courier processing fees, store credit, refunds)
+  useEffect(() => {
+    if (!supabase || !orderId) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('expenses')
+          .select('amount, category')
+          .ilike('description', `%${orderId.substring(0, 7).toUpperCase()}%`);
+        if (error) throw error;
+        if (cancelled) return;
+        const next: OrderExpensesSummary = { ...EMPTY_EXPENSES };
+        for (const row of (data || []) as { amount: number | null; category: string | null }[]) {
+          const amt = Number(row.amount) || 0;
+          switch (row.category) {
+            case 'Shipping Fee':
+              next.shippingFee += amt;
+              break;
+            case 'Processing Fee':
+              next.processingFee += amt;
+              break;
+            case 'Customer Store Credit Liability':
+            case REFUND_STORE_CREDIT_EXPENSE_CATEGORY:
+              next.storeCreditIssued += amt;
+              break;
+            case REFUND_EXPENSE_CATEGORY:
+            case REFUND_VOIDED_SALE_EXPENSE_CATEGORY:
+              next.refundedAmount += amt;
+              break;
+            default:
+              break;
+          }
+        }
+        setExpenses(next);
+      } catch (err) {
+        console.error('Order expenses fetch error:', err);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, orderId, refetchTrigger]);
+
+  return { order, customer, orderItems, payments, expenses, isLoading, refetch };
 }

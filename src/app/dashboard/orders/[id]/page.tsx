@@ -54,7 +54,8 @@ export default function OrderDetailPage() {
   const orderId = params.id as string;
   const supabase = useSupabase();
 
-  const { order, customer, orderItems: rawItems, payments: rawPayments, isLoading, refetch } = useOrderDetail(orderId);
+  const { order, customer, orderItems: rawItems, payments: rawPayments, expenses, isLoading, refetch } = useOrderDetail(orderId);
+  const { shippingFee, processingFee, storeCreditIssued, refundedAmount } = expenses;
   const { userProfile } = useUserProfile();
 
   // Dialog state
@@ -65,29 +66,6 @@ export default function OrderDetailPage() {
   const [isTrailOpen, setIsTrailOpen] = useState(false);
   const [isLogPaymentOpen, setIsLogPaymentOpen] = useState(false);
   const [isAddSpxSfOpen, setIsAddSpxSfOpen] = useState(false);
-
-  // Expenses (Shipping and Processing)
-  const [shippingFee, setShippingFee] = useState<number>(0);
-  const [processingFee, setProcessingFee] = useState<number>(0);
-
-  useEffect(() => {
-    if (!supabase || !orderId) return;
-    supabase.from('expenses')
-      .select('amount, category')
-      .ilike('description', `%${orderId.substring(0, 7).toUpperCase()}%`)
-      .then(({ data }: { data: { amount: number; category: string }[] | null }) => {
-        if (data && data.length > 0) {
-          let ship = 0;
-          let proc = 0;
-          data.forEach((d: any) => {
-            if (d.category === 'Shipping Fee') ship += d.amount;
-            else proc += d.amount;
-          });
-          setShippingFee(ship);
-          setProcessingFee(proc);
-        }
-      });
-  }, [supabase, orderId]);
 
   // Auto-open share receipt if URL has ?share=true
   useEffect(() => {
@@ -319,6 +297,18 @@ export default function OrderDetailPage() {
               <span className="text-muted-foreground">Amount Paid</span>
               <span>₱{(order.amountPaid || 0).toFixed(2)}</span>
             </div>
+            {storeCreditIssued > 0 && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Store Credit Issued</span>
+                <span className="text-destructive">- ₱{storeCreditIssued.toFixed(2)}</span>
+              </div>
+            )}
+            {refundedAmount > 0 && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Refunded</span>
+                <span className="text-destructive">- ₱{refundedAmount.toFixed(2)}</span>
+              </div>
+            )}
             {(shippingFee > 0 || processingFee > 0) && (() => {
               const codPayments = payments.filter(p => p.paymentMethod?.toLowerCase().includes('cod'));
               const actualCodCollected = codPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
