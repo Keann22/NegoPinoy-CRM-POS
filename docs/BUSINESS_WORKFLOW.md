@@ -634,6 +634,28 @@ How it works (built 2026-11-20):
   open, not seen yet, working on it, problem, late, new replies, done today; a
   "Waiting on you" list (problems and replies); and a per-staff table.
 
+## Put back the pieces of a cancelled order (owner, 2026-11-23; built 2026-11-23)
+
+- When sales cancel an order that was **already picked**, the system puts the
+  pieces back on the shelf number, but nobody told the warehouse to put the real
+  pieces back. Checked 2026-11-23: 24 of 37 cancelled orders in 30 days had been
+  picked (119 pieces). Cancelling also never showed in the order's history.
+- Now the cancel creates **one shared task for Jas, Al and Edric** (owner's
+  choice; Tess was left out): it lists each item and how many, and says if the
+  order was already packed ("buksan ang box"). All three get it (pop-up, then
+  "Mga task ko"); **whoever puts the pieces back taps Tapos na, which closes it
+  for everyone**. Due today 6 PM, or tomorrow noon if cancelled after 4 PM.
+- Only for picked orders: an unpicked order has nothing to put back, so no task.
+  Courier returns aren't included (the Returns flow has its own put-back step).
+- If the order is un-cancelled, the task closes by itself. "May problema" (e.g.
+  pieces not found) sends the owners a bell; owners see every put-back task on
+  the Tasks page ("Auto (cancelled order)").
+- The order's history now shows **Cancelled**, who cancelled it and from which
+  status.
+- The team is set in the database (`put_back_team()` in
+  scripts/migrations/2026-11-23_put_back_tasks.sql); changing who gets it is a
+  one-line change there.
+
 ## Being decided (not built yet)
 
 - **Customer purchase planner (owner, 2026-11-01)**: a premium feature on the

@@ -29,6 +29,8 @@ export interface StaffTask {
   createdAt: string;
   /** Same task given to several people at once (each has their own copy). */
   groupId: string | null;
+  /** Automatic put-back task (order cancelled after picking): one task shared by the put-back team; whoever does it closes it. */
+  auto: boolean;
   /** Replies / questions on the task. */
   messageCount: number;
   lastMessageAt: string | null;

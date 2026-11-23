@@ -41,7 +41,7 @@ export function TaskProgressDialog({ target, onOpenChange }: {
       await actOnTask(target.task.id, target.progress, { note: note.trim() });
       toast({
         title: isProblem ? 'Owners told' : 'Saved',
-        description: isProblem ? `${target.task.assignedByName} will see the problem.` : 'The owners can see you are working on it.',
+        description: isProblem ? (target.task.auto ? 'The owners will see the problem.' : `${target.task.assignedByName} will see the problem.`) : 'The owners can see you are working on it.',
       });
       close(false);
     } catch (e) {

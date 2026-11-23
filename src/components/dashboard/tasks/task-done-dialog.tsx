@@ -32,7 +32,7 @@ export function TaskDoneDialog({ task, onOpenChange, onDone }: {
     try {
       const photoUrl = photo ? await uploadTaskPhoto(photo) : null;
       await actOnTask(task.id, 'done', { note: note.trim(), photoUrl });
-      toast({ title: 'Done', description: `${task.assignedByName} will see it's done.` });
+      toast({ title: 'Done', description: task.auto ? 'Closed for everyone on the team. The owners can see it.' : `${task.assignedByName} will see it's done.` });
       onDone?.();
       close(false);
     } catch (e) {

@@ -82,7 +82,7 @@ export function TaskItem({ task, view, busy, onSeen, onProgress, onDone, onCance
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
         {view === 'owner'
           ? <span>For <span className="font-medium text-foreground">{task.assigneeName}</span> · from {task.assignedByName} · {phtWhen(task.createdAt)}</span>
-          : <span>From {task.assignedByName} · {phtWhen(task.createdAt)}</span>}
+          : <span>From {task.assignedByName}{task.auto ? <> · shared with <span className="font-medium text-foreground">{task.assigneeName}</span></> : null} · {phtWhen(task.createdAt)}</span>}
         {(view === 'owner' || !open || task.progress) && <Progress task={task} />}
         {groupProgress && groupProgress.total > 1 && (
           <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{groupProgress.done} of {groupProgress.total} done</span>

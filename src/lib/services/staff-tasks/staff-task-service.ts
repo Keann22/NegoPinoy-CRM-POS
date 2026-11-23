@@ -18,7 +18,7 @@ const SAME_PERSON: { label: string; emails: string[] }[] = [
   { label: 'Jas', emails: ['jas@gmail.com', 'jas@usares.com', 'jassy@gmail.com'] },
 ];
 
-const SELECT = 'id, message, order_id, assignee_name, assigned_by_name, due_at, status, seen_at, seen_by_name, progress, progress_note, progress_at, progress_by_name, done_at, done_by_name, done_note, done_photo_url, created_at, last_message_at, last_message_from_owner, staff_read_at, owner_read_at, group_id, staff_task_messages(count), orders(status, customers(full_name))';
+const SELECT = 'id, message, order_id, assignee_name, assigned_by_name, due_at, status, seen_at, seen_by_name, progress, progress_note, progress_at, progress_by_name, done_at, done_by_name, done_note, done_photo_url, created_at, last_message_at, last_message_from_owner, staff_read_at, owner_read_at, group_id, kind, staff_task_messages(count), orders(status, customers(full_name))';
 
 interface AuthUser {
   id: string;
@@ -79,6 +79,7 @@ interface TaskRow {
   done_at: string | null; done_by_name: string | null; done_note: string | null; done_photo_url: string | null;
   created_at: string;
   group_id: string | null;
+  kind: string | null;
   last_message_at: string | null; last_message_from_owner: boolean | null; staff_read_at: string | null; owner_read_at: string | null;
   staff_task_messages?: { count: number }[] | null;
   orders?: OrderJoin | OrderJoin[] | null;
@@ -116,6 +117,7 @@ function toTask(r: TaskRow): StaffTask {
     donePhotoUrl: r.done_photo_url,
     createdAt: r.created_at,
     groupId: r.group_id,
+    auto: r.kind === 'put_back',
     messageCount: r.staff_task_messages?.[0]?.count ?? 0,
     lastMessageAt: r.last_message_at,
     staffUnread: r.last_message_from_owner === true && unread(r.last_message_at, r.staff_read_at),
@@ -199,7 +201,7 @@ export async function createTask(
 async function getRow(supabase: SupabaseClient, id: string) {
   const { data, error } = await supabase
     .from('staff_tasks')
-    .select('id, message, status, assignee_ids, assignee_name, assigned_by_name, seen_at, order_id')
+    .select('id, message, status, assignee_ids, assignee_name, assigned_by_name, seen_at, order_id, kind')
     .eq('id', id)
     .maybeSingle();
   if (error) throw error;
@@ -221,18 +223,34 @@ export async function markSeen(supabase: SupabaseClient, id: string, caller: Tas
   if (error) throw error;
 }
 
-async function bellOwner(supabase: SupabaseClient, row: { id: string; message: string; order_id: string | null; assigned_by_name: string }, caller: TaskCaller, title: string, note: string | null) {
+/** Owner (Admin) names, for bells about automatic tasks nobody assigned by hand. */
+async function ownerNames(supabase: SupabaseClient): Promise<string[]> {
+  const owners = (await staffAccounts(supabase)).filter((u) =>
+    staffRoleNames(u).some((r) => r === 'Admin' || r === 'Owner'));
+  return Array.from(new Set(owners.map(fullName)));
+}
+
+type BellRow = { id: string; message: string; order_id: string | null; assigned_by_name: string; kind?: string | null };
+
+async function bellOwner(supabase: SupabaseClient, row: BellRow, caller: TaskCaller, title: string, note: string | null) {
+  // Automatic put-back task (order cancelled): the owners see it on the Tasks
+  // page; only a problem ("can't find the pieces") is worth a bell.
+  const auto = row.kind === 'put_back';
+  if (auto && title !== 'Task problem') return;
+  const to = auto ? await ownerNames(supabase) : [row.assigned_by_name];
   // Someone else acting for them (an owner): no bell to themselves.
-  if (!row.assigned_by_name || row.assigned_by_name === caller.name) return;
+  const names = to.filter((n) => n && n !== caller.name);
+  if (names.length === 0) return;
   const order = row.order_id ? ` (#${String(row.order_id).slice(0, 7).toUpperCase()})` : '';
-  const text = `${caller.name}${order}: ${row.message}${note ? ` — "${note}"` : ''}`;
-  await supabase.from('notifications').insert({
-    sales_person_name: row.assigned_by_name,
+  const firstLine = auto ? row.message.split('\n')[0] : row.message;
+  const text = `${caller.name}${order}: ${firstLine}${note ? ` — "${note}"` : ''}`;
+  await supabase.from('notifications').insert(names.map((name) => ({
+    sales_person_name: name,
     title,
     message: text.length > 240 ? `${text.slice(0, 237)}...` : text,
     link: `${TASKS_PAGE}?task=${row.id}`,
     is_read: false,
-  });
+  })));
 }
 
 /**
