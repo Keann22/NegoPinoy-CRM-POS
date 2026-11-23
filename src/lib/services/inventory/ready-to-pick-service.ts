@@ -64,7 +64,7 @@ export async function getReadyToPickOrders(supabase: SupabaseClient): Promise<Re
   const orders = await fetchAllPages<any>((from, to) =>
     supabase
       .from('orders')
-      .select('id, status, order_date, created_at, payment_method, total_amount, subtotal, total_discount, amount_paid, balance_due, sales_person_name, customers(full_name)')
+      .select('id, status, order_date, created_at, payment_method, total_amount, subtotal, total_discount, amount_paid, balance_due, sales_person_name, notes, customers(full_name)')
       .in('status', ['Picked (with issue)', 'Processing'])
       .order('id')
       .range(from, to)
@@ -244,6 +244,7 @@ export async function getReadyToPickOrders(supabase: SupabaseClient): Promise<Re
       isPaid: isOrderPaid(o),
       paidPercent: Math.min(100, Math.round(paidRatioOf(o) * 100)),
       salesPersonName: o.sales_person_name ? String(o.sales_person_name) : null,
+      notes: o.notes ? String(o.notes).trim() || null : null,
       noOpenIssue: o.status === 'Picked (with issue)' && !pwiWithIssues.has(String(o.id)),
       items,
     });

@@ -9,8 +9,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { ReprintOrderButton } from '@/components/dashboard/orders/reprint-order-button';
+import { ReadyToPickNoteSection } from '@/components/dashboard/tasks/ready-to-pick-note-section';
 import { useReadyToPick } from '@/hooks/useReadyToPick';
 import { useReprintOrders } from '@/hooks/useReprintOrders';
+import { useStaffDirectory } from '@/hooks/useStaffDirectory';
 import { cn } from '@/lib/utils';
 import type { OrderChangeNotice, OrderItemChange } from '@/types/order-changes';
 import type { ReadyToPickOrder } from '@/types/ready-to-pick.types';
@@ -35,6 +37,7 @@ function paymentLabel(o: ReadyToPickOrder): string {
 export function ReadyToPickList() {
   const { data, isLoading, error, reload } = useReadyToPick(true);
   const { reprint, busy: printingBatch, printView } = useReprintOrders();
+  const { staff } = useStaffDirectory();
   const [tab, setTab] = useState<TabKey>('pwi');
   const [query, setQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -304,6 +307,12 @@ export function ReadyToPickList() {
                   </li>
                 ))}
               </ul>
+              <ReadyToPickNoteSection
+                orderId={order.id}
+                notes={order.notes}
+                staff={staff}
+                onSaved={() => void reload()}
+              />
             </CardContent>
           </Card>
         ))}

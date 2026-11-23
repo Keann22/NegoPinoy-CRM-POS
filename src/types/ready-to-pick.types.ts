@@ -16,6 +16,7 @@ export interface ReadyToPickOrder {
   isPaid: boolean;
   paidPercent: number;
   salesPersonName: string | null;
+  notes: string | null;
   noOpenIssue: boolean;
   items: ReadyToPickItem[];
 }
