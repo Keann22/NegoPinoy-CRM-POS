@@ -6,10 +6,10 @@ import { Loader2, PackageOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { usePopupSnooze } from '@/hooks/usePopupSnooze';
 import { fetchRtsPrompts, patchCustomerReturn } from '@/hooks/useCustomerReturns';
 import type { RtsDecisionPrompt, ShippingPayer } from '@/types/customer-returns.types';
 
-const REOPEN_MS = 30 * 60 * 1000;
 const REFRESH_MS = 5 * 60 * 1000;
 
 const phTime = (iso: string) =>
@@ -25,7 +25,6 @@ const phTime = (iso: string) =>
 export function RtsDecisionPopup() {
   const { toast } = useToast();
   const [prompts, setPrompts] = useState<RtsDecisionPrompt[]>([]);
-  const [minimized, setMinimized] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => setPrompts(await fetchRtsPrompts()), []);
@@ -36,11 +35,7 @@ export function RtsDecisionPopup() {
     return () => clearInterval(t);
   }, [load]);
 
-  useEffect(() => {
-    if (!minimized) return;
-    const t = setTimeout(() => { setMinimized(false); load(); }, REOPEN_MS);
-    return () => clearTimeout(t);
-  }, [minimized, load]);
+  const { minimized, setMinimized } = usePopupSnooze('rts-decision', load);
 
   if (prompts.length === 0) return null;
 

@@ -6,11 +6,11 @@ import { PackageX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { usePopupSnooze } from '@/hooks/usePopupSnooze';
 import { answerSupplierPrompt, fetchSupplierPrompts } from '@/hooks/useSupplierFlags';
 import { SupplierPromptCard } from './supplier-prompt-card';
 import type { SupplierPrompt, SupplierPromptAnswer } from '@/types/supplier-stock.types';
 
-const REOPEN_MS = 30 * 60 * 1000;
 const REFRESH_MS = 5 * 60 * 1000;
 
 const DONE: Record<SupplierPromptAnswer, string> = {
@@ -33,7 +33,6 @@ export function SupplierStockPopup() {
   const { toast } = useToast();
   const router = useRouter();
   const [prompts, setPrompts] = useState<SupplierPrompt[]>([]);
-  const [minimized, setMinimized] = useState(false);
   const [busyKey, setBusyKey] = useState<string | null>(null);
 
   const load = useCallback(() => fetchSupplierPrompts().then(setPrompts), []);
@@ -42,11 +41,7 @@ export function SupplierStockPopup() {
     const t = setInterval(load, REFRESH_MS);
     return () => clearInterval(t);
   }, [load]);
-  useEffect(() => {
-    if (!minimized) return;
-    const t = setTimeout(() => { setMinimized(false); load(); }, REOPEN_MS);
-    return () => clearTimeout(t);
-  }, [minimized, load]);
+  const { minimized, setMinimized } = usePopupSnooze('supplier-stock', load);
 
   if (prompts.length === 0) return null;
 

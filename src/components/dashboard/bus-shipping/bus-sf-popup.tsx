@@ -6,10 +6,10 @@ import { Bus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { usePopupSnooze } from '@/hooks/usePopupSnooze';
 import { answerBusSfPrompt, fetchBusSfPrompts } from '@/hooks/useBusShipping';
 import type { BusSfAnswer, BusSfPrompt } from '@/types/bus-shipping.types';
 
-const REOPEN_MS = 30 * 60 * 1000;
 const REFRESH_MS = 5 * 60 * 1000;
 const peso = (n: number) => `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const phTime = (iso: string) =>
@@ -24,7 +24,6 @@ const phTime = (iso: string) =>
 export function BusSfPopup() {
   const { toast } = useToast();
   const [prompts, setPrompts] = useState<BusSfPrompt[]>([]);
-  const [minimized, setMinimized] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(() => fetchBusSfPrompts().then(setPrompts), []);
@@ -33,11 +32,7 @@ export function BusSfPopup() {
     const t = setInterval(load, REFRESH_MS);
     return () => clearInterval(t);
   }, [load]);
-  useEffect(() => {
-    if (!minimized) return;
-    const t = setTimeout(() => { setMinimized(false); load(); }, REOPEN_MS);
-    return () => clearTimeout(t);
-  }, [minimized, load]);
+  const { minimized, setMinimized } = usePopupSnooze('bus-sf', load);
 
   if (prompts.length === 0) return null;
 
