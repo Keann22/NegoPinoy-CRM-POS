@@ -25,6 +25,7 @@ import { InventoryDashboard } from '@/components/dashboard/inventory-dashboard';
 import { ComplianceWidget } from '@/components/dashboard/compliance-widget';
 import { Skeleton } from '@/components/ui/skeleton';
 import { OrderChangesCard } from '@/components/dashboard/orders/order-changes-card';
+import { MyTasksCard } from '@/components/dashboard/tasks/my-tasks-card';
 import { useUserProfile } from '@/hooks/useUserProfile';
 
 export default function DashboardPage() {
@@ -209,6 +210,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Tasks from the owners; renders nothing when there are none. */}
+      <div className="mb-8 empty:hidden"><MyTasksCard /></div>
       {(isManagement || userProfile?.roles.includes('Inventory')) && <div className="mb-8"><OrderChangesCard /></div>}
 
       <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">

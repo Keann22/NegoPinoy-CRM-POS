@@ -36,7 +36,9 @@ import { RecountRequestPopup } from '@/components/dashboard/recount-request-popu
 import { RtsDecisionPopup } from '@/components/dashboard/customer-returns/rts-decision-popup';
 import { BusSfPopup } from '@/components/dashboard/bus-shipping/bus-sf-popup';
 import { SupplierStockPopup } from '@/components/dashboard/supplier-stock/supplier-stock-popup';
-import { Bus } from 'lucide-react';
+import { Bus, ClipboardCheck } from 'lucide-react';
+import { StaffTaskPopup } from '@/components/dashboard/tasks/staff-task-popup';
+import { TasksNavBadge } from '@/components/dashboard/tasks/tasks-nav-badge';
 import { InventoryGuardianAlertModal } from '@/components/dashboard/inventory/InventoryGuardianAlertModal';
 import { InventoryGuardianTrigger } from '@/components/dashboard/inventory/InventoryGuardianTrigger';
 import { InventoryGuardianProvider } from '@/hooks/useInventoryGuardian';
@@ -81,6 +83,8 @@ export default function DashboardLayout({
     if (isManagement || isSales || isInventory) {
       links.push({ href: '/dashboard', label: 'Dashboard', icon: Home });
       links.push({ href: '/dashboard/priority', label: 'Priority List', icon: ListOrdered });
+      // Tasks the owners give staff (owner, 2026-11-23); the badge is my open-task count.
+      links.push({ href: '/dashboard/tasks', label: 'Tasks', icon: ClipboardCheck, badge: true });
     }
 
     // Sales answer resend / cancel on returned parcels there (they don't see Inventory Management).
@@ -276,6 +280,7 @@ export default function DashboardLayout({
         >
           <Icon className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />
           {link.label}
+          {'badge' in link && link.badge && <TasksNavBadge />}
         </Link>
       );
     });
@@ -292,6 +297,7 @@ export default function DashboardLayout({
       <RtsDecisionPopup />
       <BusSfPopup />
       <SupplierStockPopup />
+      <StaffTaskPopup />
       <InventoryGuardianAlertModal />
       <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr] print:block">
         <div className="hidden border-r bg-sidebar md:block print:hidden">

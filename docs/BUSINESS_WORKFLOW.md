@@ -595,6 +595,27 @@ How it works (built 2026-11-20):
 - **Reprinting is easier**: "Reprint an order" search (order # or customer name)
   on the same card, and a **Reprint** button on every order page.
 
+## Tasks for staff (owner, 2026-11-23; built 2026-11-23)
+
+- The owners used to give tasks on **Messenger** with a screenshot of the order
+  ("jas pwede na yang ipadala", "yan din"), mostly to Jas but also to other
+  staff. Nothing showed whether it was seen or done.
+- Now the owners **assign a task**: from the order page, any Priority List card
+  ("Assign task"), or left menu → **Tasks** → New task. Pick who, write the task
+  (quick picks for orders: "Pwede na ipadala", "Paki-pick at i-book", "Paki-check
+  ang order"), attach the order if any, and an **optional deadline** (within
+  1 hour, today, tomorrow or a date; "today / a date" means by 6 PM).
+- The staff member gets a **pop-up** until they tap **Nakita ko** (opening the
+  order counts too). Then it stays on their **dashboard** ("Mga task ko") and as a
+  count next to Tasks in the menu (not a floating corner button) until they tap
+  **Tapos na**, with an optional note or photo. Past the deadline, the pop-up
+  comes back ("Later" hides it 30 minutes).
+- The owner who assigned it gets a **bell** when it's done. Tasks page (owners):
+  every task with Not seen yet / Seen / Done and who did it, the order's status
+  now, late ones in red; owners can cancel one. The order page lists its tasks.
+- **One person, several accounts:** a task for Jas shows on all three of her
+  accounts; accounts with the same name count as one person.
+
 ## Being decided (not built yet)
 
 - **Customer purchase planner (owner, 2026-11-01)**: a premium feature on the

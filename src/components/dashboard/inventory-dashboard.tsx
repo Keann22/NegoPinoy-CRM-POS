@@ -7,6 +7,7 @@ import { AlertTriangle, Package, ArrowDownToLine, ArrowUpRight, ClipboardList, P
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OrderChangesCard } from "@/components/dashboard/orders/order-changes-card";
+import { MyTasksCard } from "@/components/dashboard/tasks/my-tasks-card";
 
 export function InventoryDashboard() {
   const supabase = useSupabase();
@@ -63,6 +64,9 @@ export function InventoryDashboard() {
         <h1 className="text-3xl font-bold font-headline tracking-tight">Inventory Dashboard</h1>
         <p className="text-muted-foreground">Overview of your warehouse stock and quick actions.</p>
       </div>
+
+      {/* Tasks from the owners (nothing when there are none). */}
+      <MyTasksCard />
 
       <OrderChangesCard />
 

@@ -20,6 +20,8 @@ import { MarkShippedDialog } from '@/components/dashboard/mark-shipped-dialog';
 import { WaybillSummaryDialog } from '@/components/dashboard/waybill-summary-dialog';
 import { OrderTrailDialog } from '@/components/dashboard/order-trail-dialog';
 import { ReprintOrderButton } from '@/components/dashboard/orders/reprint-order-button';
+import { AssignTaskButton } from '@/components/dashboard/tasks/assign-task-button';
+import { OrderTasksList } from '@/components/dashboard/tasks/order-tasks-list';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useOrderDetail } from '@/hooks/useOrderDetail';
 import { OrderItemsCard } from '@/components/dashboard/orders/order-items-card';
@@ -194,6 +196,7 @@ export default function OrderDetailPage() {
                 <Activity className="mr-2 h-4 w-4" /> Activity & Notes
               </Button>
               <ReprintOrderButton orderId={order.id} />
+              <AssignTaskButton order={{ id: order.id, label: `#${order.id.substring(0, 7).toUpperCase()}${customer?.fullName ? ` · ${customer.fullName}` : ''}` }} onCreated={() => window.dispatchEvent(new Event('staff-tasks-changed'))} />
               <Button variant="outline" size="sm" onClick={() => setIsShareReceiptOpen(true)}>
                 <Share2 className="mr-2 h-4 w-4" /> Share Receipt
               </Button>
@@ -201,6 +204,7 @@ export default function OrderDetailPage() {
             </div>
           </div>
         </CardHeader>
+        <OrderTasksList orderId={order.id} />
         <CardContent className="grid gap-4 md:grid-cols-3">
           <div>
             <p className="text-sm font-medium text-muted-foreground">Customer</p>

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { PriorityAction } from './priority-action-dialog';
 import { PriorityNotesPanel } from './priority-notes-panel';
+import { AssignTaskButton } from '@/components/dashboard/tasks/assign-task-button';
 import {
   BLOCK_REASONS, OS_DECISIONS, OWNER_LABELS, STEP_LABELS, phtDate, isFullyPaid,
   type MissingItem, type MissingState, type PriorityOwner, type PriorityRow,
@@ -279,6 +280,10 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
                 <PlayCircle className="mr-1.5 h-4 w-4" />Remove hold
               </Button>
             )}
+            <AssignTaskButton
+              className="h-8"
+              order={{ id: row.id, label: `#${row.id.slice(0, 7).toUpperCase()}${row.customerName ? ` · ${row.customerName}` : ''}` }}
+            />
             {row.scoreParts.length > 0 && (
               <Button size="sm" variant="ghost" className="h-8 text-muted-foreground" onClick={() => setShowWhy((v) => !v)}>
                 Why this rank <ChevronDown className={cn('ml-1 h-4 w-4 transition-transform', showWhy && 'rotate-180')} />
