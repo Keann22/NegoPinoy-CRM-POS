@@ -1,8 +1,9 @@
 -- Put-back tasks (owner, 2026-11-23).
 -- When sales cancel an order that was already picked, the system puts the
 -- pieces back on the shelf number, but nobody told the warehouse to put the
--- real pieces back (checked 2026-11-23: 24 of 37 cancelled orders in 30 days
--- had been picked, 119 pieces). Now the cancel creates ONE shared task for the
+-- real pieces back (checked 2026-11-23: in 30 days, 23 cancelled orders still
+-- had picked pieces, 93 pieces). Count only the put-back AT the cancel: earlier
+-- put-backs are OS / re-pick flips (B90A711 showed 6 soup pots for 1). Now the cancel creates ONE shared task for the
 -- put-back team (Jas, Al, Edric): everyone on the team sees it, and whoever puts
 -- the pieces back taps "Tapos na", which closes it for all.
 --

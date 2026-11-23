@@ -638,8 +638,8 @@ How it works (built 2026-11-20):
 
 - When sales cancel an order that was **already picked**, the system puts the
   pieces back on the shelf number, but nobody told the warehouse to put the real
-  pieces back. Checked 2026-11-23: 24 of 37 cancelled orders in 30 days had been
-  picked (119 pieces). Cancelling also never showed in the order's history.
+  pieces back. Checked 2026-11-23: in 30 days, 23 cancelled orders still had
+  picked pieces (93 pieces). Cancelling also never showed in the order's history.
 - Now the cancel creates **one shared task for Jas, Al and Edric** (owner's
   choice; Tess was left out): it lists each item and how many, and says if the
   order was already packed ("buksan ang box"). All three get it (pop-up, then
