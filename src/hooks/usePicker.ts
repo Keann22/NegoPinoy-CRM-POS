@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSupabase } from '@/lib/supabase/hooks';
 import { useToast } from '@/hooks/use-toast';
 import { useUserProfile } from '@/hooks/useUserProfile';
@@ -45,6 +45,16 @@ export function usePicker() {
     startScanner,
     stopScanner
   } = usePickerScanner(handleScanSuccess);
+
+  // Allow deep-linking into the normal Picker workflow via /dashboard/pick?order=<id>.
+  const autoLoadedRef = useRef(false);
+  useEffect(() => {
+    if (!supabase || autoLoadedRef.current || typeof window === 'undefined') return;
+    const orderParam = new URLSearchParams(window.location.search).get('order')?.trim();
+    if (!orderParam) return;
+    autoLoadedRef.current = true;
+    void handleScanSuccess(orderParam);
+  }, [supabase, handleScanSuccess]);
 
   return {
     scanner,

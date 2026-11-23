@@ -7,6 +7,7 @@ import { useUserProfile } from '@/hooks/useUserProfile';
 import { useMyTasks } from '@/hooks/useStaffTasks';
 import { useTaskActions } from '@/hooks/useTaskActions';
 import { OwnerTasksList } from '@/components/dashboard/tasks/owner-tasks-list';
+import { ReadyToPickBanner } from '@/components/dashboard/tasks/ready-to-pick-banner';
 import { TaskItem } from '@/components/dashboard/tasks/task-item';
 
 /** Tasks: staff see theirs (open + done this week); owners also see every task they gave. */
@@ -48,6 +49,7 @@ function TasksContent() {
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-4 md:p-6">
       <h1 className="text-2xl font-bold">Tasks</h1>
+      <ReadyToPickBanner />
       {isManagement && <OwnerTasksList highlightId={params.get('task')} />}
       {(!isManagement || tasks.length > 0) && mine}
       {dialogs}
