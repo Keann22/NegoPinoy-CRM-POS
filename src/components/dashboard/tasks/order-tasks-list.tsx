@@ -3,13 +3,17 @@
 import { useEffect } from 'react';
 import { TASKS_CHANGED_EVENT, useMyTasks, useOrderTasks } from '@/hooks/useStaffTasks';
 import { useTaskActions } from '@/hooks/useTaskActions';
+import { useUserProfile } from '@/hooks/useUserProfile';
 import { TaskItem } from './task-item';
 
 /** Tasks about this order, on the order page. The person it's for can update or finish it here. */
 export function OrderTasksList({ orderId }: { orderId: string }) {
   const { tasks, reload } = useOrderTasks(orderId);
   const { open: myOpen } = useMyTasks();
-  const { busyId, handlers, dialogs } = useTaskActions();
+  const staff = useTaskActions('staff');
+  const owner = useTaskActions('owner');
+  const { userProfile } = useUserProfile();
+  const isManagement = (userProfile?.roles || []).some((r) => ['owner', 'admin'].includes(String(r).toLowerCase()));
 
   useEffect(() => {
     const onChange = () => { void reload(); };
@@ -28,11 +32,12 @@ export function OrderTasksList({ orderId }: { orderId: string }) {
           key={t.id}
           task={t}
           view="owner"
-          busy={busyId === t.id}
-          {...(mineIds.has(t.id) ? handlers : {})}
+          busy={staff.busyId === t.id}
+          {...(mineIds.has(t.id) ? staff.handlers : isManagement ? { onReply: owner.handlers.onReply } : {})}
         />
       ))}
-      {dialogs}
+      {staff.dialogs}
+      {owner.dialogs}
     </div>
   );
 }

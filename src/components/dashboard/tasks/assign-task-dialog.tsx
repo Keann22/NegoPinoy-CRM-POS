@@ -43,7 +43,7 @@ interface Props {
 export function AssignTaskDialog({ open, onOpenChange, order: fixedOrder, onCreated }: Props) {
   const { toast } = useToast();
   const people = useTaskPeople(open);
-  const [personKey, setPersonKey] = useState('');
+  const [personKeys, setPersonKeys] = useState<string[]>([]);
   const [message, setMessage] = useState('');
   const [pickedOrder, setPickedOrder] = useState<TaskOrderRef | null>(null);
   const [due, setDue] = useState<DuePick>('none');
@@ -51,11 +51,11 @@ export function AssignTaskDialog({ open, onOpenChange, order: fixedOrder, onCrea
   const [saving, setSaving] = useState(false);
 
   const order = fixedOrder || pickedOrder;
-  const canSave = !!personKey && message.trim().length > 0 && (due !== 'date' || !!dueDate);
+  const canSave = personKeys.length > 0 && message.trim().length > 0 && (due !== 'date' || !!dueDate);
 
   const close = (next: boolean) => {
     if (!next) {
-      setPersonKey(''); setMessage(''); setPickedOrder(null); setDue('none'); setDueDate('');
+      setPersonKeys([]); setMessage(''); setPickedOrder(null); setDue('none'); setDueDate('');
     }
     onOpenChange(next);
   };
@@ -64,8 +64,8 @@ export function AssignTaskDialog({ open, onOpenChange, order: fixedOrder, onCrea
     if (!canSave) return;
     setSaving(true);
     try {
-      await createStaffTask({ personKey, message: message.trim(), orderId: order?.id || null, dueAt: dueFromPick(due, dueDate) });
-      const who = people.find((p) => p.key === personKey)?.name || 'Staff';
+      await createStaffTask({ personKeys, message: message.trim(), orderId: order?.id || null, dueAt: dueFromPick(due, dueDate) });
+      const who = people.filter((p) => personKeys.includes(p.key)).map((p) => p.name).join(', ') || 'Staff';
       toast({ title: `Task sent to ${who}`, description: 'They get a pop-up. You get a bell when it\'s done.' });
       onCreated?.();
       close(false);
@@ -86,11 +86,17 @@ export function AssignTaskDialog({ open, onOpenChange, order: fixedOrder, onCrea
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>Who</Label>
+            <Label>Who <span className="font-normal text-muted-foreground">(tap more than one if needed; each gets their own copy)</span></Label>
             {people.length === 0 && <p className="text-sm text-muted-foreground">Loading staff…</p>}
             <div className="flex flex-wrap gap-2">
               {people.map((p) => (
-                <button key={p.key} type="button" className={chip(personKey === p.key)} onClick={() => setPersonKey(p.key)}>
+                <button
+                  key={p.key}
+                  type="button"
+                  aria-pressed={personKeys.includes(p.key)}
+                  className={chip(personKeys.includes(p.key))}
+                  onClick={() => setPersonKeys((ks) => (ks.includes(p.key) ? ks.filter((k) => k !== p.key) : [...ks, p.key]))}
+                >
                   {p.name}
                   {p.roles.length > 0 && <span className="ml-1 text-xs opacity-70">· {p.roles.join(', ')}</span>}
                 </button>
@@ -153,7 +159,7 @@ export function AssignTaskDialog({ open, onOpenChange, order: fixedOrder, onCrea
 
         <DialogFooter>
           <Button variant="outline" onClick={() => close(false)}>Cancel</Button>
-          <Button onClick={save} disabled={!canSave || saving}>{saving ? 'Sending…' : 'Assign task'}</Button>
+          <Button onClick={save} disabled={!canSave || saving}>{saving ? 'Sending…' : personKeys.length > 1 ? `Assign to ${personKeys.length} people` : 'Assign task'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

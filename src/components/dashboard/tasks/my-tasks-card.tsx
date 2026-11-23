@@ -11,7 +11,7 @@ import { TaskItem } from './task-item';
 
 /** "Mga task ko" on the dashboard: open tasks from the owners until Done. Nothing when there are none. */
 export function MyTasksCard() {
-  const { open } = useMyTasks();
+  const { active: open } = useMyTasks();
   const { busyId, handlers, dialogs } = useTaskActions();
   if (open.length === 0) return null;
 

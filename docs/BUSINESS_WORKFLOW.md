@@ -620,6 +620,17 @@ How it works (built 2026-11-20):
   problema** (can't do it, reason required). A problem sends the owner a bell
   ("Task problem"), shows in orange at the top of the Tasks page, and stops the
   late pop-up (they're waiting on the owners). Staff can still tap Tapos na later.
+- **Replies (owner, 2026-11-23):** staff can ask a question or reply on a task
+  (**Magtanong**), and the owners answer there (**Reply**). Staff writing: the
+  owner who assigned it gets a bell ("Task reply") and the task shows **New reply**
+  at the top of the Tasks page. An owner writing: the task **pops up again** for
+  the staff member (staff don't watch the bell), even if it's already done.
+- **Several people at once (owner, 2026-11-23):** tap more than one person when
+  assigning. **Each gets their own copy** (own Nakita ko / Tapos na); the owners
+  see "2 of 3 done" on each copy.
+- **Dashboard summary (owners):** "Tasks for staff" on the owners' Dashboard:
+  open, not seen yet, working on it, problem, late, new replies, done today; a
+  "Waiting on you" list (problems and replies); and a per-staff table.
 
 ## Being decided (not built yet)
 

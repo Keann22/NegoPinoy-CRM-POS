@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { actOnTask, TASKS_CHANGED_EVENT, useAllTasks } from '@/hooks/useStaffTasks';
+import { useTaskActions } from '@/hooks/useTaskActions';
 import { isLate } from '@/lib/services/staff-tasks/task-dates';
 import { cn } from '@/lib/utils';
 import { AssignTaskDialog } from './assign-task-dialog';
@@ -27,14 +28,31 @@ export function OwnerTasksList({ highlightId }: { highlightId: string | null }) 
   const [person, setPerson] = useState<string | null>(null);
   const [assignOpen, setAssignOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const thread = useTaskActions('owner');
+  const openedHighlight = useRef(false);
 
   const people = useMemo(() => Array.from(new Set(tasks.map((t) => t.assigneeName))).sort(), [tasks]);
   const open = tasks.filter((t) => t.status === 'open');
   const problems = open.filter((t) => t.progress === 'problem').length;
-  // Problems first: the staff member is waiting on the owners.
+  const replies = tasks.filter((t) => t.ownerUnread).length;
+  // Problems and unread replies first: the staff member is waiting on the owners.
+  const needsOwner = (t: StaffTask) => Number(t.ownerUnread || (t.status === 'open' && t.progress === 'problem'));
   const shown = tasks
-    .filter((t) => (filter === 'all' || t.status === filter) && (!person || t.assigneeName === person))
-    .sort((a, b) => Number(b.status === 'open' && b.progress === 'problem') - Number(a.status === 'open' && a.progress === 'problem'));
+    .filter((t) => (filter === 'all' || t.status === filter || t.ownerUnread) && (!person || t.assigneeName === person))
+    .sort((a, b) => needsOwner(b) - needsOwner(a));
+
+  // Same task given to several people (one copy each): "2 of 3 done".
+  const groups = useMemo(() => {
+    const m = new Map<string, { done: number; total: number }>();
+    tasks.forEach((t) => {
+      if (!t.groupId || t.status === 'cancelled') return;
+      const g = m.get(t.groupId) || { done: 0, total: 0 };
+      g.total += 1;
+      if (t.status === 'done') g.done += 1;
+      m.set(t.groupId, g);
+    });
+    return m;
+  }, [tasks]);
 
   useEffect(() => {
     const onChange = () => { void reload().catch(() => undefined); };
@@ -45,7 +63,13 @@ export function OwnerTasksList({ highlightId }: { highlightId: string | null }) 
   useEffect(() => {
     if (!highlightId || tasks.length === 0) return;
     document.getElementById(`task-${highlightId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, [highlightId, tasks.length]);
+    // From a "Task reply" bell: open the replies straight away.
+    const t = tasks.find((x) => x.id === highlightId);
+    if (t?.ownerUnread && !openedHighlight.current) {
+      openedHighlight.current = true;
+      thread.handlers.onReply(t);
+    }
+  }, [highlightId, tasks, thread.handlers]);
 
   const cancel = async (t: StaffTask) => {
     if (!window.confirm(`Cancel this task for ${t.assigneeName}?\n\n${t.message}`)) return;
@@ -66,6 +90,7 @@ export function OwnerTasksList({ highlightId }: { highlightId: string | null }) 
           <CardTitle>Tasks for staff</CardTitle>
           <CardDescription>
             {open.length} open · {open.filter((t) => !t.seenAt).length} not seen yet · {open.filter((t) => t.progress === 'working').length} working on it · {open.filter((t) => isLate(t.dueAt)).length} late
+            {replies > 0 && <span className="font-semibold text-blue-700 dark:text-blue-400"> · {replies} new {replies === 1 ? 'reply' : 'replies'}</span>}
             {problems > 0 && <span className="font-semibold text-orange-700 dark:text-orange-400"> · {problems} with a problem</span>}
           </CardDescription>
         </div>
@@ -89,11 +114,19 @@ export function OwnerTasksList({ highlightId }: { highlightId: string | null }) 
         <div className="space-y-3">
           {shown.map((t) => (
             <div key={t.id} id={`task-${t.id}`} className={cn(highlightId === t.id && 'rounded-lg ring-2 ring-blue-500')}>
-              <TaskItem task={t} view="owner" busy={busyId === t.id} onCancel={cancel} />
+              <TaskItem
+                task={t}
+                view="owner"
+                busy={busyId === t.id}
+                onCancel={cancel}
+                onReply={thread.handlers.onReply}
+                groupProgress={t.groupId ? groups.get(t.groupId) : null}
+              />
             </div>
           ))}
         </div>
       </CardContent>
+      {thread.dialogs}
       <AssignTaskDialog open={assignOpen} onOpenChange={setAssignOpen} onCreated={reload} />
     </Card>
   );

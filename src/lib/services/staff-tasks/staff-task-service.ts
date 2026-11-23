@@ -18,7 +18,7 @@ const SAME_PERSON: { label: string; emails: string[] }[] = [
   { label: 'Jas', emails: ['jas@gmail.com', 'jas@usares.com', 'jassy@gmail.com'] },
 ];
 
-const SELECT = 'id, message, order_id, assignee_name, assigned_by_name, due_at, status, seen_at, seen_by_name, progress, progress_note, progress_at, progress_by_name, done_at, done_by_name, done_note, done_photo_url, created_at, orders(status, customers(full_name))';
+const SELECT = 'id, message, order_id, assignee_name, assigned_by_name, due_at, status, seen_at, seen_by_name, progress, progress_note, progress_at, progress_by_name, done_at, done_by_name, done_note, done_photo_url, created_at, last_message_at, last_message_from_owner, staff_read_at, owner_read_at, group_id, staff_task_messages(count), orders(status, customers(full_name))';
 
 interface AuthUser {
   id: string;
@@ -78,9 +78,17 @@ interface TaskRow {
   progress: StaffTask['progress']; progress_note: string | null; progress_at: string | null; progress_by_name: string | null;
   done_at: string | null; done_by_name: string | null; done_note: string | null; done_photo_url: string | null;
   created_at: string;
+  group_id: string | null;
+  last_message_at: string | null; last_message_from_owner: boolean | null; staff_read_at: string | null; owner_read_at: string | null;
+  staff_task_messages?: { count: number }[] | null;
   orders?: OrderJoin | OrderJoin[] | null;
 }
 type OrderJoin = { status: string | null; customers?: { full_name: string | null } | { full_name: string | null }[] | null };
+
+/** The other side wrote last and this side hasn't opened the replies since. */
+function unread(lastAt: string | null, readAt: string | null): boolean {
+  return !!lastAt && (!readAt || readAt < lastAt);
+}
 
 function toTask(r: TaskRow): StaffTask {
   const order = one(r.orders);
@@ -107,6 +115,11 @@ function toTask(r: TaskRow): StaffTask {
     doneNote: r.done_note,
     donePhotoUrl: r.done_photo_url,
     createdAt: r.created_at,
+    groupId: r.group_id,
+    messageCount: r.staff_task_messages?.[0]?.count ?? 0,
+    lastMessageAt: r.last_message_at,
+    staffUnread: r.last_message_from_owner === true && unread(r.last_message_at, r.staff_read_at),
+    ownerUnread: r.last_message_from_owner === false && unread(r.last_message_at, r.owner_read_at),
   };
 }
 
@@ -154,18 +167,21 @@ export async function createTask(
   supabase: SupabaseClient,
   input: NewStaffTask,
   by: { id: string; name: string }
-): Promise<string> {
+): Promise<string[]> {
   const message = String(input.message || '').trim();
   if (!message) throw new TaskError('Write the task first');
   if (message.length > 1000) throw new TaskError('The task is too long (1,000 characters max)');
-  const person = (await people(supabase)).find((p) => p.key === input.personKey);
-  if (!person) throw new TaskError('Pick who should do it');
+  const all = await people(supabase);
+  const chosen = all.filter((p) => input.personKeys.includes(p.key));
+  if (chosen.length === 0) throw new TaskError('Pick who should do it');
   const dueAt = input.dueAt ? new Date(input.dueAt) : null;
   if (dueAt && Number.isNaN(dueAt.getTime())) throw new TaskError('The deadline is not a valid date');
 
+  // Several people: each gets their own copy (own seen / done), linked by group_id.
+  const groupId = chosen.length > 1 ? crypto.randomUUID() : null;
   const { data, error } = await supabase
     .from('staff_tasks')
-    .insert({
+    .insert(chosen.map((person) => ({
       message,
       order_id: input.orderId || null,
       assignee_ids: person.ids,
@@ -173,11 +189,11 @@ export async function createTask(
       assigned_by_id: by.id,
       assigned_by_name: by.name,
       due_at: dueAt ? dueAt.toISOString() : null,
-    })
-    .select('id')
-    .single();
+      group_id: groupId,
+    })))
+    .select('id');
   if (error) throw error;
-  return data.id as string;
+  return (data || []).map((r) => r.id as string);
 }
 
 async function getRow(supabase: SupabaseClient, id: string) {

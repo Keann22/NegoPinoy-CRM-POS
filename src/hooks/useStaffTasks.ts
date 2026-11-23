@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
-import type { NewStaffTask, StaffTask, StaffTaskAction, TaskPerson } from '@/types/staff-tasks.types';
+import type { NewStaffTask, StaffTask, StaffTaskAction, StaffTaskMessage, TaskPerson } from '@/types/staff-tasks.types';
 
 const API = '/api/tasks';
 /** Fired after any task change, so lists that load their own copy can reload. */
@@ -79,7 +79,9 @@ export async function uploadTaskPhoto(file: File): Promise<string> {
 export function useMyTasks() {
   const tasks = useSyncExternalStore(subscribe, () => mine, () => EMPTY);
   const open = tasks.filter((t) => t.status === 'open');
-  return { tasks, open, loaded, reload: loadMine };
+  // Open tasks, plus finished ones with an owner reply not read yet.
+  const active = tasks.filter((t) => t.status === 'open' || t.staffUnread);
+  return { tasks, open, active, loaded, reload: loadMine };
 }
 
 /** Owners: everyone's tasks (Tasks page). */
@@ -130,9 +132,31 @@ export function useTaskPeople(enabled: boolean) {
   return people;
 }
 
-export async function createStaffTask(input: NewStaffTask): Promise<string> {
-  const json = await call<{ id: string }>({ method: 'POST', body: JSON.stringify(input) });
+export async function createStaffTask(input: NewStaffTask): Promise<string[]> {
+  const json = await call<{ ids: string[] }>({ method: 'POST', body: JSON.stringify(input) });
   await loadMine();
   window.dispatchEvent(new Event(TASKS_CHANGED_EVENT));
-  return json.id;
+  return json.ids;
+}
+
+/** Replies on a task. Reading them marks them read for my side, so lists reload. */
+export async function fetchTaskMessages(taskId: string): Promise<StaffTaskMessage[]> {
+  const res = await fetch(`${API}/messages?taskId=${encodeURIComponent(taskId)}`, { cache: 'no-store' });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || 'Could not load the replies');
+  await loadMine();
+  window.dispatchEvent(new Event(TASKS_CHANGED_EVENT));
+  return json.messages || [];
+}
+
+export async function sendTaskMessage(taskId: string, body: string): Promise<void> {
+  const res = await fetch(`${API}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ taskId, body }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || 'Not sent');
+  await loadMine();
+  window.dispatchEvent(new Event(TASKS_CHANGED_EVENT));
 }

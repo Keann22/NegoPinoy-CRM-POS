@@ -1,28 +1,16 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { createClient as createSessionClient } from '@/lib/supabase/server';
-import { isStaffUser } from '@/lib/auth/staff-roles';
-import { isManagementUser } from '@/lib/services/purchase-summary-service';
 import {
   cancelTask, createTask, listAllTasks, listMyTasks, listOrderTasks, listPeople, markDone, markSeen, setProgress,
-  TaskError, type TaskCaller,
+  TaskError,
 } from '@/lib/services/staff-tasks/staff-task-service';
+import { getTaskCaller } from '@/lib/services/staff-tasks/task-caller';
 
 export const dynamic = 'force-dynamic';
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
-async function getCaller(): Promise<TaskCaller | null> {
-  const session = await createSessionClient();
-  const { data: { user } } = await session.auth.getUser();
-  if (!user || !isStaffUser(user)) return null;
-  const meta: Record<string, unknown> = user.user_metadata || {};
-  return {
-    id: user.id,
-    name: `${meta.first_name || ''} ${meta.last_name || ''}`.trim() || user.email || 'Staff',
-    isManagement: isManagementUser(user),
-  };
-}
+const getCaller = getTaskCaller;
 
 function fail(e: unknown) {
   const status = e instanceof TaskError ? 400 : 500;
@@ -52,19 +40,20 @@ export async function GET(req: Request) {
   }
 }
 
-// New task (owners): { personKey, message, orderId?, dueAt? }
+// New task (owners): { personKeys: [...], message, orderId?, dueAt? } — one copy per person.
 export async function POST(req: Request) {
   try {
     const caller = await getCaller();
     if (!caller?.isManagement) return NextResponse.json({ error: 'Only the owners can assign tasks' }, { status: 403 });
     const body = await req.json();
-    const id = await createTask(supabase, {
-      personKey: String(body.personKey || ''),
+    const keys: unknown[] = Array.isArray(body.personKeys) ? body.personKeys : body.personKey ? [body.personKey] : [];
+    const ids = await createTask(supabase, {
+      personKeys: keys.map(String),
       message: String(body.message || ''),
       orderId: body.orderId ? String(body.orderId) : null,
       dueAt: body.dueAt ? String(body.dueAt) : null,
     }, caller);
-    return NextResponse.json({ id });
+    return NextResponse.json({ ids });
   } catch (e) {
     return fail(e);
   }

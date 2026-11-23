@@ -27,6 +27,23 @@ export interface StaffTask {
   doneNote: string | null;
   donePhotoUrl: string | null;
   createdAt: string;
+  /** Same task given to several people at once (each has their own copy). */
+  groupId: string | null;
+  /** Replies / questions on the task. */
+  messageCount: number;
+  lastMessageAt: string | null;
+  /** An owner replied and the staff member hasn't read it. */
+  staffUnread: boolean;
+  /** Staff asked or replied and the owners haven't read it. */
+  ownerUnread: boolean;
+}
+
+export interface StaffTaskMessage {
+  id: string;
+  authorName: string;
+  fromOwner: boolean;
+  body: string;
+  createdAt: string;
 }
 
 /** One staff member to assign to. Several accounts of the same person count as one. */
@@ -37,7 +54,8 @@ export interface TaskPerson {
 }
 
 export interface NewStaffTask {
-  personKey: string;
+  /** One or more people; each gets their own copy. */
+  personKeys: string[];
   message: string;
   orderId?: string | null;
   dueAt?: string | null;

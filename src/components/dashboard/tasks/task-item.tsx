@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { AlertTriangle, CheckCircle2, Clock, Eye, EyeOff, Hammer, Package, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, Eye, EyeOff, Hammer, MessageCircle, Package, Users, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -17,7 +17,10 @@ interface Props {
   onProgress?: (t: StaffTask, progress: StaffTaskProgress) => void;
   onDone?: (t: StaffTask) => void;
   onCancel?: (t: StaffTask) => void;
+  onReply?: (t: StaffTask) => void;
   onOpenOrder?: () => void;
+  /** Same task given to several people: "2 of 3 done". */
+  groupProgress?: { done: number; total: number } | null;
 }
 
 /** Where the task stands: Not seen yet → Seen → Working on it / Problem → Done. */
@@ -41,10 +44,12 @@ function Progress({ task }: { task: StaffTask }) {
 }
 
 /** One task: what to do, the order it's about, the deadline, where it stands, and its buttons. */
-export function TaskItem({ task, view, busy, onSeen, onProgress, onDone, onCancel, onOpenOrder }: Props) {
+export function TaskItem({ task, view, busy, onSeen, onProgress, onDone, onCancel, onReply, onOpenOrder, groupProgress }: Props) {
   const due = task.dueAt && task.status === 'open' ? dueLabel(task.dueAt) : null;
   const open = task.status === 'open';
   const problem = open && task.progress === 'problem';
+  const newReply = view === 'staff' ? task.staffUnread : task.ownerUnread;
+  const canReply = !!onReply && task.status !== 'cancelled';
   return (
     <div className={cn(
       'space-y-2 rounded-lg border p-3',
@@ -79,6 +84,10 @@ export function TaskItem({ task, view, busy, onSeen, onProgress, onDone, onCance
           ? <span>For <span className="font-medium text-foreground">{task.assigneeName}</span> · from {task.assignedByName} · {phtWhen(task.createdAt)}</span>
           : <span>From {task.assignedByName} · {phtWhen(task.createdAt)}</span>}
         {(view === 'owner' || !open || task.progress) && <Progress task={task} />}
+        {groupProgress && groupProgress.total > 1 && (
+          <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{groupProgress.done} of {groupProgress.total} done</span>
+        )}
+        {newReply && <Badge className="bg-blue-600 text-white hover:bg-blue-600">New reply</Badge>}
       </div>
 
       {open && task.progress && task.progressNote && (
@@ -102,29 +111,36 @@ export function TaskItem({ task, view, busy, onSeen, onProgress, onDone, onCance
         </div>
       )}
 
-      {open && (onSeen || onProgress || onDone || onCancel) && (
+      {((open && (onSeen || onProgress || onDone || onCancel)) || canReply) && (
         <div className="flex flex-wrap gap-2 pt-1">
-          {onSeen && !task.seenAt && (
+          {canReply && (
+            <Button size="sm" variant={newReply ? 'default' : 'outline'} disabled={busy} onClick={() => onReply?.(task)}>
+              <MessageCircle className="mr-1.5 h-4 w-4" />
+              {newReply ? 'Read reply' : view === 'staff' ? 'Magtanong' : 'Reply'}
+              {task.messageCount > 0 && <span className="ml-1 opacity-70">({task.messageCount})</span>}
+            </Button>
+          )}
+          {open && onSeen && !task.seenAt && (
             <Button size="sm" variant="outline" disabled={busy} onClick={() => onSeen(task)}>
               <Eye className="mr-1.5 h-4 w-4" />Nakita ko
             </Button>
           )}
-          {onProgress && task.progress !== 'working' && (
+          {open && onProgress && task.progress !== 'working' && (
             <Button size="sm" variant="outline" disabled={busy} className="border-sky-300 text-sky-800 dark:text-sky-300" onClick={() => onProgress(task, 'working')}>
               <Hammer className="mr-1.5 h-4 w-4" />Ginagawa na
             </Button>
           )}
-          {onProgress && task.progress !== 'problem' && (
+          {open && onProgress && task.progress !== 'problem' && (
             <Button size="sm" variant="outline" disabled={busy} className="border-orange-300 text-orange-800 dark:text-orange-300" onClick={() => onProgress(task, 'problem')}>
               <AlertTriangle className="mr-1.5 h-4 w-4" />May problema
             </Button>
           )}
-          {onDone && (
+          {open && onDone && (
             <Button size="sm" disabled={busy} className="bg-emerald-600 hover:bg-emerald-700" onClick={() => onDone(task)}>
               <CheckCircle2 className="mr-1.5 h-4 w-4" />Tapos na
             </Button>
           )}
-          {onCancel && (
+          {open && onCancel && (
             <Button size="sm" variant="ghost" disabled={busy} className="text-muted-foreground" onClick={() => onCancel(task)}>
               <XCircle className="mr-1.5 h-4 w-4" />Cancel task
             </Button>

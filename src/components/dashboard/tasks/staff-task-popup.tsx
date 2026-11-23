@@ -15,20 +15,21 @@ import { TaskItem } from './task-item';
  * A task from the owners (owner, 2026-11-23): pops up until the staff member taps
  * "Nakita ko", then it stays on their dashboard until Done. A task past its
  * deadline pops up again, unless they reported a problem (they're waiting on
- * the owners). "Later" hides it for 30 minutes.
+ * the owners). An owner's reply pops it up again. "Later" hides it for 30 minutes.
  */
 export function StaffTaskPopup() {
   const pathname = usePathname();
-  const { open, reload } = useMyTasks();
+  const { active, reload } = useMyTasks();
   const { minimized, setMinimized } = usePopupSnooze('staff-tasks', reload);
   const { busyId, handlers, dialogs, dialogOpen } = useTaskActions();
 
-  const shown = open.filter((t) => !t.seenAt || (isLate(t.dueAt) && t.progress !== 'problem'));
+  const shown = active.filter((t) =>
+    t.staffUnread || (t.status === 'open' && (!t.seenAt || (isLate(t.dueAt) && t.progress !== 'problem'))));
 
   if (dialogOpen) return dialogs;
   if (shown.length === 0 || minimized || pathname?.startsWith(TASKS_PAGE_PATH)) return null;
 
-  const anyLate = shown.some((t) => t.seenAt && isLate(t.dueAt));
+  const anyLate = shown.some((t) => t.status === 'open' && t.seenAt && isLate(t.dueAt));
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) setMinimized(true); }}>
@@ -44,6 +45,7 @@ export function StaffTaskPopup() {
           <DialogDescription>
             Tap <b>Nakita ko</b> so the owners know you saw it. It stays on your dashboard until you tap <b>Tapos na</b>.
             {anyLate && ' Some are past the deadline: tap Tapos na, or May problema if you can\'t do it.'}
+            {shown.some((t) => t.staffUnread) && ' The owner replied: tap Read reply.'}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
