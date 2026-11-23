@@ -89,7 +89,8 @@ export async function GET(req: Request) {
         expected_arrival,
         notes
       `)
-      .neq('notes', 'STAFF_DRAFT')
+      // Staff drafts are left out below, not with .neq('notes', ...): in SQL that
+      // also drops every purchase whose notes are empty, which is all of them.
       .order('created_at', { ascending: false });
 
     if (targetPoIds) {
@@ -107,8 +108,9 @@ export async function GET(req: Request) {
       poQuery = poQuery.eq('status', 'received');
     }
 
-    const { data: pos, error: queryErr } = await poQuery;
+    const { data: allPos, error: queryErr } = await poQuery;
     if (queryErr) throw queryErr;
+    const pos = (allPos || []).filter((p) => p.notes !== 'STAFF_DRAFT');
     if (!pos || pos.length === 0) {
       return NextResponse.json({ orders: [] });
     }
