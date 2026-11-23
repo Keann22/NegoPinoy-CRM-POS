@@ -19,6 +19,7 @@ import { EditOrderDialog } from '@/components/dashboard/order-dialog';
 import { MarkShippedDialog } from '@/components/dashboard/mark-shipped-dialog';
 import { WaybillSummaryDialog } from '@/components/dashboard/waybill-summary-dialog';
 import { OrderTrailDialog } from '@/components/dashboard/order-trail-dialog';
+import { ReprintOrderButton } from '@/components/dashboard/orders/reprint-order-button';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useOrderDetail } from '@/hooks/useOrderDetail';
 import { OrderItemsCard } from '@/components/dashboard/orders/order-items-card';
@@ -192,6 +193,7 @@ export default function OrderDetailPage() {
               >
                 <Activity className="mr-2 h-4 w-4" /> Activity & Notes
               </Button>
+              <ReprintOrderButton orderId={order.id} />
               <Button variant="outline" size="sm" onClick={() => setIsShareReceiptOpen(true)}>
                 <Share2 className="mr-2 h-4 w-4" /> Share Receipt
               </Button>

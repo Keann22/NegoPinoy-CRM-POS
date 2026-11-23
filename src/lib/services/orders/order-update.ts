@@ -9,6 +9,7 @@ import {
   flagItemsAddedAfterPicking
 } from '../order-issues-service';
 import { computeOrderTotals, readOrderCarriedAmounts, saveOrderItemPriceTypes } from './order-utils';
+import { diffOrderItems } from './order-change-rules';
 
 // ---------------------------------------------------------------------------
 // Cancellation stock effects
@@ -308,15 +309,29 @@ export async function editOrder(
     }
   }
 
-  // Log the edit
+  // Log the edit, with what changed in the items.
+  const itemChanges = diffOrderItems(
+    context.originalOrderItems,
+    values.orderItems.map((i) => ({ productId: i.productId, productName: i.productName, quantity: i.quantity }))
+  );
   try {
     await supabase.from('order_logs').insert({
       order_id: context.orderId,
       status: 'Order Edited',
-      user_name: context.userProfileName
+      user_name: context.userProfileName,
+      snapshot_data: itemChanges.length > 0 ? { changes: itemChanges } : null,
     });
   } catch (e) {
     console.error("Failed to log order edit:", e);
+  }
+
+  // The warehouse may be picking from the old printed form: tell them.
+  if (itemChanges.length > 0 && typeof window !== 'undefined') {
+    await fetch('/api/orders/changes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId: context.orderId, changes: itemChanges }),
+    }).catch((e) => console.error('Failed to save order change notice:', e));
   }
 
   // -- Auto-resolve issues for removed products --

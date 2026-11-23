@@ -1,6 +1,6 @@
 import { format, isValid } from 'date-fns';
-import { QRCodeCanvas } from 'qrcode.react';
 import { Order } from '@/hooks/useProcessedOrders';
+import { OrderFormPrint } from '@/components/dashboard/orders/order-form-print';
 
 export function ProcessedOrdersPrintLayout({
   orders,
@@ -51,91 +51,7 @@ export function ProcessedOrdersPrintLayout({
       <div className="font-sans text-sm pb-10">
           {printOrders.map((order, idx, arr) => (
   <div key={order.id} className="mb-4 break-inside-avoid">
-      <div className="border-2 border-black flex flex-col">
-          <div className="flex border-b-2 border-black">
-              <div className="flex-1 flex flex-col border-r-2 border-black">
-                  {/* Header Section */}
-                  <div className="flex border-b-2 border-black items-center">
-                      <div className="flex-1 p-2 border-r-2 border-black">
-                          <div className="font-bold">Negosyanteng Pinoy PH</div>
-                          <div className="text-xs">http://facebook.com/NegoPinoyPH</div>
-                      </div>
-                      <div className="flex-1 p-2 text-xs">
-                          <div className="font-bold text-base">Order #{order.id.substring(0, 7).toUpperCase()}</div>
-                          <div>Created At: {order.orderDate && isValid(new Date(order.orderDate)) ? format(new Date(order.orderDate), 'MM/dd/yyyy') : '—'}</div>
-                      </div>
-                  </div>
-                  
-                  {/* Recipient Section */}
-                  <div className="flex flex-col p-2">
-                      <div className="flex">
-                          <span className="mr-1">Recipient:</span>
-                          <div className="flex-1">
-                              <div className="font-bold">{order.customerName}</div>
-                          </div>
-                      </div>
-                      {order.customerMobile && (
-                          <div className="text-xs mt-1">
-                              <span className="font-semibold">Contact: </span>{order.customerMobile}
-                          </div>
-                      )}
-                      {order.customerAddress && (
-                          <div className="text-xs">
-                              <span className="font-semibold">Address: </span>{order.customerAddress}
-                          </div>
-                      )}
-                  </div>
-              </div>
-              <div className="p-2 flex justify-center items-center w-[166px]">
-                  <QRCodeCanvas value={order.id} size={150} />
-              </div>
-          </div>
-          
-          {/* Items Table */}
-          <div className="min-h-[120px] pb-2">
-              <table className="w-full text-xs">
-                  <thead>
-                      <tr className="border-b-2 border-black text-left">
-                          <th className="py-1 px-2 font-normal w-8">#</th>
-                          <th className="py-1 px-2 font-normal">Product</th>
-                          <th className="py-1 px-2 font-normal text-right w-12">Qty</th>
-                          <th className="py-1 px-2 font-normal text-right w-24">Amount</th>
-                      </tr>
-                  </thead>
-                  <tbody>
-                      {(order.items ?? []).map((item, i) => (
-                          <tr key={item.id}>
-                              <td className="py-1 px-2 align-top">{i + 1}</td>
-                              <td className="py-1 px-2 align-top">{item.productName}</td>
-                              <td className="py-1 px-2 align-top text-right">{item.quantity}</td>
-                              <td className="py-1 px-2 align-top text-right whitespace-nowrap font-semibold">
-                                  ₱ {(item.sellingPriceAtSale ?? 0) * item.quantity}
-                              </td>
-                          </tr>
-                      ))}
-                  </tbody>
-              </table>
-          </div>
-          
-          {/* Footer Section */}
-          <div className="flex border-t-2 border-black">
-              <div className="w-2/3 p-2 border-r-2 border-black text-xs whitespace-pre-wrap min-h-[70px]">
-                  <div className="font-bold uppercase mb-1">{order.paymentType}</div>
-                  {order.shippingDetails && (
-                      <div>
-                          <span className="font-semibold">Notes: </span>
-                          <span>{order.shippingDetails}</span>
-                      </div>
-                  )}
-                  {order.salesPersonName && (
-                      <div className="mt-1 text-gray-500">Processed by: <span className="font-semibold text-black">{order.salesPersonName}</span></div>
-                  )}
-              </div>
-              <div className="w-1/3 p-2 text-sm flex items-center">
-                  <div>Collection (COD): <span className="font-bold whitespace-nowrap">₱ {order.totalAmount}</span></div>
-              </div>
-          </div>
-      </div>
+      <OrderFormPrint order={order} />
       {/* Dashed separator between orders, except after the last one */}
       {idx < arr.length - 1 && (
           <div className="mt-4 border-b-[3px] border-dashed border-gray-600 w-full" />

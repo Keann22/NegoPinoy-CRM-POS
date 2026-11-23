@@ -574,6 +574,27 @@ How it works (built 2026-11-20):
 - **May stock na** (or recording a purchase of it) clears the status; agents
   whose customers were asked or agreed to wait get a bell.
 
+## Order changed after it was printed (owner, 2026-11-23; built 2026-11-23)
+
+- Customers **keep adding to their orders** on Messenger, so sales edit the order
+  often. The warehouse works from the **printed order form**, so items added
+  later are **left behind** (the pickers never hear about it).
+- Checked 2026-11-23: almost every order is printed right after it's made
+  (~500 in 30 days), and orders were edited ~525 times in those 30 days (~350
+  orders, 200+ of the edits after picking). Edits only logged "Order Edited",
+  never what changed.
+- Now every edit saves **what changed** (added, removed, more, fewer) in the
+  order's activity. If the order was **already printed or picked** and hasn't
+  shipped, the **Inventory dashboard and the owners' dashboard** show it under
+  **"Orders changed after printing"**: what changed, who changed it and when, and
+  "Already picked" when the new items still have to be picked.
+- **Reprint** prints the updated form marked "Updated order: replaces the
+  earlier copy", with new/more lines tagged and removed lines struck out ("don't
+  pack"). **Got it** closes it without printing. Several edits in a row show as
+  one net change; it closes by itself once the order ships or is cancelled.
+- **Reprinting is easier**: "Reprint an order" search (order # or customer name)
+  on the same card, and a **Reprint** button on every order page.
+
 ## Being decided (not built yet)
 
 - **Customer purchase planner (owner, 2026-11-01)**: a premium feature on the

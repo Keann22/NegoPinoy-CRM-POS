@@ -6,6 +6,7 @@ import { useSupabase, useUser } from "@/lib/supabase/hooks";
 import { AlertTriangle, Package, ArrowDownToLine, ArrowUpRight, ClipboardList, PackageSearch } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
+import { OrderChangesCard } from "@/components/dashboard/orders/order-changes-card";
 
 export function InventoryDashboard() {
   const supabase = useSupabase();
@@ -62,6 +63,8 @@ export function InventoryDashboard() {
         <h1 className="text-3xl font-bold font-headline tracking-tight">Inventory Dashboard</h1>
         <p className="text-muted-foreground">Overview of your warehouse stock and quick actions.</p>
       </div>
+
+      <OrderChangesCard />
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>

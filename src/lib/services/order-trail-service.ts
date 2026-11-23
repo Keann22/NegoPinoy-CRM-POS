@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { parse, isValid, format } from 'date-fns';
+import type { OrderItemChange } from '@/types/order-changes';
+import { describeChange } from './orders/order-change-rules';
 
 export type OrderTrailEntryKind = 'status' | 'note' | 'issue_reported' | 'issue_message';
 
@@ -85,6 +87,11 @@ export async function fetchOrderTrail(supabase: SupabaseClient, orderId: string)
     let detail: string | undefined;
     if (log.snapshot_data?.reason) detail = log.snapshot_data.reason;
     else if (log.snapshot_data?.productName) detail = log.snapshot_data.productName;
+    else if (Array.isArray(log.snapshot_data?.changes)) {
+      detail = log.snapshot_data.changes
+        .map((c: OrderItemChange) => `${describeChange(c).label}: ${c.name}`)
+        .join('\n');
+    }
 
     entries.push({
       id: log.id,

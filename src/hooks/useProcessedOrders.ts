@@ -6,6 +6,7 @@ import { startOfMonth, endOfMonth } from 'date-fns';
 export type OrderItem = {
     id: string;
     orderId: string;
+    productId?: string;
     productName: string;
     quantity: number;
     sellingPriceAtSale?: number;
@@ -180,6 +181,7 @@ export function useProcessedOrders() {
           existing.push({
             id: item.id,
             orderId: item.order_id,
+            productId: item.product_id,
             productName: item.products?.name || 'Unknown Product',
             quantity: item.quantity,
             sellingPriceAtSale: item.selling_price_at_sale,

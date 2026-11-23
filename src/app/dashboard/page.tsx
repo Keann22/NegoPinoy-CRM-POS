@@ -24,6 +24,7 @@ import { CollectionsDueSoon } from '@/components/dashboard/collections-due-soon'
 import { InventoryDashboard } from '@/components/dashboard/inventory-dashboard';
 import { ComplianceWidget } from '@/components/dashboard/compliance-widget';
 import { Skeleton } from '@/components/ui/skeleton';
+import { OrderChangesCard } from '@/components/dashboard/orders/order-changes-card';
 import { useUserProfile } from '@/hooks/useUserProfile';
 
 export default function DashboardPage() {
@@ -207,6 +208,8 @@ export default function DashboardPage() {
             </Popover>
         </div>
       </div>
+
+      {(isManagement || userProfile?.roles.includes('Inventory')) && <div className="mb-8"><OrderChangesCard /></div>}
 
       <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
 
