@@ -243,7 +243,13 @@ export function ReadyToPickList() {
                   <div className="space-y-1">
                     <CardTitle className="flex flex-wrap items-center gap-2 text-base">
                       <span className="text-muted-foreground">#{idx + 1}</span>
-                      <span className="font-mono font-bold">#{order.orderNo}</span>
+                      <Link
+                        href={`/dashboard/orders/${order.id}`}
+                        target="_blank"
+                        className="font-mono font-bold text-primary underline-offset-4 hover:underline"
+                      >
+                        #{order.orderNo}
+                      </Link>
                       <span>{order.customerName}</span>
                       <Badge variant={order.isPaid ? 'default' : 'secondary'} className={cn(order.isPaid && 'bg-emerald-600 hover:bg-emerald-600')}>
                         {paymentLabel(order)}
