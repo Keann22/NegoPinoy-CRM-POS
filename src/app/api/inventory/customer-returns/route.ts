@@ -9,6 +9,7 @@ import {
   openCasesForCourierReturns,
 } from '@/lib/services/customer-returns/customer-return-service';
 import { applyCustomerReturnAction } from '@/lib/services/customer-returns/customer-return-actions';
+import { wakeDueHeldReturns } from '@/lib/services/customer-returns/customer-return-hold';
 import { listRtsPrompts, logCustomerParcel, logReturnedParcel, searchOrdersForParcel } from '@/lib/services/customer-returns/customer-return-rts';
 import type { CustomerReturnAction, NewCustomerReturn } from '@/types/customer-returns.types';
 
@@ -37,6 +38,7 @@ export async function GET(req: Request) {
     if (search != null) return NextResponse.json({ orders: await searchOrdersForParcel(supabase, search) });
     const orderId = params.get('orderId');
     if (orderId) return NextResponse.json({ lines: await getReturnableLines(supabase, orderId) });
+    try { await wakeDueHeldReturns(supabase); } catch (e) { console.error('wakeDueHeldReturns:', e); }
     return NextResponse.json(await listCustomerReturns(supabase, caller.isManagement, caller.isSales, caller.isWarehouse));
   } catch (e) {
     return errorResponse(e);

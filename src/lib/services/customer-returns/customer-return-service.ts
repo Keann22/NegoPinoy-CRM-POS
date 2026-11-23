@@ -36,11 +36,21 @@ const STAGE_LIMIT_DAYS: Record<CustomerReturnStage, number> = {
   needs_owner: 1,
   to_check: 1,
   to_do: 2,
+  on_hold: Infinity,
   waiting_parcel: 14,
   done: Infinity,
 };
 
 export const shortOrder = (id: string) => id.slice(0, 7).toUpperCase();
+
+/** Current PH calendar date as YYYY-MM-DD. */
+export const todayPh = (now = Date.now()) =>
+  new Date(now).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+
+/** True while an open case is paused on a future PH hold date. */
+export function isHoldActive(r: { status?: string; hold_until?: string | null }, now = Date.now()): boolean {
+  return r.status !== 'closed' && !!r.hold_until && r.hold_until > todayPh(now);
+}
 
 // ---------------------------------------------------------------------------
 // Stage: where the case is now
@@ -60,6 +70,7 @@ export interface StageInput {
   arrived_at: string | null;
   checked_at: string | null;
   outcome_done_at: string | null;
+  hold_until?: string | null;
 }
 
 /** Can the outcome be carried out yet (or does it wait for the parcel)? */
@@ -95,6 +106,7 @@ export function computeStage(
   now = Date.now()
 ): CustomerReturnStage {
   if (r.status === 'closed') return 'done';
+  if (isHoldActive(r, now)) return 'on_hold';
   if (r.ask_back && r.arrived_at && !r.checked_at) return 'to_check';
   // Courier returns: sales says resend or cancel (owners after 3 days). Others: owners.
   if (!r.decided_at) return r.source === 'rts' && !isEscalated(r, now) ? 'needs_sales' : 'needs_owner';
@@ -164,11 +176,18 @@ const daysSince = (iso: string, until: number) => Math.max(0, Math.floor((until 
 
 /** When the case entered its current stage (for days and overdue). */
 function stageSince(r: any, stage: CustomerReturnStage): string {
-  if (stage === 'to_check') return r.arrived_at || r.created_at;
-  if (stage === 'needs_sales') return r.created_at;
-  if (stage === 'to_do' || stage === 'waiting_parcel') return r.decided_at || r.created_at;
-  if (stage === 'needs_owner' && r.checked_at) return r.checked_at;
-  return r.created_at;
+  const base =
+    stage === 'to_check' ? (r.arrived_at || r.created_at)
+    : stage === 'needs_sales' ? r.created_at
+    : stage === 'to_do' || stage === 'waiting_parcel' ? (r.decided_at || r.created_at)
+    : stage === 'needs_owner' && r.checked_at ? r.checked_at
+    : r.created_at;
+  // When a held case wakes up on its hold date, count overdue days from that date.
+  if (r.hold_until && stage !== 'on_hold' && stage !== 'done') {
+    const wokeIso = `${r.hold_until}T00:00:00+08:00`;
+    if (new Date(wokeIso).getTime() > new Date(base).getTime()) return wokeIso;
+  }
+  return base;
 }
 
 function mapCase(r: any, now: number): CustomerReturn {
@@ -234,6 +253,10 @@ function mapCase(r: any, now: number): CustomerReturn {
     needsShelving: r.status === 'open' && needsShelving(r, rawItems),
     partial: !!r.partial,
     boxNames: r.box_names ?? null,
+    holdUntil: r.hold_until ?? null,
+    holdNote: r.hold_note ?? null,
+    holdByName: r.hold_by_name ?? null,
+    holdSetAt: r.hold_set_at ?? null,
     daysOpen,
     isOverdue: stage !== 'done' && inStage > STAGE_LIMIT_DAYS[stage],
     damagedPending: !!r.checked_at && rawItems.some((i) => i.damaged_qty > 0 && !i.damaged_action),

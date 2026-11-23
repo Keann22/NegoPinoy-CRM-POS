@@ -15,7 +15,7 @@ export type CustomerReturnOutcome =
 export type DamagedAction = 'throw_away' | 'second_hand' | 'never_came_back';
 
 /** Where the case is now; one per case, in the order the work happens. */
-export type CustomerReturnStage = 'needs_sales' | 'needs_owner' | 'to_check' | 'to_do' | 'waiting_parcel' | 'done';
+export type CustomerReturnStage = 'needs_sales' | 'needs_owner' | 'to_check' | 'to_do' | 'on_hold' | 'waiting_parcel' | 'done';
 
 export const CR_SOURCE_LABELS: Record<CustomerReturnSource, string> = {
   rts: 'Courier sent it back (RTS)',
@@ -88,6 +88,7 @@ export const CR_STAGE_LABELS: Record<CustomerReturnStage, string> = {
   needs_owner: 'Needs owner',
   to_check: 'To check',
   to_do: 'To do',
+  on_hold: 'On hold',
   waiting_parcel: 'Waiting for parcel',
   done: 'Done',
 };
@@ -161,6 +162,11 @@ export interface CustomerReturn {
   partial: boolean;
   /** Which box(es) came back, e.g. "Box 2". */
   boxNames: string | null;
+  /** PH calendar date (YYYY-MM-DD) until which the case is paused on hold. */
+  holdUntil: string | null;
+  holdNote: string | null;
+  holdByName: string | null;
+  holdSetAt: string | null;
   daysOpen: number;
   isOverdue: boolean;
   /** Checked, has damaged pieces, and the owners haven't said what to do with them. */
@@ -231,7 +237,11 @@ export type CustomerReturnAction =
   /** Courier return: sales asked the customer; ask again in 4 hours. */
   | { action: 'waiting_customer'; id: string; note?: string }
   /** Staff put the OK pieces back on the shelf (stock goes up now). */
-  | { action: 'shelved'; id: string };
+  | { action: 'shelved'; id: string }
+  /** Pause the case until a PH date (YYYY-MM-DD); wakes up automatically on that date. */
+  | { action: 'hold'; id: string; holdUntil: string; note?: string }
+  /** Take a held case off hold immediately. */
+  | { action: 'resume_hold'; id: string };
 
 /** An order found when logging a returned parcel. */
 export interface ParcelOrderMatch {

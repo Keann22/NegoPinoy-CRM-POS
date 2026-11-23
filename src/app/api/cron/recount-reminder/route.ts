@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { remindUnfinishedRecounts } from '@/lib/services/inventory/recount-request-service';
 import { getTelegramConfig } from '@/lib/services/inventory/inventory-guardian-telegram-service';
+import { wakeDueHeldReturns } from '@/lib/services/customer-returns/customer-return-hold';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +25,11 @@ export async function GET(req: Request) {
       const result = await remindUnfinishedRecounts(supabase, new Date(), true);
       return NextResponse.json({ telegramConfigured: !!(cfg.botToken && cfg.chatId), ...result });
     }
-    return NextResponse.json(await remindUnfinishedRecounts(supabase));
+    const [recounts, heldReturns] = await Promise.all([
+      remindUnfinishedRecounts(supabase),
+      wakeDueHeldReturns(supabase),
+    ]);
+    return NextResponse.json({ ...recounts, heldReturnsWoke: heldReturns.woke });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }

@@ -14,6 +14,7 @@ import {
 import { createReplacementOrder, giveStoreCredit, recordRefund } from './customer-return-money';
 import { decideRts, waitForCustomer } from './customer-return-rts';
 import { removeBoxFromOrder, resendBoxAsNewOrder } from './customer-return-split';
+import { holdReturnCase, resumeHeldReturn } from './customer-return-hold';
 
 /*
  * Moving a customer return case along. See customer-return-service.ts for the
@@ -259,9 +260,17 @@ export async function applyCustomerReturnAction(
       await waitForCustomer(supabase, r, a.note, actorName, isManagement || isSales);
       return;
     }
+    case 'hold': {
+      await holdReturnCase(supabase, r, a.holdUntil, a.note, actorName);
+      return;
+    }
+    case 'resume_hold': {
+      await resumeHeldReturn(supabase, r, actorName);
+      break;
+    }
     case 'cancel_case': {
       if (r.restocked_at || r.outcome_done_at || r.replacement_order_id) throw new CustomerReturnError('Already carried out; it can no longer be cancelled.');
-      await guardedUpdate(supabase, r, { status: 'closed', closed_at: now });
+      await guardedUpdate(supabase, r, { status: 'closed', closed_at: now, hold_until: null });
       await logEvent(supabase, r.id, 'cancelled', actorName, a.note?.trim());
       return;
     }

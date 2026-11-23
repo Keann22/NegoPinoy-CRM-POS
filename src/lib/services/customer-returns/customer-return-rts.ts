@@ -5,6 +5,7 @@ import {
   CustomerReturnError,
   getReturnableLines,
   isEscalated,
+  isHoldActive,
   logEvent,
   setOrderStatus,
   shortOrder,
@@ -277,6 +278,7 @@ export async function listRtsPrompts(
   const now = Date.now();
   const me = caller.name.trim().toLowerCase();
   return (data || [])
+    .filter((r: any) => !isHoldActive(r, now))
     .filter((r: any) => !r.ask_again_at || new Date(r.ask_again_at).getTime() <= now)
     .filter((r: any) => {
       const agent = String(r.orders?.sales_person_name || '').trim().toLowerCase();

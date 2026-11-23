@@ -13,16 +13,18 @@ import { OutcomeDoneDialog } from '@/components/dashboard/customer-returns/outco
 import { OldReturnsLog } from '@/components/dashboard/customer-returns/old-returns-log';
 import { ReplacementOrderDialog } from '@/components/dashboard/customer-returns/replacement-order-dialog';
 import { RefundCreditDialog } from '@/components/dashboard/customer-returns/refund-credit-dialog';
+import { HoldReturnDialog } from '@/components/dashboard/customer-returns/hold-return-dialog';
 import { LogParcelDialog } from '@/components/dashboard/customer-returns/log-parcel-dialog';
 import { CR_STAGE_LABELS, type CustomerReturn, type CustomerReturnStage } from '@/types/customer-returns.types';
 
-const TABS: CustomerReturnStage[] = ['needs_sales', 'needs_owner', 'to_check', 'to_do', 'waiting_parcel', 'done'];
+const TABS: CustomerReturnStage[] = ['needs_sales', 'needs_owner', 'to_check', 'to_do', 'on_hold', 'waiting_parcel', 'done'];
 
 const EMPTY: Record<CustomerReturnStage, string> = {
   needs_sales: 'No returned parcels waiting for resend / cancel.',
   needs_owner: 'Nothing waiting on the owners.',
   to_check: 'No returned parcels to check.',
   to_do: 'Nothing to re-ship, send or refund.',
+  on_hold: 'No return cases on hold.',
   waiting_parcel: 'No parcels on the way back.',
   done: 'No cases closed in the last 60 days.',
 };
@@ -44,8 +46,9 @@ export default function CustomerReturnsPage() {
     const all = data?.returns || [];
     const out = Object.fromEntries(TABS.map((t) => [t, [] as CustomerReturn[]])) as Record<CustomerReturnStage, CustomerReturn[]>;
     all.forEach((r) => out[r.stage].push(r));
-    TABS.filter((t) => t !== 'done').forEach((t) =>
+    TABS.filter((t) => t !== 'done' && t !== 'on_hold').forEach((t) =>
       out[t].sort((a, b) => Number(b.isOverdue) - Number(a.isOverdue) || b.daysOpen - a.daysOpen));
+    out.on_hold.sort((a, b) => (a.holdUntil || '').localeCompare(b.holdUntil || ''));
     return out;
   }, [data]);
 
@@ -112,6 +115,7 @@ export default function CustomerReturnsPage() {
       <OutcomeDoneDialog ret={dialogFor('done')} onClose={() => setDialog(null)} onSubmit={act} />
       <ReplacementOrderDialog ret={dialogFor('replacement')} onClose={() => setDialog(null)} onSubmit={act} />
       <RefundCreditDialog ret={dialogFor('money')} onClose={() => setDialog(null)} onSubmit={act} />
+      <HoldReturnDialog ret={dialogFor('hold')} onClose={() => setDialog(null)} onSubmit={act} />
       <LogParcelDialog open={logging} onOpenChange={setLogging} onLogged={refresh} />
     </Card>
   );

@@ -17,7 +17,7 @@ import {
   type CustomerReturnAction,
 } from '@/types/customer-returns.types';
 
-export type CustomerReturnDialogKind = 'decide' | 'check' | 'done' | 'replacement' | 'money';
+export type CustomerReturnDialogKind = 'decide' | 'check' | 'done' | 'replacement' | 'money' | 'hold';
 
 const EVENT_LABELS: Record<string, string> = {
   resend_order: 'Re-send order made',
@@ -33,6 +33,9 @@ const EVENT_LABELS: Record<string, string> = {
   replacement_order: 'Replacement order made',
   refund_sent: 'Refund sent',
   credit_given: 'Store credit given',
+  held: 'Put on hold',
+  hold_resumed: 'Resumed from hold',
+  hold_ended: 'Hold date arrived',
   photos: 'Photos added',
   closed: 'Closed',
   cancelled: 'Case cancelled',
@@ -41,6 +44,10 @@ const EVENT_LABELS: Record<string, string> = {
 const peso = (n: number) => `₱${n.toLocaleString('en-PH', { maximumFractionDigits: 2 })}`;
 const phDate = (iso: string) =>
   new Date(iso).toLocaleString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+const holdDateLabel = (ymd: string) => {
+  const d = new Date(`${ymd}T00:00:00+08:00`);
+  return Number.isNaN(d.getTime()) ? ymd : d.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric' });
+};
 
 interface Props {
   ret: CustomerReturn;
@@ -57,14 +64,15 @@ export function CustomerReturnCard({ ret, isManagement, canDecideRts = false, is
   const [showHistory, setShowHistory] = useState(false);
   const [busy, setBusy] = useState(false);
   const open = ret.status === 'open';
+  const onHold = open && ret.stage === 'on_hold';
   const todo = ret.outcome ? CR_OUTCOME_TODO[ret.outcome] : null;
   const damagedTotal = ret.items.reduce((s, i) => s + i.damagedQty, 0);
   const canChangeDecision = open && !ret.outcomeDoneAt && !ret.restockedAt && !ret.replacementOrderId;
   // Which dialog carries out the decided outcome.
   const todoDialog: CustomerReturnDialogKind = ret.outcome === 'replacement' ? 'replacement' : ret.outcome === 'reship' ? 'done' : 'money';
-  const canReplaceDamaged = open && ret.outcome === 'reship' && !!ret.checkedAt && damagedTotal > 0 && !ret.replacementOrderId;
+  const canReplaceDamaged = open && !onHold && ret.outcome === 'reship' && !!ret.checkedAt && damagedTotal > 0 && !ret.replacementOrderId;
   // Courier return nobody has decided yet: sales answers resend / cancel (owners after 3 days).
-  const rtsUndecided = open && ret.source === 'rts' && !ret.decidedAt;
+  const rtsUndecided = open && !onHold && ret.source === 'rts' && !ret.decidedAt;
   const okPieces = ret.items.filter((i) => i.goodQty > 0);
 
   const run = async (action: CustomerReturnAction) => {
@@ -87,7 +95,9 @@ export function CustomerReturnCard({ ret, isManagement, canDecideRts = false, is
           </p>
         </div>
         <Badge variant={ret.isOverdue ? 'destructive' : ret.stage === 'done' ? 'outline' : 'secondary'}>
-          {CR_STAGE_LABELS[ret.stage]} · {ret.daysOpen}d{ret.isOverdue ? ' · late' : ''}
+          {onHold && ret.holdUntil
+            ? `On hold · until ${holdDateLabel(ret.holdUntil)}`
+            : `${CR_STAGE_LABELS[ret.stage]} · ${ret.daysOpen}d${ret.isOverdue ? ' · late' : ''}`}
         </Badge>
       </div>
 
@@ -139,6 +149,18 @@ export function CustomerReturnCard({ ret, isManagement, canDecideRts = false, is
         </p>
       )}
       {ret.notes && <p className="text-xs text-muted-foreground italic">“{ret.notes}”</p>}
+      {onHold && ret.holdUntil && (
+        <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+          On hold until {holdDateLabel(ret.holdUntil)}
+          {ret.holdNote ? ` · “${ret.holdNote}”` : ''}
+          {ret.holdByName ? ` (${ret.holdByName})` : ''}
+        </p>
+      )}
+      {open && !onHold && ret.holdUntil && (
+        <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+          Hold ended {holdDateLabel(ret.holdUntil)} — ready to process{ret.holdNote ? ` · “${ret.holdNote}”` : ''}
+        </p>
+      )}
       {rtsUndecided && ret.waitingCustomerAt && (
         <p className="text-xs text-amber-700">
           Waiting for the customer since {phDate(ret.waitingCustomerAt)}{ret.waitingCustomerByName ? ` (${ret.waitingCustomerByName})` : ''}
@@ -214,7 +236,7 @@ export function CustomerReturnCard({ ret, isManagement, canDecideRts = false, is
         {open && ret.stage === 'to_do' && todo && !ret.outcomeDoneAt && !(ret.partial && ret.outcome === 'reship') && (isWarehouse || ret.outcome !== 'reship') && (todo.ownerOnly && !isManagement
           ? <span className="text-xs text-muted-foreground">Waiting for the owners: {todo.label.toLowerCase()}.</span>
           : <Button size="sm" onClick={() => onDialog(todoDialog, ret)}>{todo.label}</Button>)}
-        {isWarehouse && open && ret.needsShelving && (
+        {isWarehouse && open && !onHold && ret.needsShelving && (
           <Button size="sm" disabled={busy}
             onClick={() => {
               const msg = ret.partial
@@ -227,6 +249,14 @@ export function CustomerReturnCard({ ret, isManagement, canDecideRts = false, is
         )}
         {canReplaceDamaged && (
           <Button size="sm" variant="outline" onClick={() => onDialog('replacement', ret)}>Replacement order for damaged</Button>
+        )}
+        {onHold ? (
+          <>
+            <Button size="sm" disabled={busy} onClick={() => run({ action: 'resume_hold', id: ret.id })}>Resume now</Button>
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => onDialog('hold', ret)}>Change date</Button>
+          </>
+        ) : open && (
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => onDialog('hold', ret)}>Hold until...</Button>
         )}
         {open && isManagement && canChangeDecision && (
           <Button size="sm" variant="ghost" className="text-xs text-muted-foreground" disabled={busy}
