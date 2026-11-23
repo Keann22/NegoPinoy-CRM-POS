@@ -8,7 +8,7 @@ import { OrderFormPrint } from '@/components/dashboard/orders/order-form-print';
 import type { Order } from '@/hooks/useProcessedOrders';
 import type { OrderItemChange } from '@/types/order-changes';
 
-type Job = { orders: Order[]; changes: Record<string, OrderItemChange[]> };
+type Job = { orders: Order[]; changes: Record<string, OrderItemChange[]>; compact: boolean };
 
 /**
  * Prints one or more order forms from any page, without the page around them.
@@ -21,13 +21,17 @@ export function useReprintOrders() {
   const [busy, setBusy] = useState(false);
 
   const reprint = useCallback(
-    async (orderIds: string[], changes: Record<string, OrderItemChange[]> = {}) => {
+    async (
+      orderIds: string[],
+      changes: Record<string, OrderItemChange[]> = {},
+      options: { compact?: boolean } = {}
+    ) => {
       if (!supabase || orderIds.length === 0) return false;
       setBusy(true);
       try {
         const orders = await fetchOrdersForPrint(supabase, orderIds);
         if (orders.length === 0) return false;
-        setJob({ orders, changes });
+        setJob({ orders, changes, compact: Boolean(options.compact) });
         return true;
       } finally {
         setBusy(false);
@@ -62,10 +66,10 @@ export function useReprintOrders() {
       ? createPortal(
           <div id="reprint-area" className="font-sans text-sm text-black bg-white">
             {job.orders.map((order, idx) => (
-              <div key={order.id} className="mb-4 break-inside-avoid">
-                <OrderFormPrint order={order} reprint={{ changes: job.changes[order.id] }} />
+              <div key={order.id} className={job.compact ? 'mb-2.5 break-inside-avoid' : 'mb-4 break-inside-avoid'}>
+                <OrderFormPrint order={order} reprint={{ changes: job.changes[order.id] }} compact={job.compact} />
                 {idx < job.orders.length - 1 && (
-                  <div className="mt-4 border-b-[3px] border-dashed border-gray-600 w-full" />
+                  <div className={job.compact ? 'mt-2.5 border-b-2 border-dashed border-gray-600 w-full' : 'mt-4 border-b-[3px] border-dashed border-gray-600 w-full'} />
                 )}
               </div>
             ))}
@@ -74,7 +78,7 @@ export function useReprintOrders() {
               @media print {
                 body.reprinting > *:not(#reprint-area) { display: none !important; }
                 body.reprinting #reprint-area { display: block !important; }
-                @page { margin: 1cm; }
+                @page { margin: ${job.compact ? '0.6cm' : '1cm'}; }
               }
             `}</style>
           </div>,

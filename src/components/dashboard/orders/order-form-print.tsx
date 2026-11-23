@@ -14,9 +14,11 @@ const manilaStamp = (d: Date) =>
 export function OrderFormPrint({
   order,
   reprint,
+  compact = false,
 }: {
   order: Order;
   reprint?: { changes?: OrderItemChange[] };
+  compact?: boolean;
 }) {
   const changes = reprint?.changes || [];
   const changeOf = (productId?: string) => changes.find((c) => c.product_id === productId);
@@ -55,12 +57,12 @@ export function OrderFormPrint({
             )}
           </div>
         </div>
-        <div className="p-2 flex justify-center items-center w-[166px]">
-          <QRCodeCanvas value={order.id} size={150} />
+        <div className={compact ? 'p-1.5 flex justify-center items-center w-[124px]' : 'p-2 flex justify-center items-center w-[166px]'}>
+          <QRCodeCanvas value={order.id} size={compact ? 110 : 150} />
         </div>
       </div>
 
-      <div className="min-h-[120px] pb-2">
+      <div className={compact ? 'min-h-[56px] pb-1' : 'min-h-[120px] pb-2'}>
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b-2 border-black text-left">
@@ -101,7 +103,7 @@ export function OrderFormPrint({
       </div>
 
       <div className="flex border-t-2 border-black">
-        <div className="w-2/3 p-2 border-r-2 border-black text-xs whitespace-pre-wrap min-h-[70px]">
+        <div className={compact ? 'w-2/3 p-1.5 border-r-2 border-black text-xs whitespace-pre-wrap min-h-[44px]' : 'w-2/3 p-2 border-r-2 border-black text-xs whitespace-pre-wrap min-h-[70px]'}>
           <div className="font-bold uppercase mb-1">{order.paymentType}</div>
           {order.shippingDetails && (
             <div><span className="font-semibold">Notes: </span><span>{order.shippingDetails}</span></div>
