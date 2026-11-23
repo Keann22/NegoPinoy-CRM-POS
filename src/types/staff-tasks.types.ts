@@ -43,6 +43,7 @@ export interface StaffTaskMessage {
   authorName: string;
   fromOwner: boolean;
   body: string;
+  photoUrl: string | null;
   createdAt: string;
 }
 

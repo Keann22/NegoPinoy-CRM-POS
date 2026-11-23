@@ -149,11 +149,11 @@ export async function fetchTaskMessages(taskId: string): Promise<StaffTaskMessag
   return json.messages || [];
 }
 
-export async function sendTaskMessage(taskId: string, body: string): Promise<void> {
+export async function sendTaskMessage(taskId: string, body: string, photoUrl?: string | null): Promise<void> {
   const res = await fetch(`${API}/messages`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ taskId, body }),
+    body: JSON.stringify({ taskId, body, photoUrl: photoUrl || null }),
   });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json.error || 'Not sent');

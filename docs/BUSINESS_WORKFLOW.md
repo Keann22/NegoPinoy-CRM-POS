@@ -625,6 +625,8 @@ How it works (built 2026-11-20):
   owner who assigned it gets a bell ("Task reply") and the task shows **New reply**
   at the top of the Tasks page. An owner writing: the task **pops up again** for
   the staff member (staff don't watch the bell), even if it's already done.
+  Either side can **attach a photo** to a reply (camera button), e.g. a photo of
+  the item or the shelf.
 - **Several people at once (owner, 2026-11-23):** tap more than one person when
   assigning. **Each gets their own copy** (own Nakita ko / Tapos na); the owners
   see "2 of 3 done" on each copy.

@@ -36,7 +36,7 @@ export async function listTaskMessages(supabase: SupabaseClient, taskId: string,
   const { isAssignee } = await taskFor(supabase, taskId, caller);
   const { data, error } = await supabase
     .from('staff_task_messages')
-    .select('id, author_name, from_owner, body, created_at')
+    .select('id, author_name, from_owner, body, photo_url, created_at')
     .eq('task_id', taskId)
     .order('created_at')
     .limit(200);
@@ -50,13 +50,30 @@ export async function listTaskMessages(supabase: SupabaseClient, taskId: string,
     authorName: m.author_name as string,
     fromOwner: m.from_owner as boolean,
     body: m.body as string,
+    photoUrl: (m.photo_url as string | null) || null,
     createdAt: m.created_at as string,
   }));
 }
 
-export async function postTaskMessage(supabase: SupabaseClient, taskId: string, caller: TaskCaller, bodyIn: string): Promise<void> {
+/** Only photos uploaded through /api/tasks/photo (the staff-tasks bucket). */
+function taskPhoto(url: unknown): string | null {
+  const u = String(url || '').trim();
+  if (!u) return null;
+  const prefix = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/staff-tasks/`;
+  if (!u.startsWith(prefix)) throw new TaskError('The photo was not uploaded properly. Try again.');
+  return u;
+}
+
+export async function postTaskMessage(
+  supabase: SupabaseClient,
+  taskId: string,
+  caller: TaskCaller,
+  bodyIn: string,
+  photoUrlIn?: unknown
+): Promise<void> {
   const body = String(bodyIn || '').trim();
-  if (!body) throw new TaskError('Write a message first');
+  const photoUrl = taskPhoto(photoUrlIn);
+  if (!body && !photoUrl) throw new TaskError('Write a message or add a photo first');
   if (body.length > 1000) throw new TaskError('The message is too long (1,000 characters max)');
   const { task, isAssignee } = await taskFor(supabase, taskId, caller);
   if (task.status === 'cancelled') throw new TaskError('This task was cancelled');
@@ -69,6 +86,7 @@ export async function postTaskMessage(supabase: SupabaseClient, taskId: string, 
     author_name: caller.name,
     from_owner: fromOwner,
     body,
+    photo_url: photoUrl,
   });
   if (error) throw error;
   // The writer has read everything up to their own message.
@@ -86,7 +104,7 @@ export async function postTaskMessage(supabase: SupabaseClient, taskId: string, 
 
   if (!fromOwner && task.assigned_by_name && task.assigned_by_name !== caller.name) {
     const order = task.order_id ? ` (#${String(task.order_id).slice(0, 7).toUpperCase()})` : '';
-    const text = `${caller.name}${order} on "${task.message}": ${body}`;
+    const text = `${caller.name}${order} on "${task.message}": ${body || ''}${photoUrl ? `${body ? ' ' : ''}(photo)` : ''}`;
     await supabase.from('notifications').insert({
       sales_person_name: task.assigned_by_name,
       title: 'Task reply',
