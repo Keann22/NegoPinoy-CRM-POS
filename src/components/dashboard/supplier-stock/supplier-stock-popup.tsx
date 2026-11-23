@@ -66,17 +66,9 @@ export function SupplierStockPopup() {
     router.push(`/dashboard/orders/${p.orderId}${edit ? '?edit=1' : ''}`);
   };
 
-  if (minimized) {
-    return (
-      <button
-        type="button"
-        onClick={() => setMinimized(false)}
-        className="fixed bottom-40 left-4 z-50 inline-flex items-center gap-2 rounded-full bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-lg hover:bg-amber-700"
-      >
-        <PackageX className="h-4 w-4" /> {prompts.length} order{prompts.length === 1 ? '' : 's'}: item wala sa supplier
-      </button>
-    );
-  }
+  // "Later": nothing on screen until the 30 minutes are up (owner, 2026-11-23:
+  // the corner button covered the menu and felt like the pop-up never left).
+  if (minimized) return null;
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) setMinimized(true); }}>
