@@ -13,12 +13,15 @@ interface UseProductsParams {
   supplierFilter?: string;
   page: number;
   pageSize: number;
+  imageMatchRootIds?: string[] | null;
+  imageMatchScores?: Record<string, number>;
 }
 
 function formatProduct(
   p: any,
   reservedStockMap: Record<string, number>,
-  packedStockMap: Record<string, number>
+  packedStockMap: Record<string, number>,
+  imageMatchScores?: Record<string, number>
 ): FormattedProduct {
   let sp = p.supplier_pricing || [];
   if (sp.length === 0 && p.initial_unit_cost) {
@@ -42,6 +45,7 @@ function formatProduct(
     supplierPricing: sp,
     reservedStock: reservedStockMap[p.id] || 0,
     packedStock: packedStockMap[p.id] || 0,
+    imageSimilarity: imageMatchScores?.[p.id],
   };
 }
 
@@ -60,6 +64,8 @@ export function useProducts({
   supplierFilter = 'all',
   page,
   pageSize,
+  imageMatchRootIds = null,
+  imageMatchScores,
 }: UseProductsParams) {
   const supabase = useSupabase();
   const { user } = useUser();
@@ -73,6 +79,13 @@ export function useProducts({
 
   useEffect(() => {
     if (!supabase || !user) return;
+    let cancelled = false;
+    if (Array.isArray(imageMatchRootIds) && imageMatchRootIds.length === 0) {
+      setProducts([]);
+      setTotalCount(0);
+      setIsLoading(false);
+      return;
+    }
     const fetchProducts = async () => {
       setIsLoading(true);
       try {
@@ -81,6 +94,10 @@ export function useProducts({
           .select('*', { count: 'exact' })
           .is('parent_id', null)
           .not('name', 'ilike', '[DELETED]%');
+
+        if (Array.isArray(imageMatchRootIds) && imageMatchRootIds.length > 0) {
+          query = query.in('id', imageMatchRootIds);
+        }
 
         if (searchTerm) {
           query = query.ilike('name', `%${searchTerm}%`);
@@ -139,12 +156,24 @@ export function useProducts({
         }
 
         const from = (page - 1) * pageSize;
-        const { data: parents, error, count } = await query
-          .order('name', { ascending: true })
-          .range(from, from + pageSize - 1);
-        if (error) throw error;
-
-        setTotalCount(count || 0);
+        let parents: any[] | null = null;
+        if (Array.isArray(imageMatchRootIds) && imageMatchRootIds.length > 0) {
+          const { data: matchedParents, error } = await query;
+          if (error) throw error;
+          const rankMap = new Map(imageMatchRootIds.map((id, idx) => [id, idx]));
+          const sorted = [...(matchedParents || [])].sort(
+            (a: any, b: any) => (rankMap.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (rankMap.get(b.id) ?? Number.MAX_SAFE_INTEGER)
+          );
+          if (!cancelled) setTotalCount(sorted.length);
+          parents = sorted.slice(from, from + pageSize);
+        } else {
+          const { data, error, count } = await query
+            .order('name', { ascending: true })
+            .range(from, from + pageSize - 1);
+          if (error) throw error;
+          if (!cancelled) setTotalCount(count || 0);
+          parents = data;
+        }
 
         const parentIds = (parents || []).map((p: any) => p.id);
         let children: any[] = [];
@@ -204,26 +233,35 @@ export function useProducts({
           }
         });
 
-        const formattedChildren = children.map(c => formatProduct(c, reserved, packed));
+        const formattedChildren = children.map(c => formatProduct(c, reserved, packed, imageMatchScores));
         const formatted = (parents || []).map((p: any) => {
           const productChildren = formattedChildren
             .filter(c => (rootParentMap.get(c.id) === p.id || c.parent_id === p.id) && !children.some(other => other.parent_id === c.id))
             .map(c => ({ ...c, parentName: p.name }));
+          if (imageMatchScores) {
+            productChildren.sort((a, b) => (b.imageSimilarity ?? -1) - (a.imageSimilarity ?? -1));
+          }
+          const childMaxSim = productChildren.reduce((max, c) => Math.max(max, c.imageSimilarity ?? 0), 0);
+          const bestSim = Math.max(imageMatchScores?.[p.id] ?? 0, childMaxSim);
           return {
-            ...formatProduct(p, reserved, packed),
+            ...formatProduct(p, reserved, packed, imageMatchScores),
+            ...(bestSim > 0 ? { imageSimilarity: bestSim } : {}),
             children: productChildren.length > 0 ? productChildren : undefined,
           };
         });
 
-        setProducts(formatted);
+        if (!cancelled) setProducts(formatted);
       } catch (err) {
         console.error('Error fetching products:', err);
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
     fetchProducts();
-  }, [supabase, user, searchTerm, stockFilter, categoryFilter, supplierFilter, page, pageSize, refetchTrigger]);
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, user, searchTerm, stockFilter, categoryFilter, supplierFilter, page, pageSize, imageMatchRootIds, imageMatchScores, refetchTrigger]);
 
   return { products, totalCount, isLoading, refetch };
 }

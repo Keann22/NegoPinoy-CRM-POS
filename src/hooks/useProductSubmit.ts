@@ -6,6 +6,16 @@ import { recordGuardianMemory } from '@/lib/services/inventory/inventory-guardia
 import type { FormattedProduct } from '@/types';
 import type { ProductFormValues, CreateProps, EditProps } from './useProductForm';
 
+function triggerImageEmbeddingSync(productIds: string[]) {
+  const unique = Array.from(new Set(productIds.filter(Boolean)));
+  if (unique.length === 0) return;
+  fetch('/api/products/embed-images', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ productIds: unique }),
+  }).catch((err) => console.warn('Background image embedding sync failed:', err));
+}
+
 export async function uploadImages(supabase: any, files: File[]): Promise<string[]> {
   return Promise.all(files.map(async (file) => {
     const fileExt = file.name.split('.').pop();
@@ -125,6 +135,10 @@ export function useProductSubmit({
           uploadedImageUrls = [...uploadedImageUrls, ...newUrls];
         }
         const removedImageUrls = (displayProduct.images || []).filter(url => !existingImages.includes(url));
+        const idsToSyncForEmbeddings: string[] = [];
+        if ((imageFiles && imageFiles.length > 0) || removedImageUrls.length > 0) {
+          idsToSyncForEmbeddings.push(displayProduct.id);
+        }
 
         const hasNoChildren = !displayProduct.children || displayProduct.children.length === 0;
         let handoverNote = '';
@@ -219,6 +233,7 @@ export function useProductSubmit({
 
           const { error: vImgErr } = await supabase.from('products').update({ images: finalVariantImages }).eq('id', child.id);
           if (vImgErr) throw vImgErr;
+          idsToSyncForEmbeddings.push(child.id);
 
           if (removedVariantUrls.length > 0) await deleteImages(supabase, removedVariantUrls);
         }
@@ -241,6 +256,7 @@ export function useProductSubmit({
             }).select().single();
             if (varErr) throw varErr;
             newVariantIds.push(newVar.id);
+            idsToSyncForEmbeddings.push(newVar.id);
             if (v.quantityOnHand > 0) {
               const cost = v.unitCost ?? supplierPricing?.[0]?.unitCost ?? 0;
               await supabase.from('inventory_movements').insert({ product_id: newVar.id, quantity_change: v.quantityOnHand, movement_type: 'initial_stock', timestamp: new Date().toISOString(), reason: 'Initial stock for new variation', supplier_name: supplierPricing?.[0]?.supplierName || 'Initial Stock', unit_cost: cost });
@@ -271,6 +287,7 @@ export function useProductSubmit({
         } else {
           toast({ title: 'Product Updated', description: `${values.name} has been successfully updated.${handoverNote}` });
         }
+        triggerImageEmbeddingSync(idsToSyncForEmbeddings);
         (props as EditProps).onSuccess?.();
 
       } else {
@@ -278,6 +295,7 @@ export function useProductSubmit({
         if (imageFiles && imageFiles.length > 0) uploadedImageUrls = await uploadImages(supabase, imageFiles);
 
         let parentProductId: string | null = null;
+        const createdIdsForEmbeddings: string[] = [];
         if (values.hasVariations && variations && variations.length > 0) {
           const { data: parent, error: pErr } = await supabase.from('products').insert({
             name: core.name, sku: finalSku, shelf_location: core.shelfLocation || null,
@@ -288,6 +306,7 @@ export function useProductSubmit({
           }).select().single();
           if (pErr) throw pErr;
           parentProductId = parent.id;
+          if (uploadedImageUrls.length > 0) createdIdsForEmbeddings.push(parent.id);
           (props as CreateProps).onProductAdded?.({ id: parent.id, name: core.name });
         }
 
@@ -313,6 +332,7 @@ export function useProductSubmit({
             supplier_pricing: supplierPricing || [], stock_level: p.quantityOnHand, images: varImages,
           }).select().single();
           if (insErr) throw insErr;
+          if (varImages.length > 0) createdIdsForEmbeddings.push(newProduct.id);
 
           if (i === 0 && !parentProductId) (props as CreateProps).onProductAdded?.({ id: newProduct.id, name: p.name });
 
@@ -322,6 +342,7 @@ export function useProductSubmit({
           }
         }
 
+        triggerImageEmbeddingSync(createdIdsForEmbeddings);
         toast({ title: 'Product Added', description: `${productsToCreate.length > 1 ? `${productsToCreate.length} variations` : core.name} successfully added.` });
         form.reset();
         

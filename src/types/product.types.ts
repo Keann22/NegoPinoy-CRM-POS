@@ -128,6 +128,19 @@ export type FormattedProduct = Product & {
   onSale?: boolean;
   /** Formatted regular price (e.g. "₱49.99"), set only when there's a real discount, shown struck-through. */
   regularPriceLabel?: string;
+  /** Visual similarity score (0..1) when filtering by image search. */
+  imageSimilarity?: number;
+};
+
+/** Visual match row returned by `match_products_by_image_embedding`. */
+export type ImageSearchMatch = {
+  product_id: string;
+  parent_id: string | null;
+  root_id: string;
+  product_name: string;
+  variant_name: string | null;
+  matched_image_url: string;
+  similarity: number;
 };
 
 /**

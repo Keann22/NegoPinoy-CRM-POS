@@ -264,6 +264,11 @@ export function ProductsTable({
                     </Button>
                   )}
                   {product.name}
+                  {product.imageSimilarity !== undefined && (
+                    <Badge variant="outline" className={`ml-1 ${product.imageSimilarity >= 0.80 ? 'border-emerald-600/40 text-emerald-700 dark:text-emerald-400' : 'border-primary/40 text-primary'}`}>
+                      {Math.round(product.imageSimilarity * 100)}% match
+                    </Badge>
+                  )}
                   {product.children && product.children.length > 0 && (
                     <Badge variant="secondary" className="ml-2">{product.children.length} variations</Badge>
                   )}
@@ -297,7 +302,7 @@ export function ProductsTable({
 
             {/* Child rows (variants) */}
             {expandedParents.has(product.id) && product.children?.map(child => (
-              <TableRow key={child.id} className="bg-muted/30" data-state={selectedProductIds.includes(child.id) ? 'selected' : undefined}>
+              <TableRow key={child.id} className={child.imageSimilarity !== undefined ? 'bg-primary/5' : 'bg-muted/30'} data-state={selectedProductIds.includes(child.id) ? 'selected' : undefined}>
                 <TableCell>
                   <Checkbox
                     onCheckedChange={(checked) => onSelectOne(child.id, !!checked)}
@@ -308,7 +313,16 @@ export function ProductsTable({
                 <TableCell className="hidden sm:table-cell">
                   <ZoomableImage alt="Product image" className="aspect-square rounded-md object-cover" height={64} src={child.image} width={64} data-ai-hint="product image" />
                 </TableCell>
-                <TableCell className="font-medium pl-10">└ {child.variantName || child.name}</TableCell>
+                <TableCell className="font-medium pl-10">
+                  <div className="flex items-center gap-2">
+                    <span>└ {child.variantName || child.name}</span>
+                    {child.imageSimilarity !== undefined && (
+                      <Badge variant="outline" className={child.imageSimilarity >= 0.80 ? 'border-emerald-600/40 text-emerald-700 dark:text-emerald-400' : 'border-primary/40 text-primary'}>
+                        {Math.round(child.imageSimilarity * 100)}% match
+                      </Badge>
+                    )}
+                  </div>
+                </TableCell>
                 <TableCell><Badge variant={child.status.variant}>{child.status.text}</Badge></TableCell>
                 <TableCell><PriceLabel product={child} /></TableCell>
                 <TableCell className="hidden md:table-cell">{child.shelfLocation || '-'}</TableCell>

@@ -1,9 +1,9 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useSupabase } from '@/lib/supabase/hooks';
 import { useToast } from '@/hooks/use-toast';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useProducts } from '@/hooks/useProducts';
-import type { FormattedProduct } from '@/types';
+import type { FormattedProduct, ImageSearchMatch } from '@/types';
 
 export function useProductsPage() {
   const supabase = useSupabase();
@@ -56,12 +56,53 @@ export function useProductsPage() {
   const [viewingReservedProduct, setViewingReservedProduct] = useState<{ id: string; name: string } | null>(null);
   const [viewingPackedProduct, setViewingPackedProduct] = useState<{ id: string; name: string } | null>(null);
   const [viewingAllocatedProduct, setViewingAllocatedProduct] = useState<{ id: string; name: string } | null>(null);
+  const [imageSearch, setImageSearch] = useState<{ previewUrl: string; matches: ImageSearchMatch[] } | null>(null);
 
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
   useEffect(() => {
     const handle = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
     return () => clearTimeout(handle);
   }, [searchTerm]);
+
+  const imageMatchRootIds = useMemo(() => {
+    if (!imageSearch) return null;
+    const seen = new Set<string>();
+    const ordered: string[] = [];
+    for (const m of imageSearch.matches) {
+      if (m.root_id && !seen.has(m.root_id)) {
+        seen.add(m.root_id);
+        ordered.push(m.root_id);
+      }
+    }
+    return ordered;
+  }, [imageSearch]);
+
+  const imageMatchScores = useMemo(() => {
+    if (!imageSearch) return undefined;
+    const scores: Record<string, number> = {};
+    for (const m of imageSearch.matches) {
+      scores[m.product_id] = Math.max(scores[m.product_id] ?? 0, m.similarity);
+      scores[m.root_id] = Math.max(scores[m.root_id] ?? 0, m.similarity);
+    }
+    return scores;
+  }, [imageSearch]);
+
+  const applyImageSearch = useCallback((previewUrl: string, matches: ImageSearchMatch[]) => {
+    setImageSearch({ previewUrl, matches });
+    setSearchTerm('');
+    setDebouncedSearchTerm('');
+    setCurrentPage(1);
+    const parentsToExpand = matches
+      .filter((m) => m.root_id && m.root_id !== m.product_id)
+      .map((m) => m.root_id);
+    setExpandedParents(new Set(parentsToExpand));
+  }, []);
+
+  const clearImageSearch = useCallback(() => {
+    setImageSearch(null);
+    setExpandedParents(new Set());
+    setCurrentPage(1);
+  }, []);
 
   const { products: paginatedProducts, totalCount, isLoading, refetch } = useProducts({
     searchTerm: debouncedSearchTerm,
@@ -70,6 +111,8 @@ export function useProductsPage() {
     supplierFilter,
     page: currentPage,
     pageSize: rowsPerPage,
+    imageMatchRootIds,
+    imageMatchScores,
   });
 
   const isManagement = useMemo(() => userProfile?.roles?.some(r => ['Admin', 'Owner'].includes(r)), [userProfile]);
@@ -251,6 +294,10 @@ export function useProductsPage() {
     setViewingPackedProduct,
     viewingAllocatedProduct,
     setViewingAllocatedProduct,
+    imageSearch,
+    imageMatchCount: imageMatchRootIds?.length ?? 0,
+    applyImageSearch,
+    clearImageSearch,
     paginatedProducts,
     totalCount,
     isLoading,

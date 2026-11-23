@@ -17,6 +17,7 @@ import { ViewProductHistoryDialog } from '@/components/dashboard/view-product-hi
 import { ViewProductDetailsDialog } from '@/components/dashboard/view-product-details-dialog';
 import { ProductUnallocatedStockDialog } from '@/components/dashboard/products/product-unallocated-stock-dialog';
 import { ProductsTable } from '@/components/dashboard/products/ProductsTable';
+import { ActiveImageSearchBanner, ImageSearchButton } from '@/components/dashboard/products/ImageSearchDialog';
 import { useProductsPage } from '@/hooks/useProductsPage';
 
 export type { FormattedProduct } from '@/types';
@@ -59,6 +60,10 @@ export default function ProductsPage() {
     setViewingPackedProduct,
     viewingAllocatedProduct,
     setViewingAllocatedProduct,
+    imageSearch,
+    imageMatchCount,
+    applyImageSearch,
+    clearImageSearch,
     paginatedProducts,
     totalCount,
     isLoading,
@@ -99,6 +104,7 @@ export default function ProductsPage() {
                   }}
                   className="w-full sm:w-[220px]"
                 />
+                <ImageSearchButton onResults={applyImageSearch} />
                 <Select value={stockFilter} onValueChange={(value) => {
                     setStockFilter(value);
                     setCurrentPage(1);
@@ -147,7 +153,7 @@ export default function ProductsPage() {
                         <SelectItem value="no-supplier">No Supplier</SelectItem>
                     </SelectContent>
                 </Select>
-                {(searchTerm || stockFilter !== 'all' || categoryFilter !== 'all' || supplierFilter !== 'all') && (
+                {(searchTerm || stockFilter !== 'all' || categoryFilter !== 'all' || supplierFilter !== 'all' || imageSearch) && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -156,6 +162,7 @@ export default function ProductsPage() {
                       setStockFilter('all');
                       setCategoryFilter('all');
                       setSupplierFilter('all');
+                      clearImageSearch();
                       setCurrentPage(1);
                     }}
                     className="h-9 px-2.5 text-muted-foreground hover:text-foreground"
@@ -173,6 +180,16 @@ export default function ProductsPage() {
                 </Button>
             )}
           </div>
+          {imageSearch && (
+            <ActiveImageSearchBanner
+              previewUrl={imageSearch.previewUrl}
+              visibleCount={totalCount}
+              totalVisualMatches={imageMatchCount}
+              isLoading={isLoading}
+              onNewSearch={applyImageSearch}
+              onClear={clearImageSearch}
+            />
+          )}
           <ProductsTable
             products={paginatedProducts}
             isLoading={isLoading}
@@ -209,7 +226,9 @@ export default function ProductsPage() {
               <div className="flex flex-col items-center justify-center text-center border-2 border-dashed rounded-lg p-12 mt-4">
                   <p className="text-lg font-semibold">No products found</p>
                   <p className="text-muted-foreground mt-2">
-                      {searchTerm || stockFilter !== 'all' || categoryFilter !== 'all' || supplierFilter !== 'all'
+                      {imageSearch
+                        ? 'No visually similar products matched your current filters.'
+                        : searchTerm || stockFilter !== 'all' || categoryFilter !== 'all' || supplierFilter !== 'all'
                         ? 'No products matched your current filters.'
                         : (canManageProducts ? 'Click "Add Product" to get started.' : 'No products available.')}
                   </p>
