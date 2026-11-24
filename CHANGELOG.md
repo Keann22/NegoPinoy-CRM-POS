@@ -1,5 +1,8 @@
 # Changelog & Refactoring History
 
+> **Outdated (stops at June 2026).** Current progress is in `docs/PROGRESS.md`;
+> full history is in `git log`. Kept for reference only.
+
 This file serves as a master list of changes, feature additions, and decoupling efforts made to the NegoPinoy CRM POS application. Use this document as a reference when planning further refactoring or trying to recall past architectural decisions.
 
 ## Recent Changes & Features (June 16 - June 19, 2026)

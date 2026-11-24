@@ -3,6 +3,12 @@
 **Before designing any feature, read `docs/BUSINESS_WORKFLOW.md`** — how the team
 actually buys, receives, and counts, and what must stay confidential.
 
+**Two AI coders work here (Claude and Antigravity). `docs/PROGRESS.md` is the shared
+progress board.** Read it before starting; add your task under "In progress" (your
+name, date, files) when you start; update its status if you stop half-way; move it
+to "Done recently" with the commit hash when you finish. Don't edit files the other
+agent has listed as in progress without asking the owner.
+
 ## Code Quality Rules
 
 ### File Size Limit

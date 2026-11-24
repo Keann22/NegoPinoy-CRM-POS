@@ -1,5 +1,8 @@
 # Session Handoff — Cowork → Claude Code
 
+> **Outdated (July 2026).** Current progress is in `docs/PROGRESS.md`.
+> Kept for reference only.
+
 > Read this first. This captures everything already investigated and fixed in a prior
 > Cowork session so it doesn't need to be repeated. Delete this file once you've absorbed it
 > (or keep it — up to Ken).

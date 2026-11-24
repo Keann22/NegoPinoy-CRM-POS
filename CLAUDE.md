@@ -8,6 +8,9 @@ works. The workflow is below; keep it up to date when the owner explains more.
 ## Working rules
 
 - Code rules for all agents live in `.agents/AGENTS.md`.
+- **Progress board: `docs/PROGRESS.md`**, shared with Antigravity. Read it before
+  starting work, and update it when you start, pause and finish a task (rules at
+  the top of that file).
 - Vercel deploys from `main`; commit and push to `main`, no pull requests.
 - The database is the live production Supabase project.
 - Times in the database are UTC; show and report them in Philippine time (UTC+8).
