@@ -85,6 +85,8 @@ and new BUSINESS_WORKFLOW.md sections (Customer profile, Copilot).
 
 Newest first. Older history: `git log`. Feature rules: `docs/BUSINESS_WORKFLOW.md`.
 
+- **2026-11-25** Owners' Dashboard "Tasks for staff": tap any number (e.g. Not seen
+  yet) or a per-staff count to list those tasks right there, with Reply / Cancel. (Claude, 2342a0d)
 - **2026-11-25** Ship later: "Ipadala sa petsa" on unpicked orders keeps them off
   picking and Need to Buy until 3 days before; "Hindi pa ipi-pick" on Ready to
   Pick asks sales (pop-up); 21 note-only reserved orders converted. (Claude, 7a39616)
