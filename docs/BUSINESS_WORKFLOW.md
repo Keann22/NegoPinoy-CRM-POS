@@ -735,6 +735,34 @@ How it works (built 2026-11-20):
 - **Free to sell still counts ship-later orders** (it comes from `stock_level`,
   which orders lower when they're made). Not changed yet.
 
+## Notes for a person or team (owner, 2026-11-25; built 2026-11-25)
+
+- Sales wrote requests for the warehouse as **order notes** ("meron na daw stock,
+  pacheck", "pwede na padala", "update po? wala pa din?"), but a note told no one,
+  and inventory only opens an order to pick or check it. Checked 2026-11-25: 31
+  notes written by people in 30 days, only 1 with an @tag. Sales had never opened
+  most Messages threads (20 and 18 unread), but they answer pop-ups.
+- Now every note box (order page Activity & Notes, Priority List, Ready to Pick)
+  asks **Para kanino?**: **Note lang** (default: nobody is told), **Inventory**
+  (Jas, Al, Tess, Edric, Rey), **Owners**, the order's **sales agent**, or anyone
+  else (**Iba pa**). An @tag in the note sends it to that person too. Notes go
+  **both ways** (inventory can send to sales).
+- Then **Kailangan ng sagot** (default: stays until they reply or tap Tapos na) or
+  **Pasabi lang po** (closes when they tap Nakita ko). Not "FYI": it sounds
+  sarcastic in Filipino (owner).
+- It works like a task: a **pop-up** (closing it brings it back in 30 minutes and
+  on every page load), then it stays on their dashboard ("Para sa'yo") and in
+  **Tasks** with a count in the menu until answered. Open notes also show on the
+  **order page** and in the **Picker** when the order is scanned.
+- A note to **Inventory** or **Owners** is one shared note: whoever answers first
+  closes it for everyone.
+- The answer **pops up for the sender** (not the bell) and is added to the order's
+  Activity & Notes. Senders see their notes under Tasks → **Mga note na pinadala
+  ko** (Hindi pa nakikita / Seen by Al / Answered) and can **Bawiin** one.
+- **Not seen in 2 hours:** the sender gets a pop-up once (message them on
+  Messenger), and the owners see it on their dashboard and the Tasks page.
+- The Inventory team list is in `src/lib/services/staff-tasks/staff-note-service.ts`.
+
 ## Being decided (not built yet)
 
 - **Customer purchase planner (owner, 2026-11-01)**: a premium feature on the

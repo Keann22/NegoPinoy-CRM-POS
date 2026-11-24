@@ -23,7 +23,9 @@ import {
 } from 'lucide-react';
 import { MentionInput } from '@/components/dashboard/mention-input';
 import { useStaffDirectory } from '@/hooks/useStaffDirectory';
-import { postOrderNote } from '@/lib/services/order-note-service';
+import { useSendOrderNote } from '@/hooks/useSendOrderNote';
+import { useToast } from '@/hooks/use-toast';
+import { NO_RECIPIENTS, NoteRecipientPicker, type NoteRecipients } from '@/components/dashboard/tasks/note-recipient-picker';
 import {
   fetchOrderTrail,
   type OrderTrailEntry,
@@ -83,6 +85,9 @@ export function OrderActivityCard({ orderId }: OrderActivityCardProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [newNoteText, setNewNoteText] = useState('');
   const [mentions, setMentions] = useState<string[]>([]);
+  const [recipients, setRecipients] = useState<NoteRecipients>(NO_RECIPIENTS);
+  const sendNote = useSendOrderNote();
+  const { toast } = useToast();
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
 
   const loadTrail = useCallback(async () => {
@@ -111,15 +116,16 @@ export function OrderActivityCard({ orderId }: OrderActivityCardProps) {
       : 'Staff';
 
     try {
-      // Saves to orders.notes (this card) and messages anyone @tagged.
-      const res = await postOrderNote(supabase, { orderId, text: newNoteText, authorName, mentions, staff });
-      if (res.success) {
-        setNewNoteText('');
-        setMentions([]);
-        await loadTrail();
-      }
+      // Saves to orders.notes (this card); "Para kanino?" and @tags get a pop-up.
+      const title = await sendNote({ orderId, text: newNoteText, authorName, mentions, staff, recipients });
+      setNewNoteText('');
+      setMentions([]);
+      setRecipients(NO_RECIPIENTS);
+      toast({ title });
+      await loadTrail();
     } catch (err) {
-      console.error('Error posting note / message:', err);
+      toast({ variant: 'destructive', title: 'Note not sent', description: err instanceof Error ? err.message : String(err) });
+      await loadTrail();
     } finally {
       setIsSubmitting(false);
     }
@@ -241,19 +247,21 @@ export function OrderActivityCard({ orderId }: OrderActivityCardProps) {
             mentions={mentions}
             onMentionsChange={setMentions}
             onSubmit={handlePostNote}
-            placeholder="Write a note... Type @ to tag staff (they will receive a notification and message thread)..."
+            placeholder="Write a note... Type @ to tag staff (they get a pop-up)..."
             multiline={true}
             rows={2}
             dropdownPosition="top"
             className="bg-white text-sm focus-visible:ring-indigo-500"
           />
 
+          <NoteRecipientPicker orderId={orderId} value={recipients} onChange={setRecipients} disabled={isSubmitting} />
+
           <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
             {mentions.length > 0 ? (
               <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1 text-indigo-600 font-medium">
                   <AtSign className="w-3.5 h-3.5" />
-                  Will notify & message:
+                  Will get a pop-up:
                 </span>
                 {mentions.map((name) => (
                   <Badge
@@ -274,7 +282,7 @@ export function OrderActivityCard({ orderId }: OrderActivityCardProps) {
               </div>
             ) : (
               <span className="text-[11px] text-muted-foreground">
-                Tip: Tagging staff notifies them instantly and creates a thread in Messages.
+                Tip: pick who it&apos;s for, or type @ to tag someone. They get a pop-up.
               </span>
             )}
 

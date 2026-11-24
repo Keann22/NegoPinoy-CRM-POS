@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import type { StaffTaskMessage } from '@/types/staff-tasks.types';
+import { addOrderNote } from '@/lib/services/order-trail-service';
 import { TaskError, TASKS_PAGE, type TaskCaller } from './staff-task-service';
 
 /*
@@ -16,18 +17,24 @@ interface TaskRef {
   order_id: string | null;
   assignee_ids: string[];
   assigned_by_name: string;
+  kind: string | null;
+  needs_answer: boolean | null;
+  sender_ids: string[] | null;
+  assignee_name: string;
 }
 
 async function taskFor(supabase: SupabaseClient, taskId: string, caller: TaskCaller): Promise<{ task: TaskRef; isAssignee: boolean }> {
   const { data, error } = await supabase
     .from('staff_tasks')
-    .select('id, message, status, seen_at, order_id, assignee_ids, assigned_by_name')
+    .select('id, message, status, seen_at, order_id, assignee_ids, assigned_by_name, kind, needs_answer, sender_ids, assignee_name')
     .eq('id', taskId)
     .maybeSingle();
   if (error) throw error;
   if (!data) throw new TaskError('Task not found');
   const isAssignee = (data.assignee_ids as string[]).includes(caller.id);
-  if (!isAssignee && !caller.isManagement) throw new TaskError('This task is not yours');
+  // Order notes: the person who wrote it is the other side of the conversation.
+  const isSender = data.kind === 'note' && ((data.sender_ids as string[] | null) || []).includes(caller.id);
+  if (!isAssignee && !isSender && !caller.isManagement) throw new TaskError('This task is not yours');
   return { task: data as TaskRef, isAssignee };
 }
 
@@ -79,6 +86,9 @@ export async function postTaskMessage(
   if (task.status === 'cancelled') throw new TaskError('This task was cancelled');
   const fromOwner = !isAssignee;
   const now = new Date().toISOString();
+  const isNote = task.kind === 'note';
+  // Answering a note closes it (for everyone, when it went to a team).
+  const answers = isNote && isAssignee && task.status === 'open';
 
   const { error } = await supabase.from('staff_task_messages').insert({
     task_id: taskId,
@@ -98,9 +108,19 @@ export async function postTaskMessage(
       ...(fromOwner ? { owner_read_at: now } : { staff_read_at: now }),
       // Asking about the task means they saw it.
       ...(!fromOwner && !task.seen_at ? { seen_at: now, seen_by_name: caller.name } : {}),
+      ...(answers ? { status: 'done', done_at: now, done_by_name: caller.name } : {}),
     })
     .eq('id', taskId);
   if (upErr) throw upErr;
+
+  if (isNote) {
+    // Keep the conversation in the order's Activity & Notes too. The sender gets a pop-up, not a bell.
+    if (task.order_id && body) {
+      const label = fromOwner ? `Reply to ${task.assignee_name}` : `Sagot kay ${task.assigned_by_name}`;
+      await addOrderNote(supabase, task.order_id, `${label}: ${body}`, caller.name);
+    }
+    return;
+  }
 
   if (!fromOwner && task.assigned_by_name && task.assigned_by_name !== caller.name) {
     const order = task.order_id ? ` (#${String(task.order_id).slice(0, 7).toUpperCase()})` : '';

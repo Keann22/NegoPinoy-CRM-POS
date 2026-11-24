@@ -9,8 +9,13 @@ import { useTaskActions } from '@/hooks/useTaskActions';
 import { OwnerTasksList } from '@/components/dashboard/tasks/owner-tasks-list';
 import { ReadyToPickBanner } from '@/components/dashboard/tasks/ready-to-pick-banner';
 import { TaskItem } from '@/components/dashboard/tasks/task-item';
+import { SentNotesList } from '@/components/dashboard/tasks/sent-notes-list';
+import { UnseenNotesList } from '@/components/dashboard/tasks/unseen-notes-list';
 
-/** Tasks: staff see theirs (open + done this week); owners also see every task they gave. */
+/**
+ * Tasks: staff see theirs and the order notes sent to them (open + done this week),
+ * and the notes they sent; owners also see every task they gave and notes nobody saw.
+ */
 export default function TasksPage() {
   return <Suspense><TasksContent /></Suspense>;
 }
@@ -26,9 +31,10 @@ function TasksContent() {
   const mine = (
     <Card>
       <CardHeader>
-        <CardTitle>Mga task ko</CardTitle>
+        <CardTitle>Para sa&apos;yo</CardTitle>
         <CardDescription>
-          From the owners. Tap <b>Ginagawa na</b> when you start, <b>May problema</b> if you can&apos;t do it, and <b>Tapos na</b> when it&apos;s done.
+          Tasks from the owners: tap <b>Ginagawa na</b> when you start, <b>May problema</b> if you can&apos;t do it, and <b>Tapos na</b> when it&apos;s done.
+          Notes on orders: tap <b>Sumagot</b> to answer, or <b>Nakita ko</b>.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -50,8 +56,10 @@ function TasksContent() {
     <div className="mx-auto max-w-3xl space-y-6 p-4 md:p-6">
       <h1 className="text-2xl font-bold">Tasks</h1>
       <ReadyToPickBanner />
+      {isManagement && <UnseenNotesList />}
       {isManagement && <OwnerTasksList highlightId={params.get('task')} />}
       {(!isManagement || tasks.length > 0) && mine}
+      <SentNotesList />
       {dialogs}
     </div>
   );

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
-import type { NewStaffTask, StaffTask, StaffTaskAction, StaffTaskMessage, TaskPerson } from '@/types/staff-tasks.types';
+import type { NewOrderNote, NewStaffTask, NoteTarget, StaffTask, StaffTaskAction, StaffTaskMessage, TaskPerson } from '@/types/staff-tasks.types';
 import type { OrderShipContext } from '@/lib/services/order-ship-context-service';
 
 const API = '/api/tasks';
@@ -22,18 +22,20 @@ async function call<T>(init: RequestInit & { query?: string } = {}): Promise<T> 
 }
 
 /*
- * My tasks: one shared copy for the pop-up, the dashboard card and the menu badge,
- * so they poll once and update together.
+ * My tasks and notes, and the notes I sent: one shared copy for the pop-up, the
+ * dashboard card and the menu badge, so they poll once and update together.
  */
 let mine: StaffTask[] = [];
+let sent: StaffTask[] = [];
 let loaded = false;
 const listeners = new Set<() => void>();
 let timer: number | null = null;
 
 async function loadMine() {
   try {
-    const json = await call<{ tasks: StaffTask[] }>({ query: '?view=mine' });
+    const json = await call<{ tasks: StaffTask[]; sent?: StaffTask[] }>({ query: '?view=mine' });
     mine = json.tasks || [];
+    sent = json.sent || [];
     loaded = true;
     listeners.forEach((l) => l());
   } catch {
@@ -77,6 +79,14 @@ export async function uploadTaskPhoto(file: File): Promise<string> {
   return json.url as string;
 }
 
+/** Notes I sent (open, answered this week). Shares the poll with useMyTasks. */
+export function useSentNotes() {
+  const notes = useSyncExternalStore(subscribe, () => sent, () => EMPTY);
+  // Answered and not read yet, or nobody saw it in 2 hours (shown once).
+  const needsMe = notes.filter((n) => n.senderUnread || (n.unseenTooLong && !n.senderNudged));
+  return { notes, needsMe, reload: loadMine };
+}
+
 export function useMyTasks() {
   const tasks = useSyncExternalStore(subscribe, () => mine, () => EMPTY);
   const open = tasks.filter((t) => t.status === 'open');
@@ -118,6 +128,51 @@ export function useOrderTasks(orderId: string | null | undefined) {
   }, [orderId]);
   // eslint-disable-next-line react-hooks/set-state-in-effect -- loads from the API on mount
   useEffect(() => { void reload(); }, [reload]);
+  return { tasks, reload };
+}
+
+/** Who an order note can go to ("Para kanino?"). Loaded once per order. */
+export function useNoteTargets(orderId: string | null | undefined, enabled = true) {
+  const [loaded, setLoaded] = useState<{ key: string; targets: NoteTarget[] } | null>(null);
+  const key = orderId || '';
+  useEffect(() => {
+    if (!enabled) return;
+    let alive = true;
+    call<{ targets: NoteTarget[] }>({ query: `?view=noteTargets${orderId ? `&orderId=${encodeURIComponent(orderId)}` : ''}` })
+      .then((json) => { if (alive) setLoaded({ key, targets: json.targets || [] }); })
+      .catch(() => { if (alive) setLoaded({ key, targets: [] }); });
+    return () => { alive = false; };
+  }, [orderId, key, enabled]);
+  return loaded?.key === key ? loaded.targets : [];
+}
+
+/** Sends an order note to the people / teams picked (any staff). */
+export async function sendOrderNote(input: NewOrderNote): Promise<string[]> {
+  const json = await call<{ ids: string[] }>({ method: 'POST', body: JSON.stringify({ kind: 'note', ...input }) });
+  await loadMine();
+  window.dispatchEvent(new Event(TASKS_CHANGED_EVENT));
+  return json.ids;
+}
+
+/** Owners: notes nobody saw 2 hours after they were sent. */
+export function useUnseenNotes(enabled: boolean) {
+  const [tasks, setTasks] = useState<StaffTask[]>([]);
+  const reload = useCallback(async () => {
+    if (!enabled) return;
+    try {
+      const json = await call<{ tasks: StaffTask[] }>({ query: '?view=unseenNotes' });
+      setTasks(json.tasks || []);
+    } catch {
+      // Not critical.
+    }
+  }, [enabled]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads from the API on mount
+    void reload();
+    const onChange = () => { void reload(); };
+    window.addEventListener(TASKS_CHANGED_EVENT, onChange);
+    return () => window.removeEventListener(TASKS_CHANGED_EVENT, onChange);
+  }, [reload]);
   return { tasks, reload };
 }
 

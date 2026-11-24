@@ -173,7 +173,10 @@ export async function addOrderNote(
 
     if (fetchErr) throw fetchErr;
 
-    const timestamp = format(new Date(), 'MMM d, yyyy h:mm a');
+    // Always Philippine time, also when this runs on the server (UTC).
+    const now = new Date();
+    const pht = new Date(now.getTime() + 8 * 3600000 + now.getTimezoneOffset() * 60000);
+    const timestamp = format(pht, 'MMM d, yyyy h:mm a');
     const newNoteEntry = `[${timestamp}] ${authorName.trim() || 'Staff'}:\n${noteText.trim()}`;
     const updatedNotes = order?.notes ? `${order.notes}\n\n${newNoteEntry}` : newNoteEntry;
 

@@ -1,6 +1,6 @@
 import type { OrderShipContext } from '@/lib/services/order-ship-context-service';
 
-/** A task an owner gave a staff member (table staff_tasks, owner 2026-11-23). */
+/** A task an owner gave a staff member (table staff_tasks, owner 2026-11-23), or an order note sent to someone. */
 export type StaffTaskStatus = 'open' | 'done' | 'cancelled';
 /** Between Seen and Done: "Ginagawa na" or "May problema". */
 export type StaffTaskProgress = 'working' | 'problem';
@@ -42,6 +42,39 @@ export interface StaffTask {
   staffUnread: boolean;
   /** Staff asked or replied and the owners haven't read it. */
   ownerUnread: boolean;
+  /** An order note sent to a person or team (kind 'note', owner 2026-11-25). */
+  isNote: boolean;
+  /** Note: true = "Kailangan ng sagot" (open until answered), false = "Pasabi lang po" (closes at Nakita ko). */
+  needsAnswer: boolean;
+  /** Note sent to a whole team (one shared copy: whoever answers closes it). */
+  team: NoteTeam | null;
+  /** Note I sent: they answered (replied or Tapos na) and I haven't read it. */
+  senderUnread: boolean;
+  /** Note not seen 2 hours after it was sent. */
+  unseenTooLong: boolean;
+  /** The sender already saw the "not seen in 2 hours" alert. */
+  senderNudged: boolean;
+}
+
+export type NoteTeam = 'inventory' | 'owners';
+
+/** Who an order note can be sent to ("Para kanino?"). */
+export interface NoteTarget {
+  /** 'team:inventory', 'team:owners', or a person key. */
+  key: string;
+  label: string;
+  /** "Jas, Al, Tess, Edric, Rey" or "Sales agent". */
+  detail?: string;
+  kind: 'team' | 'agent' | 'person';
+}
+
+export interface NewOrderNote {
+  orderId: string | null;
+  message: string;
+  targetKeys: string[];
+  /** Names tagged with @ in the note (sent to those people too). */
+  mentionNames?: string[];
+  needsAnswer: boolean;
 }
 
 export interface StaffTaskMessage {
@@ -68,4 +101,5 @@ export interface NewStaffTask {
   dueAt?: string | null;
 }
 
-export type StaffTaskAction = 'seen' | 'working' | 'problem' | 'done' | 'cancel';
+/** 'ack': the sender read the answer / the 2-hour alert on a note. */
+export type StaffTaskAction = 'seen' | 'working' | 'problem' | 'done' | 'cancel' | 'ack';

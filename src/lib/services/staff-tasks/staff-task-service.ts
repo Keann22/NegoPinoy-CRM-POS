@@ -19,9 +19,9 @@ const SAME_PERSON: { label: string; emails: string[] }[] = [
   { label: 'Jas', emails: ['jas@gmail.com', 'jas@usares.com', 'jassy@gmail.com'] },
 ];
 
-const SELECT = 'id, message, order_id, assignee_name, assigned_by_name, due_at, status, seen_at, seen_by_name, progress, progress_note, progress_at, progress_by_name, done_at, done_by_name, done_note, done_photo_url, created_at, last_message_at, last_message_from_owner, staff_read_at, owner_read_at, group_id, kind, staff_task_messages(count), orders(status, customers(full_name))';
+export const SELECT = 'id, message, order_id, assignee_name, assigned_by_name, due_at, status, seen_at, seen_by_name, progress, progress_note, progress_at, progress_by_name, done_at, done_by_name, done_note, done_photo_url, created_at, last_message_at, last_message_from_owner, staff_read_at, owner_read_at, group_id, kind, needs_answer, team, sender_nudged_at, staff_task_messages(count), orders(status, customers(full_name))';
 
-interface AuthUser {
+export interface AuthUser {
   id: string;
   email?: string;
   app_metadata?: unknown;
@@ -29,16 +29,16 @@ interface AuthUser {
   last_sign_in_at?: string | null;
 }
 
-type Person = TaskPerson & { ids: string[]; lastSignIn: string };
+export type Person = TaskPerson & { ids: string[]; lastSignIn: string };
 
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
 
-function fullName(u: AuthUser): string {
+export function fullName(u: AuthUser): string {
   const m = u.user_metadata || {};
   return `${m.first_name || ''} ${m.last_name || ''}`.trim() || u.email || 'Staff';
 }
 
-async function staffAccounts(supabase: SupabaseClient): Promise<AuthUser[]> {
+export async function staffAccounts(supabase: SupabaseClient): Promise<AuthUser[]> {
   const { data, error } = await supabase.auth.admin.listUsers({ perPage: 1000 });
   if (error) throw error;
   return (data.users as AuthUser[]).filter((u) =>
@@ -46,7 +46,7 @@ async function staffAccounts(supabase: SupabaseClient): Promise<AuthUser[]> {
 }
 
 /** Staff to assign to, most recently active first. */
-async function people(supabase: SupabaseClient): Promise<Person[]> {
+export async function people(supabase: SupabaseClient): Promise<Person[]> {
   const groups = new Map<string, { label: string; known: boolean; users: AuthUser[] }>();
   for (const u of await staffAccounts(supabase)) {
     const email = String(u.email || '').toLowerCase();
@@ -73,7 +73,7 @@ export async function listPeople(supabase: SupabaseClient): Promise<TaskPerson[]
   return (await people(supabase)).map(({ key, name, roles }) => ({ key, name, roles }));
 }
 
-interface TaskRow {
+export interface TaskRow {
   id: string; message: string; order_id: string | null; assignee_name: string; assigned_by_name: string;
   due_at: string | null; status: StaffTask['status']; seen_at: string | null; seen_by_name: string | null;
   progress: StaffTask['progress']; progress_note: string | null; progress_at: string | null; progress_by_name: string | null;
@@ -81,6 +81,7 @@ interface TaskRow {
   created_at: string;
   group_id: string | null;
   kind: string | null;
+  needs_answer?: boolean | null; team?: string | null; sender_nudged_at?: string | null;
   last_message_at: string | null; last_message_from_owner: boolean | null; staff_read_at: string | null; owner_read_at: string | null;
   staff_task_messages?: { count: number }[] | null;
   orders?: OrderJoin | OrderJoin[] | null;
@@ -92,8 +93,12 @@ function unread(lastAt: string | null, readAt: string | null): boolean {
   return !!lastAt && (!readAt || readAt < lastAt);
 }
 
-function toTask(r: TaskRow): StaffTask {
+/** A note not seen this long after it was sent: the sender is told and the owners see it (owner, 2026-11-25). */
+export const NOTE_UNSEEN_MS = 2 * 60 * 60 * 1000;
+
+export function toTask(r: TaskRow): StaffTask {
   const order = one(r.orders);
+  const isNote = r.kind === 'note';
   const customer = one(order?.customers);
   return {
     id: r.id,
@@ -122,7 +127,17 @@ function toTask(r: TaskRow): StaffTask {
     messageCount: r.staff_task_messages?.[0]?.count ?? 0,
     lastMessageAt: r.last_message_at,
     staffUnread: r.last_message_from_owner === true && unread(r.last_message_at, r.staff_read_at),
-    ownerUnread: r.last_message_from_owner === false && unread(r.last_message_at, r.owner_read_at),
+    ownerUnread: !isNote && r.last_message_from_owner === false && unread(r.last_message_at, r.owner_read_at),
+    isNote,
+    needsAnswer: isNote && r.needs_answer !== false,
+    team: r.team === 'inventory' || r.team === 'owners' ? r.team : null,
+    // The sender's side of a note: they replied, or answered with Tapos na.
+    senderUnread: isNote && (
+      (r.last_message_from_owner === false && unread(r.last_message_at, r.owner_read_at))
+      || (r.needs_answer !== false && r.status === 'done' && unread(r.done_at, r.owner_read_at))
+    ),
+    unseenTooLong: isNote && r.status === 'open' && !r.seen_at && Date.now() - new Date(r.created_at).getTime() > NOTE_UNSEEN_MS,
+    senderNudged: !!r.sender_nudged_at,
   };
 }
 
@@ -130,7 +145,7 @@ function toTask(r: TaskRow): StaffTask {
  * Adds "can this order ship yet?" to tasks about an order: its hold note, what it
  * still owes, and the customer's other open orders (found 2026-11-24, #020106B).
  */
-async function withOrderContext(supabase: SupabaseClient, tasks: StaffTask[]): Promise<StaffTask[]> {
+export async function withOrderContext(supabase: SupabaseClient, tasks: StaffTask[]): Promise<StaffTask[]> {
   // Only orders still open: a shipped or cancelled order has nothing left to decide,
   // and put-back tasks are about pieces, not shipping.
   const ids = tasks.filter((t) => !t.auto).map((t) => t.orderId).filter(Boolean) as string[];
@@ -174,6 +189,8 @@ export async function listAllTasks(supabase: SupabaseClient, days = 14): Promise
     .from('staff_tasks')
     .select(SELECT)
     .or(`status.eq.open,created_at.gte.${since}`)
+    // Order notes have their own lists (sent by me / not seen in 2 hours).
+    .or('kind.is.null,kind.neq.note')
     .order('created_at', { ascending: false })
     .limit(500);
   if (error) throw error;
@@ -226,10 +243,10 @@ export async function createTask(
   return (data || []).map((r) => r.id as string);
 }
 
-async function getRow(supabase: SupabaseClient, id: string) {
+export async function getRow(supabase: SupabaseClient, id: string) {
   const { data, error } = await supabase
     .from('staff_tasks')
-    .select('id, message, status, assignee_ids, assignee_name, assigned_by_name, seen_at, order_id, kind')
+    .select('id, message, status, assignee_ids, assignee_name, assigned_by_name, seen_at, order_id, kind, needs_answer, sender_ids')
     .eq('id', id)
     .maybeSingle();
   if (error) throw error;
@@ -244,9 +261,16 @@ export async function markSeen(supabase: SupabaseClient, id: string, caller: Tas
   const row = await getRow(supabase, id);
   if (!row.assignee_ids.includes(caller.id)) throw new TaskError('This task is not yours');
   if (row.seen_at) return;
+  const now = new Date().toISOString();
+  // "Pasabi lang po" note: seeing it is all it needs.
+  const closes = row.kind === 'note' && row.needs_answer === false && row.status === 'open';
   const { error } = await supabase
     .from('staff_tasks')
-    .update({ seen_at: new Date().toISOString(), seen_by_name: caller.name })
+    .update({
+      seen_at: now,
+      seen_by_name: caller.name,
+      ...(closes ? { status: 'done', done_at: now, done_by_name: caller.name } : {}),
+    })
     .eq('id', id);
   if (error) throw error;
 }
@@ -263,6 +287,8 @@ type BellRow = { id: string; message: string; order_id: string | null; assigned_
 async function bellOwner(supabase: SupabaseClient, row: BellRow, caller: TaskCaller, title: string, note: string | null) {
   // Automatic put-back task (order cancelled): the owners see it on the Tasks
   // page; only a problem ("can't find the pieces") is worth a bell.
+  // Order notes: the sender gets a pop-up instead (sales don't watch the bell).
+  if (row.kind === 'note') return;
   const auto = row.kind === 'put_back';
   if (auto && title !== 'Task problem') return;
   const to = auto ? await ownerNames(supabase) : [row.assigned_by_name];
@@ -344,10 +370,12 @@ export async function markDone(
   await bellOwner(supabase, row, caller, 'Task done', note);
 }
 
-/** Owners take a task back (wrong person, not needed anymore). */
+/** Owners take a task back (wrong person, not needed anymore); the writer of a note can too. */
 export async function cancelTask(supabase: SupabaseClient, id: string, caller: TaskCaller): Promise<void> {
-  if (!caller.isManagement) throw new TaskError('Only the owners can cancel a task');
   const row = await getRow(supabase, id);
+  // The person who wrote a note can take it back too.
+  const isSender = row.kind === 'note' && (row.sender_ids || []).includes(caller.id);
+  if (!caller.isManagement && !isSender) throw new TaskError('Only the owners can cancel a task');
   if (row.status !== 'open') throw new TaskError('Only open tasks can be cancelled');
   const { error } = await supabase
     .from('staff_tasks')

@@ -3,17 +3,25 @@
 import Link from 'next/link';
 import { ClipboardCheck } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useMyTasks } from '@/hooks/useStaffTasks';
+import { useMyTasks, useSentNotes } from '@/hooks/useStaffTasks';
 import { useTaskActions } from '@/hooks/useTaskActions';
 import { isLate } from '@/lib/services/staff-tasks/task-dates';
 import { TASKS_PAGE_PATH } from './tasks-nav-badge';
 import { TaskItem } from './task-item';
 
-/** "Mga task ko" on the dashboard: open tasks from the owners until Done. Nothing when there are none. */
+/**
+ * "Mga task ko" on the dashboard: open tasks from the owners until Done, and order
+ * notes sent to me until answered. Plus how many of my own notes are waiting.
+ * Nothing when there are none.
+ */
 export function MyTasksCard() {
   const { active: open } = useMyTasks();
+  const { notes: sent } = useSentNotes();
   const { busyId, handlers, dialogs } = useTaskActions();
-  if (open.length === 0) return null;
+  const waiting = sent.filter((n) => n.status === 'open').length;
+  const answered = sent.filter((n) => n.senderUnread).length;
+  if (open.length === 0 && waiting === 0 && answered === 0) return null;
+  const hasNotes = open.some((t) => t.isNote);
 
   // Late first, then by deadline, then newest.
   const sorted = [...open].sort((a, b) => {
@@ -27,8 +35,16 @@ export function MyTasksCard() {
   return (
     <Card className="border-blue-200 dark:border-blue-900">
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg"><ClipboardCheck className="h-5 w-5 text-blue-600" /> Mga task ko ({open.length})</CardTitle>
-        <CardDescription>From the owners. Tap <b>Tapos na</b> when it&apos;s done. <Link href={TASKS_PAGE_PATH} className="underline">See all</Link></CardDescription>
+        <CardTitle className="flex items-center gap-2 text-lg"><ClipboardCheck className="h-5 w-5 text-blue-600" /> {hasNotes ? "Para sa'yo" : 'Mga task ko'} ({open.length})</CardTitle>
+        <CardDescription>
+          {open.length > 0 && <>Tap <b>Tapos na</b> when it&apos;s done{hasNotes ? <>, or <b>Sumagot</b> on a note</> : null}. </>}
+          {(waiting > 0 || answered > 0) && (
+            <Link href={`${TASKS_PAGE_PATH}#sent-notes`} className="font-medium text-foreground underline">
+              {answered > 0 ? `${answered} note mo may sagot na` : ''}{answered > 0 && waiting > 0 ? ' · ' : ''}{waiting > 0 ? `${waiting} note mo hinihintay ang sagot` : ''}
+            </Link>
+          )}{' '}
+          <Link href={TASKS_PAGE_PATH} className="underline">See all</Link>
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {sorted.map((t) => (

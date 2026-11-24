@@ -13,6 +13,7 @@ import { BorrowDialog, type BorrowTarget } from '@/components/dashboard/picker/b
 import { ReportDamagedDialog } from '@/components/dashboard/supplier-returns/report-damaged-dialog';
 import { ShelfGuardDialog } from '@/components/dashboard/picker/shelf-guard-dialog';
 import { useShelfGuard } from '@/hooks/picker/useShelfGuard';
+import { OrderTasksList } from '@/components/dashboard/tasks/order-tasks-list';
 
 function formatMemoryAge(dateStr?: string): string {
   if (!dateStr) return '';
@@ -170,6 +171,8 @@ export default function PickerApp() {
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-6">
+            {/* Notes sent to someone about this order (owner, 2026-11-25): seen while picking. */}
+            <div className="mb-4 empty:hidden"><OrderTasksList orderId={scannedOrderId} openNotesOnly /></div>
             <form onSubmit={handleSubmitPicking} className="space-y-6">
               
               <div className="space-y-4">

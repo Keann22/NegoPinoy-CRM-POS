@@ -11,6 +11,7 @@ import { useTaskActions } from '@/hooks/useTaskActions';
 import { isLate, phtDateString } from '@/lib/services/staff-tasks/task-dates';
 import { cn } from '@/lib/utils';
 import { TaskItem } from './task-item';
+import { UnseenNotesAlert } from './unseen-notes-list';
 import { TASKS_PAGE_PATH } from './tasks-nav-badge';
 import type { StaffTask } from '@/types/staff-tasks.types';
 
@@ -200,6 +201,7 @@ export function OwnerTasksSummary() {
         </Button>
       </CardHeader>
       <CardContent className="space-y-4">
+        <UnseenNotesAlert />
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-7">
           <Stat {...statProps('open')} />
           <Stat {...statProps('notSeen')} tone="orange" />

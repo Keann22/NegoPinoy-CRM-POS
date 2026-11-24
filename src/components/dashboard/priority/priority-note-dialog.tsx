@@ -10,7 +10,8 @@ import { useSupabase } from '@/lib/supabase/hooks';
 import { useToast } from '@/hooks/use-toast';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useStaffDirectory } from '@/hooks/useStaffDirectory';
-import { postOrderNote } from '@/lib/services/order-note-service';
+import { useSendOrderNote } from '@/hooks/useSendOrderNote';
+import { NO_RECIPIENTS, NoteRecipientPicker, type NoteRecipients } from '@/components/dashboard/tasks/note-recipient-picker';
 import type { PriorityRow } from '@/lib/priority/priority-rules';
 
 /**
@@ -25,8 +26,10 @@ export function PriorityNoteDialog({ row, onClose, onSaved }: { row: PriorityRow
   const [text, setText] = useState('');
   const [mentions, setMentions] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [recipients, setRecipients] = useState<NoteRecipients>(NO_RECIPIENTS);
+  const sendNote = useSendOrderNote();
 
-  useEffect(() => { setText(''); setMentions([]); }, [row?.id]);
+  useEffect(() => { setText(''); setMentions([]); setRecipients(NO_RECIPIENTS); }, [row?.id]);
 
   if (!row) return null;
   const shortId = row.id.slice(0, 7).toUpperCase();
@@ -38,13 +41,12 @@ export function PriorityNoteDialog({ row, onClose, onSaved }: { row: PriorityRow
     if (!supabase || !text.trim() || saving) return;
     setSaving(true);
     try {
-      const res = await postOrderNote(supabase, { orderId: row.id, text, authorName, mentions, staff });
-      if (!res.success) throw new Error(typeof res.error === 'string' ? res.error : 'Could not save the note');
-      toast({ title: mentions.length ? `Note saved — ${mentions.join(', ')} notified` : 'Note saved to the order' });
+      toast({ title: await sendNote({ orderId: row.id, text, authorName, mentions, staff, recipients }) });
       onSaved();
       onClose();
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Could not save the note', description: e.message });
+    } catch (e: unknown) {
+      toast({ variant: 'destructive', title: 'Note not sent', description: e instanceof Error ? e.message : String(e) });
+      onSaved(); // it may have been saved to the order before sending failed
     } finally {
       setSaving(false);
     }
@@ -56,7 +58,7 @@ export function PriorityNoteDialog({ row, onClose, onSaved }: { row: PriorityRow
         <DialogHeader>
           <DialogTitle>Add note</DialogTitle>
           <DialogDescription>
-            #{shortId} · {row.customerName || 'Customer'} — saved to the order&apos;s Activity &amp; Notes. Type @ to tag staff; they get a message.
+            #{shortId} · {row.customerName || 'Customer'} — saved to the order&apos;s Activity &amp; Notes. Pick who it&apos;s for (or type @) and they get a pop-up.
           </DialogDescription>
         </DialogHeader>
         {row.recentNotes[0] && (
@@ -78,6 +80,7 @@ export function PriorityNoteDialog({ row, onClose, onSaved }: { row: PriorityRow
           dropdownPosition="bottom"
           disabled={saving}
         />
+        <NoteRecipientPicker orderId={row.id} value={recipients} onChange={setRecipients} disabled={saving} />
         <DialogFooter className="items-center gap-2 sm:justify-between">
           <Link href={`/dashboard/orders/${row.id}#order-activity`} className="text-xs text-primary underline">
             View all notes{row.noteCount > 0 ? ` (${row.noteCount})` : ''}

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { AlertTriangle, CheckCircle2, Clock, Eye, EyeOff, Hammer, MessageCircle, Package, Users, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, Eye, EyeOff, Hammer, MessageCircle, NotebookPen, Package, Users, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -30,7 +30,7 @@ function Progress({ task }: { task: StaffTask }) {
   if (task.status === 'done' && task.doneAt) {
     return (
       <span className="flex items-center gap-1 text-emerald-700 dark:text-emerald-400">
-        <CheckCircle2 className="h-3.5 w-3.5" />Done {phtWhen(task.doneAt)}{task.doneByName ? ` · ${task.doneByName}` : ''}
+        <CheckCircle2 className="h-3.5 w-3.5" />{task.isNote ? (task.needsAnswer ? 'Answered' : 'Seen') : 'Done'} {phtWhen(task.doneAt)}{task.doneByName ? ` · ${task.doneByName}` : ''}
       </span>
     );
   }
@@ -51,13 +51,22 @@ export function TaskItem({ task, view, busy, onSeen, onProgress, onDone, onCance
   const problem = open && task.progress === 'problem';
   const newReply = view === 'staff' ? task.staffUnread : task.ownerUnread;
   const canReply = !!onReply && task.status !== 'cancelled';
+  const note = task.isNote;
   return (
     <div className={cn(
       'space-y-2 rounded-lg border p-3',
+      note && open && 'border-amber-300 bg-amber-50/60 dark:border-amber-900 dark:bg-amber-950/30',
       due?.late && 'border-red-300 bg-red-50/60 dark:border-red-900 dark:bg-red-950/30',
       problem && 'border-orange-300 bg-orange-50/60 dark:border-orange-900 dark:bg-orange-950/30',
       !open && 'opacity-75'
     )}>
+      {note && (
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          <Badge variant="outline" className="border-amber-400 text-amber-800 dark:text-amber-300"><NotebookPen className="mr-1 h-3 w-3" />Note</Badge>
+          <span className="font-medium text-muted-foreground">{task.needsAnswer ? 'Kailangan ng sagot' : 'Pasabi lang po'}</span>
+          {task.unseenTooLong && <Badge variant="outline" className="border-red-400 text-red-700 dark:text-red-300">Not seen in 2 hours</Badge>}
+        </div>
+      )}
       <div className="flex flex-wrap items-start justify-between gap-2">
         <p className="whitespace-pre-wrap font-medium">{task.message}</p>
         {due && (
@@ -91,7 +100,7 @@ export function TaskItem({ task, view, busy, onSeen, onProgress, onDone, onCance
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
         {view === 'owner'
           ? <span>For <span className="font-medium text-foreground">{task.assigneeName}</span> · from {task.assignedByName} · {phtWhen(task.createdAt)}</span>
-          : <span>From {task.assignedByName}{task.auto ? <> · shared with <span className="font-medium text-foreground">{task.assigneeName}</span></> : null} · {phtWhen(task.createdAt)}</span>}
+          : <span>From {task.assignedByName}{task.auto || task.team ? <> · {task.team ? 'para sa' : 'shared with'} <span className="font-medium text-foreground">{task.assigneeName}</span></> : null} · {phtWhen(task.createdAt)}</span>}
         {(view === 'owner' || !open || task.progress) && <Progress task={task} />}
         {groupProgress && groupProgress.total > 1 && (
           <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{groupProgress.done} of {groupProgress.total} done</span>
@@ -125,7 +134,7 @@ export function TaskItem({ task, view, busy, onSeen, onProgress, onDone, onCance
           {canReply && (
             <Button size="sm" variant={newReply ? 'default' : 'outline'} disabled={busy} onClick={() => onReply?.(task)}>
               <MessageCircle className="mr-1.5 h-4 w-4" />
-              {newReply ? 'Read reply' : view === 'staff' ? 'Magtanong' : 'Reply'}
+              {newReply ? 'Read reply' : view === 'staff' ? (note ? 'Sumagot' : 'Magtanong') : 'Reply'}
               {task.messageCount > 0 && <span className="ml-1 opacity-70">({task.messageCount})</span>}
             </Button>
           )}
@@ -134,24 +143,24 @@ export function TaskItem({ task, view, busy, onSeen, onProgress, onDone, onCance
               <Eye className="mr-1.5 h-4 w-4" />Nakita ko
             </Button>
           )}
-          {open && onProgress && task.progress !== 'working' && (
+          {open && onProgress && !note && task.progress !== 'working' && (
             <Button size="sm" variant="outline" disabled={busy} className="border-sky-300 text-sky-800 dark:text-sky-300" onClick={() => onProgress(task, 'working')}>
               <Hammer className="mr-1.5 h-4 w-4" />Ginagawa na
             </Button>
           )}
-          {open && onProgress && task.progress !== 'problem' && (
+          {open && onProgress && !note && task.progress !== 'problem' && (
             <Button size="sm" variant="outline" disabled={busy} className="border-orange-300 text-orange-800 dark:text-orange-300" onClick={() => onProgress(task, 'problem')}>
               <AlertTriangle className="mr-1.5 h-4 w-4" />May problema
             </Button>
           )}
-          {open && onDone && (
+          {open && onDone && (!note || task.needsAnswer) && (
             <Button size="sm" disabled={busy} className="bg-emerald-600 hover:bg-emerald-700" onClick={() => onDone(task)}>
               <CheckCircle2 className="mr-1.5 h-4 w-4" />Tapos na
             </Button>
           )}
           {open && onCancel && (
             <Button size="sm" variant="ghost" disabled={busy} className="text-muted-foreground" onClick={() => onCancel(task)}>
-              <XCircle className="mr-1.5 h-4 w-4" />Cancel task
+              <XCircle className="mr-1.5 h-4 w-4" />{note ? 'Bawiin' : 'Cancel task'}
             </Button>
           )}
         </div>

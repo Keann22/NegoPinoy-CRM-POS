@@ -7,7 +7,8 @@ import { MentionInput } from '@/components/dashboard/mention-input';
 import { useSupabase } from '@/lib/supabase/hooks';
 import { useToast } from '@/hooks/use-toast';
 import { useUserProfile } from '@/hooks/useUserProfile';
-import { postOrderNote } from '@/lib/services/order-note-service';
+import { useSendOrderNote } from '@/hooks/useSendOrderNote';
+import { NO_RECIPIENTS, NoteRecipientPicker, type NoteRecipients } from './note-recipient-picker';
 
 interface Props {
   orderId: string;
@@ -29,6 +30,8 @@ export function ReadyToPickNoteSection({ orderId, notes, staff, onSaved }: Props
   const [text, setText] = useState('');
   const [mentions, setMentions] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [recipients, setRecipients] = useState<NoteRecipients>(NO_RECIPIENTS);
+  const sendNote = useSendOrderNote();
 
   const authorName = userProfile
     ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() || userProfile.email || 'Staff'
@@ -38,11 +41,10 @@ export function ReadyToPickNoteSection({ orderId, notes, staff, onSaved }: Props
     if (!supabase || !text.trim() || saving) return;
     setSaving(true);
     try {
-      const res = await postOrderNote(supabase, { orderId, text, authorName, mentions, staff });
-      if (!res.success) throw new Error(typeof res.error === 'string' ? res.error : 'Could not save note');
-      toast({ title: mentions.length ? `Note saved — ${mentions.join(', ')} notified` : 'Note saved to order' });
+      toast({ title: await sendNote({ orderId, text, authorName, mentions, staff, recipients }) });
       setText('');
       setMentions([]);
+      setRecipients(NO_RECIPIENTS);
       setComposing(false);
       onSaved();
     } catch (e: unknown) {
@@ -109,6 +111,7 @@ export function ReadyToPickNoteSection({ orderId, notes, staff, onSaved }: Props
             dropdownPosition="bottom"
             disabled={saving}
           />
+          <NoteRecipientPicker orderId={orderId} value={recipients} onChange={setRecipients} disabled={saving} />
           <div className="flex justify-end gap-2">
             <Button
               type="button"
