@@ -27,19 +27,19 @@ Both must keep this file current. Dates and times are Philippine time (UTC+8).
 
 Format: `- **Task** (Agent, started YYYY-MM-DD). Files/area. Status.`
 
-- **Wala sa Supplier: prompts card on the Dashboard** (agent unknown, found
+- **Wala sa Supplier: prompts card on the Dashboard** (Antigravity, found
   uncommitted 2026-11-25). `src/components/dashboard/supplier-stock/supplier-prompts-card.tsx`
   (new), `src/hooks/useSupplierFlags.ts` (shared `useSupplierPrompts`),
   `supplier-stock-popup.tsx`, `supplier-flag-dialog.tsx`, `supplier-stock/page.tsx`,
   `src/app/dashboard/page.tsx`, `src/app/dashboard/layout.tsx` (Wala sa Supplier and
-  Pabilang as top-level menu items). Status: not committed; owner of this work
-  should confirm it is finished, run typecheck, commit.
-- **Bundle recipe self-loop guard + typo check on shelf counts** (agent unknown,
+  Pabilang as top-level menu items). Status: not committed; Antigravity to
+  confirm it is finished, run typecheck, commit.
+- **Bundle recipe self-loop guard + typo check on shelf counts** (Antigravity,
   found uncommitted 2026-11-25). `src/lib/services/procurement-service.ts`,
   `src/app/api/inventory/procurement-request/route.ts` (skip a recipe component that
   points to itself), `InventoryGuardianAlertModal.tsx`, `alert-review-adjust-dialog.tsx`
   (confirm counts of 500+, round to whole pieces). Status: not committed.
-- **Messenger backfill + comment access check** (agent unknown, found uncommitted
+- **Messenger backfill + comment access check** (Antigravity, found uncommitted
   2026-11-25). `supabase/functions/facebook-webhook/index.ts`, `sync.ts`
   (`backfill_conversations`, `comments_check`, auto-link / fill customer details).
   Status: not committed; unknown whether the Edge Function was deployed.
