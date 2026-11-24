@@ -9,6 +9,7 @@
  */
 
 import type { ShipHold, SiblingOrder } from '@/lib/services/order-ship-context-service';
+import { isPickDeferred } from '@/lib/shipping/ship-hold-rules';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -88,7 +89,7 @@ export const OS_DECISIONS = {
   remove: 'Remove the item (customer cancelled it)',
 } as const;
 export type OsDecision = keyof typeof OS_DECISIONS;
-export type PriorityStep = 'send_today' | 'send_upload' | 'pack' | 'book' | 'prep' | 'stale' | 'hold' | 'ship_hold' | 'recheck' | MissingState;
+export type PriorityStep = 'send_today' | 'send_upload' | 'pack' | 'book' | 'prep' | 'stale' | 'hold' | 'ship_hold' | 'ship_later' | 'recheck' | MissingState;
 
 export interface MissingItem {
   productId: string;
@@ -214,6 +215,7 @@ export const STEP_LABELS: Record<PriorityStep, string> = {
   stale: 'No activity 30+ days — confirm with customer or cancel',
   hold: 'On hold',
   ship_hold: 'Not for shipping yet: sales is holding it',
+  ship_later: 'Ships on a later date: not picked until 3 days before',
 };
 
 export const OWNER_LABELS: Record<PriorityOwner, string> = {
@@ -314,6 +316,12 @@ function classify(o: PriorityOrderInput, now: Date) {
   if (o.sendToday && o.sendToday.date <= phtDate(now)) {
     const step = ['Packed', 'For Shipping'].includes(o.status) ? 'send_upload' as const : 'send_today' as const;
     return { group: 'send_today' as const, owner: 'warehouse' as const, step, stepSince: o.sendToday.at, dueAt: pickupAt(o.sendToday.date) };
+  }
+
+  // Ships on a later date and not picked yet (owner, 2026-11-25): we run lean,
+  // so it waits until 3 days before and the shelf pieces go to other orders.
+  if (isPickDeferred(o.shipHold?.detail, o.status, phtDate(now))) {
+    return { group: 'hold' as const, owner: 'none' as const, step: 'ship_later' as const, stepSince: o.shipHold?.at || null, dueAt: null };
   }
 
   // Sales held it (waiting for the customer's other orders, payment, a date...):

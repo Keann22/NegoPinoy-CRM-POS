@@ -10,7 +10,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { saveShipHold, useShipHoldForm } from '@/hooks/useShipHolds';
-import { DEFAULT_CHECK_DAYS, addDaysPht, paidEnough, shortPhtDate } from '@/lib/shipping/ship-hold-rules';
+import {
+  DEFAULT_CHECK_DAYS, NOT_PICKED_STATUSES, PICK_LEAD_DAYS, addDaysPht, paidEnough, pickStartsOn, shortPhtDate,
+} from '@/lib/shipping/ship-hold-rules';
 import { cn } from '@/lib/utils';
 import {
   SHIP_HOLD_KINDS, SHIP_HOLD_KIND_ORDER, type ShipHoldFormData, type ShipHoldKind, type ShipVia,
@@ -30,6 +32,8 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved?: () => void;
+  /** Reason picked when the order has no hold yet (the "Hindi pa ipi-pick" answer opens it on "Ipadala sa petsa"). */
+  defaultKind?: ShipHoldKind;
 }
 
 /**
@@ -37,7 +41,7 @@ interface Props {
  * is asked again, and which of the customer's orders ship with it. Replaces the
  * free-text Delay box on Packed Orders.
  */
-export function ShipHoldDialog({ orderId, open, onOpenChange, onSaved }: Props) {
+export function ShipHoldDialog({ orderId, open, onOpenChange, onSaved, defaultKind }: Props) {
   const { form, error, loading } = useShipHoldForm(open ? orderId : null);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -50,19 +54,22 @@ export function ShipHoldDialog({ orderId, open, onOpenChange, onSaved }: Props) 
         </DialogHeader>
         {loading && <p className="text-sm text-muted-foreground">Loading the order…</p>}
         {error && <p className="text-sm text-destructive">{error}</p>}
-        {form && <HoldForm key={form.orderId} form={form} onCancel={() => onOpenChange(false)} onSaved={() => { onSaved?.(); onOpenChange(false); }} />}
+        {form && <HoldForm key={form.orderId} form={form} defaultKind={defaultKind} onCancel={() => onOpenChange(false)} onSaved={() => { onSaved?.(); onOpenChange(false); }} />}
       </DialogContent>
     </Dialog>
   );
 }
 
-function HoldForm({ form, onCancel, onSaved }: { form: ShipHoldFormData; onCancel: () => void; onSaved: () => void }) {
+function HoldForm({ form, defaultKind, onCancel, onSaved }: { form: ShipHoldFormData; defaultKind?: ShipHoldKind; onCancel: () => void; onSaved: () => void }) {
   const { toast } = useToast();
   const h = form.hold;
   const busHint = /bus/i.test(form.holdText || '');
-  const [kind, setKind] = useState<ShipHoldKind | null>(h?.kind || null);
+  const notPicked = NOT_PICKED_STATUSES.includes(form.status);
+  // Not picked yet: the usual reason is "ship on a date" (reserved for later).
+  const firstKind = h?.kind || defaultKind || (notPicked ? 'date' : null);
+  const [kind, setKind] = useState<ShipHoldKind | null>(firstKind);
   const [note, setNote] = useState(h?.note || (!h && form.holdText ? form.holdText : ''));
-  const [checkOn, setCheckOn] = useState(h?.checkOn || addDaysPht(DEFAULT_CHECK_DAYS));
+  const [checkOn, setCheckOn] = useState(h?.checkOn || (firstKind === 'date' ? '' : addDaysPht(DEFAULT_CHECK_DAYS)));
   const [shipVia, setShipVia] = useState<ShipVia>(h?.shipVia || (busHint ? 'bus' : 'courier'));
   const [withIds, setWithIds] = useState<string[]>(
     h?.groupId ? h.orders.map((o) => o.id).filter((id) => id !== form.orderId) : form.others.map((o) => o.id),
@@ -76,6 +83,7 @@ function HoldForm({ form, onCancel, onSaved }: { form: ShipHoldFormData; onCance
   };
 
   const tomorrow = addDaysPht(1);
+  const shipLater = notPicked && kind === 'date' && !!checkOn && checkOn >= tomorrow;
   const needsOrders = kind === 'with_orders' && withIds.length === 0;
   const canSave = !!kind && !!checkOn && checkOn >= tomorrow && !needsOrders && (kind !== 'other' || note.trim().length > 0);
   const unpaidByBus = kind === 'with_orders' && shipVia === 'bus'
@@ -87,7 +95,7 @@ function HoldForm({ form, onCancel, onSaved }: { form: ShipHoldFormData; onCance
     setSaving(true);
     try {
       await saveShipHold({ orderId: form.orderId, kind, note, checkOn, shipVia, withOrderIds: kind === 'with_orders' ? withIds : [] });
-      toast({ title: 'Naka-hold', description: `We'll ask again on ${shortPhtDate(checkOn)}${kind === 'with_orders' ? ', or as soon as every order is packed and paid' : kind === 'payment' ? ', or as soon as it is paid' : ''}.` });
+      toast({ title: 'Naka-hold', description: shipLater ? `Not picked until ${shortPhtDate(pickStartsOn(checkOn))}, ships ${shortPhtDate(checkOn)}.` : `We'll ask again on ${shortPhtDate(checkOn)}${kind === 'with_orders' ? ', or as soon as every order is packed and paid' : kind === 'payment' ? ', or as soon as it is paid' : ''}.` });
       onSaved();
     } catch (e) {
       toast({ variant: 'destructive', title: 'Not saved', description: e instanceof Error ? e.message : String(e) });
@@ -161,6 +169,15 @@ function HoldForm({ form, onCancel, onSaved }: { form: ShipHoldFormData; onCance
           <Label htmlFor="hold-check">{kind === 'date' ? 'Ipadala sa' : 'Tanungin ulit sa'}</Label>
           <Input id="hold-check" type="date" min={tomorrow} value={checkOn} onChange={(e) => setCheckOn(e.target.value)} className="w-48" />
           {checkOn && checkOn < tomorrow && <p className="text-xs font-medium text-amber-800 dark:text-amber-300">Pick a date after today.</p>}
+          {notPicked && kind === 'date' && (
+            <p className="rounded-md bg-sky-50 px-2 py-1.5 text-xs text-sky-900 dark:bg-sky-950/40 dark:text-sky-200">
+              Hindi pa ito na-pick, kaya hindi muna ipi-pick.{' '}
+              {shipLater
+                ? `Babalik sa pick list sa ${shortPhtDate(pickStartsOn(checkOn))} (${PICK_LEAD_DAYS} araw bago).`
+                : `Babalik sa pick list ${PICK_LEAD_DAYS} araw bago ang petsa.`}{' '}
+              Hanggang doon, puwedeng gamitin ng ibang order ang stock sa shelf, at bibilhin lang ito malapit na sa petsa.
+            </p>
+          )}
           <p className="text-xs text-muted-foreground">
             The sales agent gets a pop-up that day (&ldquo;Ready na ba?&rdquo;). Owners see it if there&apos;s no answer after 3 days.
           </p>

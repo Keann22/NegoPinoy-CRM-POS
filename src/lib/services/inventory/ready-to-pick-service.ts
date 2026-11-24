@@ -1,7 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { fetchAllPages, layawayItemsPaid } from '../procurement-demand-service';
 import { getUnpickedQtyMap, shelfNumberOf } from './shelf-stock-service';
-import type { ReadyToPickItem, ReadyToPickOrder, ReadyToPickResponse } from '@/types/ready-to-pick.types';
+import { getDeferredPicks, getOpenPickSkips } from '../shipping/pick-skip-service';
+import { PICK_SKIP_REASONS } from '@/types/pick-skips.types';
+import type { ReadyToPickItem, ReadyToPickOrder, ReadyToPickParked, ReadyToPickResponse } from '@/types/ready-to-pick.types';
 
 const MIN_LAYAWAY_PAID_RATIO = 0.9;
 const CHUNK = 200;
@@ -34,6 +36,48 @@ function isOrderPaid(o: any): boolean {
   return o.payment_method === 'Lay-away' && layawayItemsPaid(o);
 }
 
+interface ParkableOrder {
+  id: string;
+  status: string;
+  sales_person_name: string | null;
+  customers?: { full_name: string | null } | { full_name: string | null }[] | null;
+}
+
+function customerNameOf(o: Pick<ParkableOrder, 'customers'>): string {
+  const customer = Array.isArray(o.customers) ? o.customers[0] : o.customers;
+  return String(customer?.full_name || 'Unknown').replace(/\s+/g, ' ').trim();
+}
+
+function parkedBase(o: ParkableOrder): Omit<ReadyToPickParked, 'note'> {
+  return {
+    id: String(o.id),
+    orderNo: String(o.id).slice(0, 7).toUpperCase(),
+    status: String(o.status),
+    customerName: customerNameOf(o),
+    salesPersonName: o.sales_person_name ? String(o.sales_person_name) : null,
+  };
+}
+
+/**
+ * Orders left off the list for now (owner, 2026-11-25): a "ship on a date" hold
+ * that's too early to pick, or a "Hindi pa ipi-pick" question sales hasn't answered.
+ */
+async function parkOrders<T extends ParkableOrder>(supabase: SupabaseClient, orders: T[]) {
+  const [deferred, skips] = await Promise.all([getDeferredPicks(supabase), getOpenPickSkips(supabase)]);
+  const shipLater: ReadyToPickParked[] = [];
+  const askedSales: ReadyToPickParked[] = [];
+  const keep: T[] = [];
+  for (const o of orders) {
+    const d = deferred.get(String(o.id));
+    const q = skips.get(String(o.id));
+    if (d) shipLater.push({ ...parkedBase(o), shipOn: d.shipOn, pickFrom: d.pickFrom, note: d.note });
+    else if (q) askedSales.push({ ...parkedBase(o), reasonLabel: PICK_SKIP_REASONS[q.reason].label, note: q.note, byName: q.byName, at: q.at });
+    else keep.push(o);
+  }
+  shipLater.sort((a, b) => String(a.shipOn).localeCompare(String(b.shipOn)));
+  return { keep, shipLater, askedSales };
+}
+
 function isEligibleOrder(o: any): boolean {
   if (o.payment_method !== 'Lay-away') return true;
   if (isOrderPaid(o)) return true;
@@ -54,6 +98,7 @@ async function fetchInChunks<T>(ids: string[], run: (chunk: string[]) => Promise
  *
  * Rules:
  * - Excludes On-Hold orders and Lay-aways under 90% paid.
+ * - Ship-later orders and "Hindi pa ipi-pick" questions are listed apart.
  * - Uses products.shelf_stock via shelfNumberOf() (fallback: locked formula).
  * - Expands bundle/set products into their component SKUs.
  * - Allocates scarce shelf stock Paid-first, then oldest-first, so two orders
@@ -70,10 +115,11 @@ export async function getReadyToPickOrders(supabase: SupabaseClient): Promise<Re
       .range(from, to)
   );
 
-  const eligible = orders.filter(isEligibleOrder);
-  if (eligible.length === 0) {
-    return { generatedAt: new Date().toISOString(), pickedWithIssue: [], processing: [], contendedCount: 0 };
-  }
+  const parked = await parkOrders(supabase, orders.filter(isEligibleOrder));
+  const { shipLater, askedSales } = parked;
+  const eligible = parked.keep;
+  const empty = { generatedAt: new Date().toISOString(), pickedWithIssue: [], processing: [], contendedCount: 0, shipLater, askedSales };
+  if (eligible.length === 0) return empty;
 
   const pwiIds = eligible.filter((o) => o.status === 'Picked (with issue)').map((o) => o.id as string);
   const procIds = eligible.filter((o) => o.status === 'Processing').map((o) => o.id as string);
@@ -146,9 +192,7 @@ export async function getReadyToPickOrders(supabase: SupabaseClient): Promise<Re
   const initialProductIds = Array.from(
     new Set(Array.from(rawByOrder.values()).flat().map((r) => r.productId))
   );
-  if (initialProductIds.length === 0) {
-    return { generatedAt: new Date().toISOString(), pickedWithIssue: [], processing: [], contendedCount: 0 };
-  }
+  if (initialProductIds.length === 0) return empty;
 
   const initialProducts = await fetchInChunks(initialProductIds, (chunk) =>
     fetchAllPages<any>((from, to) =>
@@ -233,13 +277,12 @@ export async function getReadyToPickOrders(supabase: SupabaseClient): Promise<Re
     if (!allAvailable || items.length === 0) continue;
 
     items.sort((a, b) => a.name.localeCompare(b.name));
-    const customer = Array.isArray(o.customers) ? o.customers[0] : o.customers;
     candidates.push({
       id: String(o.id),
       orderNo: String(o.id).slice(0, 7).toUpperCase(),
       status: o.status,
       orderDate: String(o.order_date || o.created_at),
-      customerName: String(customer?.full_name || 'Unknown').replace(/\s+/g, ' ').trim(),
+      customerName: customerNameOf(o),
       paymentMethod: String(o.payment_method || ''),
       isPaid: isOrderPaid(o),
       paidPercent: Math.min(100, Math.round(paidRatioOf(o) * 100)),
@@ -282,5 +325,7 @@ export async function getReadyToPickOrders(supabase: SupabaseClient): Promise<Re
     pickedWithIssue: fillable.filter((o) => o.status === 'Picked (with issue)'),
     processing: fillable.filter((o) => o.status === 'Processing'),
     contendedCount,
+    shipLater,
+    askedSales,
   };
 }

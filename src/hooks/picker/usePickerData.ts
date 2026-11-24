@@ -5,6 +5,8 @@ import { handleStockStatusTransition } from '@/lib/services/orders/order-update'
 import type { OrderItem, PickGroup, PickRow, ProductMemoryHint } from './types';
 import { fetchProductMemoriesForPicker } from './pickerMemoryHelper';
 import { usePickMarks } from './usePickMarks';
+import { fetchPickDeferral } from '@/hooks/usePickSkips';
+import { shortPhtDate } from '@/lib/shipping/ship-hold-rules';
 
 export function usePickerData(
   supabase: SupabaseClient | null,
@@ -33,6 +35,20 @@ export function usePickerData(
 
   const handleScanSuccess = async (orderId: string) => {
     if (!supabase) return;
+    // Ships on a later date (owner, 2026-11-25): don't pick it yet, the shelf
+    // pieces can go to other orders. The picker can still go ahead.
+    const later = await fetchPickDeferral(orderId);
+    if (later && !window.confirm(
+      `Ipapadala pa ito sa ${shortPhtDate(later.shipOn)}${later.note ? ` (${later.note})` : ''}.
+`
+      + `Huwag munang i-pick hanggang ${shortPhtDate(later.pickFrom)}: puwedeng gamitin ng ibang order ang stock.
+
+`
+      + 'I-pick pa rin?'
+    )) {
+      setScannedOrderId(null);
+      return;
+    }
     setLoading(true);
     setScannedOrderId(orderId);
     resetData();

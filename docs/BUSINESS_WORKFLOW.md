@@ -700,6 +700,41 @@ How it works (built 2026-11-20):
   other). Ask date today (December ones: Dec 1), so each agent first sees 10-12
   old holds to review. Backup: scripts/reports/2026-11-24-ship-hold-conversion-backup.json.
 
+## Ship later: don't pick yet (owner, 2026-11-25; built 2026-11-25)
+
+- Some orders are **reserved** or ship on a **later date** ("reserve for
+  December", "NOV21 SHIPPING ONWARDS"). Staff kept skipping them on Ready to
+  Pick, but the reason was only in the notes, so they stayed on every list.
+  Found 2026-11-25: 7 orders on Ready to Pick → Picked (with issue): 2 said
+  reserved, 1 had a released hold, **4 had no reason saved**. 21 unpicked orders
+  had "reserved / ship on a date" only in their notes.
+- **We run lean, so an order that ships later isn't picked yet.** Sales sets
+  **Ipadala sa petsa** (the ship date) on the unpicked order: Priority card
+  **Ipadala sa ibang petsa**, or the hold dialog (it opens on that reason for
+  unpicked orders). Until **3 days before** that date the order is off Ready to
+  Pick (listed under "Ipapadala pa sa ibang petsa"), on the Priority List under
+  On hold, and **not on Need to Buy**. Its shelf pieces stay free for other
+  orders; we buy close to the date if the shelf is short then.
+- 3 days before, it comes back to picking and Need to Buy by itself. After it's
+  packed, the usual **Ready na ba?** pop-up comes on the ship date.
+- The Picker warns if someone scans it early ("I-pick pa rin?"); they can
+  still go ahead.
+- **Need it kept aside now** (paid, or hard to get again): pick it now, then
+  hold the packed order as before.
+- **Hindi pa ipi-pick** (Ready to Pick): staff who skip an order must say why
+  (reserved / later date, or Iba pa with a note). The order's **sales agent
+  gets a pop-up** (with the held-orders pop-up): **Ipadala sa petsa…** (set the
+  date), **I-pick na ngayon** (back on Ready to Pick), or **Asked customer,
+  waiting** (back in 4 hours). Owners see it after 3 days with no answer or when
+  the order has no agent. Until answered, the order is under "Hinihintay ang
+  sagot ng sales" on Ready to Pick. Wrong or missing items still go through the
+  Picker as OS.
+- 2026-11-25: the 21 note-only orders were turned into these questions for
+  their sales agents (undo in
+  `scripts/migrations/2026-11-25_convert_reserved_notes_to_pick_questions.sql`).
+- **Free to sell still counts ship-later orders** (it comes from `stock_level`,
+  which orders lower when they're made). Not changed yet.
+
 ## Being decided (not built yet)
 
 - **Customer purchase planner (owner, 2026-11-01)**: a premium feature on the

@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { ALL_OPEN_STATUSES, UNFULFILLED_STATUSES } from './procurement-service';
+import { getDeferredPicks } from './shipping/pick-skip-service';
 
 export async function fetchAllPages<T>(
   fetcher: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: any }>
@@ -146,6 +147,9 @@ export async function calculateProcurementDemand(
   }
 
   const openIssueKeys = new Set(openIssues?.map((i: any) => `${i.order_id}-${i.product_id}`));
+  // Ships on a later date, more than 3 days away (owner, 2026-11-25): not bought
+  // for yet. We run lean; it comes back on Need to Buy 3 days before.
+  const shipLaterIds = new Set((await getDeferredPicks(supabase)).keys());
   // Pieces still missing per order + product. A line of 2 where the picker found 1
   // needs 1 bought, not 2 (found 2026-11-20: #9A913A04 pitcher counted as 2).
   // Shared across lines of the same product on one order, so it is used once.
@@ -187,6 +191,7 @@ export async function calculateProcurementDemand(
   const isUnfulfilledFor = (row: any, targetProductId: string): boolean => {
     // Lay-away still being paid off: consume stock, but don't auto-buy.
     if (row.orders.payment_method === 'Lay-away' && !layawayItemsPaid(row.orders)) return false;
+    if (shipLaterIds.has(row.orders.id)) return false;
     if (row.orders.status === 'Picked (with issue)') {
       return (
         openIssueKeys.has(`${row.orders.id}-${targetProductId}`) ||

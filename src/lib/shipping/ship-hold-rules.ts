@@ -65,6 +65,27 @@ export function addDaysPht(days: number, now = new Date()): string {
   return phtToday(new Date(now.getTime() + days * 86400000));
 }
 
+/**
+ * Ship later (owner, 2026-11-25): we run lean, so an order the customer wants
+ * shipped on a later date isn't picked yet. Until a few days before that date
+ * the shelf pieces stay free for other orders and it isn't bought for.
+ */
+export const PICK_LEAD_DAYS = 3;
+/** Orders with pieces still to take off the shelf. */
+export const NOT_PICKED_STATUSES = ['Pending Payment', 'Processing', 'Waiting for Stock', 'On-Hold', 'Picked (with issue)'];
+
+/** The day picking starts for an order that ships on `shipOn` (YYYY-MM-DD). */
+export function pickStartsOn(shipOn: string): string {
+  return phtToday(new Date(new Date(`${shipOn}T12:00:00+08:00`).getTime() - PICK_LEAD_DAYS * 86400000));
+}
+
+/** A "ship on a date" hold on an order not picked yet, and it's too early to pick. */
+export function isPickDeferred(
+  hold: { kind: string; checkOn: string } | null | undefined, status: string, today = phtToday(),
+): boolean {
+  return !!hold && hold.kind === 'date' && NOT_PICKED_STATUSES.includes(status) && today < pickStartsOn(hold.checkOn);
+}
+
 /** Short label like "Nov 30". */
 export function shortPhtDate(ymd: string): string {
   return new Intl.DateTimeFormat('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric' })

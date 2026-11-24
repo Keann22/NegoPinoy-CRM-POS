@@ -85,6 +85,9 @@ and new BUSINESS_WORKFLOW.md sections (Customer profile, Copilot).
 
 Newest first. Older history: `git log`. Feature rules: `docs/BUSINESS_WORKFLOW.md`.
 
+- **2026-11-25** Ship later: "Ipadala sa petsa" on unpicked orders keeps them off
+  picking and Need to Buy until 3 days before; "Hindi pa ipi-pick" on Ready to
+  Pick asks sales (pop-up); 21 note-only reserved orders converted. (Claude, HASH)
 - **2026-11-25** Progress board created (this file) and the update rule added to
   `.agents/AGENTS.md` and `CLAUDE.md`. (Claude)
 - **2026-11-24** Reprint area shows in print; confirm before clearing change alerts (2145984).

@@ -6,6 +6,7 @@ import {
   SHIP_HOLD_KINDS, type NewShipHold, type ShipHoldAnswer, type ShipHoldDetail, type ShipHoldFormData,
   type ShipHoldKind, type ShipHoldPrompt, type ShipVia,
 } from '@/types/ship-holds.types';
+import { resolvePickSkips } from './pick-skip-service';
 
 /*
  * Structured "not for shipping yet" holds (owner, 2026-11-24, phase 2).
@@ -174,6 +175,8 @@ export async function setShipHold(supabase: SupabaseClient, input: NewShipHold, 
     reason: holdText(input.kind, input.note, withIds.map(shortOrderId), input.shipVia),
     kind: input.kind, checkOn: input.checkOn, shipVia: input.shipVia, groupId,
   });
+  // Answers the warehouse's "Hindi pa ipi-pick" question, if there was one.
+  await resolvePickSkips(supabase, ids, 'held', actorName);
 }
 
 /** The hold's whole group (or just the hold). */

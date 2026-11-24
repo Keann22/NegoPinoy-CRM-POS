@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Ban, BadgeCheck, ChevronDown, Clock, Flame, MessageSquarePlus, PauseCircle, PlayCircle, Truck, X, Lock } from 'lucide-react';
+import { Ban, BadgeCheck, CalendarClock, ChevronDown, Clock, Flame, MessageSquarePlus, PauseCircle, PlayCircle, Truck, X, Lock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -76,7 +76,8 @@ function timer(row: PriorityRow): { text: string; tone: 'late' | 'today' | 'ok' 
 
 export type RowAction = PriorityAction | 'clear_hold' | 'unmark' | 'unurgent' | 'unreserve' | 'note' | 'ship_hold' | 'ship_release';
 
-/** Picked or later: "Hindi pa ipapadala" sets a structured ship hold (phase 2, 2026-11-24). */
+/** Picked or later: "Hindi pa ipapadala" sets a structured ship hold (phase 2, 2026-11-24).
+ * Not picked yet: "Ipadala sa ibang petsa" (ship later, 2026-11-25) keeps it off picking until 3 days before. */
 const CAN_SHIP_HOLD = ['Picked', 'Photo', 'Packed', 'For Shipping'];
 
 /** Orders that still have items to take off the shelf (a reservation only matters then). */
@@ -310,6 +311,11 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
             {canEdit && CAN_SHIP_HOLD.includes(row.status) && !row.shipHold?.bus && (
               <Button size="sm" variant="outline" className="h-8" onClick={() => onAction(row, 'ship_hold')}>
                 <PauseCircle className="mr-1.5 h-4 w-4" />{row.shipHold ? 'Change hold' : 'Hindi pa ipapadala'}
+              </Button>
+            )}
+            {canEdit && NEEDS_PICKING.includes(row.status) && !row.shipHold?.bus && (
+              <Button size="sm" variant="outline" className="h-8" onClick={() => onAction(row, 'ship_hold')}>
+                <CalendarClock className="mr-1.5 h-4 w-4" />{row.shipHold?.detail ? 'Change hold' : 'Ipadala sa ibang petsa'}
               </Button>
             )}
             {canEdit && row.hold && (
