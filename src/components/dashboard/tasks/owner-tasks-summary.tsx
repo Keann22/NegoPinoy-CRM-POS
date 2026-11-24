@@ -1,19 +1,56 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, ArrowRight, ClipboardCheck, MessageCircle } from 'lucide-react';
+import { AlertTriangle, ArrowRight, ClipboardCheck, MessageCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { TASKS_CHANGED_EVENT, useAllTasks } from '@/hooks/useStaffTasks';
+import { useToast } from '@/hooks/use-toast';
+import { actOnTask, TASKS_CHANGED_EVENT, useAllTasks } from '@/hooks/useStaffTasks';
+import { useTaskActions } from '@/hooks/useTaskActions';
 import { isLate, phtDateString } from '@/lib/services/staff-tasks/task-dates';
 import { cn } from '@/lib/utils';
+import { TaskItem } from './task-item';
 import { TASKS_PAGE_PATH } from './tasks-nav-badge';
 import type { StaffTask } from '@/types/staff-tasks.types';
 
 interface PersonRow { name: string; open: number; late: number; problem: number; doneToday: number }
 
-function Stat({ label, value, tone }: { label: string; value: number; tone?: 'red' | 'orange' | 'blue' | 'green' }) {
+const PICKED_LIST_ID = 'owner-tasks-picked';
+
+type StatKey = 'open' | 'notSeen' | 'working' | 'problem' | 'late' | 'replies' | 'doneToday';
+
+const STAT_LABEL: Record<StatKey, string> = {
+  open: 'Open',
+  notSeen: 'Not seen yet',
+  working: 'Working on it',
+  problem: 'Problem',
+  late: 'Late',
+  replies: 'New replies',
+  doneToday: 'Done today',
+};
+
+/** Which tasks each number counts. The numbers and the lists both use this, so they always agree. */
+function inStat(key: StatKey, t: StaffTask, today: string): boolean {
+  const open = t.status === 'open';
+  switch (key) {
+    case 'open': return open;
+    case 'notSeen': return open && !t.seenAt;
+    case 'working': return open && t.progress === 'working';
+    case 'problem': return open && t.progress === 'problem';
+    case 'late': return open && isLate(t.dueAt);
+    case 'replies': return t.ownerUnread;
+    case 'doneToday': return t.status === 'done' && !!t.doneAt && phtDateString(new Date(t.doneAt)) === today;
+  }
+}
+
+function Stat({ label, value, tone, active, onClick }: {
+  label: string;
+  value: number;
+  tone?: 'red' | 'orange' | 'blue' | 'green';
+  active: boolean;
+  onClick: () => void;
+}) {
   const color = value === 0 ? 'text-muted-foreground' : {
     red: 'text-red-700 dark:text-red-400',
     orange: 'text-orange-700 dark:text-orange-400',
@@ -21,16 +58,46 @@ function Stat({ label, value, tone }: { label: string; value: number; tone?: 're
     green: 'text-emerald-700 dark:text-emerald-400',
   }[tone || 'blue'] || '';
   return (
-    <div className="rounded-lg border p-3">
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={value === 0}
+      aria-pressed={active}
+      title={value === 0 ? undefined : 'Show these tasks'}
+      className={cn(
+        'rounded-lg border p-3 text-left transition-colors',
+        value > 0 ? 'cursor-pointer hover:bg-muted' : 'cursor-default',
+        active && 'border-primary bg-muted ring-2 ring-primary'
+      )}
+    >
       <div className={cn('text-2xl font-bold tabular-nums', tone ? color : '')}>{value}</div>
       <div className="text-xs text-muted-foreground">{label}</div>
-    </div>
+    </button>
+  );
+}
+
+/** A number in the per-staff table: tap to list that person's tasks. */
+function PersonCount({ value, className, onClick }: { value: number; className?: string; onClick: () => void }) {
+  if (value === 0) return <span className={cn('tabular-nums', className)}>0</span>;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn('tabular-nums underline decoration-dotted underline-offset-4 hover:text-primary', className)}
+    >
+      {value}
+    </button>
   );
 }
 
 /** Owners' dashboard: how the tasks given to staff stand, and what's waiting on the owners. */
 export function OwnerTasksSummary() {
+  const { toast } = useToast();
   const { tasks, reload } = useAllTasks(true);
+  const thread = useTaskActions('owner');
+  // Tapped number: list the tasks it counts (all staff, or one person from the table).
+  const [picked, setPicked] = useState<{ key: StatKey; person: string | null } | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
     const onChange = () => { void reload().catch(() => undefined); };
@@ -42,7 +109,7 @@ export function OwnerTasksSummary() {
   const s = useMemo(() => {
     const today = phtDateString();
     const open = tasks.filter((t) => t.status === 'open');
-    const doneToday = tasks.filter((t) => t.status === 'done' && t.doneAt && phtDateString(new Date(t.doneAt)) === today);
+    const doneToday = tasks.filter((t) => inStat('doneToday', t, today));
     const needsYou: StaffTask[] = tasks
       .filter((t) => t.ownerUnread || (t.status === 'open' && t.progress === 'problem'))
       .slice(0, 5);
@@ -56,27 +123,77 @@ export function OwnerTasksSummary() {
       byPerson.set(t.assigneeName, r);
     });
     doneToday.forEach((t) => { const r = row(t.assigneeName); r.doneToday += 1; byPerson.set(t.assigneeName, r); });
+    const count = (key: StatKey) => tasks.filter((t) => inStat(key, t, today)).length;
     return {
-      open: open.length,
-      notSeen: open.filter((t) => !t.seenAt).length,
-      working: open.filter((t) => t.progress === 'working').length,
-      problem: open.filter((t) => t.progress === 'problem').length,
-      late: open.filter((t) => isLate(t.dueAt)).length,
-      replies: tasks.filter((t) => t.ownerUnread).length,
-      doneToday: doneToday.length,
+      counts: {
+        open: open.length,
+        notSeen: count('notSeen'),
+        working: count('working'),
+        problem: count('problem'),
+        late: count('late'),
+        replies: count('replies'),
+        doneToday: doneToday.length,
+      } as Record<StatKey, number>,
       needsYou,
       people: Array.from(byPerson.values()).sort((a, b) => b.late - a.late || b.open - a.open),
     };
   }, [tasks]);
 
+  const pickedTasks = useMemo(() => {
+    if (!picked) return [];
+    const today = phtDateString();
+    // Deadline first (late ones on top), then oldest.
+    return tasks
+      .filter((t) => inStat(picked.key, t, today) && (!picked.person || t.assigneeName === picked.person))
+      .sort((a, b) => (a.dueAt || '9999').localeCompare(b.dueAt || '9999') || a.createdAt.localeCompare(b.createdAt));
+  }, [picked, tasks]);
+
+  // Same task given to several people (one copy each): "2 of 3 done".
+  const groups = useMemo(() => {
+    const m = new Map<string, { done: number; total: number }>();
+    tasks.forEach((t) => {
+      if (!t.groupId || t.status === 'cancelled') return;
+      const g = m.get(t.groupId) || { done: 0, total: 0 };
+      g.total += 1;
+      if (t.status === 'done') g.done += 1;
+      m.set(t.groupId, g);
+    });
+    return m;
+  }, [tasks]);
+
+  const pick = (key: StatKey, person: string | null = null) => {
+    const same = picked?.key === key && picked.person === person;
+    setPicked(same ? null : { key, person });
+    if (!same) setTimeout(() => document.getElementById(PICKED_LIST_ID)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+  };
+
+  const cancel = async (t: StaffTask) => {
+    if (!window.confirm(`Cancel this task for ${t.assigneeName}?\n\n${t.message}`)) return;
+    setBusyId(t.id);
+    try {
+      await actOnTask(t.id, 'cancel');
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Not cancelled', description: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   if (tasks.length === 0) return null;
+
+  const statProps = (key: StatKey) => ({
+    label: STAT_LABEL[key],
+    value: s.counts[key],
+    active: picked?.key === key && !picked.person,
+    onClick: () => pick(key),
+  });
 
   return (
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0 pb-3">
         <div className="space-y-1">
           <CardTitle className="flex items-center gap-2 text-lg"><ClipboardCheck className="h-5 w-5 text-blue-600" /> Tasks for staff</CardTitle>
-          <CardDescription>What you assigned: open now, and what was done today.</CardDescription>
+          <CardDescription>What you assigned: open now, and what was done today. Tap a number to see those tasks.</CardDescription>
         </div>
         <Button asChild variant="outline" size="sm">
           <Link href={TASKS_PAGE_PATH}>Open Tasks <ArrowRight className="ml-1 h-4 w-4" /></Link>
@@ -84,14 +201,41 @@ export function OwnerTasksSummary() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-7">
-          <Stat label="Open" value={s.open} />
-          <Stat label="Not seen yet" value={s.notSeen} tone="orange" />
-          <Stat label="Working on it" value={s.working} tone="blue" />
-          <Stat label="Problem" value={s.problem} tone="orange" />
-          <Stat label="Late" value={s.late} tone="red" />
-          <Stat label="New replies" value={s.replies} tone="blue" />
-          <Stat label="Done today" value={s.doneToday} tone="green" />
+          <Stat {...statProps('open')} />
+          <Stat {...statProps('notSeen')} tone="orange" />
+          <Stat {...statProps('working')} tone="blue" />
+          <Stat {...statProps('problem')} tone="orange" />
+          <Stat {...statProps('late')} tone="red" />
+          <Stat {...statProps('replies')} tone="blue" />
+          <Stat {...statProps('doneToday')} tone="green" />
         </div>
+
+        {picked && (
+          <div id={PICKED_LIST_ID} className="space-y-2 rounded-lg border bg-muted/30 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-medium">
+                {STAT_LABEL[picked.key]}{picked.person ? ` · ${picked.person}` : ''} ({pickedTasks.length})
+              </p>
+              <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setPicked(null)}>
+                <X className="mr-1 h-4 w-4" />Close
+              </Button>
+            </div>
+            {pickedTasks.length === 0 && <p className="text-sm text-muted-foreground">None right now.</p>}
+            <div className="max-h-[32rem] space-y-2 overflow-y-auto">
+              {pickedTasks.map((t) => (
+                <TaskItem
+                  key={t.id}
+                  task={t}
+                  view="owner"
+                  busy={busyId === t.id}
+                  onCancel={cancel}
+                  onReply={thread.handlers.onReply}
+                  groupProgress={t.groupId ? groups.get(t.groupId) : null}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         {s.needsYou.length > 0 && (
           <div className="space-y-1.5">
@@ -131,10 +275,14 @@ export function OwnerTasksSummary() {
                 {s.people.map((p) => (
                   <tr key={p.name} className="border-t">
                     <td className="py-1.5">{p.name}</td>
-                    <td className="py-1.5 text-right tabular-nums">{p.open}</td>
-                    <td className={cn('py-1.5 text-right tabular-nums', p.late > 0 && 'font-semibold text-red-700 dark:text-red-400')}>{p.late}</td>
-                    <td className={cn('py-1.5 text-right tabular-nums', p.problem > 0 && 'font-semibold text-orange-700 dark:text-orange-400')}>{p.problem}</td>
-                    <td className="py-1.5 text-right tabular-nums">{p.doneToday}</td>
+                    <td className="py-1.5 text-right"><PersonCount value={p.open} onClick={() => pick('open', p.name)} /></td>
+                    <td className="py-1.5 text-right">
+                      <PersonCount value={p.late} className={p.late > 0 ? 'font-semibold text-red-700 dark:text-red-400' : ''} onClick={() => pick('late', p.name)} />
+                    </td>
+                    <td className="py-1.5 text-right">
+                      <PersonCount value={p.problem} className={p.problem > 0 ? 'font-semibold text-orange-700 dark:text-orange-400' : ''} onClick={() => pick('problem', p.name)} />
+                    </td>
+                    <td className="py-1.5 text-right"><PersonCount value={p.doneToday} onClick={() => pick('doneToday', p.name)} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -142,6 +290,7 @@ export function OwnerTasksSummary() {
           </div>
         )}
       </CardContent>
+      {thread.dialogs}
     </Card>
   );
 }
