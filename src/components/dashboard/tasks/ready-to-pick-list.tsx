@@ -98,14 +98,23 @@ export function ReadyToPickList() {
     const matched = ((json.notices || []) as OrderChangeNotice[]).filter((n) => idSet.has(n.orderId));
     const changesMap: Record<string, OrderItemChange[]> = {};
     matched.forEach((n) => { changesMap[n.orderId] = n.changes; });
-    const ok = await reprint(orderedIds, changesMap, { compact: compactPrint });
-    if (ok && matched.length > 0) {
-      await fetch('/api/orders/changes', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderIds: matched.map((n) => n.orderId), how: 'reprinted' }),
-      }).catch(() => {});
-    }
+    await reprint(orderedIds, changesMap, {
+      compact: compactPrint,
+      confirmClear:
+        matched.length > 0
+          ? {
+              count: matched.length,
+              onConfirm: async () => {
+                const r = await fetch('/api/orders/changes', {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ orderIds: matched.map((n) => n.orderId), how: 'reprinted' }),
+                });
+                if (!r.ok) throw new Error('Could not mark orders as reprinted');
+              },
+            }
+          : undefined,
+    });
   };
 
   const tabBtn = (active: boolean) =>

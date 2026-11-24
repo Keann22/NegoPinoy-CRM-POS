@@ -16,14 +16,21 @@ export function ReprintOrderButton({ orderId }: { orderId: string }) {
     const res = await fetch('/api/orders/changes', { cache: 'no-store' }).catch(() => null);
     const json = res?.ok ? await res.json() : { notices: [] };
     const notice = (json.notices as OrderChangeNotice[]).find((n) => n.orderId === orderId);
-    const ok = await reprint([orderId], notice ? { [orderId]: notice.changes } : {});
-    if (ok && notice) {
-      await fetch('/api/orders/changes', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderIds: [orderId], how: 'reprinted' }),
-      }).catch(() => {});
-    }
+    await reprint([orderId], notice ? { [orderId]: notice.changes } : {}, {
+      confirmClear: notice
+        ? {
+            count: 1,
+            onConfirm: async () => {
+              const r = await fetch('/api/orders/changes', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ orderIds: [orderId], how: 'reprinted' }),
+              });
+              if (!r.ok) throw new Error('Could not mark order as reprinted');
+            },
+          }
+        : undefined,
+    });
   };
 
   return (

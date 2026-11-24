@@ -41,17 +41,25 @@ export function OrderChangesCard() {
   const { reprint, busy, printView } = useReprintOrders();
 
   const reprintNotice = async (n: OrderChangeNotice) => {
-    const ok = await reprint([n.orderId], { [n.orderId]: n.changes });
+    const ok = await reprint([n.orderId], { [n.orderId]: n.changes }, {
+      confirmClear: {
+        count: 1,
+        onConfirm: () => handle([n.orderId], 'reprinted'),
+      },
+    });
     if (!ok) return toast({ variant: 'destructive', title: 'Could not load the order to print' });
-    handle([n.orderId], 'reprinted').catch((e) => toast({ variant: 'destructive', title: e.message }));
   };
 
   const reprintAll = async () => {
     const changes = Object.fromEntries(notices.map((n) => [n.orderId, n.changes]));
     const ids = notices.map((n) => n.orderId);
-    const ok = await reprint(ids, changes);
+    const ok = await reprint(ids, changes, {
+      confirmClear: {
+        count: ids.length,
+        onConfirm: () => handle(ids, 'reprinted'),
+      },
+    });
     if (!ok) return toast({ variant: 'destructive', title: 'Could not load the orders to print' });
-    handle(ids, 'reprinted').catch((e) => toast({ variant: 'destructive', title: e.message }));
   };
 
   const gotIt = (n: OrderChangeNotice) =>
