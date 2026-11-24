@@ -677,10 +677,28 @@ How it works (built 2026-11-20):
   ("Pwede na ipadala", "i-book") on a held order warns first (it can still be sent).
 - Staff: when a task can't be done yet, tap **May problema** (or **Magtanong**),
   not Tapos na.
-- Phase 2 (not built): pick a hold reason from a list (ship with other orders /
-  waiting for payment / will add more / ship on a date), a check-again date that
-  asks sales "Ready na ba?", ship-together groups that pop up "Kumpleto na" when
-  every order is packed and paid, and converting the current free-text holds.
+- **Phase 2 (built 2026-11-24): structured holds.** Packed Orders → **Delay** /
+  **Change hold** and the Priority card's **Hindi pa ipapadala** open one dialog:
+  pick why (**Isasabay sa ibang order**, **Hintay bayad**, **Mag-a-add pa ang
+  customer**, **Ipadala sa petsa**, **Iba pa**), when to ask again (default 7
+  days), and for ship-together the customer's orders to tick and **Courier or
+  Bus** (by bus, COD orders must be paid first). Each order in a group gets the
+  hold; the note on each says "Isasabay sa #...".
+- The order's **sales agent gets a pop-up**: **Kumpleto na / Bayad na: pwede na
+  ipadala** as soon as every order in the group is packed and paid (or the
+  payment it waited for came in), and **Ready na ba?** on the ask-again date.
+  Answers: **Ready na: ipadala** (the orders go back to Packed Orders → Ready),
+  **Hindi pa** (pick the next date), **Asked customer, waiting** (back in 4
+  hours), **Change hold**. Owners see what sales didn't answer for 3 days. Only
+  once something in the group is picked or packed.
+- A hold ends by itself when the order ships, is cancelled, or Verify Shipping /
+  Revert clears the note (database trigger). Bus-marked orders ("BUS SHIPPING:")
+  stay with Bus Shipping.
+- 2026-11-24 conversion: the 37 free-text holds became structured (11 waiting for
+  payment incl. "layaway na lang", 8 ship on a date, 4 adding more, 4 ship
+  together with 9 of the customers' other orders added to their groups, 10
+  other). Ask date today (December ones: Dec 1), so each agent first sees 10-12
+  old holds to review. Backup: scripts/reports/2026-11-24-ship-hold-conversion-backup.json.
 
 ## Being decided (not built yet)
 

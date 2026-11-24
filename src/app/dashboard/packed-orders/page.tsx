@@ -15,7 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format, differenceInDays } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { VerifyShippingDialog } from '@/components/dashboard/verify-shipping-dialog';
-import { NotForShippingDialog } from '@/components/dashboard/not-for-shipping-dialog';
+import { ShipHoldDialog } from '@/components/dashboard/ship-holds/ship-hold-dialog';
 import { RevertPendingDialog } from '@/components/dashboard/revert-pending-dialog';
 import { Order } from '@/app/dashboard/orders/page';
 
@@ -230,8 +230,8 @@ export default function PackedOrdersPage() {
                 <Button variant="outline" size="sm" onClick={() => setRevertOrder(order)} title="Revert to Processing">
                   <RotateCcw className="h-4 w-4 mr-1" /> Revert
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => setNotForShippingOrder(order)} className="text-destructive hover:text-destructive hover:bg-destructive/10" title="Not for shipping">
-                  <XCircle className="h-4 w-4 mr-1" /> Delay
+                <Button variant="outline" size="sm" onClick={() => setNotForShippingOrder(order)} className="text-destructive hover:text-destructive hover:bg-destructive/10" title="Not for shipping yet: why, and when to ask again">
+                  <XCircle className="h-4 w-4 mr-1" /> {isWaitingTab ? 'Change hold' : 'Delay'}
                 </Button>
                 <Button variant="outline" size="sm" asChild title="Went by bus: record the fee we paid">
                   <Link href={`/dashboard/bus-shipping?order=${order.id}`}><Bus className="h-4 w-4 mr-1" /> Ship by bus</Link>
@@ -334,11 +334,11 @@ export default function PackedOrdersPage() {
         onOpenChange={(open) => !open && setVerifyOrder(null)} 
         onSuccess={refetchOrders} 
       />
-      <NotForShippingDialog 
-        order={notForShippingOrder} 
-        open={!!notForShippingOrder} 
-        onOpenChange={(open) => !open && setNotForShippingOrder(null)} 
-        onSuccess={refetchOrders} 
+      <ShipHoldDialog
+        orderId={notForShippingOrder?.id || null}
+        open={!!notForShippingOrder}
+        onOpenChange={(open) => !open && setNotForShippingOrder(null)}
+        onSaved={refetchOrders}
       />
       <RevertPendingDialog
         order={revertOrder}

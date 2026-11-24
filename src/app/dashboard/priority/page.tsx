@@ -20,6 +20,8 @@ import { OsDecisionDialog } from '@/components/dashboard/priority/os-decision-di
 import { PriorityNoteDialog } from '@/components/dashboard/priority/priority-note-dialog';
 import { CarryOverList } from '@/components/dashboard/priority/carryover-list';
 import { ReturnsToActList } from '@/components/dashboard/priority/returns-to-act-list';
+import { ShipHoldDialog } from '@/components/dashboard/ship-holds/ship-hold-dialog';
+import { SHIP_HOLDS_CHANGED_EVENT, releaseShipHold } from '@/hooks/useShipHolds';
 
 type Tab = PriorityGroup | 'to_follow' | 'returns';
 const RETURNS_HINT = 'Customer returns waiting on someone: owners decide, the warehouse checks parcels, replacements and refunds get done. Tap one to open the Returns page.';
@@ -59,6 +61,7 @@ export default function PriorityListPage() {
   const [urgentOnly, setUrgentOnly] = useState(false);
   const [search, setSearch] = useState('');
   const [dialog, setDialog] = useState<{ row: PriorityRow; action: PriorityAction } | null>(null);
+  const [shipHoldOrderId, setShipHoldOrderId] = useState<string | null>(null);
   const loadedOnce = useRef(false);
 
   const load = useCallback(async () => {
@@ -81,6 +84,22 @@ export default function PriorityListPage() {
   }, [toast]);
 
   useEffect(() => { load(); }, [load]);
+  // A hold answered from the pop-up changes this list too.
+  useEffect(() => {
+    window.addEventListener(SHIP_HOLDS_CHANGED_EVENT, load);
+    return () => window.removeEventListener(SHIP_HOLDS_CHANGED_EVENT, load);
+  }, [load]);
+
+  const releaseHold = async (row: PriorityRow) => {
+    const holdId = row.shipHold?.detail?.id;
+    if (!holdId) return;
+    try {
+      const { orderIds } = await releaseShipHold(holdId);
+      toast({ title: 'Ready to ship', description: `${orderIds.length > 1 ? `${orderIds.length} orders are` : 'It is'} back on Packed Orders → Ready.` });
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Could not save', description: e instanceof Error ? e.message : String(e) });
+    }
+  };
 
   // One-tap actions (no dialog): remove a hold, remove a send-today mark.
   const quickEvent = async (row: PriorityRow, kind: 'hold_cleared' | 'send_today_cancelled' | 'urgent_cleared' | 'reserve_cleared', done: string) => {
@@ -101,6 +120,8 @@ export default function PriorityListPage() {
     if (action === 'unurgent') return quickEvent(row, 'urgent_cleared', 'No longer nagmamadali');
     if (action === 'unreserve') return quickEvent(row, 'reserve_cleared', 'Reservation removed');
     if (action === 'note') return setNoteRow(row);
+    if (action === 'ship_hold') return setShipHoldOrderId(row.id);
+    if (action === 'ship_release') return releaseHold(row);
     setDialog({ row, action });
   };
 
@@ -262,6 +283,7 @@ export default function PriorityListPage() {
 
       <PriorityActionDialog row={dialog?.row || null} action={dialog?.action || null} canOverride={isAdmin || isJas} onClose={() => setDialog(null)} onSaved={load} />
       <PriorityNoteDialog row={noteRow} onClose={() => setNoteRow(null)} onSaved={load} />
+      <ShipHoldDialog orderId={shipHoldOrderId} open={!!shipHoldOrderId} onOpenChange={(o) => { if (!o) setShipHoldOrderId(null); }} />
       <OsDecisionDialog row={decide?.row || null} item={decide?.item || null} onClose={() => setDecide(null)} onSaved={load} />
     </div>
   );

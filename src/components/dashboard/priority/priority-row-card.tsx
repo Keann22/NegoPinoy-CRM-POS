@@ -10,6 +10,9 @@ import type { PriorityAction } from './priority-action-dialog';
 import { PriorityNotesPanel } from './priority-notes-panel';
 import { AssignTaskButton } from '@/components/dashboard/tasks/assign-task-button';
 import { ShipContextBlock } from '@/components/dashboard/orders/ship-context-block';
+import { ShipHoldOrdersList } from '@/components/dashboard/ship-holds/ship-hold-orders-list';
+import { SHIP_HOLD_KINDS } from '@/types/ship-holds.types';
+import { shortPhtDate } from '@/lib/shipping/ship-hold-rules';
 import {
   BLOCK_REASONS, OS_DECISIONS, OWNER_LABELS, STEP_LABELS, phtDate, isFullyPaid,
   type MissingItem, type MissingState, type PriorityOwner, type PriorityRow,
@@ -57,6 +60,9 @@ const ITEM_STATE: Record<MissingState, string> = {
 function timer(row: PriorityRow): { text: string; tone: 'late' | 'today' | 'ok' } | null {
   if (row.group === 'hold') {
     if (row.hold) return { text: `Back on ${shortDate(row.hold.until)}`, tone: 'ok' };
+    const detail = row.shipHold?.detail;
+    if (row.step === 'ship_hold' && detail?.complete) return { text: 'Kumpleto na: pwede na ipadala', tone: 'today' };
+    if (row.step === 'ship_hold' && detail) return { text: `Ask again ${shortPhtDate(detail.checkOn)}`, tone: 'ok' };
     if (row.step === 'ship_hold' && row.shipHold?.at) return { text: `Held since ${shortDate(row.shipHold.at)}`, tone: 'ok' };
     return null;
   }
@@ -68,7 +74,10 @@ function timer(row: PriorityRow): { text: string; tone: 'late' | 'today' | 'ok' 
   return { text: `Due in ${days}d`, tone: 'ok' };
 }
 
-export type RowAction = PriorityAction | 'clear_hold' | 'unmark' | 'unurgent' | 'unreserve' | 'note';
+export type RowAction = PriorityAction | 'clear_hold' | 'unmark' | 'unurgent' | 'unreserve' | 'note' | 'ship_hold' | 'ship_release';
+
+/** Picked or later: "Hindi pa ipapadala" sets a structured ship hold (phase 2, 2026-11-24). */
+const CAN_SHIP_HOLD = ['Picked', 'Photo', 'Packed', 'For Shipping'];
 
 /** Orders that still have items to take off the shelf (a reservation only matters then). */
 const NEEDS_PICKING = ['Pending Payment', 'Processing', 'Waiting for Stock', 'On-Hold', 'Picked (with issue)'];
@@ -207,7 +216,19 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
               ⚠️ May be OS — check these first: {row.mayBeOs.map((m) => `${m.name} (stock ${m.stock})`).join(', ')}
             </div>
           )}
-          <ShipContextBlock hold={row.shipHold} others={row.otherOpenOrders} />
+          {row.shipHold?.detail && (
+            <div className="space-y-1 rounded-md border border-amber-200 px-2 py-1.5 text-xs dark:border-amber-900">
+              <div className="font-medium">
+                {SHIP_HOLD_KINDS[row.shipHold.detail.kind].label}{row.shipHold.detail.shipVia === 'bus' ? ' · by bus' : ''}
+                <span className="font-normal text-muted-foreground"> · sales is asked again {shortPhtDate(row.shipHold.detail.checkOn)}</span>
+              </div>
+              {row.shipHold.detail.orders.length > 1 && <ShipHoldOrdersList orders={row.shipHold.detail.orders} />}
+            </div>
+          )}
+          <ShipContextBlock
+            hold={row.shipHold}
+            others={row.otherOpenOrders.filter((o) => !row.shipHold?.detail?.orders.some((g) => g.id === o.id))}
+          />
           {row.urgent && (
             <div className="text-xs text-red-700 dark:text-red-300">Nagmamadali: “{row.urgent.note}” — {row.urgent.byName}, {shortDate(row.urgent.at)}</div>
           )}
@@ -280,6 +301,16 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
                   <PauseCircle className="mr-1.5 h-4 w-4" />Hold
                 </Button>
               </>
+            )}
+            {canEdit && row.shipHold?.detail && (
+              <Button size="sm" className="h-8 bg-emerald-600 hover:bg-emerald-700" onClick={() => onAction(row, 'ship_release')}>
+                <PlayCircle className="mr-1.5 h-4 w-4" />Ready na: ipadala
+              </Button>
+            )}
+            {canEdit && CAN_SHIP_HOLD.includes(row.status) && !row.shipHold?.bus && (
+              <Button size="sm" variant="outline" className="h-8" onClick={() => onAction(row, 'ship_hold')}>
+                <PauseCircle className="mr-1.5 h-4 w-4" />{row.shipHold ? 'Change hold' : 'Hindi pa ipapadala'}
+              </Button>
             )}
             {canEdit && row.hold && (
               <Button size="sm" variant="outline" className="h-8" onClick={() => onAction(row, 'clear_hold')}>

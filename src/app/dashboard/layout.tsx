@@ -36,6 +36,7 @@ import { RecountRequestPopup } from '@/components/dashboard/recount-request-popu
 import { RtsDecisionPopup } from '@/components/dashboard/customer-returns/rts-decision-popup';
 import { BusSfPopup } from '@/components/dashboard/bus-shipping/bus-sf-popup';
 import { SupplierStockPopup } from '@/components/dashboard/supplier-stock/supplier-stock-popup';
+import { ShipHoldPopup } from '@/components/dashboard/ship-holds/ship-hold-popup';
 import { Bus, ClipboardCheck } from 'lucide-react';
 import { StaffTaskPopup } from '@/components/dashboard/tasks/staff-task-popup';
 import { TasksNavBadge } from '@/components/dashboard/tasks/tasks-nav-badge';
@@ -297,6 +298,7 @@ export default function DashboardLayout({
       <RtsDecisionPopup />
       <BusSfPopup />
       <SupplierStockPopup />
+      <ShipHoldPopup />
       <StaffTaskPopup />
       <InventoryGuardianAlertModal />
       <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr] print:block">

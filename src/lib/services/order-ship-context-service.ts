@@ -1,5 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { fetchAllPages } from './procurement-demand-service';
+import { OPEN_ORDER_STATUSES, shortOrderId } from '@/lib/shipping/ship-hold-rules';
+import { getHoldDetails } from './shipping/ship-hold-service';
+import type { ShipHoldDetail } from '@/types/ship-holds.types';
+
+export { OPEN_ORDER_STATUSES, shortOrderId };
 
 /*
  * Can this order ship yet? (owner, 2026-11-24)
@@ -14,11 +19,6 @@ import { fetchAllPages } from './procurement-demand-service';
  * same customer's other open orders with their status and balance. Server only.
  */
 
-/** Orders not shipped, delivered or cancelled yet. */
-export const OPEN_ORDER_STATUSES = [
-  'Pending Payment', 'Processing', 'Picked', 'Picked (with issue)', 'Photo',
-  'Packed', 'For Shipping', 'On-Hold', 'Waiting for Stock',
-];
 
 const BUS_PREFIX = 'BUS SHIPPING';
 const ORDER_COLS = 'id, status, customer_id, payment_method, balance_due, not_for_shipping_reason, order_date, created_at';
@@ -42,6 +42,8 @@ export interface ShipHold {
   bus: boolean;
   byName: string | null;
   at: string | null;
+  /** Reason type, check-again date and ship-together group (phase 2); null for old free-text holds. */
+  detail: ShipHoldDetail | null;
 }
 
 export interface SiblingOrder {
@@ -62,7 +64,6 @@ export interface OrderShipContext {
   others: SiblingOrder[];
 }
 
-export const shortOrderId = (id: string) => `#${id.slice(0, 7).toUpperCase()}`;
 
 async function inChunks<T>(ids: string[], fetchChunk: (chunk: string[]) => Promise<T[]>): Promise<T[]> {
   const out: T[] = [];
@@ -73,7 +74,11 @@ async function inChunks<T>(ids: string[], fetchChunk: (chunk: string[]) => Promi
 function holdOf(reason: string | null, log: HoldLog | undefined): ShipHold | null {
   const text = (reason || '').trim();
   if (!text) return null;
-  return { reason: text, bus: text.toUpperCase().startsWith(BUS_PREFIX), byName: log?.user_name || null, at: log?.created_at || null };
+  return { reason: text, bus: text.toUpperCase().startsWith(BUS_PREFIX), byName: log?.user_name || null, at: log?.created_at || null, detail: null };
+}
+
+function withDetail(hold: ShipHold | null, detail: ShipHoldDetail | null): ShipHold | null {
+  return hold ? { ...hold, detail } : null;
 }
 
 export async function getShipContexts(supabase: SupabaseClient, orderIds: string[]): Promise<Map<string, OrderShipContext>> {
@@ -85,14 +90,16 @@ export async function getShipContexts(supabase: SupabaseClient, orderIds: string
     supabase.from('orders').select(ORDER_COLS).in('id', c).order('id').range(f, t)));
   const customerIds = Array.from(new Set(orders.map((o) => o.customer_id).filter((v): v is string => !!v)));
 
-  const [siblings, logs] = await Promise.all([
+  const heldIds = orders.filter((o) => o.not_for_shipping_reason).map((o) => o.id);
+  const [siblings, logs, details] = await Promise.all([
     inChunks(customerIds, (c) => fetchAllPages<OrderRow>((f, t) =>
       supabase.from('orders').select(ORDER_COLS)
         .in('customer_id', c).in('status', OPEN_ORDER_STATUSES).order('id').range(f, t))),
     // Who held it: the latest "Marked Not Ready to Ship" log (Packed Orders → Delay).
-    inChunks(orders.filter((o) => o.not_for_shipping_reason).map((o) => o.id), (c) => fetchAllPages<HoldLog>((f, t) =>
+    inChunks(heldIds, (c) => fetchAllPages<HoldLog>((f, t) =>
       supabase.from('order_logs').select('order_id, user_name, created_at')
         .eq('status', 'Marked Not Ready to Ship').in('order_id', c).order('id').range(f, t))),
+    getHoldDetails(supabase, heldIds),
   ]);
 
   const latestLog = new Map<string, HoldLog>();
@@ -120,7 +127,7 @@ export async function getShipContexts(supabase: SupabaseClient, orderIds: string
       status: o.status,
       paymentMethod: o.payment_method,
       balanceDue: Number(o.balance_due || 0),
-      hold: holdOf(o.not_for_shipping_reason, latestLog.get(o.id)),
+      hold: withDetail(holdOf(o.not_for_shipping_reason, latestLog.get(o.id)), details.get(o.id) || null),
       others,
     });
   }

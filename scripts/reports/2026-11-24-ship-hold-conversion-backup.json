@@ -1,0 +1,224 @@
+[
+ {
+  "id": "5e4c8884-7009-4725-9130-43adb2b6977f",
+  "status": "Packed",
+  "customer_id": "fa2a7de2-e830-440e-82a3-b3fc2aba590c",
+  "not_for_shipping_reason": "Nov. 27 daw po, may emergency lang"
+ },
+ {
+  "id": "f5c1421e-2dae-496a-a124-1df421e17f4d",
+  "status": "Packed",
+  "customer_id": "f9a97e29-04a3-489d-bba7-44c697e58186",
+  "not_for_shipping_reason": "wait po sa installment niya\nsabay na daw po"
+ },
+ {
+  "id": "083323ff-b3bc-4c42-b7ff-0855fe42df0e",
+  "status": "Packed",
+  "customer_id": "53f4b107-7c74-4ff2-8c23-485e57761be9",
+  "not_for_shipping_reason": "Ggcash yata ulit payment wait pa"
+ },
+ {
+  "id": "fded76ac-0dab-44a0-a1b0-e06885241171",
+  "status": "Packed",
+  "customer_id": "4c302cbb-fee5-41ed-a6c1-df042caa03a2",
+  "not_for_shipping_reason": "wait lang po payment"
+ },
+ {
+  "id": "05853d38-cf6a-4090-99cf-8cc7c682cd4b",
+  "status": "Packed",
+  "customer_id": "be7a75e0-acb0-4e24-86be-054d7da20215",
+  "not_for_shipping_reason": "Nov21 booking"
+ },
+ {
+  "id": "a5ff7eee-4362-4bb0-af34-93630e9a7dea",
+  "status": "On-Hold",
+  "customer_id": "09901006-bf59-405e-9d1b-b18d91e84f15",
+  "not_for_shipping_reason": "Hold daw po muna, sabay sabay na po ipapadala lahat for bus shipping po"
+ },
+ {
+  "id": "101d6c6e-ab35-4282-9c97-830f6cc06135",
+  "status": "Packed",
+  "customer_id": "eb0ab394-292b-4acf-904d-ba74e4b95256",
+  "not_for_shipping_reason": "1st week of december daw po"
+ },
+ {
+  "id": "fa740d46-3680-4a81-bfb0-0d4504525271",
+  "status": "Picked",
+  "customer_id": "91a53f5c-bba9-4727-80ea-7a77493f9840",
+  "not_for_shipping_reason": "Nov shipping"
+ },
+ {
+  "id": "20c5f387-9477-4cdf-8921-56795c18fb7b",
+  "status": "Packed",
+  "customer_id": "25a6f471-96f8-4c0e-8618-cad11cfc5a1e",
+  "not_for_shipping_reason": "Isasabay nalang po sa ibang items nya by December"
+ },
+ {
+  "id": "28153dfa-9b1d-4a47-9cf0-41cb5109701f",
+  "status": "Packed",
+  "customer_id": "b7c0e6a1-345c-4c31-be0f-3ec690199763",
+  "not_for_shipping_reason": "NOV 15 daw po"
+ },
+ {
+  "id": "015eab0e-ee23-4b4e-86d7-2b15cefcc9e4",
+  "status": "Picked",
+  "customer_id": "93ae0519-05d4-4805-ad61-ae22c16d8b56",
+  "not_for_shipping_reason": "Mag add pa daw po"
+ },
+ {
+  "id": "b6306f3b-8d30-40fe-aba2-0e0b808b7623",
+  "status": "Packed",
+  "customer_id": "57ceae5f-50fa-4644-9d79-1e5c9f3d4951",
+  "not_for_shipping_reason": "pawait daw po mag add pa"
+ },
+ {
+  "id": "afcdaf29-8f77-413a-a9d5-b90f71e346af",
+  "status": "Packed",
+  "customer_id": "4c302cbb-fee5-41ed-a6c1-df042caa03a2",
+  "not_for_shipping_reason": "pawait lang daw po sa payment"
+ },
+ {
+  "id": "55523d50-b0cb-437c-9fad-93804696ee27",
+  "status": "Packed",
+  "customer_id": "74950494-b4f5-4b3b-b81c-49c97ef252b0",
+  "not_for_shipping_reason": "may add pa daw po"
+ },
+ {
+  "id": "d8f6ffce-79b4-472e-b8b8-097e526686ff",
+  "status": "Packed",
+  "customer_id": "4e96be6c-5564-4be9-a857-d9b5b7f659af",
+  "not_for_shipping_reason": "WALK IN Magmemessage daw po kung kelan sya pupunta"
+ },
+ {
+  "id": "d37ec112-b869-42ba-a6fc-c725a1c609f8",
+  "status": "Packed",
+  "customer_id": "e2eef567-1f30-40fa-8a61-44427f8756f1",
+  "not_for_shipping_reason": "pawait daw po muna nito mag add pa"
+ },
+ {
+  "id": "7759378b-06ba-46af-a6ef-0d70f6d99648",
+  "status": "Packed",
+  "customer_id": "f6077f87-6359-49bc-a2d5-06e6d57ffde6",
+  "not_for_shipping_reason": "katapusan daw po paship ng pauna na po ng payment fully paid niya po sa katapusan"
+ },
+ {
+  "id": "64e9c0ac-07c3-432c-ad4a-b9e38f735b57",
+  "status": "Packed",
+  "customer_id": "1576bb0e-952b-46d1-bfd0-17deaed0d653",
+  "not_for_shipping_reason": "Next week shipping Nov. 16"
+ },
+ {
+  "id": "7807a2e0-052a-420b-ba9f-27e42fe70214",
+  "status": "Packed",
+  "customer_id": "5dc2f303-9049-4cdd-824b-0eb192357a35",
+  "not_for_shipping_reason": "hold po muna, may emergency daw po"
+ },
+ {
+  "id": "31eef831-8426-4d4c-ab4e-a7f5e3e2b52e",
+  "status": "Packed",
+  "customer_id": "22c352dd-5a55-4d70-8040-885fcf9d696e",
+  "not_for_shipping_reason": "wait reply"
+ },
+ {
+  "id": "04263988-6ec8-40e2-ac8a-be4c9b84388e",
+  "status": "Packed",
+  "customer_id": "e4460aad-3597-4618-8744-5e3947a08a37",
+  "not_for_shipping_reason": "wait message"
+ },
+ {
+  "id": "020106b3-4a40-4a14-954b-8c9e22b9f7e6",
+  "status": "Packed",
+  "customer_id": "f9048fad-171c-459d-92d7-98531d894747",
+  "not_for_shipping_reason": "waiting sa ibang items nya, sabay sabay ipapadala bus shipping"
+ },
+ {
+  "id": "2697e3f1-522c-4998-87ec-e37f11ca65f8",
+  "status": "Packed",
+  "customer_id": "e4460aad-3597-4618-8744-5e3947a08a37",
+  "not_for_shipping_reason": "wait pa daw po dumating ung new card nablock daw po kasi card niya"
+ },
+ {
+  "id": "4d401f00-f76f-4542-9b98-5ab9f68dc16c",
+  "status": "Packed",
+  "customer_id": "61246291-6606-43d0-bae9-3efd4e4ecf38",
+  "not_for_shipping_reason": "wait reply"
+ },
+ {
+  "id": "97f28e74-6220-4590-b311-c72d34b84442",
+  "status": "Packed",
+  "customer_id": "b3cfb8dd-ea02-4703-b5a9-f272e0ff036b",
+  "not_for_shipping_reason": "wait lang po ng sahod"
+ },
+ {
+  "id": "fd3445ec-cce4-4575-a14e-96aeabeb508c",
+  "status": "On-Hold",
+  "customer_id": "84091adb-3254-4c22-bcd8-a7d7ad0bd2cd",
+  "not_for_shipping_reason": "Layaway na daw po ito lahat \nWaiting sa dp"
+ },
+ {
+  "id": "749e3803-38e4-421d-843c-35c5ef08048a",
+  "status": "Packed",
+  "customer_id": "8e7a8371-7d5e-4562-ae2d-b688708ca1b1",
+  "not_for_shipping_reason": "Layaway daw po"
+ },
+ {
+  "id": "0f23080e-dc68-4ec8-9c80-a372cae6d3d2",
+  "status": "Packed",
+  "customer_id": "6843727e-6012-4c29-b1aa-63f015d513ce",
+  "not_for_shipping_reason": "Ipipick up nlang daw po ito"
+ },
+ {
+  "id": "9c9ea532-2824-4d1e-b0a3-e7ff76d4b5b5",
+  "status": "Packed",
+  "customer_id": "bf4989ec-8403-4e05-bb9d-abb5a73cfd40",
+  "not_for_shipping_reason": "Hold muna po"
+ },
+ {
+  "id": "87f021be-01f7-4fdd-bbc7-91dc8ef072ed",
+  "status": "Packed",
+  "customer_id": "471e2dc2-49d9-4dea-9485-3fd31868bf46",
+  "not_for_shipping_reason": "Wait lang po confirmation kung sino magrereceived, umalis daw po kasi receiveer"
+ },
+ {
+  "id": "60f16778-2b44-4c28-a2e6-0822b40697e0",
+  "status": "Packed",
+  "customer_id": "606fe033-4c94-425f-b44b-20de5d9f471e",
+  "not_for_shipping_reason": "sa december nadaw po padala lahat ng items niya."
+ },
+ {
+  "id": "0e1caa00-ad50-4b91-9478-890600321296",
+  "status": "Packed",
+  "customer_id": "a09bec74-850e-49fe-9849-a01e0bdbaabe",
+  "not_for_shipping_reason": "LAYAWAY NA LANG DAW PO NAGFINANCIAL PROB"
+ },
+ {
+  "id": "7d4cbf65-cb27-4f80-9da4-80cfb3479672",
+  "status": "Packed",
+  "customer_id": "77e5b25c-0322-48d4-98ee-d5f2d2cc142b",
+  "not_for_shipping_reason": "Wait full payment before iship"
+ },
+ {
+  "id": "fffbb1e1-f163-4fd1-ae1e-f57dee2d6837",
+  "status": "Packed",
+  "customer_id": "88eb7f02-114d-428d-86ed-3bc5b5fc69ff",
+  "not_for_shipping_reason": "Layaway na lang daw po ito"
+ },
+ {
+  "id": "15ef2f1d-3857-44bc-9c53-4888f9ff85fb",
+  "status": "Packed",
+  "customer_id": "3b568b36-7780-4da1-a6de-b19083031e96",
+  "not_for_shipping_reason": "Nov. 30 daw po"
+ },
+ {
+  "id": "17d9b4d7-e16d-4abb-bad6-436433aa2e39",
+  "status": "Packed",
+  "customer_id": "a5d5c37e-61da-43bb-9ab6-875ee0da66d8",
+  "not_for_shipping_reason": "waiting for reply kung pwede na"
+ },
+ {
+  "id": "a9e939ea-37c1-4ce8-a6e6-0b7ad2c47afd",
+  "status": "Packed",
+  "customer_id": "72f1f4a5-07d0-42ab-bac5-c05776e0bd0a",
+  "not_for_shipping_reason": "Babayaran daw po sa gcash tapos bus shipping\nWait pa po payment"
+ }
+]
