@@ -656,6 +656,32 @@ How it works (built 2026-11-20):
   scripts/migrations/2026-11-23_put_back_tasks.sql); changing who gets it is a
   one-line change there.
 
+## Held orders and "Pwede na ipadala" (owner, 2026-11-24; phase 1 built 2026-11-24)
+
+- Sales hold a packed order with a free-text reason (Packed Orders → **Delay**,
+  or Bus Shipping marks it "BUS SHIPPING: …"): waiting for the customer's other
+  orders ("sabay-sabay"), waiting for payment, will add more, ship on a date.
+  Checked 2026-11-24: 34 picked/packed orders held this way, 41 days old on
+  average; 12 wait on another open order of the same customer.
+- Found 2026-11-24: the Priority List never read that note, so #020106B (paid,
+  packed) looked ready and the owner assigned Czarina "Pwede na ipadala". It was
+  waiting for #3509BAD (₱2,661.05) and #D911D94 (₱691.85, not picked). Czarina
+  had nowhere to say "hindi pa" except the Done note, so the task closed as Done.
+- **A bus doesn't collect COD**, so orders going together by bus must be paid
+  first even when they're marked COD.
+- Now (phase 1): a **packed** order with a hold note is under **On hold** on the
+  Priority List (not Ready), with the note, who held it and since when. Every
+  Priority card, the **Assign task** screen and the staff member's **task card**
+  show the hold note, what the order still owes, and the **same customer's other
+  open orders** with status and balance (COD included). Assigning a "ship" task
+  ("Pwede na ipadala", "i-book") on a held order warns first (it can still be sent).
+- Staff: when a task can't be done yet, tap **May problema** (or **Magtanong**),
+  not Tapos na.
+- Phase 2 (not built): pick a hold reason from a list (ship with other orders /
+  waiting for payment / will add more / ship on a date), a check-again date that
+  asks sales "Ready na ba?", ship-together groups that pop up "Kumpleto na" when
+  every order is packed and paid, and converting the current free-text holds.
+
 ## Being decided (not built yet)
 
 - **Customer purchase planner (owner, 2026-11-01)**: a premium feature on the

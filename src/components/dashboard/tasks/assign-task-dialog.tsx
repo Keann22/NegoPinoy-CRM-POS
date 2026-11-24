@@ -1,14 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { ClipboardCheck, X } from 'lucide-react';
+import { AlertTriangle, ClipboardCheck, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { createStaffTask, useTaskPeople } from '@/hooks/useStaffTasks';
+import { createStaffTask, useOrderShipContext, useTaskPeople } from '@/hooks/useStaffTasks';
+import { ShipContextBlock, owedOf } from '@/components/dashboard/orders/ship-context-block';
+import type { OrderShipContext } from '@/lib/services/order-ship-context-service';
+import { shipsBeforePaid } from '@/lib/priority/priority-rules';
 import { OrderSearch } from '@/components/dashboard/order-search';
 import { dueFromPick, phtDateString, type DuePick } from '@/lib/services/staff-tasks/task-dates';
 import { cn } from '@/lib/utils';
@@ -25,6 +28,32 @@ const DUE_PICKS: { value: DuePick; label: string }[] = [
 
 /** Common order tasks, one tap to fill in (the owners' usual Messenger messages). */
 const ORDER_QUICK_TEXT = ['Pwede na ipadala', 'Paki-pick at i-book', 'Paki-check ang order'];
+
+/** ₱3,352.90, or ₱2,000 for whole pesos. */
+const peso = (n: number) => {
+  const v = n || 0;
+  const cents = Math.round(v * 100) % 100 !== 0;
+  return `₱${v.toLocaleString('en-PH', { minimumFractionDigits: cents ? 2 : 0, maximumFractionDigits: 2 })}`;
+};
+
+/** A task that tells staff to send or book the order. */
+const SHIP_WORDS = /ipadala|padala|i-?book|ship/i;
+
+/**
+ * Why "Pwede na ipadala" may be wrong for this order (found 2026-11-24: #020106B
+ * was held for the customer's other orders, which still owed ₱3,352.90).
+ */
+function shipWarnings(ctx: OrderShipContext): string[] {
+  const out: string[] = [];
+  if (ctx.hold) out.push(`Sales marked it not for shipping yet: "${ctx.hold.reason}"`);
+  const owed = owedOf(ctx);
+  // COD and installments normally ship unpaid (the courier collects); only a
+  // held one (e.g. going by bus, which doesn't collect) needs paying first.
+  if (owed > 0 && (!shipsBeforePaid(ctx.paymentMethod) || ctx.hold)) out.push(`This order has ${peso(owed)} balance unpaid${ctx.paymentMethod === 'COD' ? ' (COD)' : ''}.`);
+  const othersOwed = ctx.others.reduce((s, o) => s + owedOf(o), 0);
+  if (ctx.hold && othersOwed > 0) out.push(`The customer's other open orders have ${peso(othersOwed)} balance unpaid.`);
+  return out;
+}
 
 const chip = (active: boolean) => cn(
   'rounded-full border px-3 py-1.5 text-sm transition-colors',
@@ -51,6 +80,8 @@ export function AssignTaskDialog({ open, onOpenChange, order: fixedOrder, onCrea
   const [saving, setSaving] = useState(false);
 
   const order = fixedOrder || pickedOrder;
+  const shipContext = useOrderShipContext(open ? order?.id : null);
+  const warnings = shipContext && SHIP_WORDS.test(message) ? shipWarnings(shipContext) : [];
   const canSave = personKeys.length > 0 && message.trim().length > 0 && (due !== 'date' || !!dueDate);
 
   const close = (next: boolean) => {
@@ -121,6 +152,9 @@ export function AssignTaskDialog({ open, onOpenChange, order: fixedOrder, onCrea
                 label: `#${o.id.slice(0, 7).toUpperCase()}${o.customers?.full_name ? ` · ${o.customers.full_name}` : ''}`,
               })} />
             )}
+            {shipContext && (
+              <ShipContextBlock hold={shipContext.hold} others={shipContext.others} self={shipContext} />
+            )}
           </div>
 
           <div className="space-y-2">
@@ -139,6 +173,18 @@ export function AssignTaskDialog({ open, onOpenChange, order: fixedOrder, onCrea
               onChange={(e) => setMessage(e.target.value)}
               placeholder="e.g. Jas, pwede na yang ipadala"
             />
+            {warnings.length > 0 && (
+              <div role="alert" className="flex gap-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-200">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <p className="font-medium">Check before sending: this order may not be ready to ship.</p>
+                  <ul className="mt-0.5 list-disc pl-4">
+                    {warnings.map((w) => <li key={w}>{w}</li>)}
+                  </ul>
+                  <p className="mt-1 text-xs opacity-80">You can still assign it, e.g. to collect the balance first.</p>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">

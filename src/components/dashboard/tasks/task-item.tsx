@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { dueLabel, phtWhen } from '@/lib/services/staff-tasks/task-dates';
 import type { StaffTask, StaffTaskProgress } from '@/types/staff-tasks.types';
+import { ShipContextBlock } from '@/components/dashboard/orders/ship-context-block';
 
 interface Props {
   task: StaffTask;
@@ -77,6 +78,14 @@ export function TaskItem({ task, view, busy, onSeen, onProgress, onDone, onCance
           {task.orderCustomer && <span>· {task.orderCustomer}</span>}
           {task.orderStatus && <span className="text-muted-foreground">· {task.orderStatus}</span>}
         </Link>
+      )}
+      {open && task.orderContext && (
+        <ShipContextBlock
+          hold={task.orderContext.hold}
+          others={task.orderContext.others}
+          self={task.orderContext}
+          onNavigate={onOpenOrder}
+        />
       )}
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">

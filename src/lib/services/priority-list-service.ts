@@ -4,6 +4,7 @@ import { findStage } from '@/lib/online-order-tracking';
 import { staffNotes } from './order-trail-service';
 import { getOwedReplacements } from './supplier-return-service';
 import { applyOwedReplacements } from '@/lib/priority/owed-replacements';
+import { getShipContexts } from './order-ship-context-service';
 import {
   PRIORITY_RULES, rankOrder, compareRows, transitState, phtDate, shipsBeforePaid,
   type MissingItem, type PriorityOrderInput, type PriorityRow, type PriorityHold,
@@ -155,7 +156,7 @@ export async function getPriorityList(
   const ids = eligible.map((o) => o.id);
 
   // 2. Everything else, keyed by order.
-  const [payments, issues, sources, events, borrows, logs, lines] = await Promise.all([
+  const [payments, issues, sources, events, borrows, logs, lines, shipContexts] = await Promise.all([
     inChunks(ids, (c) => fetchAllPages<any>((f, t) =>
       supabase.from('payments').select('order_id, payment_date, created_at').in('order_id', c).order('id').range(f, t))),
     inChunks(ids, (c) => fetchAllPages<any>((f, t) =>
@@ -169,6 +170,7 @@ export async function getPriorityList(
       supabase.from('order_logs').select('order_id, created_at').in('order_id', c).order('id').range(f, t))),
     inChunks(ids, (c) => fetchAllPages<any>((f, t) =>
       supabase.from('order_items').select('order_id, product_id, product_name, products(stock_level, assembly_recipe)').in('order_id', c).order('id').range(f, t))),
+    getShipContexts(supabase, ids),
   ]);
   const lineCount = new Map<string, number>();
   lines.forEach((l) => lineCount.set(l.order_id, (lineCount.get(l.order_id) || 0) + 1));
@@ -249,6 +251,8 @@ export async function getPriorityList(
       followUps,
       lastFollowUp,
       hold,
+      shipHold: shipContexts.get(o.id)?.hold || null,
+      otherOpenOrders: shipContexts.get(o.id)?.others || [],
       sendToday,
       sendTodayBlock,
       urgent,

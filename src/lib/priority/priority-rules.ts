@@ -8,6 +8,8 @@
  * item nobody decided on for days is.
  */
 
+import type { ShipHold, SiblingOrder } from '@/lib/services/order-ship-context-service';
+
 const DAY = 24 * 60 * 60 * 1000;
 
 export const PRIORITY_RULES = {
@@ -86,7 +88,7 @@ export const OS_DECISIONS = {
   remove: 'Remove the item (customer cancelled it)',
 } as const;
 export type OsDecision = keyof typeof OS_DECISIONS;
-export type PriorityStep = 'send_today' | 'send_upload' | 'pack' | 'book' | 'prep' | 'stale' | 'hold' | 'recheck' | MissingState;
+export type PriorityStep = 'send_today' | 'send_upload' | 'pack' | 'book' | 'prep' | 'stale' | 'hold' | 'ship_hold' | 'recheck' | MissingState;
 
 export interface MissingItem {
   productId: string;
@@ -148,6 +150,14 @@ export interface PriorityOrderInput {
   followUps: number;
   lastFollowUp: { note: string | null; byName: string | null; at: string } | null;
   hold: PriorityHold | null;
+  /**
+   * Sales marked it not for shipping yet (Packed Orders → Delay, or marked for
+   * bus). Found 2026-11-24: #020106B showed as ready while it waited for the
+   * customer's other orders, so the owner assigned "Pwede na ipadala".
+   */
+  shipHold: ShipHold | null;
+  /** The same customer's other open orders (shipped together, still owing...). */
+  otherOpenOrders: SiblingOrder[];
   /** Latest staff notes from the order's Activity & Notes, newest first (stamp = as written, PHT). */
   recentNotes: { text: string; actor: string; stamp: string }[];
   noteCount: number;
@@ -203,6 +213,7 @@ export const STEP_LABELS: Record<PriorityStep, string> = {
   recheck: 'Status says OS but nothing is reported — re-pick to check',
   stale: 'No activity 30+ days — confirm with customer or cancel',
   hold: 'On hold',
+  ship_hold: 'Not for shipping yet: sales is holding it',
 };
 
 export const OWNER_LABELS: Record<PriorityOwner, string> = {
@@ -292,6 +303,9 @@ export function isHoldActive(hold: PriorityHold | null, now: Date): boolean {
   return !!hold && hold.until >= phtDate(now);
 }
 
+/** Statuses where a not-for-shipping note puts the order On hold. */
+export const SHIP_HOLD_STATUSES = ['Packed', 'For Shipping'];
+
 function classify(o: PriorityOrderInput, now: Date) {
   if (o.status === 'On-Hold' || isHoldActive(o.hold, now)) {
     return { group: 'hold' as const, owner: 'none' as const, step: 'hold' as const, stepSince: null, dueAt: null };
@@ -300,6 +314,14 @@ function classify(o: PriorityOrderInput, now: Date) {
   if (o.sendToday && o.sendToday.date <= phtDate(now)) {
     const step = ['Packed', 'For Shipping'].includes(o.status) ? 'send_upload' as const : 'send_today' as const;
     return { group: 'send_today' as const, owner: 'warehouse' as const, step, stepSince: o.sendToday.at, dueAt: pickupAt(o.sendToday.date) };
+  }
+
+  // Sales held it (waiting for the customer's other orders, payment, a date...):
+  // not ready to send even if it's paid and packed. Only once packed: marking
+  // for bus also sets the note on orders not picked yet, and those still need
+  // picking and packing.
+  if (o.shipHold && SHIP_HOLD_STATUSES.includes(o.status)) {
+    return { group: 'hold' as const, owner: 'none' as const, step: 'ship_hold' as const, stepSince: o.shipHold.at, dueAt: null };
   }
 
   // Missing items need someone to act (sales decides, buyer buys) even while the

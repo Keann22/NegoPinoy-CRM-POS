@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import type { PriorityAction } from './priority-action-dialog';
 import { PriorityNotesPanel } from './priority-notes-panel';
 import { AssignTaskButton } from '@/components/dashboard/tasks/assign-task-button';
+import { ShipContextBlock } from '@/components/dashboard/orders/ship-context-block';
 import {
   BLOCK_REASONS, OS_DECISIONS, OWNER_LABELS, STEP_LABELS, phtDate, isFullyPaid,
   type MissingItem, type MissingState, type PriorityOwner, type PriorityRow,
@@ -54,7 +55,11 @@ const ITEM_STATE: Record<MissingState, string> = {
 
 /** "Late 3d" / "Due today" / "Due in 2d" for the current step. */
 function timer(row: PriorityRow): { text: string; tone: 'late' | 'today' | 'ok' } | null {
-  if (row.group === 'hold') return row.hold ? { text: `Back on ${shortDate(row.hold.until)}`, tone: 'ok' } : null;
+  if (row.group === 'hold') {
+    if (row.hold) return { text: `Back on ${shortDate(row.hold.until)}`, tone: 'ok' };
+    if (row.step === 'ship_hold' && row.shipHold?.at) return { text: `Held since ${shortDate(row.shipHold.at)}`, tone: 'ok' };
+    return null;
+  }
   if (!row.dueAt) return null;
   if (row.daysLate > 0) return { text: `Late ${row.daysLate}d`, tone: 'late' };
   const today = phtDate(new Date());
@@ -202,6 +207,7 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
               ⚠️ May be OS — check these first: {row.mayBeOs.map((m) => `${m.name} (stock ${m.stock})`).join(', ')}
             </div>
           )}
+          <ShipContextBlock hold={row.shipHold} others={row.otherOpenOrders} />
           {row.urgent && (
             <div className="text-xs text-red-700 dark:text-red-300">Nagmamadali: “{row.urgent.note}” — {row.urgent.byName}, {shortDate(row.urgent.at)}</div>
           )}

@@ -1,3 +1,5 @@
+import type { OrderShipContext } from '@/lib/services/order-ship-context-service';
+
 /** A task an owner gave a staff member (table staff_tasks, owner 2026-11-23). */
 export type StaffTaskStatus = 'open' | 'done' | 'cancelled';
 /** Between Seen and Done: "Ginagawa na" or "May problema". */
@@ -12,6 +14,8 @@ export interface StaffTask {
   orderCustomer: string | null;
   /** The order's status now, so the owner sees if "ship this" happened. */
   orderStatus: string | null;
+  /** Hold note, what it still owes, and the customer's other open orders. */
+  orderContext?: OrderShipContext | null;
   assigneeName: string;
   assignedByName: string;
   dueAt: string | null;

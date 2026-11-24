@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import type { NewStaffTask, StaffTask, StaffTaskAction, StaffTaskMessage, TaskPerson } from '@/types/staff-tasks.types';
+import type { OrderShipContext } from '@/lib/services/order-ship-context-service';
 
 const API = '/api/tasks';
 /** Fired after any task change, so lists that load their own copy can reload. */
@@ -130,6 +131,21 @@ export function useTaskPeople(enabled: boolean) {
       .catch(() => setPeople([]));
   }, [enabled, people.length]);
   return people;
+}
+
+/** Assign task: is the order held, does it or the customer's other orders still owe? (owners) */
+export function useOrderShipContext(orderId: string | null | undefined) {
+  // Keyed by order, so a different order never shows the previous one's context.
+  const [loaded, setLoaded] = useState<{ orderId: string; context: OrderShipContext | null } | null>(null);
+  useEffect(() => {
+    if (!orderId) return;
+    let alive = true;
+    call<{ context: OrderShipContext | null }>({ query: `?view=orderContext&orderId=${encodeURIComponent(orderId)}` })
+      .then((json) => { if (alive) setLoaded({ orderId, context: json.context || null }); })
+      .catch(() => { if (alive) setLoaded({ orderId, context: null }); });
+    return () => { alive = false; };
+  }, [orderId]);
+  return orderId && loaded?.orderId === orderId ? loaded.context : null;
 }
 
 export async function createStaffTask(input: NewStaffTask): Promise<string[]> {

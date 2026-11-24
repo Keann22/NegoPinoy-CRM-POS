@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import {
-  cancelTask, createTask, listAllTasks, listMyTasks, listOrderTasks, listPeople, markDone, markSeen, setProgress,
+  cancelTask, createTask, getOrderContext, listAllTasks, listMyTasks, listOrderTasks, listPeople, markDone, markSeen, setProgress,
   TaskError,
 } from '@/lib/services/staff-tasks/staff-task-service';
 import { getTaskCaller } from '@/lib/services/staff-tasks/task-caller';
@@ -18,7 +18,7 @@ function fail(e: unknown) {
 }
 
 // ?view=mine (default): my tasks. ?view=all: every task (owners). ?view=people: who to assign to (owners).
-// ?view=order&orderId=: tasks on one order.
+// ?view=order&orderId=: tasks on one order. ?view=orderContext&orderId=: hold note + customer's other open orders (owners).
 export async function GET(req: Request) {
   try {
     const caller = await getCaller();
@@ -33,6 +33,10 @@ export async function GET(req: Request) {
     }
     if (!caller.isManagement) return NextResponse.json({ error: 'Owners only' }, { status: 403 });
     if (view === 'people') return NextResponse.json({ people: await listPeople(supabase) });
+    if (view === 'orderContext') {
+      const orderId = params.get('orderId');
+      return NextResponse.json({ context: orderId ? await getOrderContext(supabase, orderId) : null });
+    }
     const days = Math.min(90, Math.max(1, Number(params.get('days')) || 14));
     return NextResponse.json({ tasks: await listAllTasks(supabase, days) });
   } catch (e) {

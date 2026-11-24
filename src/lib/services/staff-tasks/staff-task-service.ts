@@ -1,6 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { staffRoleNames } from '@/lib/auth/staff-roles';
 import type { NewStaffTask, StaffTask, TaskPerson } from '@/types/staff-tasks.types';
+import { getShipContexts, OPEN_ORDER_STATUSES, type OrderShipContext } from '@/lib/services/order-ship-context-service';
 
 /*
  * Staff tasks (owner, 2026-11-23): instead of messaging Jas "pwede na yang
@@ -125,6 +126,33 @@ function toTask(r: TaskRow): StaffTask {
   };
 }
 
+/**
+ * Adds "can this order ship yet?" to tasks about an order: its hold note, what it
+ * still owes, and the customer's other open orders (found 2026-11-24, #020106B).
+ */
+async function withOrderContext(supabase: SupabaseClient, tasks: StaffTask[]): Promise<StaffTask[]> {
+  // Only orders still open: a shipped or cancelled order has nothing left to decide,
+  // and put-back tasks are about pieces, not shipping.
+  const ids = tasks.filter((t) => !t.auto).map((t) => t.orderId).filter(Boolean) as string[];
+  if (ids.length === 0) return tasks;
+  let contexts: Map<string, OrderShipContext>;
+  try {
+    contexts = await getShipContexts(supabase, ids);
+  } catch (e) {
+    console.error('Task order context failed', e);
+    return tasks;
+  }
+  return tasks.map((t) => {
+    const ctx = !t.auto && t.orderId ? contexts.get(t.orderId) : undefined;
+    return { ...t, orderContext: ctx && OPEN_ORDER_STATUSES.includes(ctx.status) ? ctx : null };
+  });
+}
+
+/** For the Assign task dialog: can this order ship yet? */
+export async function getOrderContext(supabase: SupabaseClient, orderId: string): Promise<OrderShipContext | null> {
+  return (await getShipContexts(supabase, [orderId])).get(orderId) || null;
+}
+
 /** The caller's open tasks, plus what they finished in the last 7 days. */
 export async function listMyTasks(supabase: SupabaseClient, userId: string): Promise<StaffTask[]> {
   const since = new Date(Date.now() - 7 * 86400000).toISOString();
@@ -136,7 +164,7 @@ export async function listMyTasks(supabase: SupabaseClient, userId: string): Pro
     .order('created_at', { ascending: false })
     .limit(200);
   if (error) throw error;
-  return ((data || []) as unknown as TaskRow[]).map(toTask);
+  return withOrderContext(supabase, ((data || []) as unknown as TaskRow[]).map(toTask));
 }
 
 /** Owners' view: every open task, and tasks done or cancelled in the last `days` days. */
@@ -149,7 +177,7 @@ export async function listAllTasks(supabase: SupabaseClient, days = 14): Promise
     .order('created_at', { ascending: false })
     .limit(500);
   if (error) throw error;
-  return ((data || []) as unknown as TaskRow[]).map(toTask);
+  return withOrderContext(supabase, ((data || []) as unknown as TaskRow[]).map(toTask));
 }
 
 /** Open and recent tasks on one order (shown on the order page). */
@@ -162,7 +190,7 @@ export async function listOrderTasks(supabase: SupabaseClient, orderId: string):
     .order('created_at', { ascending: false })
     .limit(20);
   if (error) throw error;
-  return ((data || []) as unknown as TaskRow[]).map(toTask);
+  return withOrderContext(supabase, ((data || []) as unknown as TaskRow[]).map(toTask));
 }
 
 export async function createTask(

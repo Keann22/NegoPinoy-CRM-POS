@@ -31,7 +31,7 @@ const GROUPS: { key: PriorityGroup; label: string; hint: string }[] = [
   { key: 'waiting', label: 'Waiting for items', hint: 'Something is OS. The owner shows who has to move next: sales decides, the buyer buys, or it is on the way.' },
   { key: 'prep', label: 'Prep now', hint: 'Lay-aways 80%+ paid. Check stock now so nothing is missing when the last payment comes in.' },
   { key: 'stale', label: 'No activity 30d+', hint: 'Nobody has touched these in 30+ days. Sales: confirm with the customer if we still send it, or cancel the order.' },
-  { key: 'hold', label: 'On hold', hint: 'Customer asked to wait, or the order is On-Hold. They come back on their hold date.' },
+  { key: 'hold', label: 'On hold', hint: 'Customer asked to wait, the order is On-Hold, or it is packed but sales marked it not for shipping yet (Packed Orders → Waiting to be Shipped, or marked for bus). Dated holds come back on their date; not-for-shipping ones leave when the order is verified for shipping.' },
 ];
 
 export default function PriorityListPage() {
