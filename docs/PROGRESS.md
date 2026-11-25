@@ -85,6 +85,9 @@ and new BUSINESS_WORKFLOW.md sections (Customer profile, Copilot).
 
 Newest first. Older history: `git log`. Feature rules: `docs/BUSINESS_WORKFLOW.md`.
 
+- **2026-11-25** Every staff screen in English (labels, pop-ups, toasts, Telegram recount
+  messages, put-back task text): glossary in BUSINESS_WORKFLOW.md "Screens in English".
+  Customer-facing text stays Filipino. (Claude, 5296908)
 - **2026-11-25** Order notes for a person or team: "Para kanino?" on every note box
   (Inventory / Owners / agent / anyone), Kailangan ng sagot / Pasabi lang po; pop-up until
   answered, answer pops up for the sender, 2-hour unseen alert. (Claude, 440a449)
