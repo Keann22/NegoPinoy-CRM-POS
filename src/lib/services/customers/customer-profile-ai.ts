@@ -202,6 +202,9 @@ export function buildHeuristicPersona(ctx: CustomerProfileContext): AnalyzedPers
   };
 }
 
+const RETRYABLE_HTTP = new Set([429, 500, 502, 503, 504]);
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 export async function analyzeCustomerPersona(
   ctx: CustomerProfileContext,
   existingCorrection?: { personaType?: string | null; correctionNote?: string | null }
@@ -210,33 +213,59 @@ export async function analyzeCustomerPersona(
   if (!apiKey) return buildHeuristicPersona(ctx);
 
   const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25_000);
+  const promptText = buildPrompt(ctx, existingCorrection);
+  const backoffs = [1500, 4000];
 
   try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal,
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: buildPrompt(ctx, existingCorrection) }] }],
-          generationConfig: {
-            temperature: 0.2,
-            responseMimeType: 'application/json',
-            maxOutputTokens: 2048,
-            thinkingConfig: { thinkingBudget: 0 },
-          },
-        }),
-      }
-    );
+    let rawText: string | undefined;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 25_000);
+      try {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal,
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: promptText }] }],
+              generationConfig: {
+                temperature: 0.2,
+                responseMimeType: 'application/json',
+                maxOutputTokens: 2048,
+                thinkingConfig: { thinkingBudget: 0 },
+              },
+            }),
+          }
+        );
 
-    if (!res.ok) return buildHeuristicPersona(ctx);
-    const json = (await res.json()) as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-    };
-    const rawText = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!res.ok) {
+          if (RETRYABLE_HTTP.has(res.status) && attempt < 2) {
+            await sleep(backoffs[attempt]);
+            continue;
+          }
+          return buildHeuristicPersona(ctx);
+        }
+        const json = (await res.json()) as {
+          candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+        };
+        rawText = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (rawText) break;
+        if (attempt < 2) {
+          await sleep(backoffs[attempt]);
+          continue;
+        }
+      } catch (err) {
+        if (attempt < 2) {
+          await sleep(backoffs[attempt]);
+          continue;
+        }
+        throw err;
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
     if (!rawText) return buildHeuristicPersona(ctx);
 
     const parsed = JSON.parse(rawText) as Record<string, unknown>;
@@ -343,7 +372,5 @@ export async function analyzeCustomerPersona(
   } catch (err) {
     console.warn('analyzeCustomerPersona failed, falling back to heuristic:', err);
     return buildHeuristicPersona(ctx);
-  } finally {
-    clearTimeout(timeout);
   }
 }

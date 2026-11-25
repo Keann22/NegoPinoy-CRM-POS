@@ -3,8 +3,10 @@ import { createClient } from '@supabase/supabase-js';
 import { remindUnfinishedRecounts } from '@/lib/services/inventory/recount-request-service';
 import { getTelegramConfig } from '@/lib/services/inventory/inventory-guardian-telegram-service';
 import { wakeDueHeldReturns } from '@/lib/services/customer-returns/customer-return-hold';
+import { refreshStaleCustomerProfiles } from '@/lib/services/customers/customer-profile-refresh';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
@@ -25,11 +27,14 @@ export async function GET(req: Request) {
       const result = await remindUnfinishedRecounts(supabase, new Date(), true);
       return NextResponse.json({ telegramConfigured: !!(cfg.botToken && cfg.chatId), ...result });
     }
-    const [recounts, heldReturns] = await Promise.all([
+    const [recounts, heldReturns, profilesRefreshed] = await Promise.all([
       remindUnfinishedRecounts(supabase),
       wakeDueHeldReturns(supabase),
+      refreshStaleCustomerProfiles(supabase, { limit: 12, concurrency: 3 }).catch((err) => ({
+        error: err instanceof Error ? err.message : String(err),
+      })),
     ]);
-    return NextResponse.json({ ...recounts, heldReturnsWoke: heldReturns.woke });
+    return NextResponse.json({ ...recounts, heldReturnsWoke: heldReturns.woke, profilesRefreshed });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }

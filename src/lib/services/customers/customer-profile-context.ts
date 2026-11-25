@@ -47,6 +47,12 @@ export interface CustomerProfileContext {
   metrics: CustomerPersonaMetrics;
 }
 
+export interface SharedCatalogSnapshot {
+  productList: RawProductRow[];
+  productCategoryMap: Map<string, string>;
+  stoppedOrOosFlags: Set<string>;
+}
+
 const CUSTOMER_COLS =
   'id, psid, full_name, suki_tier, total_lifetime_spend, mobile_number, location_city, location_barangay, city, province, address_line, store_credit, preferred_honorific, preferred_payment, stove_type, family_size, specialty_cuisine, ai_summary_notes, pain_points';
 
@@ -132,13 +138,31 @@ export async function resolveCustomerRow(
   throw new CustomerProfileError('Provide customerId or psid');
 }
 
+export async function loadSharedCatalogSnapshot(
+  supabase: SupabaseClient
+): Promise<SharedCatalogSnapshot> {
+  const [productList, { data: activeFlags, error: flagErr }] = await Promise.all([
+    fetchAllProducts(supabase),
+    supabase.from('supplier_stock_flags').select('product_id, status').is('cleared_at', null),
+  ]);
+  if (flagErr) throw flagErr;
+  const productCategoryMap = new Map(productList.map((p) => [p.id, p.category || 'Other']));
+  const stoppedOrOosFlags = new Set(
+    (activeFlags ?? [])
+      .filter((f) => ['stop_selling', 'waiting_restock', 'other_variant'].includes(String(f.status)))
+      .map((f) => String(f.product_id))
+  );
+  return { productList, productCategoryMap, stoppedOrOosFlags };
+}
+
 export async function buildCustomerProfileContext(
   supabase: SupabaseClient,
-  target: { customerId?: string; psid?: string }
+  target: { customerId?: string; psid?: string },
+  sharedCatalog?: SharedCatalogSnapshot
 ): Promise<CustomerProfileContext> {
   const customer = await resolveCustomerRow(supabase, target);
 
-  const [{ data: rawOrders, error: ordErr }, chatRes, productList, { data: activeFlags }] =
+  const [{ data: rawOrders, error: ordErr }, chatRes, catalogSnapshot] =
     await Promise.all([
       supabase
         .from('orders')
@@ -156,12 +180,13 @@ export async function buildCustomerProfileContext(
             .order('created_at', { ascending: false })
             .limit(100)
         : Promise.resolve({ data: [], count: 0, error: null }),
-      fetchAllProducts(supabase),
-      supabase.from('supplier_stock_flags').select('product_id, status').is('cleared_at', null),
+      sharedCatalog ? Promise.resolve(sharedCatalog) : loadSharedCatalogSnapshot(supabase),
     ]);
 
   if (ordErr) throw ordErr;
   if (chatRes.error) throw chatRes.error;
+
+  const { productList, productCategoryMap, stoppedOrOosFlags } = catalogSnapshot;
 
   const orderRows = (rawOrders ?? []) as unknown as RawOrderRow[];
   const orderIds = orderRows.map((o) => o.id);
@@ -182,13 +207,6 @@ export async function buildCustomerProfileContext(
       }
     }
   }
-
-  const productCategoryMap = new Map(productList.map((p) => [p.id, p.category || 'Other']));
-  const stoppedOrOosFlags = new Set(
-    (activeFlags ?? [])
-      .filter((f) => ['stop_selling', 'waiting_restock', 'other_variant'].includes(String(f.status)))
-      .map((f) => String(f.product_id))
-  );
 
   const orders: OrderSummaryForAi[] = orderRows.map((o) => ({
     id: o.id,

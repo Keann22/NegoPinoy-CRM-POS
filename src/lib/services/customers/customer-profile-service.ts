@@ -17,10 +17,12 @@ import {
   buildCustomerProfileContext,
   CustomerProfileError,
   resolveCustomerRow,
+  type SharedCatalogSnapshot,
 } from './customer-profile-context';
 
 export { CustomerProfileError };
 export { listCustomerProfiles, generateBatchProfiles } from './customer-profile-list';
+export { refreshStaleCustomerProfiles } from './customer-profile-refresh';
 
 interface DbProfileRow {
   id: string;
@@ -48,6 +50,7 @@ interface DbProfileRow {
   staff_correction_note: string | null;
   staff_verified_by: string | null;
   staff_verified_at: string | null;
+  needs_refresh?: boolean | null;
   generated_at: string;
   updated_at: string;
 }
@@ -149,8 +152,11 @@ async function computeFreshMeta(
   }
   const newOrdersCount = Math.max(0, currentOrders - Number(row.source_order_count || 0));
   const newMessagesCount = Math.max(0, currentMsgs - Number(row.source_message_count || 0));
+  const overdueStale =
+    Number(row.metrics?.overdueLayawayCount || 0) > 0 &&
+    Date.now() - new Date(row.generated_at).getTime() > 7 * 86400000;
   return {
-    isStale: newOrdersCount > 0 || newMessagesCount >= 5,
+    isStale: Boolean(row.needs_refresh) || newOrdersCount > 0 || newMessagesCount >= 5 || overdueStale,
     newOrdersCount,
     newMessagesCount,
     within24hWindow,
@@ -191,9 +197,10 @@ export async function getCustomerProfile(
 
 export async function generateCustomerProfile(
   supabase: SupabaseClient,
-  target: { customerId?: string; psid?: string }
+  target: { customerId?: string; psid?: string },
+  sharedCatalog?: SharedCatalogSnapshot
 ): Promise<CustomerProfileResponse> {
-  const ctx = await buildCustomerProfileContext(supabase, target);
+  const ctx = await buildCustomerProfileContext(supabase, target, sharedCatalog);
 
   const { data: existingRow } = await supabase
     .from('customer_profiles')
@@ -233,6 +240,9 @@ export async function generateCustomerProfile(
     source_message_count: ctx.totalMessageCount,
     last_message_at: ctx.metrics.lastChatAt,
     model_used: analyzed.modelUsed,
+    needs_refresh: false,
+    needs_refresh_reason: null,
+    needs_refresh_at: null,
     generated_at: nowIso,
     updated_at: nowIso,
   };

@@ -22,6 +22,9 @@ const EMPTY_META: CustomerProfileMeta = {
   within24hWindow: false,
 };
 
+// Track which customer keys already triggered an automatic background refresh in this session.
+const autoRefreshedKeys = new Set<string>();
+
 export function useCustomerPersona({ customerId, psid }: UseCustomerPersonaParams) {
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [meta, setMeta] = useState<CustomerProfileMeta>(EMPTY_META);
@@ -35,31 +38,6 @@ export function useCustomerPersona({ customerId, psid }: UseCustomerPersonaParam
     if (psid) return `psid=${encodeURIComponent(psid)}`;
     return null;
   }, [customerId, psid]);
-
-  const reload = useCallback(async () => {
-    if (!queryKey) {
-      setProfile(null);
-      setMeta(EMPTY_META);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/customers/profile?${queryKey}`, { cache: 'no-store' });
-      const data = (await res.json()) as CustomerProfileResponse & { error?: string };
-      if (!res.ok) throw new Error(data.error || 'Failed to load customer persona');
-      setProfile(data.profile ?? null);
-      setMeta(data.meta ?? EMPTY_META);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load persona');
-    } finally {
-      setLoading(false);
-    }
-  }, [queryKey]);
-
-  useEffect(() => {
-    void reload();
-  }, [reload]);
 
   const generate = useCallback(async () => {
     if (!customerId && !psid) return null;
@@ -84,6 +62,39 @@ export function useCustomerPersona({ customerId, psid }: UseCustomerPersonaParam
       setGenerating(false);
     }
   }, [customerId, psid]);
+
+  const reload = useCallback(async () => {
+    if (!queryKey) {
+      setProfile(null);
+      setMeta(EMPTY_META);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/customers/profile?${queryKey}`, { cache: 'no-store' });
+      const data = (await res.json()) as CustomerProfileResponse & { error?: string };
+      if (!res.ok) throw new Error(data.error || 'Failed to load customer persona');
+      setProfile(data.profile ?? null);
+      setMeta(data.meta ?? EMPTY_META);
+
+      const shouldAutoRefresh =
+        Boolean(data.profile && data.meta?.isStale) ||
+        Boolean(!data.profile && customerId);
+      if (shouldAutoRefresh && !autoRefreshedKeys.has(queryKey)) {
+        autoRefreshedKeys.add(queryKey);
+        void generate();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load persona');
+    } finally {
+      setLoading(false);
+    }
+  }, [queryKey, customerId, generate]);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
 
   const submitFeedback = useCallback(
     async (input: {

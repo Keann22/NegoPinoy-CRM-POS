@@ -7,6 +7,7 @@ import type {
   StaffProfileVerdict,
 } from '@/types';
 import { isWorthMessagingToday } from '@/types';
+import { loadSharedCatalogSnapshot } from './customer-profile-context';
 import { generateCustomerProfile } from './customer-profile-service';
 
 /**
@@ -31,6 +32,35 @@ export async function psidsMessagedWithin24h(supabase: SupabaseClient): Promise<
   return psids;
 }
 
+interface ProfileIndexRow {
+  customer_id: string;
+  psid: string | null;
+  persona_type: PersonaType;
+  persona_label: string;
+  summary: string;
+  next_action_type: NextActionType;
+  metrics: CustomerPersonaMetrics | null;
+  staff_verdict: StaffProfileVerdict | null;
+  generated_at: string;
+}
+
+async function fetchAllProfileIndexRows(supabase: SupabaseClient): Promise<ProfileIndexRow[]> {
+  const rows: ProfileIndexRow[] = [];
+  for (let from = 0; from < 20000; from += 1000) {
+    const { data, error } = await supabase
+      .from('customer_profiles')
+      .select('customer_id, psid, persona_type, persona_label, summary, next_action_type, metrics, staff_verdict, generated_at')
+      .order('generated_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, from + 999);
+    if (error) throw error;
+    const chunk = (data ?? []) as unknown as ProfileIndexRow[];
+    rows.push(...chunk);
+    if (chunk.length < 1000) break;
+  }
+  return rows;
+}
+
 export async function listCustomerProfiles(
   supabase: SupabaseClient,
   opts: { persona?: string | null; action?: string | null; todayOnly?: boolean } = {}
@@ -40,30 +70,15 @@ export async function listCustomerProfiles(
   totalProfiled: number;
   worthMessagingCount: number;
 }> {
-  const [{ data, error }, recentPsids] = await Promise.all([
-    supabase
-      .from('customer_profiles')
-      .select('customer_id, psid, persona_type, persona_label, summary, next_action_type, metrics, staff_verdict, generated_at')
-      .order('generated_at', { ascending: false })
-      .limit(1000),
+  const [rows, recentPsids] = await Promise.all([
+    fetchAllProfileIndexRows(supabase),
     psidsMessagedWithin24h(supabase),
   ]);
-  if (error) throw error;
 
   const countsByPersona: Record<string, number> = {};
   let worthMessagingCount = 0;
 
-  const all: CustomerProfileListItem[] = ((data ?? []) as Array<{
-    customer_id: string;
-    psid: string | null;
-    persona_type: PersonaType;
-    persona_label: string;
-    summary: string;
-    next_action_type: NextActionType;
-    metrics: CustomerPersonaMetrics | null;
-    staff_verdict: StaffProfileVerdict | null;
-    generated_at: string;
-  }>).map((r) => {
+  const all: CustomerProfileListItem[] = rows.map((r) => {
     countsByPersona[r.persona_type] = (countsByPersona[r.persona_type] || 0) + 1;
     const within24hWindow = Boolean(r.psid && recentPsids.has(r.psid));
     const overdueLayawayCount = Number(r.metrics?.overdueLayawayCount || 0);
@@ -98,32 +113,24 @@ export async function generateBatchProfiles(
   limit = 5
 ): Promise<{ generated: number; failed: number; totalAttempted: number; items: CustomerProfileListItem[] }> {
   const clamped = Math.min(8, Math.max(1, Math.round(limit)));
-
-  const [{ data: existing }, { data: candidates }] = await Promise.all([
-    supabase.from('customer_profiles').select('customer_id'),
-    supabase
-      .from('customers')
-      .select('id, psid, total_lifetime_spend')
-      .not('full_name', 'is', null)
-      .neq('full_name', '')
-      .not('address_line', 'is', null)
-      .neq('address_line', '')
-      .order('total_lifetime_spend', { ascending: false, nullsFirst: false })
-      .limit(120),
+  const [{ data: candidates, error: rpcErr }, sharedCatalog] = await Promise.all([
+    supabase.rpc('get_unprofiled_order_customers', { p_limit: clamped }),
+    loadSharedCatalogSnapshot(supabase),
   ]);
+  if (rpcErr) throw rpcErr;
 
-  const profiledIds = new Set((existing ?? []).map((r) => String(r.customer_id)));
-  const pool = (candidates ?? []).filter((c) => !profiledIds.has(String(c.id)));
-  pool.sort((a, b) => Number(Boolean(b.psid)) - Number(Boolean(a.psid)));
-
-  const chosen = pool.slice(0, clamped);
+  const chosen = (candidates ?? []) as Array<{ customer_id: string }>;
   let generated = 0;
   let failed = 0;
   const items: CustomerProfileListItem[] = [];
 
   for (const c of chosen) {
     try {
-      const res = await generateCustomerProfile(supabase, { customerId: String(c.id) });
+      const res = await generateCustomerProfile(
+        supabase,
+        { customerId: String(c.customer_id) },
+        sharedCatalog
+      );
       if (res.profile) {
         generated++;
         items.push({
@@ -140,7 +147,7 @@ export async function generateBatchProfiles(
       }
     } catch (err) {
       failed++;
-      console.warn(`Batch persona skipped customer ${c.id}:`, err);
+      console.warn(`Batch persona skipped customer ${c.customer_id}:`, err);
     }
   }
 
