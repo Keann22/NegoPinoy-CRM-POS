@@ -31,13 +31,16 @@ export function StaffTaskPopup() {
   const { busyId, handlers, dialogs, dialogOpen } = useTaskActions();
   const sentActions = useSentNoteActions();
 
-  const shown = active.filter((t) =>
+  // The Tasks page already lists their own tasks, so those don't pop up there; an
+  // answer to a note they sent still does (owner, 2026-11-25).
+  const onTasksPage = !!pathname?.startsWith(TASKS_PAGE_PATH);
+  const shown = onTasksPage ? [] : active.filter((t) =>
     t.staffUnread || (t.status === 'open' && (!t.seenAt || (isLate(t.dueAt) && t.progress !== 'problem'))));
 
   if (dialogOpen) return dialogs;
   if (sentActions.dialogOpen) return sentActions.dialogs;
   const total = shown.length + needsMe.length;
-  if (total === 0 || minimized || pathname?.startsWith(TASKS_PAGE_PATH)) return null;
+  if (total === 0 || minimized) return null;
 
   const anyLate = shown.some((t) => t.status === 'open' && t.seenAt && isLate(t.dueAt));
   const notes = shown.filter((t) => t.isNote);
