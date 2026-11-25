@@ -8,7 +8,7 @@ import { usePopupSnooze } from '@/hooks/usePopupSnooze';
 import { actOnTask, useMyTasks, useSentNotes } from '@/hooks/useStaffTasks';
 import { useTaskActions } from '@/hooks/useTaskActions';
 import { useSentNoteActions } from '@/hooks/useSentNoteActions';
-import { isTaskLate } from '@/lib/services/staff-tasks/task-dates';
+import { isTaskLate, isWaitingDue } from '@/lib/services/staff-tasks/task-dates';
 import { TASKS_PAGE_PATH } from './tasks-nav-badge';
 import { TaskItem } from './task-item';
 import { SentNoteItem } from './sent-note-item';
@@ -35,7 +35,7 @@ export function StaffTaskPopup() {
   // answer to a note they sent still does (owner, 2026-11-25).
   const onTasksPage = !!pathname?.startsWith(TASKS_PAGE_PATH);
   const shown = onTasksPage ? [] : active.filter((t) =>
-    t.staffUnread || (t.status === 'open' && (!t.seenAt || (isTaskLate(t) && t.progress !== 'problem'))));
+    t.staffUnread || (t.status === 'open' && (!t.seenAt || isWaitingDue(t) || (isTaskLate(t) && t.progress !== 'problem'))));
 
   if (dialogOpen) return dialogs;
   if (sentActions.dialogOpen) return sentActions.dialogs;

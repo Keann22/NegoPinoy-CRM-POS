@@ -8,10 +8,11 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { dueLabel, isWorkingToday, phtWhen } from '@/lib/services/staff-tasks/task-dates';
+import { dueLabel, isWaitingDue, isWaitingNow, isWorkingToday, phtWhen, waitingUntil } from '@/lib/services/staff-tasks/task-dates';
 import { OPEN_ORDER_STATUSES } from '@/lib/shipping/ship-hold-rules';
-import type { StaffTask, StaffTaskProgress } from '@/types/staff-tasks.types';
+import type { StaffTask, StaffTaskProgress, TaskAnswer } from '@/types/staff-tasks.types';
 import { ShipContextBlock } from '@/components/dashboard/orders/ship-context-block';
+import { TaskAnswerPanel } from './task-answer-panel';
 
 interface Props {
   task: StaffTask;
@@ -25,6 +26,8 @@ interface Props {
   onReply?: (t: StaffTask) => void;
   onHold?: (t: StaffTask) => void;
   onReschedule?: (t: StaffTask) => void;
+  /** Sales / owners: the answer buttons on a task about an order (OK to ship, hasn't replied, cancel). */
+  onAnswer?: (t: StaffTask, answer: TaskAnswer) => void;
   onOpenOrder?: () => void;
   /** Same task given to several people: "2 of 3 done". */
   groupProgress?: { done: number; total: number } | null;
@@ -43,6 +46,15 @@ function Progress({ task }: { task: StaffTask }) {
   if (task.progress === 'problem' && task.progressAt) {
     return <span className="flex items-center gap-1 font-medium text-orange-700 dark:text-orange-400"><AlertTriangle className="h-3.5 w-3.5" />Problem {phtWhen(task.progressAt)}</span>;
   }
+  if (task.progress === 'waiting' && task.progressAt) {
+    const until = waitingUntil(task);
+    return (
+      <span className="flex items-center gap-1 text-sky-700 dark:text-sky-400">
+        <Clock className="h-3.5 w-3.5" />
+        {isWaitingDue(task) ? `Waiting for customer since ${phtWhen(task.progressAt)} · ask again now` : `Waiting for customer since ${phtWhen(task.progressAt)}${until ? ` · ask again ${phtWhen(until.toISOString())}` : ''}`}
+      </span>
+    );
+  }
   if (task.progress === 'working' && task.progressAt) {
     return <span className="flex items-center gap-1 text-sky-700 dark:text-sky-400"><Hammer className="h-3.5 w-3.5" />Working on it since {phtWhen(task.progressAt)}</span>;
   }
@@ -51,16 +63,20 @@ function Progress({ task }: { task: StaffTask }) {
 }
 
 /** One task: what to do, the order it's about, the deadline, where it stands, and its buttons. */
-export function TaskItem({ task, view, busy, onSeen, onProgress, onDone, onCancel, onReply, onHold, onReschedule, onOpenOrder, groupProgress }: Props) {
+export function TaskItem({ task, view, busy, onSeen, onProgress, onDone, onCancel, onReply, onHold, onReschedule, onAnswer, onOpenOrder, groupProgress }: Props) {
   const due = task.dueAt && task.status === 'open' ? dueLabel(task.dueAt) : null;
   const open = task.status === 'open';
   const problem = open && task.progress === 'problem';
   const workingToday = isWorkingToday(task);
-  const showRedLate = !!due?.late && !workingToday;
+  const waitingNow = isWaitingNow(task);
+  const paused = workingToday || waitingNow;
+  const showRedLate = !!due?.late && !paused;
   const newReply = view === 'staff' ? task.staffUnread : task.ownerUnread;
   const canReply = !!onReply && task.status !== 'cancelled';
   const note = task.isNote;
   const closedOrder = open && !note && !task.auto && !!task.orderId && !!task.orderStatus && !OPEN_ORDER_STATUSES.includes(task.orderStatus);
+  // Sales / owners answer for the customer with buttons; the panel replaces Working on it / hold / bus.
+  const showAnswers = !!onAnswer && open && !note && !task.auto && !!task.orderId && !!task.orderContext && !closedOrder && !problem;
   return (
     <div className={cn(
       'space-y-2 rounded-lg border p-3',
@@ -83,7 +99,7 @@ export function TaskItem({ task, view, busy, onSeen, onProgress, onDone, onCance
             variant="outline"
             className={cn(
               'shrink-0',
-              due.late && workingToday
+              due.late && paused
                 ? 'border-sky-300 text-sky-800 dark:border-sky-800 dark:text-sky-300'
                 : due.late
                   ? 'border-red-400 text-red-700 dark:text-red-300'
@@ -91,7 +107,7 @@ export function TaskItem({ task, view, busy, onSeen, onProgress, onDone, onCance
             )}
           >
             <Clock className="mr-1 h-3 w-3" />
-            {due.late && workingToday ? 'Past due · updated today' : due.text}
+            {due.late && waitingNow ? 'Past due · waiting for customer' : due.late && workingToday ? 'Past due · updated today' : due.text}
           </Badge>
         )}
       </div>
@@ -133,7 +149,7 @@ export function TaskItem({ task, view, busy, onSeen, onProgress, onDone, onCance
         {newReply && <Badge className="bg-blue-600 text-white hover:bg-blue-600">New reply</Badge>}
       </div>
 
-      {open && task.progress && task.progressNote && (
+      {open && task.progress && task.progressNote && !(showAnswers && task.progress === 'waiting') && (
         <p className={cn(
           'whitespace-pre-wrap rounded-md p-2 text-sm',
           task.progress === 'problem' ? 'bg-orange-100 text-orange-900 dark:bg-orange-950/60 dark:text-orange-200' : 'bg-sky-50 dark:bg-sky-950/40'
@@ -154,6 +170,10 @@ export function TaskItem({ task, view, busy, onSeen, onProgress, onDone, onCance
         </div>
       )}
 
+      {showAnswers && onAnswer && (
+        <TaskAnswerPanel task={task} busy={busy} onAnswer={onAnswer} onHold={onHold} onOpenOrder={onOpenOrder} />
+      )}
+
       {((open && (onSeen || onProgress || onDone || onCancel || onHold || onReschedule)) || canReply) && (
         <div className="flex flex-wrap gap-2 pt-1">
           {canReply && (
@@ -168,7 +188,7 @@ export function TaskItem({ task, view, busy, onSeen, onProgress, onDone, onCance
               <Eye className="mr-1.5 h-4 w-4" />Got it
             </Button>
           )}
-          {open && onProgress && !note && (task.progress !== 'working' || !workingToday) && (
+          {open && onProgress && !note && !showAnswers && (task.progress !== 'working' || !workingToday) && (
             <Button size="sm" variant="outline" disabled={busy} className="border-sky-300 text-sky-800 dark:text-sky-300" onClick={() => onProgress(task, 'working')}>
               <Hammer className="mr-1.5 h-4 w-4" />{task.progress === 'working' ? 'Update' : 'Working on it'}
             </Button>
@@ -178,7 +198,7 @@ export function TaskItem({ task, view, busy, onSeen, onProgress, onDone, onCance
               <AlertTriangle className="mr-1.5 h-4 w-4" />Problem
             </Button>
           )}
-          {open && !note && !task.auto && task.orderId && task.orderContext && (
+          {open && !note && !task.auto && !showAnswers && task.orderId && task.orderContext && (
             <>
               {onHold && (
                 <Button size="sm" variant="outline" disabled={busy} className="border-amber-300 text-amber-800 dark:border-amber-800 dark:text-amber-300" onClick={() => onHold(task)}>
@@ -200,9 +220,15 @@ export function TaskItem({ task, view, busy, onSeen, onProgress, onDone, onCance
             </Button>
           )}
           {open && onDone && (!note || task.needsAnswer) && (
-            <Button size="sm" disabled={busy} className="bg-emerald-600 hover:bg-emerald-700" onClick={() => onDone(task)}>
-              <CheckCircle2 className="mr-1.5 h-4 w-4" />Done
-            </Button>
+            showAnswers ? (
+              <Button size="sm" variant="outline" disabled={busy} onClick={() => onDone(task)}>
+                <CheckCircle2 className="mr-1.5 h-4 w-4" />Done (other)
+              </Button>
+            ) : (
+              <Button size="sm" disabled={busy} className="bg-emerald-600 hover:bg-emerald-700" onClick={() => onDone(task)}>
+                <CheckCircle2 className="mr-1.5 h-4 w-4" />Done
+              </Button>
+            )
           )}
           {open && onCancel && (
             <Button size="sm" variant="ghost" disabled={busy} className="text-muted-foreground" onClick={() => onCancel(task)}>

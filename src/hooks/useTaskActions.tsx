@@ -3,12 +3,14 @@
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { actOnTask } from '@/hooks/useStaffTasks';
+import { useUserProfile } from '@/hooks/useUserProfile';
+import { TaskAnswerDialog, type AnswerTarget } from '@/components/dashboard/tasks/task-answer-dialog';
 import { TaskDoneDialog } from '@/components/dashboard/tasks/task-done-dialog';
 import { TaskProgressDialog, type ProgressTarget } from '@/components/dashboard/tasks/task-progress-dialog';
 import { TaskRescheduleDialog } from '@/components/dashboard/tasks/task-reschedule-dialog';
 import { TaskThreadDialog } from '@/components/dashboard/tasks/task-thread-dialog';
 import { ShipHoldDialog } from '@/components/dashboard/ship-holds/ship-hold-dialog';
-import type { StaffTask, StaffTaskProgress } from '@/types/staff-tasks.types';
+import type { StaffTask, StaffTaskProgress, TaskAnswer } from '@/types/staff-tasks.types';
 
 /**
  * The buttons on a task (Got it / Working on it / Problem / Done / Reply / Don't ship yet)
@@ -23,6 +25,10 @@ export function useTaskActions(view: 'staff' | 'owner' = 'staff', onChanged?: ()
   const [replyTask, setReplyTask] = useState<StaffTask | null>(null);
   const [holdTask, setHoldTask] = useState<StaffTask | null>(null);
   const [rescheduleTask, setRescheduleTask] = useState<StaffTask | null>(null);
+  const [answerTarget, setAnswerTarget] = useState<AnswerTarget | null>(null);
+  // Answer buttons (OK to ship / hasn't replied / cancel) are for the people who talk to the customer.
+  const { userProfile } = useUserProfile();
+  const canAnswer = view === 'staff' && !!userProfile?.roles.some((r) => r === 'Sales' || r === 'Admin' || r === 'Owner');
 
   const onSeen = async (t: StaffTask) => {
     setBusyId(t.id);
@@ -49,6 +55,7 @@ export function useTaskActions(view: 'staff' | 'owner' = 'staff', onChanged?: ()
     onReply: (t: StaffTask) => setReplyTask(t),
     onHold: (t: StaffTask) => setHoldTask(t),
     ...(view === 'owner' ? { onReschedule: (t: StaffTask) => setRescheduleTask(t) } : {}),
+    ...(canAnswer ? { onAnswer: (t: StaffTask, answer: TaskAnswer) => setAnswerTarget({ task: t, answer }) } : {}),
   };
 
   const dialogs = (
@@ -79,6 +86,11 @@ export function useTaskActions(view: 'staff' | 'owner' = 'staff', onChanged?: ()
         onOpenChange={(o) => { if (!o) setRescheduleTask(null); }}
         onSaved={onChanged}
       />
+      <TaskAnswerDialog
+        target={answerTarget}
+        onOpenChange={(o) => { if (!o) setAnswerTarget(null); }}
+        onDone={onChanged}
+      />
     </>
   );
 
@@ -86,6 +98,6 @@ export function useTaskActions(view: 'staff' | 'owner' = 'staff', onChanged?: ()
     busyId,
     handlers,
     dialogs,
-    dialogOpen: !!doneTask || !!progressTarget || !!replyTask || !!holdTask || !!rescheduleTask,
+    dialogOpen: !!doneTask || !!progressTarget || !!replyTask || !!holdTask || !!rescheduleTask || !!answerTarget,
   };
 }

@@ -71,10 +71,33 @@ export function isWorkingToday(
     && phtDateString(new Date(t.progressAt)) === today;
 }
 
-/** Open, past deadline, and not already updated with a "Working on it" note today. */
+/** "Customer hasn't replied": the task comes back after this many hours (like returns and holds). */
+export const WAIT_HOURS = 4;
+
+type WaitFields = Pick<StaffTask, 'status' | 'progress' | 'progressAt'>;
+
+/** When a "Customer hasn't replied" task comes back ("Customer replied yet?"), or null. */
+export function waitingUntil(t: WaitFields): Date | null {
+  if (t.status !== 'open' || t.progress !== 'waiting' || !t.progressAt) return null;
+  return new Date(new Date(t.progressAt).getTime() + WAIT_HOURS * 3600000);
+}
+
+/** Waiting for the customer and not due back yet: no late flag, no pop-up. */
+export function isWaitingNow(t: WaitFields): boolean {
+  const until = waitingUntil(t);
+  return !!until && until.getTime() > Date.now();
+}
+
+/** Waiting for the customer and the 4 hours are up: ask the staff member again. */
+export function isWaitingDue(t: WaitFields): boolean {
+  const until = waitingUntil(t);
+  return !!until && until.getTime() <= Date.now();
+}
+
+/** Open, past deadline, not updated with a "Working on it" note today, and not waiting on the customer. */
 export function isTaskLate(
   t: Pick<StaffTask, 'status' | 'dueAt' | 'progress' | 'progressNote' | 'progressAt'>,
   today: string = phtDateString(),
 ): boolean {
-  return t.status === 'open' && isLate(t.dueAt) && !isWorkingToday(t, today);
+  return t.status === 'open' && isLate(t.dueAt) && !isWorkingToday(t, today) && !isWaitingNow(t);
 }

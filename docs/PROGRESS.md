@@ -90,6 +90,13 @@ and new BUSINESS_WORKFLOW.md sections (Copilot, task actions).
 
 Newest first. Older history: `git log`. Feature rules: `docs/BUSINESS_WORKFLOW.md`.
 
+- **2026-11-25** Task answer buttons for sales: OK to ship / Don't ship yet / Ship by
+  bus / Customer hasn't replied (back in 4 hours) / Cancel the order (paid = owners
+  decide); "Waiting for customer" tile. Migration
+  `2026-11-25_task_progress_waiting.sql` (applied). Tested on fake order #68BF109
+  (undone). Not tested live: OK to ship releasing a hold, the paid-cancel Problem.
+  (Claude)
+
 - **2026-11-25** Owner to-do "Only you can do these" on the owners' Dashboard and Tasks
   page (GCash statement, SPX file, flagged payments, held counts page, returns, staff
   waiting, supplier returns, Payment Fix, costs, bus unpaid); GCash/SPX uploads saved in

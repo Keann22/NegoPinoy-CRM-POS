@@ -4,12 +4,13 @@ import { isTaskLate, phtDateString } from '@/lib/services/staff-tasks/task-dates
 import { cn } from '@/lib/utils';
 import type { StaffTask } from '@/types/staff-tasks.types';
 
-export type StatKey = 'open' | 'notSeen' | 'working' | 'problem' | 'late' | 'replies' | 'doneToday';
+export type StatKey = 'open' | 'notSeen' | 'working' | 'waiting' | 'problem' | 'late' | 'replies' | 'doneToday';
 
 export const STAT_LABEL: Record<StatKey, string> = {
   open: 'Open',
   notSeen: 'Not seen yet',
   working: 'Working on it',
+  waiting: 'Waiting for customer',
   problem: 'Problem',
   late: 'Late',
   replies: 'New replies',
@@ -20,13 +21,14 @@ const STAT_TONE: Record<StatKey, 'red' | 'orange' | 'blue' | 'green' | undefined
   open: undefined,
   notSeen: 'orange',
   working: 'blue',
+  waiting: 'blue',
   problem: 'orange',
   late: 'red',
   replies: 'blue',
   doneToday: 'green',
 };
 
-const STAT_KEYS: StatKey[] = ['open', 'notSeen', 'working', 'problem', 'late', 'replies', 'doneToday'];
+const STAT_KEYS: StatKey[] = ['open', 'notSeen', 'working', 'waiting', 'problem', 'late', 'replies', 'doneToday'];
 
 /** Which tasks each number counts. The numbers and the lists both use this, so they always agree. */
 export function inStat(key: StatKey, t: StaffTask, today: string): boolean {
@@ -35,6 +37,7 @@ export function inStat(key: StatKey, t: StaffTask, today: string): boolean {
     case 'open': return open;
     case 'notSeen': return open && !t.seenAt;
     case 'working': return open && t.progress === 'working';
+    case 'waiting': return open && t.progress === 'waiting';
     case 'problem': return open && t.progress === 'problem';
     case 'late': return isTaskLate(t, today);
     case 'replies': return t.ownerUnread;
@@ -89,7 +92,7 @@ export function TaskStatGrid({ counts, activeKey, onPick }: {
   onPick: (key: StatKey) => void;
 }) {
   return (
-    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-8">
       {STAT_KEYS.map((key) => (
         <StatTile
           key={key}

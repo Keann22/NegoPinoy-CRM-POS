@@ -4,6 +4,11 @@ import type { OrderShipContext } from '@/lib/services/order-ship-context-service
 export type StaffTaskStatus = 'open' | 'done' | 'cancelled';
 /** Between Seen and Done: "Working on it" or "Problem". */
 export type StaffTaskProgress = 'working' | 'problem';
+/** Stored progress: also 'waiting' = "Customer hasn't replied" (answer buttons, owner 2026-11-25). */
+export type StaffTaskStoredProgress = StaffTaskProgress | 'waiting';
+
+/** The answer buttons on a sales task about an order (owner, 2026-11-25). */
+export type TaskAnswer = 'ok_to_ship' | 'waiting' | 'cancel';
 
 export interface StaffTask {
   id: string;
@@ -22,7 +27,7 @@ export interface StaffTask {
   status: StaffTaskStatus;
   seenAt: string | null;
   seenByName: string | null;
-  progress: StaffTaskProgress | null;
+  progress: StaffTaskStoredProgress | null;
   progressNote: string | null;
   progressAt: string | null;
   progressByName: string | null;

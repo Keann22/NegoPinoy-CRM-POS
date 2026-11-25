@@ -694,6 +694,19 @@ How it works (built 2026-11-20):
     pauses the late pop-up and red Late count for **that Philippine day only**
     (`Past due · updated today`); if still open tomorrow without a fresh
     update, it alerts as Late again.
+- **Answer buttons (owner, 2026-11-25).** Found 2026-11-25: sales answered "check
+  with the customer: ship or cancel?" tasks with free-text replies (Ask), so 11
+  tasks stayed open, one answer was typed on the wrong customer's task, and a
+  customer's reply went unnoticed. Now a task about an open order shows **What did
+  the customer say?** for sales and owners (their own tasks): **OK to ship**
+  (releases the hold if any, closes the task), **Don't ship yet** / **Ship by bus**
+  (the hold and bus dialogs), **Customer hasn't replied** (note what was asked; the
+  task isn't late while waiting and pops up again after 4 hours: "Customer replied
+  yet?"), and **Cancel the order** (reason required). An unpaid order is cancelled
+  right away (stock back, put-back task if picked, history shows who and why). A
+  **paid** order isn't cancelled from the task: it becomes a Problem so the owners
+  decide store credit or refund. Warehouse staff keep Working on it / Done. Owners'
+  Tasks page counts **Waiting for customer**.
 
 ## Put back the pieces of a cancelled order (owner, 2026-11-23; built 2026-11-23)
 
