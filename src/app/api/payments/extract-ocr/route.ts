@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { createWorker } from 'tesseract.js';
 import { afterReferenceRead, checkReceiver, readReceiver } from '@/lib/services/payments/payment-reference-check';
 import { extractGcashRefFromNotes, isOwnPhoneNumberRef } from '@/lib/services/payments/payment-ref-utils';
+import { extractReceiptDateTime } from '@/lib/services/payments/payment-date-ocr';
 
 export const maxDuration = 60;
 
@@ -149,13 +150,15 @@ export async function POST(request: Request) {
 
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
+    const { data: existingRow } = await supabase
+      .from('payments')
+      .select('notes, payment_date')
+      .eq('id', paymentId)
+      .maybeSingle();
+    const rowMeta = existingRow as { notes?: string | null; payment_date?: string | null } | null;
+
     if (!referenceNumber) {
-      const { data: existingRow } = await supabase
-        .from('payments')
-        .select('notes')
-        .eq('id', paymentId)
-        .maybeSingle();
-      const fromNotes = extractGcashRefFromNotes((existingRow as { notes?: string | null } | null)?.notes);
+      const fromNotes = extractGcashRefFromNotes(rowMeta?.notes);
       if (fromNotes) referenceNumber = fromNotes;
     }
 
@@ -165,17 +168,34 @@ export async function POST(request: Request) {
       const receiver = readReceiver(allText);
       if (!usedFallback && !receiver.ours && receiver.others.length === 0) {
         const visionText = await runGoogleVision(proofUrl);
-        if (visionText) allText = `${allText}\n${visionText}`;
+        if (visionText) {
+          usedFallback = true;
+          allText = `${allText}\n${visionText}`;
+        }
       }
       await checkReceiver(supabase, paymentId, allText);
     } catch (checkError) {
       console.warn('[OCR] Receiver check failed:', checkError);
     }
 
-    if (referenceNumber || ocrAmount !== null) {
+    let receiptDt = extractReceiptDateTime(allText, rowMeta?.payment_date);
+    if (!receiptDt.date && !usedFallback) {
+      const visionText = await runGoogleVision(proofUrl);
+      if (visionText) {
+        usedFallback = true;
+        allText = `${allText}\n${visionText}`;
+        if (!referenceNumber) referenceNumber = extractReferenceNumber(visionText);
+        if (ocrAmount === null) ocrAmount = extractOcrAmount(visionText);
+        receiptDt = extractReceiptDateTime(allText, rowMeta?.payment_date);
+      }
+    }
+
+    if (referenceNumber || ocrAmount !== null || receiptDt.date) {
       const updates: Record<string, unknown> = {};
       if (referenceNumber) updates.reference_number = referenceNumber;
       if (ocrAmount !== null) updates.ocr_amount = ocrAmount;
+      if (receiptDt.date) updates.ocr_payment_date = receiptDt.date;
+      if (receiptDt.time) updates.ocr_payment_time = receiptDt.time;
 
       const { error } = await supabase
         .from('payments')
@@ -186,14 +206,23 @@ export async function POST(request: Request) {
 
       // Copy the reference to the rest of a several-orders transfer, and warn the
       // owners if it was already used on another payment. Never fails the OCR.
-      try {
-        await afterReferenceRead(supabase, paymentId, referenceNumber, ocrAmount);
-      } catch (checkError) {
-        console.warn('[OCR] Reference check failed:', checkError);
+      if (referenceNumber || ocrAmount !== null) {
+        try {
+          await afterReferenceRead(supabase, paymentId, referenceNumber, ocrAmount);
+        } catch (checkError) {
+          console.warn('[OCR] Reference check failed:', checkError);
+        }
       }
 
       console.log(`[OCR] Finished. Saved to DB.`);
-      return NextResponse.json({ success: true, referenceNumber, ocrAmount, usedFallback });
+      return NextResponse.json({
+        success: true,
+        referenceNumber,
+        ocrAmount,
+        ocrPaymentDate: receiptDt.date,
+        ocrPaymentTime: receiptDt.time,
+        usedFallback,
+      });
     }
 
     return NextResponse.json({ success: true, message: 'No reference number or amount found', usedFallback });

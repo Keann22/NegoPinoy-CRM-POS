@@ -12,6 +12,8 @@ interface RawPaymentRow {
   reference_number: string | null;
   proof_url: string | null;
   ocr_amount: number | string | null;
+  ocr_payment_date: string | null;
+  ocr_payment_time: string | null;
   status: string | null;
   transfer_id: string | null;
   transfer_amount: number | string | null;
@@ -40,7 +42,7 @@ export async function fetchAllProofPayments(
     let query = supabase
       .from('payments')
       .select(
-        'id, order_id, amount, payment_date, created_at, payment_method, notes, reference_number, proof_url, ocr_amount, status, transfer_id, transfer_amount',
+        'id, order_id, amount, payment_date, created_at, payment_method, notes, reference_number, proof_url, ocr_amount, ocr_payment_date, ocr_payment_time, status, transfer_id, transfer_amount',
       )
       .not('proof_url', 'is', null)
       .neq('proof_url', '')
@@ -70,7 +72,7 @@ export async function fetchPaymentsForStatement(supabase: SupabaseClient): Promi
     const { data, error } = await supabase
       .from('payments')
       .select(
-        'id, order_id, amount, payment_date, created_at, payment_method, notes, reference_number, proof_url, ocr_amount, status, transfer_id, transfer_amount',
+        'id, order_id, amount, payment_date, created_at, payment_method, notes, reference_number, proof_url, ocr_amount, ocr_payment_date, ocr_payment_time, status, transfer_id, transfer_amount',
       )
       .in('status', ['Pending', 'Verified'])
       .neq('payment_method', 'SPX COD Remittance')
@@ -127,6 +129,8 @@ async function attachOrderInfo(
       reference_number: r.reference_number,
       proof_url: r.proof_url,
       ocr_amount: r.ocr_amount === null || r.ocr_amount === undefined ? null : Number(r.ocr_amount),
+      ocr_payment_date: r.ocr_payment_date || null,
+      ocr_payment_time: r.ocr_payment_time || null,
       status: normalizeStatus(r.status),
       transfer_id: r.transfer_id,
       transfer_amount: r.transfer_amount === null || r.transfer_amount === undefined ? null : Number(r.transfer_amount),

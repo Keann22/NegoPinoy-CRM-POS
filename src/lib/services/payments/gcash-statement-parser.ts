@@ -1,3 +1,5 @@
+import { normalizeTime24 } from './payment-date-ocr';
+
 export interface PdfTextItem {
   str: string;
   transform: number[];
@@ -6,6 +8,7 @@ export interface PdfTextItem {
 export interface StatementTransaction {
   index: number;
   date: string | null;
+  time: string | null;
   rawDate: string;
   description: string;
   refNo: string | null;
@@ -347,6 +350,7 @@ function finalizeTransaction(draft: CoreRowDraft, layout: ColumnLayout, index: n
   return {
     index,
     date: draft.dateIso,
+    time: normalizeTime24(combinedLine),
     rawDate: draft.rawDate,
     description: descPart,
     refNo: draft.refNo,

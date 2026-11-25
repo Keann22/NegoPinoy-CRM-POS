@@ -21,6 +21,8 @@ export interface PaymentLogItem {
   reference_number: string | null;
   proof_url: string | null;
   ocr_amount: number | null;
+  ocr_payment_date: string | null;
+  ocr_payment_time: string | null;
   status: PaymentStatus;
   transfer_id: string | null;
   transfer_amount: number | null;
@@ -67,10 +69,15 @@ export interface StatementDateAmountCandidate {
   proofUrl: string | null;
   notes: string | null;
   statementDate: string;
+  statementTime: string | null;
   statementRef: string | null;
   statementAmount: number;
   statementDesc: string;
   channelLabel: string | null;
+  receiptDate: string | null;
+  receiptTime: string | null;
+  timeDiffMinutes: number | null;
+  matchReason: string;
   confidence: 'high' | 'medium';
   confidenceScore: number;
   dayDiff: number;

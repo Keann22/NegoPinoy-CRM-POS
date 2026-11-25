@@ -5,26 +5,18 @@ import {
   isPaymentFlagged,
   isStandardGcashRef,
 } from './payment-ref-utils';
+import {
+  calendarDaysBetween,
+  extractDateFromNotes,
+  minutesDiff,
+  toPhDateString,
+} from './payment-date-ocr';
 import type { StatementTransaction } from './gcash-statement-parser';
 import type {
   PaymentLogItem,
   StatementAmountMismatch,
   StatementDateAmountCandidate,
 } from '@/types/payment-log.types';
-
-function toPhDate(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  const ph = new Date(d.getTime() + 8 * 3600 * 1000);
-  return ph.toISOString().slice(0, 10);
-}
-
-function calendarDayDiff(dateA: string, dateB: string): number {
-  const a = Date.UTC(Number(dateA.slice(0, 4)), Number(dateA.slice(5, 7)) - 1, Number(dateA.slice(8, 10)));
-  const b = Date.UTC(Number(dateB.slice(0, 4)), Number(dateB.slice(5, 7)) - 1, Number(dateB.slice(8, 10)));
-  return Math.round((a - b) / 86400000);
-}
 
 function effectivePaymentRef(p: PaymentLogItem): string | null {
   return cleanNumericRef(p.reference_number) || extractGcashRefFromNotes(p.notes);
@@ -47,13 +39,17 @@ function findMatchingTx(
         if (tx.direction === 'debit') continue;
         if (!tx.rawLine.replace(/\s/g, '').includes(noZeros)) continue;
         const token = tx.rawLine.split(/\s+/).find((t) => t.replace(/\D/g, '').startsWith(noZeros));
-        if (token) {
-          return { tx, matchedRef: token.replace(/\D/g, '') };
-        }
+        if (token) return { tx, matchedRef: token.replace(/\D/g, '') };
       }
     }
   }
   return null;
+}
+
+function isWeekendToMonday(stmtDate: string, dayDiff: number): boolean {
+  if (dayDiff !== -1 && dayDiff !== -2) return false;
+  const d = new Date(`${stmtDate}T12:00:00Z`).getUTCDay();
+  return d === 6 || d === 0; // Saturday or Sunday
 }
 
 export function matchStatementPayments(params: {
@@ -68,7 +64,6 @@ export function matchStatementPayments(params: {
   const AMOUNT_TOLERANCE = 5;
   const livePayments = allPayments.filter((p) => p.order_status !== 'Cancelled');
 
-  // Group ALL live payments (Pending + Verified) by effective ref so partial split transfers sum accurately
   const groups = new Map<string, PaymentLogItem[]>();
   for (const payment of livePayments) {
     if (!payment.amount) continue;
@@ -90,7 +85,6 @@ export function matchStatementPayments(params: {
     const pendingInGroup = group.filter((p) => p.status === 'Pending');
     if (pendingInGroup.length === 0) continue;
 
-    // Never auto-verify flagged reused-ref or wrong-receiver payments in Pass 1.
     const hasHardFlag = pendingInGroup.some((p) => {
       const n = p.notes || '';
       return isPaymentFlagged(n) && (n.includes('[GCash reference already used') || n.includes('[Not sent to our GCash:'));
@@ -100,12 +94,11 @@ export function matchStatementPayments(params: {
     const match = findMatchingTx(refClean, transactions);
     if (!match || match.tx.amount === null) continue;
 
-    // Date-gap guard: block auto-verifying if statement tx is > 14 days away from every pending payment.
     if (match.tx.date) {
       const txDate = match.tx.date;
       const anyNearDate = pendingInGroup.some((p) => {
-        const payDate = toPhDate(p.payment_date);
-        return !payDate || Math.abs(calendarDayDiff(txDate, payDate)) <= 14;
+        const payDate = p.ocr_payment_date || toPhDateString(p.payment_date);
+        return !payDate || Math.abs(calendarDaysBetween(txDate, payDate)) <= 14;
       });
       if (!anyNearDate) continue;
     }
@@ -138,7 +131,7 @@ export function matchStatementPayments(params: {
     }
   }
 
-  // Pass 2: Date + Amount Candidate Matching (Bank Transfers, International Remittance, missing-ref)
+  // Pass 2: Receipt Date/Time + Amount Candidate Matching
   const remainingTxs = transactions.filter(
     (tx) =>
       !consumedTxIndices.has(tx.index) &&
@@ -158,13 +151,26 @@ export function matchStatementPayments(params: {
       Number(p.amount) > 0,
   );
 
-  const rawPairs: { payment: PaymentLogItem; tx: StatementTransaction; dayDiff: number }[] = [];
+  type Pair = {
+    payment: PaymentLogItem;
+    tx: StatementTransaction;
+    dayDiff: number;
+    dateSource: 'receipt' | 'notes' | 'uploaded';
+    effDate: string;
+    effTime: string | null;
+  };
+  const rawPairs: Pair[] = [];
   const paymentMatchCounts = new Map<string, number>();
   const txMatchCounts = new Map<number, number>();
 
   for (const payment of candidatePayments) {
-    const payDate = toPhDate(payment.payment_date);
-    if (!payDate) continue;
+    const notesDate = !payment.ocr_payment_date ? extractDateFromNotes(payment.notes, payment.payment_date) : null;
+    const uploadedDate = toPhDateString(payment.payment_date);
+    const dateSource: Pair['dateSource'] = payment.ocr_payment_date ? 'receipt' : notesDate ? 'notes' : 'uploaded';
+    const effDate = payment.ocr_payment_date || notesDate || uploadedDate;
+    if (!effDate) continue;
+    const effTime = payment.ocr_payment_date ? payment.ocr_payment_time : null;
+
     const payAmount = Number(payment.amount);
     const payCleanRef = cleanNumericRef(payment.reference_number);
     const payHasStdGcashRef = isStandardGcashRef(payment.reference_number);
@@ -172,10 +178,13 @@ export function matchStatementPayments(params: {
     for (const tx of remainingTxs) {
       if (!tx.date || tx.amount === null) continue;
       if (Math.abs(tx.amount - payAmount) > 1) continue;
-      const diff = calendarDayDiff(tx.date, payDate);
-      if (Math.abs(diff) > 2) continue;
+      const diff = calendarDaysBetween(tx.date, effDate);
+      const inWindow =
+        dateSource === 'receipt'
+          ? Math.abs(diff) <= 1
+          : Math.abs(diff) <= 2 || (diff === -3 && new Date(`${tx.date}T12:00:00Z`).getUTCDay() >= 5);
+      if (!inWindow) continue;
 
-      // Do not suggest pairing a GCash-to-GCash payment with a known 13-digit ref against a DIFFERENT GCash-to-GCash transfer.
       if (
         payHasStdGcashRef &&
         !tx.isBankOrRemittance &&
@@ -186,61 +195,111 @@ export function matchStatementPayments(params: {
         continue;
       }
 
-      rawPairs.push({ payment, tx, dayDiff: diff });
+      rawPairs.push({ payment, tx, dayDiff: diff, dateSource, effDate, effTime });
       paymentMatchCounts.set(payment.id, (paymentMatchCounts.get(payment.id) || 0) + 1);
       txMatchCounts.set(tx.index, (txMatchCounts.get(tx.index) || 0) + 1);
     }
   }
 
-  const suggestedMatches: StatementDateAmountCandidate[] = rawPairs.map(({ payment, tx, dayDiff }) => {
-    const isAmbiguous =
-      (paymentMatchCounts.get(payment.id) || 0) > 1 || (txMatchCounts.get(tx.index) || 0) > 1;
-    const payAmount = Number(payment.amount);
-    const looksLikeNonGcashRef =
-      payment.payment_method === 'Bank Transfer' ||
-      payment.payment_method === 'Other' ||
-      isBankDatePrefixedRef(payment.reference_number) ||
-      !cleanNumericRef(payment.reference_number);
+  const suggestedMatches: StatementDateAmountCandidate[] = rawPairs.map(
+    ({ payment, tx, dayDiff, dateSource, effDate, effTime }) => {
+      const isAmbiguous =
+        (paymentMatchCounts.get(payment.id) || 0) > 1 || (txMatchCounts.get(tx.index) || 0) > 1;
+      const payAmount = Number(payment.amount);
+      const looksLikeNonGcashRef =
+        payment.payment_method === 'Bank Transfer' ||
+        payment.payment_method === 'Other' ||
+        isBankDatePrefixedRef(payment.reference_number) ||
+        !cleanNumericRef(payment.reference_number);
 
-    let score = 50;
-    if (Math.abs(tx.amount! - payAmount) < 0.01) score += 10;
-    if (Math.round(payAmount * 100) % 10000 !== 0) score += 10;
-    else if (Math.round(payAmount) % 500 === 0) score -= 5;
+      const timeDiffMinutes =
+        effTime && tx.time && dayDiff === 0 ? minutesDiff(tx.time, effTime) : null;
+      const exactTimeMatch = timeDiffMinutes !== null && Math.abs(timeDiffMinutes) <= 15;
 
-    const absDiff = Math.abs(dayDiff);
-    if (absDiff === 0) score += 15;
-    else if (absDiff === 1) score += 8;
-    else score -= 5;
+      let score = 50;
+      if (Math.abs(tx.amount! - payAmount) < 0.01) score += 10;
+      if (Math.round(payAmount * 100) % 10000 !== 0) score += 10;
+      else if (Math.round(payAmount) % 500 === 0) score -= 5;
 
-    if (tx.isBankOrRemittance) score += 12;
-    if (looksLikeNonGcashRef) score += 5;
-    score += isAmbiguous ? -25 : 8;
+      let matchReason = '';
+      if (dateSource === 'receipt') {
+        if (dayDiff === 0 && exactTimeMatch) {
+          score += 28;
+          const mAbs = Math.abs(timeDiffMinutes!);
+          matchReason = mAbs === 0 ? 'Exact receipt date & time' : `Receipt date & time (±${mAbs}m)`;
+        } else if (dayDiff === 0) {
+          score += 20;
+          matchReason = 'Receipt date matches';
+        } else {
+          score += 10;
+          matchReason = 'Receipt date ±1d';
+        }
+      } else if (dateSource === 'notes') {
+        if (dayDiff === 0) {
+          score += 18;
+          matchReason = 'Notes date matches';
+        } else if (Math.abs(dayDiff) === 1) {
+          score += 8;
+          matchReason = 'Notes date ±1d';
+        } else {
+          score -= 5;
+          matchReason = `${Math.abs(dayDiff)}d gap`;
+        }
+      } else {
+        if (dayDiff === 0) {
+          score += 15;
+          matchReason = 'Same day';
+        } else if (isWeekendToMonday(tx.date!, dayDiff)) {
+          score += 8;
+          matchReason = 'Weekend → Mon upload';
+        } else if (Math.abs(dayDiff) === 1) {
+          score += 8;
+          matchReason = 'Uploaded ±1d';
+        } else {
+          score -= 5;
+          matchReason = `Uploaded ${Math.abs(dayDiff)}d later`;
+        }
+      }
 
-    const confidenceScore = Math.max(25, Math.min(98, Math.round(score)));
-    const confidence: 'high' | 'medium' = confidenceScore >= 85 && !isAmbiguous ? 'high' : 'medium';
+      if (tx.isBankOrRemittance) score += 12;
+      if (looksLikeNonGcashRef) score += 5;
 
-    return {
-      paymentId: payment.id,
-      orderId: payment.order_id,
-      orderShortId: (payment.order_id || '').slice(0, 7).toUpperCase(),
-      customerName: payment.customer_name,
-      paymentDate: payment.payment_date,
-      paymentMethod: payment.payment_method,
-      amount: payAmount,
-      ocrAmount: payment.ocr_amount,
-      proofUrl: payment.proof_url,
-      notes: payment.notes,
-      statementDate: tx.date!,
-      statementRef: tx.refNo,
-      statementAmount: tx.amount!,
-      statementDesc: tx.description,
-      channelLabel: tx.channelLabel,
-      confidence,
-      confidenceScore,
-      dayDiff,
-      isAmbiguous,
-    };
-  });
+      const timeDisambiguated = dateSource === 'receipt' && dayDiff === 0 && timeDiffMinutes !== null && Math.abs(timeDiffMinutes) <= 10;
+      if (!isAmbiguous) score += 8;
+      else score += timeDisambiguated ? -5 : -25;
+
+      const confidenceScore = Math.max(25, Math.min(99, Math.round(score)));
+      const effectiveAmbiguous = isAmbiguous && !timeDisambiguated;
+      const confidence: 'high' | 'medium' = confidenceScore >= 85 && !effectiveAmbiguous ? 'high' : 'medium';
+
+      return {
+        paymentId: payment.id,
+        orderId: payment.order_id,
+        orderShortId: (payment.order_id || '').slice(0, 7).toUpperCase(),
+        customerName: payment.customer_name,
+        paymentDate: payment.payment_date,
+        paymentMethod: payment.payment_method,
+        amount: payAmount,
+        ocrAmount: payment.ocr_amount,
+        proofUrl: payment.proof_url,
+        notes: payment.notes,
+        statementDate: tx.date!,
+        statementTime: tx.time,
+        statementRef: tx.refNo,
+        statementAmount: tx.amount!,
+        statementDesc: tx.description,
+        channelLabel: tx.channelLabel,
+        receiptDate: dateSource === 'receipt' ? effDate : null,
+        receiptTime: effTime,
+        timeDiffMinutes,
+        matchReason,
+        confidence,
+        confidenceScore,
+        dayDiff,
+        isAmbiguous: effectiveAmbiguous,
+      };
+    },
+  );
 
   suggestedMatches.sort((a, b) => {
     if (a.confidenceScore !== b.confidenceScore) return b.confidenceScore - a.confidenceScore;

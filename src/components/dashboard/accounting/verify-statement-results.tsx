@@ -16,6 +16,16 @@ import type {
 const peso = (n: number) =>
   `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+function formatTime12(hhmm: string | null | undefined): string {
+  if (!hhmm) return '';
+  const m = hhmm.match(/^(\d{2}):(\d{2})$/);
+  if (!m) return hhmm;
+  const h24 = Number(m[1]);
+  const ap = h24 >= 12 ? 'PM' : 'AM';
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return `${h12}:${m[2]} ${ap}`;
+}
+
 type ConfidenceFilter = 'all' | 'high' | 'other';
 
 function confidenceBadgeClass(score: number, isAmbiguous: boolean): string {
@@ -232,7 +242,9 @@ export function VerifyStatementResults({
                         </Badge>
                         <span className="font-semibold">{peso(c.amount)}</span>
                         <span className="text-muted-foreground">
-                          ({isValid(payD) ? format(payD, 'MMM d, yyyy') : c.paymentDate})
+                          {c.receiptDate
+                            ? `(Receipt: ${c.receiptDate}${c.receiptTime ? ` ${formatTime12(c.receiptTime)}` : ''})`
+                            : `(Logged: ${isValid(payD) ? format(payD, 'MMM d, yyyy') : c.paymentDate})`}
                         </span>
                         {c.channelLabel && (
                           <Badge className="text-[10px] bg-blue-600 hover:bg-blue-600">
@@ -245,9 +257,13 @@ export function VerifyStatementResults({
                         >
                           {score}%{c.isAmbiguous ? ' · Ambiguous' : ' match'}
                         </Badge>
+                        {c.matchReason && (
+                          <span className="text-[11px] text-muted-foreground">{c.matchReason}</span>
+                        )}
                       </div>
                       <p className="text-muted-foreground break-words">
-                        Statement: <strong>{c.statementDate}</strong> • <strong>{peso(c.statementAmount)}</strong>
+                        Statement: <strong>{c.statementDate}{c.statementTime ? ` ${formatTime12(c.statementTime)}` : ''}</strong> •{' '}
+                        <strong>{peso(c.statementAmount)}</strong>
                         {c.statementRef ? ` • Ref ${c.statementRef}` : ''} • {c.statementDesc}
                       </p>
                     </div>
