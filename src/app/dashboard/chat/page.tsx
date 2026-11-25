@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Suspense } from 'react';
+import React, { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { RefreshCw, MessageSquare } from 'lucide-react';
 import { useChat } from '@/hooks/useChat';
@@ -13,6 +13,7 @@ import { AddOrderDialog } from '@/components/dashboard/order-dialog';
 function ChatHistoryContent() {
   const searchParams = useSearchParams();
   const initialPsid = searchParams.get('psid');
+  const [injectedDraft, setInjectedDraft] = useState<{ id: number; text: string } | null>(null);
 
   const {
     threads,
@@ -100,7 +101,7 @@ function ChatHistoryContent() {
                 messages={activeMessages}
                 customerDetail={customerDetail}
               />
-              <ChatComposer onSendMessage={sendReply} />
+              <ChatComposer onSendMessage={sendReply} injectedDraft={injectedDraft} />
             </>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
@@ -129,6 +130,7 @@ function ChatHistoryContent() {
           onUnlinkAccount={unlinkAccount}
           onDismissCandidate={dismissCandidate}
           onReloadDossier={reloadDossier}
+          onUseDraft={(text) => setInjectedDraft({ id: Date.now(), text })}
         />
       </div>
     </div>

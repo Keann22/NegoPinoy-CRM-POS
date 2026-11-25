@@ -25,3 +25,4 @@ export * from './crm-email.types';
 export * from './procurement-search.types';
 export * from './supplier-returns.types';
 export * from './customer-returns.types';
+export * from './customer-profile.types';

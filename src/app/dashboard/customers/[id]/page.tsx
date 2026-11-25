@@ -15,6 +15,7 @@ import { AddCustomerDialog } from '@/components/dashboard/add-customer-dialog';
 import { Pencil, Mail, MessageSquare } from 'lucide-react';
 import { StoreCreditLedgerTable } from '@/components/dashboard/customers/StoreCreditLedgerTable';
 import { LiveChatMatchCard } from '@/components/dashboard/customers/LiveChatMatchCard';
+import { CustomerPersonaCard } from '@/components/dashboard/customers/CustomerPersonaCard';
 import { useCustomerDetail, type CustomerProfileData } from '@/hooks/useCustomerDetail';
 
 const getStatusVariant = (status: Order['orderStatus']) => {
@@ -187,6 +188,9 @@ export default function CustomerDetailPage() {
           mode="full"
           onLinked={() => refresh()}
         />
+
+        {/* Customer Persona & Sales Playbook */}
+        <CustomerPersonaCard customerId={customer.id} psid={customer.psid} mode="full" />
 
         {editingCustomer && (
           <AddCustomerDialog

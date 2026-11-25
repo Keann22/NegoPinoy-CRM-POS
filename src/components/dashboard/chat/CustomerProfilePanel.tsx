@@ -39,6 +39,7 @@ interface CustomerProfilePanelProps {
   onDismissCandidate?: (customerId: string) => void;
   onReloadDossier?: () => void;
   onCreateOrder?: () => void;
+  onUseDraft?: (text: string) => void;
 }
 
 export function CustomerProfilePanel({
@@ -57,6 +58,7 @@ export function CustomerProfilePanel({
   onDismissCandidate,
   onReloadDossier,
   onCreateOrder,
+  onUseDraft,
 }: CustomerProfilePanelProps) {
   const [activeTab, setActiveTab] = useState<'profile' | 'orders'>('profile');
   const [isEditingName, setIsEditingName] = useState(false);
@@ -288,6 +290,7 @@ export function CustomerProfilePanel({
                 displayAddress={displayAddress}
                 savingNotes={savingNotes}
                 onSaveNotes={onSaveNotes}
+                onUseDraft={onUseDraft}
               />
             ) : (
               <CustomerOrdersTab

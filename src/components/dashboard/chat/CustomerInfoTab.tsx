@@ -14,6 +14,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import type { CustomerDossier } from '@/types';
+import { CustomerPersonaCard } from '@/components/dashboard/customers/CustomerPersonaCard';
 
 interface CustomerInfoTabProps {
   psid: string;
@@ -22,6 +23,7 @@ interface CustomerInfoTabProps {
   displayAddress: string;
   savingNotes: boolean;
   onSaveNotes: (notes: string) => Promise<void>;
+  onUseDraft?: (text: string) => void;
 }
 
 export function CustomerInfoTab({
@@ -31,6 +33,7 @@ export function CustomerInfoTab({
   displayAddress,
   savingNotes,
   onSaveNotes,
+  onUseDraft,
 }: CustomerInfoTabProps) {
   const [noteDraft, setNoteDraft] = useState('');
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -151,6 +154,14 @@ export function CustomerInfoTab({
           </div>
         </div>
       )}
+
+      {/* Customer Persona & Next Best Move */}
+      <CustomerPersonaCard
+        customerId={customerDetail?.id}
+        psid={psid}
+        mode="compact"
+        onUseDraft={onUseDraft}
+      />
 
       {/* Internal Staff Notes */}
       <div className="space-y-2">

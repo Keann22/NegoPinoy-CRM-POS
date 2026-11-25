@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { MoreHorizontal, Star, Flame, Users, Search, Mail } from 'lucide-react';
+import { MoreHorizontal, Star, Search, Mail, Sparkles, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -30,19 +30,37 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { AddCustomerDialog } from '@/components/dashboard/add-customer-dialog';
 import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useCustomerProfileIndex } from '@/hooks/useCustomerPersona';
+import { isWorthMessagingToday } from '@/types';
+import { useToast } from '@/hooks/use-toast';
+import {
+  CustomerPersonaCell,
+  CustomerPersonaFilterBar,
+  type PersonaFilterKey,
+} from '@/components/dashboard/customers/CustomerPersonaListParts';
 
 export default function CustomersPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [customers, setCustomers] = useState<any[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<any | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [personaFilter, setPersonaFilter] = useState<PersonaFilterKey>('all');
   const itemsPerPage = 10;
   const supabase = createClient();
+  const {
+    profiles,
+    byCustomerId,
+    totalProfiled,
+    worthMessagingCount,
+    batchRunning,
+    runBatch,
+  } = useCustomerProfileIndex();
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -95,11 +113,94 @@ export default function CustomersPage() {
     return () => { isMounted = false; };
   }, [debouncedQuery, supabase]);
 
-  const paginatedData = customers ? customers.slice(
+  // Persona views load the profiled customers by id: the "All" list above only
+  // holds the newest 1,000 customers (Supabase row cap), so most profiled
+  // customers would never be in it.
+  const personaIds = useMemo(() => {
+    if (personaFilter === 'all') return null;
+    return profiles
+      .filter((p) => {
+        if (personaFilter === 'profiled') return true;
+        if (personaFilter === 'payment_followup') return p.nextActionType === 'payment_followup';
+        if (personaFilter === 'today') return isWorthMessagingToday(p);
+        return p.personaType === personaFilter;
+      })
+      .map((p) => p.customerId);
+  }, [profiles, personaFilter]);
+  const personaIdsKey = personaIds ? personaIds.join(',') : null;
+
+  const [personaCustomers, setPersonaCustomers] = useState<any[] | null>(null);
+  const [personaLoading, setPersonaLoading] = useState(false);
+
+  useEffect(() => {
+    if (personaIds === null) {
+      setPersonaCustomers(null);
+      return;
+    }
+    const ids = personaIds ?? [];
+    let isMounted = true;
+    const load = async () => {
+      setPersonaLoading(true);
+      try {
+        const rows: any[] = [];
+        for (let i = 0; i < ids.length; i += 150) {
+          const { data, error } = await supabase
+            .from('customers')
+            .select('*')
+            .in('id', ids.slice(i, i + 150));
+          if (error) throw error;
+          rows.push(...(data || []));
+        }
+        // Keep the profile list's order (newest persona first).
+        const order = new Map(ids.map((id, idx) => [id, idx]));
+        rows.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+        if (isMounted) setPersonaCustomers(rows);
+      } catch (err) {
+        console.error('Error loading profiled customers:', err);
+        if (isMounted) setPersonaCustomers([]);
+      } finally {
+        if (isMounted) setPersonaLoading(false);
+      }
+    };
+    void load();
+    return () => { isMounted = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [personaIdsKey, supabase]);
+
+  const filteredCustomers = useMemo(() => {
+    if (personaFilter === 'all') return customers;
+    if (!personaCustomers) return null;
+    const words = debouncedQuery.toLowerCase().split(' ').filter((w) => w.trim() !== '');
+    if (words.length === 0) return personaCustomers;
+    return personaCustomers.filter((cust) => {
+      const name = String(cust.full_name || '').toLowerCase();
+      return words.every((w) => name.includes(w));
+    });
+  }, [customers, personaFilter, personaCustomers, debouncedQuery]);
+
+  const listLoading = isLoading || (personaFilter !== 'all' && (personaLoading || personaCustomers === null));
+
+  const handleBatchBuild = async () => {
+    try {
+      const res = await runBatch(5);
+      toast({
+        title: 'Customer personas updated',
+        description: `Built ${res.generated} of ${res.totalAttempted} customer persona(s).`,
+      });
+    } catch (err) {
+      toast({
+        variant: 'destructive',
+        title: 'Could not build personas',
+        description: err instanceof Error ? err.message : 'Batch error',
+      });
+    }
+  };
+
+  const paginatedData = filteredCustomers ? filteredCustomers.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   ) : [];
-  const totalPages = customers ? Math.ceil(customers.length / itemsPerPage) : 0;
+  const totalPages = filteredCustomers ? Math.ceil(filteredCustomers.length / itemsPerPage) : 0;
 
   return (
     <Card>
@@ -107,20 +208,24 @@ export default function CustomersPage() {
         <div>
           <CardTitle className="font-headline">Customer CRM</CardTitle>
           <CardDescription>
-            Search and manage customer profiles.
+            Search and manage customer profiles &amp; AI personas ({totalProfiled} profiled).
           </CardDescription>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                     type="search"
                     placeholder="Search by name..."
-                    className="pl-8 w-[250px]"
+                    className="pl-8 w-[220px]"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                 />
             </div>
+            <Button variant="secondary" onClick={handleBatchBuild} disabled={batchRunning}>
+              <Sparkles className={`w-4 h-4 mr-1.5 text-amber-500 ${batchRunning ? 'animate-spin' : ''}`} />
+              {batchRunning ? 'Building...' : 'Build AI Personas (+5)'}
+            </Button>
             <Button variant="outline" asChild>
               <Link href="/dashboard/customers/email">
                 <Mail className="w-4 h-4 mr-1.5 text-primary" />
@@ -144,12 +249,21 @@ export default function CustomersPage() {
       )}
 
       <CardContent>
+        <CustomerPersonaFilterBar
+          personaFilter={personaFilter}
+          totalProfiled={totalProfiled}
+          worthMessagingCount={worthMessagingCount}
+          onChange={(key) => {
+            setPersonaFilter(key);
+            setCurrentPage(1);
+          }}
+        />
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Customer</TableHead>
               <TableHead>Tier</TableHead>
-              <TableHead>Kitchen Profile</TableHead>
+              <TableHead>Customer Persona &amp; Profile</TableHead>
               <TableHead>Spend & Engagement</TableHead>
               <TableHead>
                 <span className="sr-only">Actions</span>
@@ -157,7 +271,7 @@ export default function CustomersPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading && Array.from({ length: 3 }).map((_, i) => (
+            {listLoading && Array.from({ length: 3 }).map((_, i) => (
                  <TableRow key={i}>
                     <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
@@ -166,7 +280,7 @@ export default function CustomersPage() {
                     <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                  </TableRow>
             ))}
-            {!isLoading && paginatedData && paginatedData.map((cust) => {
+            {!listLoading && paginatedData && paginatedData.map((cust) => {
               return (
               <TableRow key={cust.id}>
                 <TableCell>
@@ -186,16 +300,11 @@ export default function CustomersPage() {
                   </span>
                 </TableCell>
                 <TableCell>
-                  <div className="space-y-1.5">
-                    <div className="flex items-center text-sm">
-                      <Flame className="w-4 h-4 text-orange-500 mr-2 opacity-70" />
-                      <span className="text-muted-foreground">{cust.stove_type || 'Unknown Stove'}</span>
-                    </div>
-                    <div className="flex items-center text-sm">
-                      <Users className="w-4 h-4 text-blue-500 mr-2 opacity-70" />
-                      <span className="text-muted-foreground text-xs">Family Size: {cust.family_size || '?'}</span>
-                    </div>
-                  </div>
+                  <CustomerPersonaCell
+                    profile={byCustomerId.get(cust.id)}
+                    stoveType={cust.stove_type}
+                    familySize={cust.family_size}
+                  />
                 </TableCell>
                 <TableCell className="font-medium">
                   <div className="text-emerald-500 font-medium mb-1">₱{Number(cust.total_lifetime_spend || 0).toLocaleString()}</div>
@@ -230,13 +339,21 @@ export default function CustomersPage() {
             )})}
           </TableBody>
         </Table>
-        {!isLoading && (!customers || customers.length === 0) && (
+        {!listLoading && (!filteredCustomers || filteredCustomers.length === 0) && (
             <div className="flex flex-col items-center justify-center text-center border-2 border-dashed rounded-lg p-12 mt-4">
                 {debouncedQuery.trim() ? (
                     <>
                         <p className="text-lg font-semibold">No customers found</p>
                         <p className="text-muted-foreground mt-2">
                             Try adjusting your search criteria.
+                        </p>
+                    </>
+                ) : personaFilter !== 'all' ? (
+                    <>
+                        <Users className="h-10 w-10 text-muted-foreground mb-4 opacity-50" />
+                        <p className="text-lg font-semibold">No customers in this group yet</p>
+                        <p className="text-muted-foreground mt-2">
+                            Only customers with a persona are listed here. Use &quot;Build AI Personas&quot; to add more.
                         </p>
                     </>
                 ) : (
@@ -251,10 +368,10 @@ export default function CustomersPage() {
             </div>
         )}
       </CardContent>
-      {customers && customers.length > 0 && (
+      {filteredCustomers && filteredCustomers.length > 0 && (
         <CardFooter className="flex flex-col sm:flex-row justify-between items-center py-4 gap-4 border-t">
           <div className="text-xs text-muted-foreground text-center sm:text-left">
-            Showing <strong>{(currentPage - 1) * itemsPerPage + 1}</strong>-<strong>{Math.min(currentPage * itemsPerPage, customers.length)}</strong> of <strong>{customers.length}</strong> results
+            Showing <strong>{(currentPage - 1) * itemsPerPage + 1}</strong>-<strong>{Math.min(currentPage * itemsPerPage, filteredCustomers.length)}</strong> of <strong>{filteredCustomers.length}</strong> results
           </div>
           <div className="flex gap-2">
             <Button

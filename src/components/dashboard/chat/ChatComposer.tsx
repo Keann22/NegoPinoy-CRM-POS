@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Send, Zap, ChevronUp } from 'lucide-react';
 
 interface ChatComposerProps {
   onSendMessage: (text: string) => Promise<void>;
   disabled?: boolean;
+  injectedDraft?: { id: number; text: string } | null;
 }
 
 const CANNED_RESPONSES = [
@@ -27,10 +28,16 @@ const CANNED_RESPONSES = [
   },
 ];
 
-export function ChatComposer({ onSendMessage, disabled = false }: ChatComposerProps) {
+export function ChatComposer({ onSendMessage, disabled = false, injectedDraft = null }: ChatComposerProps) {
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [showQuickReplies, setShowQuickReplies] = useState(false);
+
+  useEffect(() => {
+    if (injectedDraft?.text) {
+      setInputText(injectedDraft.text);
+    }
+  }, [injectedDraft?.id, injectedDraft?.text]);
 
   const handleSend = async () => {
     if (!inputText.trim() || isSending || disabled) return;
