@@ -70,7 +70,7 @@ export function ReadyToPickOrderCard({ order, index, selected, onToggle, onSkip,
             </Button>
             <ReprintOrderButton orderId={order.id} />
             <Button variant="outline" size="sm" onClick={onSkip}>
-              <PauseCircle className="mr-1.5 h-3.5 w-3.5" />Hindi pa ipi-pick
+              <PauseCircle className="mr-1.5 h-3.5 w-3.5" />Don&apos;t pick yet
             </Button>
             <Button asChild size="sm">
               <Link href={`/dashboard/pick?order=${order.id}`}>

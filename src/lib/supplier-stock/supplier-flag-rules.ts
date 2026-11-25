@@ -19,10 +19,10 @@ export const SUPPLIER_FLAG_RULES = {
 };
 
 export const SUPPLIER_FLAG_LABELS: Record<SupplierFlagStatus, string> = {
-  waiting_restock: 'Wala sa supplier: hintayin',
-  other_variant: 'Ibang kulay/size lang ang meron',
-  price_up: 'Tumaas ang presyo',
-  stop_selling: 'Hindi na ibebenta',
+  waiting_restock: 'Out at supplier: wait for stock',
+  other_variant: 'Only another color/size',
+  price_up: 'Price went up',
+  stop_selling: 'Stop selling',
 };
 
 /** One line for sales: what it means for their customer. */

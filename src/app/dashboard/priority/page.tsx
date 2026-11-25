@@ -117,7 +117,7 @@ export default function PriorityListPage() {
   const onAction = (row: PriorityRow, action: RowAction) => {
     if (action === 'clear_hold') return quickEvent(row, 'hold_cleared', 'Hold removed');
     if (action === 'unmark') return quickEvent(row, 'send_today_cancelled', 'Removed from send today');
-    if (action === 'unurgent') return quickEvent(row, 'urgent_cleared', 'No longer nagmamadali');
+    if (action === 'unurgent') return quickEvent(row, 'urgent_cleared', 'No longer urgent');
     if (action === 'unreserve') return quickEvent(row, 'reserve_cleared', 'Reservation removed');
     if (action === 'note') return setNoteRow(row);
     if (action === 'ship_hold') return setShipHoldOrderId(row.id);
@@ -244,7 +244,7 @@ export default function PriorityListPage() {
         </div>
         <div className="flex items-center gap-2 px-1">
           <Switch id="urgent-only" checked={urgentOnly} onCheckedChange={setUrgentOnly} />
-          <Label htmlFor="urgent-only">Nagmamadali only</Label>
+          <Label htmlFor="urgent-only">Urgent only</Label>
         </div>
         </>)}
       </div>

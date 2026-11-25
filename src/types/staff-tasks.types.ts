@@ -2,7 +2,7 @@ import type { OrderShipContext } from '@/lib/services/order-ship-context-service
 
 /** A task an owner gave a staff member (table staff_tasks, owner 2026-11-23), or an order note sent to someone. */
 export type StaffTaskStatus = 'open' | 'done' | 'cancelled';
-/** Between Seen and Done: "Ginagawa na" or "May problema". */
+/** Between Seen and Done: "Working on it" or "Problem". */
 export type StaffTaskProgress = 'working' | 'problem';
 
 export interface StaffTask {
@@ -44,11 +44,11 @@ export interface StaffTask {
   ownerUnread: boolean;
   /** An order note sent to a person or team (kind 'note', owner 2026-11-25). */
   isNote: boolean;
-  /** Note: true = "Kailangan ng sagot" (open until answered), false = "Pasabi lang po" (closes at Nakita ko). */
+  /** Note: true = "Needs a reply" (open until answered), false = "Just letting you know" (closes at Got it). */
   needsAnswer: boolean;
   /** Note sent to a whole team (one shared copy: whoever answers closes it). */
   team: NoteTeam | null;
-  /** Note I sent: they answered (replied or Tapos na) and I haven't read it. */
+  /** Note I sent: they answered (replied or Done) and I haven't read it. */
   senderUnread: boolean;
   /** Note not seen 2 hours after it was sent. */
   unseenTooLong: boolean;
@@ -58,7 +58,7 @@ export interface StaffTask {
 
 export type NoteTeam = 'inventory' | 'owners';
 
-/** Who an order note can be sent to ("Para kanino?"). */
+/** Who an order note can be sent to ("Who is it for?"). */
 export interface NoteTarget {
   /** 'team:inventory', 'team:owners', or a person key. */
   key: string;

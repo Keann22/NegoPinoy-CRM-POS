@@ -8,11 +8,11 @@ export type ShipHoldKind = 'with_orders' | 'payment' | 'adding' | 'date' | 'othe
 export type ShipVia = 'courier' | 'bus';
 
 export const SHIP_HOLD_KINDS: Record<ShipHoldKind, { label: string; hint: string }> = {
-  with_orders: { label: 'Isasabay sa ibang order', hint: 'Ship together with the customer’s other orders' },
-  payment: { label: 'Hintay bayad', hint: 'Waiting for the customer to pay' },
-  adding: { label: 'Mag-a-add pa ang customer', hint: 'Customer will add more items' },
-  date: { label: 'Ipadala sa petsa', hint: 'Customer asked to ship on a date' },
-  other: { label: 'Iba pa', hint: 'Something else (write it in the note)' },
+  with_orders: { label: 'Ship with other orders', hint: 'Ship together with the customer’s other orders' },
+  payment: { label: 'Waiting for payment', hint: 'Waiting for the customer to pay' },
+  adding: { label: 'Customer will add more', hint: 'Customer will add more items' },
+  date: { label: 'Ship on a date', hint: 'Customer asked to ship on a date' },
+  other: { label: 'Other', hint: 'Something else (write it in the note)' },
 };
 
 export const SHIP_HOLD_KIND_ORDER: ShipHoldKind[] = ['with_orders', 'payment', 'adding', 'date', 'other'];
@@ -72,7 +72,7 @@ export interface ShipHoldPrompt {
   overdue: boolean;
 }
 
-/** Ready na = release (goes to Ready to ship); not_yet = ask again on a date; waiting = asked customer, back in 4 hours. */
+/** Ready = release (goes to Ready to ship); not_yet = ask again on a date; waiting = asked customer, back in 4 hours. */
 export type ShipHoldAnswer = 'release' | 'not_yet' | 'waiting';
 
 /** For the hold dialog: the order, its current hold, and the customer's other open orders. */

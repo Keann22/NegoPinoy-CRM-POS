@@ -32,7 +32,7 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved?: () => void;
-  /** Reason picked when the order has no hold yet (the "Hindi pa ipi-pick" answer opens it on "Ipadala sa petsa"). */
+  /** Reason picked when the order has no hold yet (the "Don't pick yet" answer opens it on "Ship on a date"). */
   defaultKind?: ShipHoldKind;
 }
 
@@ -47,7 +47,7 @@ export function ShipHoldDialog({ orderId, open, onOpenChange, onSaved, defaultKi
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><PauseCircle className="h-5 w-5" /> Hindi pa ipapadala</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><PauseCircle className="h-5 w-5" /> Don&apos;t ship yet</DialogTitle>
           <DialogDescription>
             {form ? `${form.shortId} · ${form.customerName} · ${form.status}` : 'Why this order waits, and when to ask again.'}
           </DialogDescription>
@@ -95,7 +95,7 @@ function HoldForm({ form, defaultKind, onCancel, onSaved }: { form: ShipHoldForm
     setSaving(true);
     try {
       await saveShipHold({ orderId: form.orderId, kind, note, checkOn, shipVia, withOrderIds: kind === 'with_orders' ? withIds : [] });
-      toast({ title: 'Naka-hold', description: shipLater ? `Not picked until ${shortPhtDate(pickStartsOn(checkOn))}, ships ${shortPhtDate(checkOn)}.` : `We'll ask again on ${shortPhtDate(checkOn)}${kind === 'with_orders' ? ', or as soon as every order is packed and paid' : kind === 'payment' ? ', or as soon as it is paid' : ''}.` });
+      toast({ title: 'On hold', description: shipLater ? `Not picked until ${shortPhtDate(pickStartsOn(checkOn))}, ships ${shortPhtDate(checkOn)}.` : `We'll ask again on ${shortPhtDate(checkOn)}${kind === 'with_orders' ? ', or as soon as every order is packed and paid' : kind === 'payment' ? ', or as soon as it is paid' : ''}.` });
       onSaved();
     } catch (e) {
       toast({ variant: 'destructive', title: 'Not saved', description: e instanceof Error ? e.message : String(e) });
@@ -112,7 +112,7 @@ function HoldForm({ form, defaultKind, onCancel, onSaved }: { form: ShipHoldForm
         )}
 
         <div className="space-y-2">
-          <Label>Bakit hindi pa?</Label>
+          <Label>Why not yet?</Label>
           <div className="flex flex-wrap gap-2">
             {SHIP_HOLD_KIND_ORDER.map((k) => (
               <button key={k} type="button" aria-pressed={kind === k} className={chip(kind === k)} onClick={() => pickKind(k)} title={SHIP_HOLD_KINDS[k].hint}>
@@ -124,7 +124,7 @@ function HoldForm({ form, defaultKind, onCancel, onSaved }: { form: ShipHoldForm
 
         {kind === 'with_orders' && (
           <div className="space-y-2">
-            <Label>Kasama ang mga order na ito</Label>
+            <Label>Ships together with these orders</Label>
             {form.others.length === 0 && <p className="text-sm text-muted-foreground">This customer has no other open orders.</p>}
             <ul className="space-y-1">
               {form.others.map((o) => (
@@ -143,7 +143,7 @@ function HoldForm({ form, defaultKind, onCancel, onSaved }: { form: ShipHoldForm
                 </li>
               ))}
             </ul>
-            <Label className="pt-1">Paano ipapadala?</Label>
+            <Label className="pt-1">How will it ship?</Label>
             <div className="flex flex-wrap gap-2">
               <button type="button" aria-pressed={shipVia === 'courier'} className={chip(shipVia === 'courier')} onClick={() => setShipVia('courier')}>
                 <Truck className="mr-1 inline h-4 w-4" />Courier (SPX)
@@ -162,24 +162,24 @@ function HoldForm({ form, defaultKind, onCancel, onSaved }: { form: ShipHoldForm
 
         <div className="space-y-2">
           <Label htmlFor="hold-note">Note {kind === 'other' ? '' : <span className="font-normal text-muted-foreground">(optional)</span>}</Label>
-          <Textarea id="hold-note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. sabay sa sahod niya, Nov 30 daw" />
+          <Textarea id="hold-note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. on her payday, she said Nov 30" />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="hold-check">{kind === 'date' ? 'Ipadala sa' : 'Tanungin ulit sa'}</Label>
+          <Label htmlFor="hold-check">{kind === 'date' ? 'Ship on' : 'Ask again on'}</Label>
           <Input id="hold-check" type="date" min={tomorrow} value={checkOn} onChange={(e) => setCheckOn(e.target.value)} className="w-48" />
           {checkOn && checkOn < tomorrow && <p className="text-xs font-medium text-amber-800 dark:text-amber-300">Pick a date after today.</p>}
           {notPicked && kind === 'date' && (
             <p className="rounded-md bg-sky-50 px-2 py-1.5 text-xs text-sky-900 dark:bg-sky-950/40 dark:text-sky-200">
-              Hindi pa ito na-pick, kaya hindi muna ipi-pick.{' '}
+              It isn't picked yet, so it won't be picked for now.{' '}
               {shipLater
-                ? `Babalik sa pick list sa ${shortPhtDate(pickStartsOn(checkOn))} (${PICK_LEAD_DAYS} araw bago).`
-                : `Babalik sa pick list ${PICK_LEAD_DAYS} araw bago ang petsa.`}{' '}
-              Hanggang doon, puwedeng gamitin ng ibang order ang stock sa shelf, at bibilhin lang ito malapit na sa petsa.
+                ? `Back on the pick list on ${shortPhtDate(pickStartsOn(checkOn))} (${PICK_LEAD_DAYS} days before).`
+                : `Back on the pick list ${PICK_LEAD_DAYS} days before the date.`}{' '}
+              Until then, other orders can use the shelf stock, and it is bought close to the date.
             </p>
           )}
           <p className="text-xs text-muted-foreground">
-            The sales agent gets a pop-up that day (&ldquo;Ready na ba?&rdquo;). Owners see it if there&apos;s no answer after 3 days.
+            The sales agent gets a pop-up that day (&ldquo;Ready to ship?&rdquo;). Owners see it if there&apos;s no answer after 3 days.
           </p>
         </div>
       </div>

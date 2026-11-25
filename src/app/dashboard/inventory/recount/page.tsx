@@ -68,10 +68,10 @@ export default function RecountPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold font-headline">
-            <ClipboardCheck className="h-6 w-6 text-primary" /> Pabilang (Recount)
+            <ClipboardCheck className="h-6 w-6 text-primary" /> Recount
           </h1>
           <p className="text-sm text-muted-foreground">
-            Bilangin ang nasa 3C (shelf). Bawat produkto ay naka-save agad.
+            Count what is on 3C (the shelf). Each product saves on its own.
           </p>
         </div>
 
@@ -84,7 +84,7 @@ export default function RecountPage() {
             onClick={() => setActiveTab('batches')}
             className="h-8 gap-1.5 text-xs"
           >
-            <ListFilter className="h-3.5 w-3.5" /> Mga Pabilang
+            <ListFilter className="h-3.5 w-3.5" /> To count
           </Button>
           <Button
             type="button"
@@ -93,7 +93,7 @@ export default function RecountPage() {
             onClick={() => setActiveTab('progress')}
             className="h-8 gap-1.5 text-xs"
           >
-            <TrendingUp className="h-3.5 w-3.5" /> Pag-usad ng Bilang
+            <TrendingUp className="h-3.5 w-3.5" /> Count progress
           </Button>
         </div>
       </div>
@@ -121,7 +121,7 @@ export default function RecountPage() {
               <div className="flex items-center gap-2">
                 <Target className="h-4 w-4 text-emerald-600" />
                 <span>
-                  <strong>Pag-usad Ngayon:</strong> {countProgress.today.matchedCount} sa {countProgress.today.totalCounted} tumugma sa unallocated shelf stock (<strong>{countProgress.today.accuracyRate}% Accuracy</strong>)
+                  <strong>Today:</strong> {countProgress.today.matchedCount} of {countProgress.today.totalCounted} matched the shelf number (<strong>{countProgress.today.accuracyRate}% Accuracy</strong>)
                 </span>
               </div>
               <Button
@@ -130,7 +130,7 @@ export default function RecountPage() {
                 onClick={() => setActiveTab('progress')}
                 className="h-6 px-2 text-[11px] text-emerald-700 dark:text-emerald-300 hover:text-emerald-800"
               >
-                Tingnan ang detalye →
+                See details →
               </Button>
             </div>
           )}
@@ -138,7 +138,7 @@ export default function RecountPage() {
           <div className="relative">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Hanapin ang produkto"
+              placeholder="Search products"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="pl-9"
@@ -154,7 +154,7 @@ export default function RecountPage() {
           {!loading && !error && batches.length === 0 && (
             <Card>
               <CardContent className="p-6 text-center text-muted-foreground">
-                Walang pabilang ngayon. Salamat!
+                Nothing to count right now. Thank you!
               </CardContent>
             </Card>
           )}
@@ -172,15 +172,15 @@ export default function RecountPage() {
                   <CardTitle className="text-base">{head.message}</CardTitle>
                   <CardDescription>
                     {head.requestedByName && <>— {head.requestedByName} · </>}
-                    Hiniling {phTime(head.createdAt)}
-                    {head.dueDate && <> · Tapusin bago {phDay(head.dueDate)}</>}
+                    Requested {phTime(head.createdAt)}
+                    {head.dueDate && <> · Due by {phDay(head.dueDate)}</>}
                   </CardDescription>
                   <div className="space-y-1">
                     <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                       <div className="h-full bg-green-600 transition-all" style={{ width: `${pct}%` }} />
                     </div>
                     <p className="text-sm font-medium">
-                      {doneCount} sa {batch.length} ang nabilang na
+                      {doneCount} of {batch.length} counted
                     </p>
                   </div>
                 </CardHeader>
@@ -189,13 +189,13 @@ export default function RecountPage() {
                     <RecountLine key={r.id} row={r} onSave={save} />
                   ))}
                   {open.length === 0 && doneCount < batch.length && (
-                    <p className="text-sm text-muted-foreground">Walang tugma sa hinahanap.</p>
+                    <p className="text-sm text-muted-foreground">No products match your search.</p>
                   )}
 
                   {done.length > 0 && (
                     <details className="rounded-md border bg-muted/30 p-3" open={open.length === 0}>
                       <summary className="cursor-pointer text-sm font-semibold text-green-700">
-                        <CheckCircle2 className="mr-1 inline h-4 w-4" /> Nabilang na ({done.length})
+                        <CheckCircle2 className="mr-1 inline h-4 w-4" /> Counted ({done.length})
                       </summary>
                       <ul className="mt-2 divide-y text-sm">
                         {done.map((r) => {
@@ -214,15 +214,15 @@ export default function RecountPage() {
                                 </span>
                                 {isMatch ? (
                                   <Badge className="bg-emerald-100 border-emerald-300 text-emerald-800 dark:bg-emerald-950 dark:border-emerald-800 dark:text-emerald-300 text-[10px]">
-                                    ✓ Tugma sa shelf (0 diff)
+                                    ✓ Matches shelf (0 diff)
                                   </Badge>
                                 ) : diff != null && diff > 0 ? (
                                   <Badge className="bg-amber-100 border-amber-300 text-amber-800 dark:bg-amber-950 dark:border-amber-800 dark:text-amber-300 text-[10px]">
-                                    Sobra ng +{diff} (dati {r.systemBefore})
+                                    Over by +{diff} (was {r.systemBefore})
                                   </Badge>
                                 ) : diff != null && diff < 0 ? (
                                   <Badge className="bg-rose-100 border-rose-300 text-rose-800 dark:bg-rose-950 dark:border-rose-800 dark:text-rose-300 text-[10px]">
-                                    Kulang ng {diff} (dati {r.systemBefore})
+                                    Short by {-diff} (was {r.systemBefore})
                                   </Badge>
                                 ) : null}
                               </div>

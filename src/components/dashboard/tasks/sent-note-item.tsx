@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { phtWhen } from '@/lib/services/staff-tasks/task-dates';
 import type { StaffTask } from '@/types/staff-tasks.types';
 
-/** Where a note I sent stands: Hindi pa nakikita → Seen by Al → Answered by Al. */
+/** Where a note I sent stands: Not seen yet → Seen by Al → Answered by Al. */
 function NoteStatus({ note }: { note: StaffTask }) {
   if (note.status === 'done' && note.doneAt) {
     return (
@@ -22,12 +22,12 @@ function NoteStatus({ note }: { note: StaffTask }) {
   }
   return (
     <span className={cn('flex items-center gap-1', note.unseenTooLong ? 'font-medium text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400')}>
-      <EyeOff className="h-3.5 w-3.5" />Hindi pa nakikita{note.unseenTooLong ? ' (2+ oras na)' : ''}
+      <EyeOff className="h-3.5 w-3.5" />Not seen yet{note.unseenTooLong ? ' (2+ hours)' : ''}
     </span>
   );
 }
 
-/** A note I sent: who it's for, where it stands, the answer, and Read answer / Ok / Bawiin. */
+/** A note I sent: who it's for, where it stands, the answer, and Read answer / Ok / Withdraw. */
 export function SentNoteItem({ note, busy, onRead, onAck, onCancel }: {
   note: StaffTask;
   busy?: boolean;
@@ -43,9 +43,9 @@ export function SentNoteItem({ note, busy, onRead, onAck, onCancel }: {
       alert && 'border-red-300 bg-red-50/60 dark:border-red-900 dark:bg-red-950/30'
     )}>
       <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-        <span>Para kay <span className="font-medium text-foreground">{note.assigneeName}</span> · {phtWhen(note.createdAt)}</span>
-        <span>· {note.needsAnswer ? 'Kailangan ng sagot' : 'Pasabi lang po'}</span>
-        {note.senderUnread && <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">May sagot na</Badge>}
+        <span>For <span className="font-medium text-foreground">{note.assigneeName}</span> · {phtWhen(note.createdAt)}</span>
+        <span>· {note.needsAnswer ? 'Needs a reply' : 'Just letting you know'}</span>
+        {note.senderUnread && <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">Answered</Badge>}
       </div>
       <p className="whitespace-pre-wrap text-sm">{note.message}</p>
       {note.orderId && (
@@ -58,7 +58,7 @@ export function SentNoteItem({ note, busy, onRead, onAck, onCancel }: {
       <div className="text-xs"><NoteStatus note={note} /></div>
       {alert && (
         <p className="text-sm text-red-800 dark:text-red-300">
-          Wala pang nakakakita nito sa loob ng 2 oras. Pakisabihan sila sa Messenger o tawagan; nakikita na rin ito ng owners.
+          Nobody has seen this in 2 hours. Message them on Messenger or call them; the owners can see it too.
         </p>
       )}
       {note.doneNote && <p className="whitespace-pre-wrap rounded-md bg-emerald-50 p-2 text-sm dark:bg-emerald-950/40">&ldquo;{note.doneNote}&rdquo;</p>}
@@ -66,7 +66,7 @@ export function SentNoteItem({ note, busy, onRead, onAck, onCancel }: {
         {onRead && (note.messageCount > 0 || note.status === 'open') && (
           <Button size="sm" variant={note.senderUnread ? 'default' : 'outline'} disabled={busy} onClick={() => onRead(note)}>
             <MessageCircle className="mr-1.5 h-4 w-4" />
-            {note.senderUnread && note.messageCount > 0 ? 'Basahin ang sagot' : note.messageCount > 0 ? `Replies (${note.messageCount})` : 'Mag-follow up'}
+            {note.senderUnread && note.messageCount > 0 ? 'Read the answer' : note.messageCount > 0 ? `Replies (${note.messageCount})` : 'Follow up'}
           </Button>
         )}
         {onAck && (note.senderUnread || alert) && (
@@ -76,7 +76,7 @@ export function SentNoteItem({ note, busy, onRead, onAck, onCancel }: {
         )}
         {onCancel && note.status === 'open' && (
           <Button size="sm" variant="ghost" disabled={busy} className="text-muted-foreground" onClick={() => onCancel(note)}>
-            <Undo2 className="mr-1.5 h-4 w-4" />Bawiin
+            <Undo2 className="mr-1.5 h-4 w-4" />Withdraw
           </Button>
         )}
       </div>

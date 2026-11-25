@@ -43,7 +43,7 @@ export const PRIORITY_RULES = {
     /** Orders with this many lines or more count as big. */
     bigOrderLines: 10,
     bigOrder: 30,
-    /** Customer is in a hurry ("nagmamadali"). */
+    /** Customer is in a hurry ("urgent"). */
     urgent: 60,
     perExtraOsRound: 10,
     /** An item was taken from this order for another one: it shouldn't lose its place. */
@@ -377,7 +377,7 @@ function scoreFor(o: PriorityOrderInput, daysLate: number, daysSincePaid: number
     const label = isFullyPaid(o) ? 'fully paid' : 'ordered';
     parts.push({ label: `${daysSincePaid} day${daysSincePaid === 1 ? '' : 's'} since ${label}`, points: daysSincePaid * p.perDayPaid });
   }
-  if (o.urgent) parts.push({ label: 'Customer is in a hurry (nagmamadali)', points: p.urgent });
+  if (o.urgent) parts.push({ label: 'Customer is in a hurry', points: p.urgent });
   if (isFullyPaid(o)) parts.push({ label: 'Fully paid', points: p.fullyPaid });
   if (o.totalAmount >= 20000) parts.push({ label: 'Order ₱20k+', points: p.value20k });
   else if (o.totalAmount >= 10000) parts.push({ label: 'Order ₱10k+', points: p.value10k });
@@ -420,13 +420,13 @@ export function rankOrder(o: PriorityOrderInput, now: Date): PriorityRow {
 }
 
 /**
- * Layers within every tab: nagmamadali first, then fully paid, then the rest.
+ * Layers within every tab: urgent first, then fully paid, then the rest.
  * A paid customer has done their part, so they never wait behind an unpaid
  * order however late it is; points only order orders within a layer.
  */
 export type PriorityLayer = 0 | 1 | 2;
 export const LAYER_LABELS: Record<PriorityLayer, string> = {
-  0: 'Nagmamadali',
+  0: 'Urgent',
   1: 'Fully paid',
   2: 'Others (COD, installment and not yet fully paid)',
 };

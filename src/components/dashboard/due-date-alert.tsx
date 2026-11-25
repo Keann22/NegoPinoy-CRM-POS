@@ -57,7 +57,7 @@ export function DueDateAlert() {
                 <AlertTitle className="text-base font-bold">Action Required!</AlertTitle>
                 <AlertDescription>
                     You have <strong>{dueCount}</strong> accounts due for collection today or past due! <br />
-                    <em>(May kailangan ka na singilin)</em>
+                    <em>(You have payments to collect)</em>
                 </AlertDescription>
                 <button 
                     onClick={() => setIsVisible(false)}

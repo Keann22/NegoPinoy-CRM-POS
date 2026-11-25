@@ -30,7 +30,7 @@ export function useSentNoteActions() {
     onRead: (n: StaffTask) => setThread(n),
     onAck: (n: StaffTask) => { void run(n, 'ack'); },
     onCancel: (n: StaffTask) => {
-      if (window.confirm('Bawiin ang note? Mawawala ito sa kanila (nasa order notes pa rin).')) void run(n, 'cancel');
+      if (window.confirm('Withdraw this note? It disappears for them (it stays in the order notes).')) void run(n, 'cancel');
     },
   };
 

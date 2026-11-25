@@ -20,7 +20,7 @@ const CHIP = 'fixed bottom-4 left-4 z-50 inline-flex items-center gap-2 rounded-
  * Recount requests on Jas's and Al's accounts: an owner asked them to count these products.
  * Up to 10 products: a sticky pop-up they can minimize to a red chip, but it comes
  * back every 30 minutes and on every page load until each product is counted.
- * More than 10: just a red chip ("38 pabilang pa") that opens the Pabilang page.
+ * More than 10: just a red chip ("38 left to recount") that opens the Recount page.
  * Nothing shows on the Pabilang page itself.
  * Jas / Al counts the Unit 1 shelf only (Unit 2 is left as recorded), blind: no system numbers.
  */
@@ -47,7 +47,7 @@ export function RecountRequestPopup() {
   if (requests.length > INLINE_MAX) {
     return (
       <Link href={RECOUNT_PAGE} className={CHIP}>
-        <AlertTriangle className="h-4 w-4" /> {requests.length} pabilang pa
+        <AlertTriangle className="h-4 w-4" /> {requests.length} left to recount
       </Link>
     );
   }
@@ -59,7 +59,7 @@ export function RecountRequestPopup() {
         onClick={() => setMinimized(false)}
         className={CHIP}
       >
-        <AlertTriangle className="h-4 w-4" /> {requests.length} pabilang pa
+        <AlertTriangle className="h-4 w-4" /> {requests.length} left to recount
       </button>
     );
   }
@@ -75,7 +75,7 @@ export function RecountRequestPopup() {
           <div key={batch[0].batchId} className="space-y-3">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-red-700">
-                <AlertTriangle className="h-5 w-5" /> Pabilang
+                <AlertTriangle className="h-5 w-5" /> Recount
               </DialogTitle>
               <DialogDescription className="text-base text-slate-900">
                 {batch[0].message}
@@ -83,7 +83,7 @@ export function RecountRequestPopup() {
               </DialogDescription>
             </DialogHeader>
             <p className="text-xs text-muted-foreground">
-              Bilangin ang nasa 3C (shelf). Ilagay 0 kung wala.
+              Count what is on 3C (the shelf). Enter 0 if there are none.
             </p>
             <div className="space-y-3">
               {batch.map((r) => <RecountLine key={r.id} row={r} onSave={save} />)}
@@ -91,10 +91,10 @@ export function RecountRequestPopup() {
           </div>
         ))}
         <Button asChild className="w-full" variant="outline">
-          <Link href={RECOUNT_PAGE}>Buksan ang Pabilang page</Link>
+          <Link href={RECOUNT_PAGE}>Open the Recount page</Link>
         </Button>
         <Button variant="ghost" className="w-full" onClick={() => setMinimized(true)}>
-          Mamaya na, bibilangin ko pa
+          Later, still counting
         </Button>
       </DialogContent>
     </Dialog>

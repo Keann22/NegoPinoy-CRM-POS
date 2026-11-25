@@ -13,7 +13,7 @@ async function post(body: Record<string, unknown>): Promise<void> {
   window.dispatchEvent(new Event(SHIP_HOLDS_CHANGED_EVENT));
 }
 
-/** Warehouse: "Hindi pa ipi-pick", and why. */
+/** Warehouse: "Don't pick yet", and why. */
 export const skipPick = (orderId: string, reason: PickSkipReason, note: string) => post({ action: 'skip', orderId, reason, note });
 /** Sales: pick it now, or asked the customer (back in 4 hours). */
 export const answerPickSkip = (id: string, answer: PickSkipAnswer) => post({ action: 'answer', id, answer });

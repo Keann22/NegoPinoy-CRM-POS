@@ -131,7 +131,7 @@ export function useOrderTasks(orderId: string | null | undefined) {
   return { tasks, reload };
 }
 
-/** Who an order note can go to ("Para kanino?"). Loaded once per order. */
+/** Who an order note can go to ("Who is it for?"). Loaded once per order. */
 export function useNoteTargets(orderId: string | null | undefined, enabled = true) {
   const [loaded, setLoaded] = useState<{ key: string; targets: NoteTarget[] } | null>(null);
   const key = orderId || '';

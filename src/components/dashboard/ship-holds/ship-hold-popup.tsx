@@ -117,10 +117,10 @@ export function ShipHoldPopup() {
         >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300">
-              <PackageCheck className="h-5 w-5" /> Naka-hold na orders
+              <PackageCheck className="h-5 w-5" /> Orders on hold
             </DialogTitle>
             <DialogDescription>
-              {complete > 0 ? `${complete} ready to go. ` : ''}Tell us if these can ship now.{prompts.length > 0 ? <> &ldquo;Ready na&rdquo; puts them back on Packed Orders → Ready.</> : null}
+              {complete > 0 ? `${complete} ready to go. ` : ''}Tell us if these can ship now.{prompts.length > 0 ? <> &ldquo;Ready: ship it&rdquo; puts them back on Packed Orders → Ready.</> : null}
             </DialogDescription>
           </DialogHeader>
           <ul className="space-y-3">

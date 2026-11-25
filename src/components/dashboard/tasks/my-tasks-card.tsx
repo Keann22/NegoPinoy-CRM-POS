@@ -35,12 +35,12 @@ export function MyTasksCard() {
   return (
     <Card className="border-blue-200 dark:border-blue-900">
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg"><ClipboardCheck className="h-5 w-5 text-blue-600" /> {hasNotes ? "Para sa'yo" : 'Mga task ko'} ({open.length})</CardTitle>
+        <CardTitle className="flex items-center gap-2 text-lg"><ClipboardCheck className="h-5 w-5 text-blue-600" /> {hasNotes ? 'For you' : 'My tasks'} ({open.length})</CardTitle>
         <CardDescription>
-          {open.length > 0 && <>Tap <b>Tapos na</b> when it&apos;s done{hasNotes ? <>, or <b>Sumagot</b> on a note</> : null}. </>}
+          {open.length > 0 && <>Tap <b>Done</b> when it&apos;s done{hasNotes ? <>, or <b>Answer</b> on a note</> : null}. </>}
           {(waiting > 0 || answered > 0) && (
             <Link href={`${TASKS_PAGE_PATH}#sent-notes`} className="font-medium text-foreground underline">
-              {answered > 0 ? `${answered} note mo may sagot na` : ''}{answered > 0 && waiting > 0 ? ' · ' : ''}{waiting > 0 ? `${waiting} note mo hinihintay ang sagot` : ''}
+              {answered > 0 ? `${answered} of your notes answered` : ''}{answered > 0 && waiting > 0 ? ' · ' : ''}{waiting > 0 ? `${waiting} waiting for an answer` : ''}
             </Link>
           )}{' '}
           <Link href={TASKS_PAGE_PATH} className="underline">See all</Link>

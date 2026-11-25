@@ -20,15 +20,15 @@ export function RecountLine({ row, onSave }: Props) {
 
   const submit = async () => {
     if (u1.trim() === '' || !(Number(u1) >= 0)) {
-      toast({ title: 'Ilagay ang bilang', description: 'Ilagay 0 kung wala.', variant: 'destructive' });
+      toast({ title: 'Enter the count', description: 'Enter 0 if there are none.', variant: 'destructive' });
       return;
     }
     setSaving(true);
     try {
       await onSave(row.id, Number(u1));
-      toast({ title: 'Salamat! Na-save ang bilang', description: row.productName });
+      toast({ title: 'Thank you! Count saved', description: row.productName });
     } catch (e) {
-      toast({ title: 'Hindi na-save', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
+      toast({ title: 'Not saved', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
       setSaving(false);
     }
   };
@@ -40,11 +40,11 @@ export function RecountLine({ row, onSave }: Props) {
       </p>
       <div className="flex flex-wrap items-end gap-2">
         <label className="text-xs text-muted-foreground">
-          Bilang sa 3C
+          Count on 3C
           <Input type="number" inputMode="numeric" min={0} className="h-10 w-24" value={u1} onChange={(e) => setU1(e.target.value)} />
         </label>
         <Button onClick={submit} disabled={saving} className="h-10">
-          {saving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}I-save
+          {saving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}Save
         </Button>
       </div>
     </div>

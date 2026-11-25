@@ -79,7 +79,7 @@ export function SupplierStockPopup() {
       >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
-            <PackageX className="h-5 w-5" /> Wala sa supplier: ask the customer
+            <PackageX className="h-5 w-5" /> Out at supplier: ask the customer
           </DialogTitle>
           <DialogDescription>We can&apos;t buy these items right now. Ask each customer, then answer here. Paid orders are first.</DialogDescription>
         </DialogHeader>

@@ -152,14 +152,14 @@ export function SupplierFlagDialog({
         <div className="space-y-1">
           <Label htmlFor="sf-note">Note for sales (optional)</Label>
           <textarea id="sf-note" value={note} onChange={(e) => setNote(e.target.value)} rows={2}
-            placeholder="e.g. baka matagalan, 2 weeks daw"
+            placeholder="e.g. may take a while, supplier says 2 weeks"
             className="w-full rounded-md border bg-background p-2 text-sm" />
           <p className="text-[11px] text-muted-foreground">Sales see this. Don&apos;t write the supplier&apos;s name or the cost.</p>
         </div>
 
         <div className="flex flex-wrap justify-between gap-2 pt-1">
           {current ? (
-            <Button type="button" variant="outline" disabled={busy} onClick={clear}>May stock na</Button>
+            <Button type="button" variant="outline" disabled={busy} onClick={clear}>Back in stock</Button>
           ) : <span />}
           <div className="flex gap-2">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>

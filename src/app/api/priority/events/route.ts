@@ -58,13 +58,13 @@ export async function POST(req: Request) {
     }
     if (kind === 'send_today' && cleanNote.length < 2) return bad('Add why it has to go out today.');
     if ((kind === 'urgent' || kind === 'urgent_cleared') && !canMark) {
-      return bad('Only sales, admins and the jas accounts can mark a customer as nagmamadali.', 403);
+      return bad('Only sales, admins and the jas accounts can mark a customer as urgent.', 403);
     }
-    if (kind === 'urgent' && cleanNote.length < 2) return bad('Add what the customer said (e.g. "kailangan bago Nov 5").');
+    if (kind === 'urgent' && cleanNote.length < 2) return bad('Add what the customer said (e.g. "needs it before Nov 5").');
     if ((kind === 'reserve' || kind === 'reserve_cleared') && !canMark) {
       return bad('Only sales, admins and the jas accounts can reserve stock for a replacement.', 403);
     }
-    if (kind === 'reserve' && cleanNote.length < 2) return bad('Add what it replaces (e.g. "palit sa leaking jar").');
+    if (kind === 'reserve' && cleanNote.length < 2) return bad('Add what it replaces (e.g. "replaces the leaking jar").');
     if (kind === 'send_today_blocked') {
       if (!(reason in BLOCK_REASONS)) return bad('Pick why it can\'t be sent today.');
       if (reason === 'other' && cleanNote.length < 2) return bad('Add what is stopping it.');

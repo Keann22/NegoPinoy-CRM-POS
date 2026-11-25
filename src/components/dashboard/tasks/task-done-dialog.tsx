@@ -46,13 +46,13 @@ export function TaskDoneDialog({ task, onOpenChange, onDone }: {
     <Dialog open={!!task} onOpenChange={close}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-emerald-600" /> Tapos na?</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-emerald-600" /> Done?</DialogTitle>
           <DialogDescription className="text-base text-foreground">{task?.message}</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1.5">
             <Label htmlFor="task-done-note">Note (optional)</Label>
-            <Textarea id="task-done-note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Naipadala na, SPX" />
+            <Textarea id="task-done-note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Shipped by SPX" />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="task-done-photo" className="flex items-center gap-1.5"><Camera className="h-4 w-4" /> Photo (optional)</Label>

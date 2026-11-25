@@ -256,7 +256,7 @@ export async function getRow(supabase: SupabaseClient, id: string) {
 
 export interface TaskCaller { id: string; name: string; isManagement: boolean }
 
-/** "Nakita ko": the assignee saw the task. */
+/** "Got it": the assignee saw the task. */
 export async function markSeen(supabase: SupabaseClient, id: string, caller: TaskCaller): Promise<void> {
   const row = await getRow(supabase, id);
   if (!row.assignee_ids.includes(caller.id)) throw new TaskError('This task is not yours');

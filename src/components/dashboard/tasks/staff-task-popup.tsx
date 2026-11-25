@@ -43,9 +43,9 @@ export function StaffTaskPopup() {
   const notes = shown.filter((t) => t.isNote);
   const tasks = shown.filter((t) => !t.isNote);
   const title = needsMe.length && !shown.length
-    ? (needsMe.length === 1 ? 'Tungkol sa note mo' : `${needsMe.length} update sa mga note mo`)
-    : !tasks.length ? (notes.length === 1 ? 'May note para sa iyo' : `${notes.length} note para sa iyo`)
-      : total === 1 ? 'May task ka' : `${total} para sa iyo`;
+    ? (needsMe.length === 1 ? 'About your note' : `${needsMe.length} updates on your notes`)
+    : !tasks.length ? (notes.length === 1 ? 'A note for you' : `${notes.length} notes for you`)
+      : total === 1 ? 'You have a task' : `${total} for you`;
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) setMinimized(true); }}>
@@ -59,9 +59,9 @@ export function StaffTaskPopup() {
             <ClipboardCheck className="h-5 w-5" /> {title}
           </DialogTitle>
           <DialogDescription>
-            {tasks.length > 0 && <>Tap <b>Nakita ko</b> so the owners know you saw it. It stays on your dashboard until you tap <b>Tapos na</b>.</>}
-            {notes.length > 0 && <> Notes: tap <b>Sumagot</b> to answer, or <b>Nakita ko</b>. It stays on your dashboard and in Tasks until it&apos;s answered.</>}
-            {anyLate && ' Some are past the deadline: tap Tapos na, or May problema if you can\'t do it.'}
+            {tasks.length > 0 && <>Tap <b>Got it</b> so the owners know you saw it. It stays on your dashboard until you tap <b>Done</b>.</>}
+            {notes.length > 0 && <> Notes: tap <b>Answer</b>, or <b>Got it</b>. It stays on your dashboard and in Tasks until it&apos;s answered.</>}
+            {anyLate && ' Some are past the deadline: tap Done, or Problem if you can\'t do it.'}
             {shown.some((t) => t.staffUnread) && ' There is a new reply: tap Read reply.'}
           </DialogDescription>
         </DialogHeader>
@@ -79,7 +79,7 @@ export function StaffTaskPopup() {
           ))}
           {needsMe.length > 0 && (
             <>
-              {shown.length > 0 && <p className="pt-1 text-sm font-medium text-muted-foreground">Mga note mo</p>}
+              {shown.length > 0 && <p className="pt-1 text-sm font-medium text-muted-foreground">Your notes</p>}
               {needsMe.map((n) => (
                 <SentNoteItem key={n.id} note={n} busy={sentActions.busyId === n.id} {...sentActions.handlers} />
               ))}

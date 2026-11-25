@@ -66,7 +66,7 @@ export function InventoryGuardianMemoryTimeline({ productId, adjustmentsOnly = f
           }`}>
             <CheckCircle className="h-2.5 w-2.5 text-emerald-600" />
             {isMatch
-              ? `Tugma sa Shelf: ${entry.physicalCount ?? 0} (Confirmed Correct)`
+              ? `Matches shelf: ${entry.physicalCount ?? 0} (Confirmed Correct)`
               : `Physical Count: ${entry.physicalCount ?? 0} (${shelfDiff > 0 ? `+${shelfDiff}` : shelfDiff}${shelfBefore != null ? `, shelf was ${shelfBefore}` : ''})`}
           </Badge>
         );

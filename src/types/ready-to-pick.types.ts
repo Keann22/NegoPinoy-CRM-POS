@@ -28,7 +28,7 @@ export interface ReadyToPickResponse {
   contendedCount: number;
   /** "Ship on a date" holds, too early to pick (picking starts 3 days before). */
   shipLater: ReadyToPickParked[];
-  /** Skipped with "Hindi pa ipi-pick": waiting for sales to set a date or say pick it. */
+  /** Skipped with "Don't pick yet": waiting for sales to set a date or say pick it. */
   askedSales: ReadyToPickParked[];
 }
 
@@ -42,7 +42,7 @@ export interface ReadyToPickParked {
   /** Ships later: the ship date and the day picking starts (YYYY-MM-DD, PHT). */
   shipOn?: string;
   pickFrom?: string;
-  /** Warehouse asked sales ("Hindi pa ipi-pick"). */
+  /** Warehouse asked sales ("Don't pick yet"). */
   reasonLabel?: string;
   note: string | null;
   byName?: string | null;

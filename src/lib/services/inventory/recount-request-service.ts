@@ -110,11 +110,11 @@ export async function completeRecount(
   input: { id: string; unit1: number; actorName: string }
 ) {
   const unit1 = Math.round(Number(input.unit1));
-  if (!(unit1 >= 0)) throw new RecountError('Ilagay ang bilang sa 3C (0 kung wala).');
+  if (!(unit1 >= 0)) throw new RecountError('Enter the count on 3C (0 if there are none).');
 
   const { data: req, error } = await supabase.from('recount_requests').select('*').eq('id', input.id).single();
   if (error || !req) throw new RecountError('Request not found.');
-  if (req.status !== 'open') throw new RecountError('Nabilang na ito.');
+  if (req.status !== 'open') throw new RecountError('This was already counted.');
 
   const shelf = (await getShelfForProducts(supabase, [req.product_id]))[req.product_id];
   const unit2Kept = shelf?.unit2 ?? 0;
@@ -125,7 +125,7 @@ export async function completeRecount(
     .from('recount_requests')
     .update({ status: 'done', counted_unit1: unit1, counted_unit2: null, system_before: systemUnit1Before, done_by_name: input.actorName, done_at: new Date().toISOString() })
     .eq('id', req.id).eq('status', 'open').select('id');
-  if (!claimed || claimed.length === 0) throw new RecountError('Nabilang na ito.');
+  if (!claimed || claimed.length === 0) throw new RecountError('This was already counted.');
 
   try {
     await applyPhysicalShelfCount(supabase, {
@@ -181,19 +181,19 @@ export async function notifyIfBatchDone(supabase: SupabaseClient, batchId: strin
     const total = (r.counted_unit1 || 0) + (r.counted_unit2 || 0);
     const before = r.system_before;
     const diff = before == null ? null : before - total;
-    const verdict = diff == null ? '' : diff > 0 ? `, sobra ng ${diff} ang system` : diff < 0 ? `, kulang ng ${-diff} ang system` : ', tama ang system';
+    const verdict = diff == null ? '' : diff > 0 ? `, system was ${diff} over` : diff < 0 ? `, system was ${-diff} short` : ', system was right';
     const counted = unit1Only ? `3C <b>${total}</b>` : `<b>${total}</b> (3C ${r.counted_unit1}, 4A ${r.counted_unit2})`;
     return `✅ ${esc(r.productName)}: ${counted}` +
-      `${before != null ? `, dati ${before}` : ''}${verdict} — ${esc(r.done_by_name || 'Jas')}, ${phTime(r.done_at)}`;
+      `${before != null ? `, was ${before}` : ''}${verdict} — ${esc(r.done_by_name || 'Jas')}, ${phTime(r.done_at)}`;
   });
   const actor = rows.find((r) => r.done_by_name)?.done_by_name || 'Jas / Al';
   const text = [
-    `<b>Tapos na ang pabilang (${esc(actor)})</b>`,
+    `<b>Recount done (${esc(actor)})</b>`,
     `"${esc(rows[0].message)}"`,
     '',
     ...lines,
     '',
-    'Na-update na ang stocks sa bilang.',
+    'Stock numbers were updated to the counts.',
   ].join('\n');
   const sent = await sendTelegramMessage(text);
   if (!sent.success) {
@@ -232,13 +232,13 @@ export async function remindUnfinishedRecounts(supabase: SupabaseClient, now = n
     const open = rows.filter((r) => r.status === 'open');
     const timeLabel = new Intl.DateTimeFormat('en-PH', { timeZone: PH_TZ, hour: 'numeric', minute: '2-digit' }).format(now);
     const text = [
-      `<b>⏰ Hindi pa tapos nina Jas at Al ang pabilang</b> (${timeLabel})`,
+      `<b>⏰ Jas and Al have not finished the recount</b> (${timeLabel})`,
       `"${esc(rows[0].message)}"`,
       '',
-      `${open.length} sa ${rows.length} ang hindi pa nabibilang:`,
+      `${open.length} of ${rows.length} not counted yet:`,
       ...open.map((r) => `• ${esc(r.productName)}`),
       '',
-      'Nakalista pa rin sa kanila (Pabilang page) hanggang mabilang lahat.',
+      'They stay on their Recount page until all are counted.',
     ].join('\n');
     const res = await sendTelegramMessage(text);
     if (res.success) sent += 1;

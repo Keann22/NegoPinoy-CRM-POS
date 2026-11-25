@@ -37,7 +37,7 @@ export function getComplianceTier(compliancePercent: number): ComplianceTier {
       label: '0% Compliance',
       deductionPercent: 100,
       color: 'destructive',
-      description: 'Walang ginawang task sa buong buwan — 100% Forfeiture',
+      description: 'No tasks done the whole month — 100% Forfeiture',
     };
   }
   if (compliancePercent < 50) {
@@ -53,7 +53,7 @@ export function getComplianceTier(compliancePercent: number): ComplianceTier {
       label: '50%–69%',
       deductionPercent: 50,
       color: 'destructive',
-      description: '50%–69% compliance — 50% deduction sa kabuuang incentive',
+      description: '50%–69% compliance — 50% deduction from the whole incentive',
     };
   }
   if (compliancePercent < 80) {
@@ -61,7 +61,7 @@ export function getComplianceTier(compliancePercent: number): ComplianceTier {
       label: '70%–79%',
       deductionPercent: 20,
       color: 'warning',
-      description: '70%–79% compliance — 20% deduction sa kabuuang incentive',
+      description: '70%–79% compliance — 20% deduction from the whole incentive',
     };
   }
   if (compliancePercent < 92) {
@@ -69,14 +69,14 @@ export function getComplianceTier(compliancePercent: number): ComplianceTier {
       label: '80%–91%',
       deductionPercent: 10,
       color: 'warning',
-      description: '80%–91% compliance — 10% deduction sa kabuuang incentive',
+      description: '80%–91% compliance — 10% deduction from the whole incentive',
     };
   }
   return {
     label: '92%–100%',
     deductionPercent: 0,
     color: 'success',
-    description: '92%–100% compliance — Walang deduction. Makukuha ang buong incentive!',
+    description: '92%–100% compliance — No deduction. You get the whole incentive!',
   };
 }
 

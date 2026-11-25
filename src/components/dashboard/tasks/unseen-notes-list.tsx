@@ -19,8 +19,8 @@ export function UnseenNotesList() {
   return (
     <Card className="border-red-200 dark:border-red-900">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><EyeOff className="h-5 w-5 text-red-600" /> Notes na hindi pa nakikita (2+ oras) ({tasks.length})</CardTitle>
-        <CardDescription>Sent to someone, but nobody tapped Nakita ko or answered yet. The sender was told.</CardDescription>
+        <CardTitle className="flex items-center gap-2"><EyeOff className="h-5 w-5 text-red-600" /> Notes not seen yet (2+ hours) ({tasks.length})</CardTitle>
+        <CardDescription>Sent to someone, but nobody tapped Got it or answered yet. The sender was told.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {tasks.map((t) => (
@@ -39,7 +39,7 @@ export function UnseenNotesAlert() {
   return (
     <Link href={TASKS_PAGE_PATH} className="flex items-center gap-2 rounded-md border border-red-300 bg-red-50 p-2 text-sm text-red-800 hover:underline dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
       <EyeOff className="h-4 w-4 shrink-0" />
-      {tasks.length} note{tasks.length === 1 ? '' : 's'} na hindi pa nakikita (2+ oras): {tasks.slice(0, 3).map((t) => `${t.assignedByName} → ${t.assigneeName}`).join(', ')}
+      {tasks.length} note{tasks.length === 1 ? '' : 's'} not seen yet (2+ hours): {tasks.slice(0, 3).map((t) => `${t.assignedByName} → ${t.assigneeName}`).join(', ')}
     </Link>
   );
 }

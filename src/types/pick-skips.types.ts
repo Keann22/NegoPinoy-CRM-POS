@@ -6,8 +6,8 @@
 export type PickSkipReason = 'later' | 'other';
 
 export const PICK_SKIP_REASONS: Record<PickSkipReason, { label: string; hint: string }> = {
-  later: { label: 'Naka-reserve / sa ibang petsa ipapadala', hint: 'Customer or sales asked to ship it later' },
-  other: { label: 'Iba pa', hint: 'Something else (write it in the note)' },
+  later: { label: 'Reserved / ships on a later date', hint: 'Customer or sales asked to ship it later' },
+  other: { label: 'Other', hint: 'Something else (write it in the note)' },
 };
 
 /** pick_now: sales says pick it; waiting: asked the customer, back in 4 hours. */

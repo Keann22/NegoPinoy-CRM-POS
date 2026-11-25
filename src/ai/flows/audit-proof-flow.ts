@@ -194,7 +194,7 @@ export async function auditProof(input: AuditProofInput): Promise<AuditProofOutp
       verdict: 'flagged',
       confidence: 0,
       feedback:
-        'Hindi ma-verify ng AI ang proof mo dahil sa technical error. Mano-mano munang i-rereview ng admin. (AI audit failed due to a technical error.)',
+        'The AI could not check your proof because of a technical error. An admin will review it by hand.',
       isFacebookScreenshot: false,
       matchesTaskType: false,
     };

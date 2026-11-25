@@ -84,7 +84,7 @@ export function useAgentDailyLogs(userId?: string) {
       if (existingHash) {
         return {
           success: false,
-          error: `Duplicate screenshot detected! Ang larawang ito ay na-upload na noong ${existingHash.log_date}. Please upload a new, unique screenshot.`,
+          error: `Duplicate screenshot detected! This image was already uploaded on ${existingHash.log_date}. Please upload a new, unique screenshot.`,
         };
       }
 

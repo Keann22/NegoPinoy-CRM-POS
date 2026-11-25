@@ -25,8 +25,8 @@ export function ShipHoldPromptCard({ prompt: p, busy, onAnswer, onEdit }: Props)
   const [askDate, setAskDate] = useState<string | null>(null);
   const d = p.detail;
   const title = p.reason === 'complete'
-    ? d.kind === 'payment' ? 'Bayad na: pwede na ipadala' : 'Kumpleto na: pwede na ipadala'
-    : 'Ready na ba?';
+    ? d.kind === 'payment' ? 'Paid: OK to ship' : 'Complete: OK to ship'
+    : 'Ready to ship?';
   return (
     <li className={cn('space-y-2 rounded-md border p-3', p.reason === 'complete' && 'border-emerald-300 bg-emerald-50/60 dark:border-emerald-900 dark:bg-emerald-950/30')}>
       <div className="text-sm">
@@ -44,16 +44,16 @@ export function ShipHoldPromptCard({ prompt: p, busy, onAnswer, onEdit }: Props)
       <ShipHoldOrdersList orders={d.orders} />
       {!d.complete && d.kind === 'with_orders' && (
         <p className="text-xs text-amber-800 dark:text-amber-300">
-          Not all of them are ready. &ldquo;Ready na&rdquo; lets these go without waiting for the rest.
+          Not all of them are ready. &ldquo;Ready: ship it&rdquo; lets these go without waiting for the rest.
         </p>
       )}
 
       {askDate === null ? (
         <div className="flex flex-wrap gap-2">
           <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" disabled={busy} onClick={() => onAnswer('release')}>
-            {busy && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}Ready na: ipadala
+            {busy && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}Ready: ship it
           </Button>
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => setAskDate(addDaysPht(DEFAULT_CHECK_DAYS))}>Hindi pa</Button>
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => setAskDate(addDaysPht(DEFAULT_CHECK_DAYS))}>Not yet</Button>
           <Button size="sm" variant="ghost" disabled={busy} onClick={() => onAnswer('waiting')}>Asked customer, waiting</Button>
           <Button size="sm" variant="ghost" disabled={busy} onClick={onEdit}>Change hold</Button>
           <Button size="sm" variant="link" asChild className="px-1">
@@ -62,7 +62,7 @@ export function ShipHoldPromptCard({ prompt: p, busy, onAnswer, onEdit }: Props)
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm">Tanungin ulit sa</span>
+          <span className="text-sm">Ask again on</span>
           <Input type="date" min={addDaysPht(1)} value={askDate} onChange={(e) => setAskDate(e.target.value)} className="h-8 w-40" />
           <Button size="sm" disabled={busy || !askDate} onClick={() => onAnswer('not_yet', askDate)}>Save</Button>
           <Button size="sm" variant="ghost" onClick={() => setAskDate(null)}>Back</Button>

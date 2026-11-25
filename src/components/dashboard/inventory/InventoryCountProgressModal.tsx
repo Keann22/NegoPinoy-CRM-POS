@@ -18,10 +18,10 @@ export function InventoryCountProgressModal({ open, onOpenChange }: Props) {
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl font-bold font-headline">
-            <Target className="h-5 w-5 text-primary" /> Pag-usad ng Bilang at Tugma sa Shelf
+            <Target className="h-5 w-5 text-primary" /> Count progress: matches with the shelf
           </DialogTitle>
           <DialogDescription>
-            Pagsusuri kung ang physical count sa shelf ay tumutugma sa unallocated stock ng system.
+            Whether each shelf count matches the shelf number in the system.
           </DialogDescription>
         </DialogHeader>
 

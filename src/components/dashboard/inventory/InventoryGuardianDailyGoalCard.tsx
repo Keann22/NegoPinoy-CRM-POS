@@ -87,18 +87,18 @@ export function InventoryGuardianDailyGoalCard({
         {dailyProgress.completedToday > 0 && (
           <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-0.5">
             <span>
-              🎯 Tugma sa Shelf:{' '}
+              🎯 Matches shelf:{' '}
               <strong className="text-emerald-700 dark:text-emerald-400">
                 {dailyProgress.matchedToday ?? 0}
               </strong>{' '}
-              sa {dailyProgress.countedToday ?? dailyProgress.completedToday} ({dailyProgress.accuracyRateToday ?? 0}%)
+              of {dailyProgress.countedToday ?? dailyProgress.completedToday} ({dailyProgress.accuracyRateToday ?? 0}%)
             </span>
             <button
               type="button"
               onClick={() => setShowProgressModal(true)}
               className="text-primary hover:underline text-[10px] font-semibold flex items-center gap-1"
             >
-              <TrendingUp className="h-3 w-3" /> Pag-usad ng Bilang →
+              <TrendingUp className="h-3 w-3" /> Count progress →
             </button>
           </div>
         )}
@@ -120,7 +120,7 @@ export function InventoryGuardianDailyGoalCard({
                   <span className="font-semibold text-foreground truncate max-w-[120px]">{item.productName}</span>
                   <span className="text-primary font-medium">({item.actorName})</span>
                   {item.discrepancy === 0 ? (
-                    <span className="text-emerald-700 dark:text-emerald-400 font-bold ml-0.5">✓ Tugma</span>
+                    <span className="text-emerald-700 dark:text-emerald-400 font-bold ml-0.5">✓ Match</span>
                   ) : item.discrepancy != null ? (
                     <span className="text-amber-700 dark:text-amber-400 font-medium ml-0.5">
                       {item.discrepancy > 0 ? `+${item.discrepancy}` : item.discrepancy}
@@ -203,7 +203,7 @@ export function GoalCompletedModalView({
               {dailyProgress.assignedStaffName ? `${dailyProgress.assignedStaffName}` : 'Staff'} has successfully verified <strong>{dailyProgress.completedToday} of {dailyProgress.target} products</strong> today.
               {dailyProgress.matchedToday != null && dailyProgress.matchedToday > 0 && (
                 <span className="block mt-1 text-emerald-700 dark:text-emerald-400 font-semibold">
-                  🎯 {dailyProgress.matchedToday} product(s) tumugma sa unallocated shelf stock! ({dailyProgress.accuracyRateToday}%)
+                  🎯 {dailyProgress.matchedToday} product(s) matched the shelf number! ({dailyProgress.accuracyRateToday}%)
                 </span>
               )}
             </p>
@@ -221,7 +221,7 @@ export function GoalCompletedModalView({
                 <div className="flex items-center gap-1.5">
                   {item.discrepancy === 0 ? (
                     <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 text-[10px]">
-                      ✓ Tugma
+                      ✓ Match
                     </Badge>
                   ) : item.discrepancy != null ? (
                     <span className="text-[10px] text-amber-700 font-mono">

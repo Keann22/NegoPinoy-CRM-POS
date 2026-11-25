@@ -27,7 +27,7 @@ const DUE_PICKS: { value: DuePick; label: string }[] = [
 ];
 
 /** Common order tasks, one tap to fill in (the owners' usual Messenger messages). */
-const ORDER_QUICK_TEXT = ['Pwede na ipadala', 'Paki-pick at i-book', 'Paki-check ang order'];
+const ORDER_QUICK_TEXT = ['OK to ship', 'Please pick and book', 'Please check the order'];
 
 /** ₱3,352.90, or ₱2,000 for whole pesos. */
 const peso = (n: number) => {
@@ -40,7 +40,7 @@ const peso = (n: number) => {
 const SHIP_WORDS = /ipadala|padala|i-?book|ship/i;
 
 /**
- * Why "Pwede na ipadala" may be wrong for this order (found 2026-11-24: #020106B
+ * Why "OK to ship" may be wrong for this order (found 2026-11-24: #020106B
  * was held for the customer's other orders, which still owed ₱3,352.90).
  */
 function shipWarnings(ctx: OrderShipContext): string[] {
@@ -171,7 +171,7 @@ export function AssignTaskDialog({ open, onOpenChange, order: fixedOrder, onCrea
               rows={3}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="e.g. Jas, pwede na yang ipadala"
+              placeholder="e.g. Jas, this one can ship now"
             />
             {warnings.length > 0 && (
               <div role="alert" className="flex gap-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-200">

@@ -33,7 +33,7 @@ export function ReadyToPickParkedLists({ shipLater, askedSales }: { shipLater: R
       {askedSales.length > 0 && (
         <details open className="rounded-lg border border-amber-300 dark:border-amber-800">
           <summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm font-semibold text-amber-800 dark:text-amber-300">
-            <MessageCircleQuestion className="h-4 w-4" /> Hinihintay ang sagot ng sales ({askedSales.length})
+            <MessageCircleQuestion className="h-4 w-4" /> Waiting for sales to answer ({askedSales.length})
           </summary>
           <ul className="divide-y border-t">
             {askedSales.map((o) => (
@@ -50,14 +50,14 @@ export function ReadyToPickParkedLists({ shipLater, askedSales }: { shipLater: R
       {shipLater.length > 0 && (
         <details className="rounded-lg border">
           <summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm font-semibold">
-            <CalendarClock className="h-4 w-4" /> Ipapadala pa sa ibang petsa ({shipLater.length}): huwag munang i-pick
+            <CalendarClock className="h-4 w-4" /> Ships on a later date ({shipLater.length}): don&apos;t pick yet
           </summary>
           <ul className="divide-y border-t">
             {shipLater.map((o) => (
               <Row key={o.id} o={o}>
                 <p className="text-xs">
-                  Ipadala sa <b>{o.shipOn ? shortPhtDate(o.shipOn) : '?'}</b>
-                  {' · '}babalik dito sa {o.pickFrom ? shortPhtDate(o.pickFrom) : '?'}
+                  Ships <b>{o.shipOn ? shortPhtDate(o.shipOn) : '?'}</b>
+                  {' · '}back on this list {o.pickFrom ? shortPhtDate(o.pickFrom) : '?'}
                   {o.note ? <span className="text-muted-foreground"> · “{o.note}”</span> : null}
                 </p>
               </Row>

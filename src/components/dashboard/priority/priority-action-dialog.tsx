@@ -48,16 +48,16 @@ const COPY: Record<PriorityAction, { title: string; description: string; notePla
     save: 'Mark send today',
   },
   urgent: {
-    title: 'Customer is in a hurry (nagmamadali)',
+    title: 'Customer is in a hurry',
     description: 'Moves the order up the list and tells the owner/admins right away, with what is missing, so they can follow up or buy it.',
-    notePlaceholder: 'e.g. Kailangan bago Nov 5, aalis ng bansa',
+    notePlaceholder: 'e.g. Needs it before Nov 5, leaving the country',
     noteLabel: 'What the customer said',
-    save: 'Mark nagmamadali',
+    save: 'Mark urgent',
   },
   reserve: {
     title: 'Reserve stock for this replacement',
     description: "The next pieces of these items go to this order. Pickers can't give them to another order (owners can override), and Receiving shows they are for this customer. It ends by itself once the order is picked.",
-    notePlaceholder: 'e.g. Palit sa leaking jar ni Virginia (#324C949)',
+    notePlaceholder: "e.g. Replaces Virginia's leaking jar (#324C949)",
     noteLabel: 'What it replaces',
     save: 'Reserve stock',
   },
@@ -112,7 +112,7 @@ export function PriorityActionDialog({ row, action, canOverride = false, onClose
         action === 'followup' ? 'Follow-up logged'
         : action === 'hold' ? `On hold until ${holdUntil}`
         : action === 'block' ? 'Sent back to sales'
-        : action === 'urgent' ? 'Marked nagmamadali — owner/admins notified'
+        : action === 'urgent' ? 'Marked urgent — owner/admins notified'
         : action === 'reserve' ? 'Stock reserved for this replacement'
         : data.sendDate === today ? 'On today\'s send list' : `On the send list for ${data.sendDate}`;
       toast({ title });

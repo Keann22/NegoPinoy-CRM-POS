@@ -95,7 +95,7 @@ export function TaskThreadDialog({ task, view, onOpenChange }: {
           {loading && messages.length === 0 && <p className="p-2 text-sm text-muted-foreground">Loading…</p>}
           {!loading && messages.length === 0 && (
             <p className="p-2 text-sm text-muted-foreground">
-              {view === 'staff' ? `Wala pang tanong. May tanong ka kay ${other}? Isulat sa baba.` : `No replies yet. Write to ${other} below.`}
+              {view === 'staff' ? `No messages yet. Have a question for ${other}? Write it below.` : `No replies yet. Write to ${other} below.`}
             </p>
           )}
           {messages.map((m) => {
@@ -151,7 +151,7 @@ export function TaskThreadDialog({ task, view, onOpenChange }: {
               rows={2}
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder={view === 'staff' ? 'Magtanong o sumagot…' : `Reply to ${other}…`}
+              placeholder={view === 'staff' ? 'Ask or answer…' : `Reply to ${other}…`}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); } }}
             />
             <Button onClick={send} disabled={(!text.trim() && !photo) || sending} aria-label="Send">

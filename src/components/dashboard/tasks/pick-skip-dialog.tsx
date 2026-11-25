@@ -45,7 +45,7 @@ export function PickSkipDialog({ order, onOpenChange, onSaved }: Props) {
     setSaving(true);
     try {
       await skipPick(order.id, reason, note);
-      toast({ title: 'Tinanong ang sales', description: `${order.salesPersonName || 'The owners'} will set the ship date or say pick it now.` });
+      toast({ title: 'Asked sales', description: `${order.salesPersonName || 'The owners'} will set the ship date or say pick it now.` });
       onSaved();
       close(false);
     } catch (e) {
@@ -59,14 +59,14 @@ export function PickSkipDialog({ order, onOpenChange, onSaved }: Props) {
     <Dialog open={!!order} onOpenChange={close}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><PauseCircle className="h-5 w-5" /> Hindi pa ipi-pick</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><PauseCircle className="h-5 w-5" /> Don&apos;t pick yet</DialogTitle>
           <DialogDescription>
             {order ? `#${order.orderNo} · ${order.customerName}` : ''}. Sales will be asked to set the ship date or say pick it now.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>Bakit?</Label>
+            <Label>Why?</Label>
             <div className="flex flex-wrap gap-2">
               {REASONS.map((r) => (
                 <button key={r} type="button" aria-pressed={reason === r} className={chip(reason === r)} onClick={() => setReason(r)} title={PICK_SKIP_REASONS[r].hint}>
@@ -77,7 +77,7 @@ export function PickSkipDialog({ order, onOpenChange, onSaved }: Props) {
           </div>
           <div className="space-y-2">
             <Label htmlFor="pick-skip-note">Note {reason === 'other' ? '' : <span className="font-normal text-muted-foreground">(optional)</span>}</Label>
-            <Textarea id="pick-skip-note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. sabi sa order form: reserve for December" />
+            <Textarea id="pick-skip-note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. order form says: reserve for December" />
           </div>
           <p className="text-xs text-muted-foreground">Item missing or wrong on the shelf? Use Pick Now and mark it OS instead.</p>
         </div>

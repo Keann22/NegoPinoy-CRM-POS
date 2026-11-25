@@ -763,6 +763,37 @@ How it works (built 2026-11-20):
   Messenger), and the owners see it on their dashboard and the Tasks page.
 - The Inventory team list is in `src/lib/services/staff-tasks/staff-note-service.ts`.
 
+## Screens in English (owner, 2026-11-25)
+
+- **Every staff screen is in English.** Older sections of this file still use the
+  Filipino names the screens had before; this is what they are called now:
+  - Tasks and notes: Nakita ko → **Got it**, Ginagawa na → **Working on it**, May
+    problema → **Problem**, Tapos na → **Done**, Magtanong → **Ask**, Sumagot →
+    **Answer**, Bawiin → **Withdraw**, Mga task ko / Para sa'yo → **My tasks / For
+    you**, Mga note na pinadala ko → **Notes I sent**.
+  - Note box: Para kanino? → **Who is it for?**, Note lang → **Just a note**, Iba pa →
+    **Someone else**, Kailangan ng sagot → **Needs a reply**, Pasabi lang po → **Just
+    letting you know** (not "FYI").
+  - Task quick picks: **OK to ship**, **Please pick and book**, **Please check the order**.
+  - Menu: Pabilang (Recount) → **Recount**, Wala sa Supplier → **Out at Supplier**.
+    Statuses: **Out at supplier: wait for stock**, **Only another color/size**, **Price
+    went up**, **Stop selling**; May stock na → **Back in stock**.
+  - Holds: Hindi pa ipapadala → **Don't ship yet**, Ipadala sa ibang petsa → **Ship on
+    another date**, reasons **Ship with other orders / Waiting for payment / Customer
+    will add more / Ship on a date / Other**; Kumpleto na / Bayad na: pwede na ipadala →
+    **Complete / Paid: OK to ship**, Ready na ba? → **Ready to ship?**, Ready na:
+    ipadala → **Ready: ship it**, Hindi pa → **Not yet**.
+  - Picking: Hindi pa ipi-pick → **Don't pick yet**, I-pick na ngayon → **Pick it now**.
+  - Counts: Tugma sa shelf → **Matches shelf**, Sobra / Kulang → **Over by / Short by**,
+    Pag-usad ng Bilang → **Count progress**.
+  - Nagmamadali → **Urgent**.
+- **Still in Filipino on purpose:** what goes to customers or couriers (Live Chat
+  quick replies, customer emails, the AI persona's draft messages, the SPX rider
+  instruction), and whatever staff type themselves (notes, task text, hold notes).
+- The put-back task for a cancelled picked order is written in English too (database
+  function, `scripts/migrations/2026-11-25_put_back_task_english.sql`); tasks made
+  before 2026-11-25 keep their old text.
+
 ## Being decided (not built yet)
 
 - **Customer purchase planner (owner, 2026-11-01)**: a premium feature on the

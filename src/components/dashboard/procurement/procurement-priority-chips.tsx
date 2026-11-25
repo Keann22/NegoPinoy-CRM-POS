@@ -20,12 +20,12 @@ export function ProcurementPriorityChips({ priority }: { priority?: ItemPriority
     <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] font-semibold">
       {priority.urgent.length > 0 && (
         <span className="rounded bg-red-600 px-1.5 py-0.5 text-white">
-          🔥 Nagmamadali: {orderLinks(priority.urgent)}
+          🔥 Urgent: {orderLinks(priority.urgent)}
         </span>
       )}
       {priority.paid.length > 0 && (
         <span className="rounded bg-green-600 px-1.5 py-0.5 text-white">
-          ✅ Bayad na: {orderLinks(priority.paid)}
+          ✅ Paid: {orderLinks(priority.paid)}
         </span>
       )}
     </div>
@@ -39,8 +39,8 @@ export function ProcurementPriorityCounts({ items }: { items: any[] }) {
   if (!urgent && !paid) return null;
   return (
     <span className="flex gap-1.5 text-xs font-semibold">
-      {urgent > 0 && <span className="rounded bg-red-600 px-2 py-0.5 text-white">🔥 {urgent} nagmamadali</span>}
-      {paid > 0 && <span className="rounded bg-green-600 px-2 py-0.5 text-white">✅ {paid} bayad na</span>}
+      {urgent > 0 && <span className="rounded bg-red-600 px-2 py-0.5 text-white">🔥 {urgent} urgent</span>}
+      {paid > 0 && <span className="rounded bg-green-600 px-2 py-0.5 text-white">✅ {paid} paid</span>}
     </span>
   );
 }

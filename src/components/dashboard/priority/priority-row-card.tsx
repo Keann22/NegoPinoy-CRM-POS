@@ -61,7 +61,7 @@ function timer(row: PriorityRow): { text: string; tone: 'late' | 'today' | 'ok' 
   if (row.group === 'hold') {
     if (row.hold) return { text: `Back on ${shortDate(row.hold.until)}`, tone: 'ok' };
     const detail = row.shipHold?.detail;
-    if (row.step === 'ship_hold' && detail?.complete) return { text: 'Kumpleto na: pwede na ipadala', tone: 'today' };
+    if (row.step === 'ship_hold' && detail?.complete) return { text: 'Complete: OK to ship', tone: 'today' };
     if (row.step === 'ship_hold' && detail) return { text: `Ask again ${shortPhtDate(detail.checkOn)}`, tone: 'ok' };
     if (row.step === 'ship_hold' && row.shipHold?.at) return { text: `Held since ${shortDate(row.shipHold.at)}`, tone: 'ok' };
     return null;
@@ -125,7 +125,7 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
             <div className="flex flex-wrap gap-1.5">
               {row.urgent && (
                 <span className="inline-flex items-center gap-1 rounded bg-red-600 px-2 py-0.5 text-xs font-semibold text-white">
-                  <Flame className="h-3 w-3" />Nagmamadali
+                  <Flame className="h-3 w-3" />Urgent
                 </span>
               )}
               {row.reserved && (
@@ -231,7 +231,7 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
             others={row.otherOpenOrders.filter((o) => !row.shipHold?.detail?.orders.some((g) => g.id === o.id))}
           />
           {row.urgent && (
-            <div className="text-xs text-red-700 dark:text-red-300">Nagmamadali: “{row.urgent.note}” — {row.urgent.byName}, {shortDate(row.urgent.at)}</div>
+            <div className="text-xs text-red-700 dark:text-red-300">Urgent: “{row.urgent.note}” — {row.urgent.byName}, {shortDate(row.urgent.at)}</div>
           )}
           {row.reserved && (
             <div className="text-xs text-violet-700 dark:text-violet-300">
@@ -275,7 +275,7 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
             )}
             {canEdit && !row.urgent && (
               <Button size="sm" variant="outline" className="h-8 border-red-300 text-red-700 dark:text-red-300" onClick={() => onAction(row, 'urgent')}>
-                <Flame className="mr-1.5 h-4 w-4" />Nagmamadali
+                <Flame className="mr-1.5 h-4 w-4" />Urgent
               </Button>
             )}
             {canEdit && row.urgent && (
@@ -305,17 +305,17 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
             )}
             {canEdit && row.shipHold?.detail && (
               <Button size="sm" className="h-8 bg-emerald-600 hover:bg-emerald-700" onClick={() => onAction(row, 'ship_release')}>
-                <PlayCircle className="mr-1.5 h-4 w-4" />Ready na: ipadala
+                <PlayCircle className="mr-1.5 h-4 w-4" />Ready: ship it
               </Button>
             )}
             {canEdit && CAN_SHIP_HOLD.includes(row.status) && !row.shipHold?.bus && (
               <Button size="sm" variant="outline" className="h-8" onClick={() => onAction(row, 'ship_hold')}>
-                <PauseCircle className="mr-1.5 h-4 w-4" />{row.shipHold ? 'Change hold' : 'Hindi pa ipapadala'}
+                <PauseCircle className="mr-1.5 h-4 w-4" />{row.shipHold ? 'Change hold' : "Don't ship yet"}
               </Button>
             )}
             {canEdit && NEEDS_PICKING.includes(row.status) && !row.shipHold?.bus && (
               <Button size="sm" variant="outline" className="h-8" onClick={() => onAction(row, 'ship_hold')}>
-                <CalendarClock className="mr-1.5 h-4 w-4" />{row.shipHold?.detail ? 'Change hold' : 'Ipadala sa ibang petsa'}
+                <CalendarClock className="mr-1.5 h-4 w-4" />{row.shipHold?.detail ? 'Change hold' : 'Ship on another date'}
               </Button>
             )}
             {canEdit && row.hold && (

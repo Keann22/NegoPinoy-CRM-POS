@@ -15,7 +15,7 @@ export function useRecountPage() {
     try {
       const res = await fetch(`${API}?view=page`, { cache: 'no-store' });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Hindi ma-load');
+      if (!res.ok) throw new Error(json.error || 'Could not load');
       setRows(json.rows || []);
       setError(null);
     } catch (e) {
@@ -35,7 +35,7 @@ export function useRecountPage() {
   const save = useCallback(async (id: string, unit1: number) => {
     const res = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, unit1 }) });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(json.error || 'Hindi na-save');
+    if (!res.ok) throw new Error(json.error || 'Not saved');
     await refresh();
   }, [refresh]);
 

@@ -44,7 +44,7 @@ export function SupplierFlagList({
                 {f.status === 'stop_selling' ? ` · ${f.freeToSell} left to sell` : ''}
               </p>
             </div>
-            {canSetStatus && <Button size="sm" variant="outline" onClick={() => onEdit(f)}>Change / May stock na</Button>}
+            {canSetStatus && <Button size="sm" variant="outline" onClick={() => onEdit(f)}>Change / Back in stock</Button>}
           </div>
 
           {f.orders.length === 0 ? (

@@ -113,7 +113,7 @@ export function EditUnallocatedStockDialog({ item, isOpen, onClose, onSuccess }:
               <span>
                 {item.isVerifiedMatch ? (
                   <>
-                    <strong className="text-emerald-900 font-semibold">Tugma sa Shelf (Confirmed Correct)</strong> · Verified: <strong className="text-emerald-900 font-semibold">{new Date(item.lastEditedAt).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}</strong>
+                    <strong className="text-emerald-900 font-semibold">Matches shelf (confirmed correct)</strong> · Verified: <strong className="text-emerald-900 font-semibold">{new Date(item.lastEditedAt).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}</strong>
                     {item.lastEditedBy ? <> by <strong className="text-emerald-900 font-semibold">{item.lastEditedBy}</strong></> : ''}
                   </>
                 ) : (

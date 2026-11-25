@@ -46,7 +46,7 @@ async function orderAgent(supabase: SupabaseClient, orderId: string | null, all:
   return name ? all.find((p) => p.name.toLowerCase() === name) || null : null;
 }
 
-/** "Para kanino?": the teams, the order's sales agent, then everyone else. */
+/** "Who is it for?": the teams, the order's sales agent, then everyone else. */
 export async function listNoteTargets(supabase: SupabaseClient, orderId: string | null, callerId: string): Promise<NoteTarget[]> {
   const all = await people(supabase);
   const agent = await orderAgent(supabase, orderId, all);
@@ -54,7 +54,7 @@ export async function listNoteTargets(supabase: SupabaseClient, orderId: string 
     key: `team:${t.team}`, label: TEAM_LABEL[t.team], detail: t.names, kind: 'team',
   }));
   if (agent && !agent.ids.includes(callerId)) {
-    targets.push({ key: agent.key, label: agent.name, detail: 'Sales agent ng order', kind: 'agent' });
+    targets.push({ key: agent.key, label: agent.name, detail: 'Sales agent of this order', kind: 'agent' });
   }
   for (const p of all) {
     if (p.ids.includes(callerId) || p.key === agent?.key) continue;

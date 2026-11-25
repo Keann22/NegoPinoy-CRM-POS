@@ -15,7 +15,7 @@ export const shortOrderId = (id: string) => `#${id.slice(0, 7).toUpperCase()}`;
 export const PACKED_STATUSES = ['Packed', 'For Shipping'];
 /** Courier collects these on delivery (installments ship before they're paid off). */
 const COLLECTED_ON_DELIVERY = ['COD', 'Installment'];
-/** Days of no answer before the owners see the "Ready na ba?" card too. */
+/** Days of no answer before the owners see the "Ready to ship?" card too. */
 export const OWNER_AFTER_DAYS = 3;
 export const DEFAULT_CHECK_DAYS = 7;
 export const ASK_AGAIN_HOURS = 4;

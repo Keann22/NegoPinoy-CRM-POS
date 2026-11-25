@@ -32,7 +32,7 @@ export function useRecountRequests() {
   const save = useCallback(async (id: string, unit1: number) => {
     const res = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, unit1 }) });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(json.error || 'Hindi na-save');
+    if (!res.ok) throw new Error(json.error || 'Not saved');
     await refresh();
   }, [refresh]);
 

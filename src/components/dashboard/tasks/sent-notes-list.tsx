@@ -15,15 +15,15 @@ export function SentNotesList() {
   return (
     <Card id="sent-notes">
       <CardHeader>
-        <CardTitle>Mga note na pinadala ko</CardTitle>
-        <CardDescription>Kung nakita na nila at ano ang sagot. Ang sagot ay mag-pop-up din sa iyo.</CardDescription>
+        <CardTitle>Notes I sent</CardTitle>
+        <CardDescription>Whether they saw it and what they answered. Answers also pop up for you.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {open.length === 0 && <p className="text-sm text-muted-foreground">Walang hinihintay na sagot.</p>}
+        {open.length === 0 && <p className="text-sm text-muted-foreground">Not waiting for any answers.</p>}
         {open.map((n) => <SentNoteItem key={n.id} note={n} busy={busyId === n.id} {...handlers} />)}
         {done.length > 0 && (
           <>
-            <p className="pt-2 text-sm font-medium text-muted-foreground">Sinagot / nakita ngayong linggo</p>
+            <p className="pt-2 text-sm font-medium text-muted-foreground">Answered / seen this week</p>
             {done.map((n) => <SentNoteItem key={n.id} note={n} onRead={handlers.onRead} />)}
           </>
         )}

@@ -116,7 +116,7 @@ export async function postTaskMessage(
   if (isNote) {
     // Keep the conversation in the order's Activity & Notes too. The sender gets a pop-up, not a bell.
     if (task.order_id && body) {
-      const label = fromOwner ? `Reply to ${task.assignee_name}` : `Sagot kay ${task.assigned_by_name}`;
+      const label = fromOwner ? `Reply to ${task.assignee_name}` : `Answer to ${task.assigned_by_name}`;
       await addOrderNote(supabase, task.order_id, `${label}: ${body}`, caller.name);
     }
     return;

@@ -54,9 +54,9 @@ export function NoteRecipientPicker({ orderId, value, onChange, disabled }: {
   return (
     <fieldset disabled={disabled} className="space-y-2">
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="mr-1 text-xs font-semibold text-muted-foreground">Para kanino?</span>
+        <span className="mr-1 text-xs font-semibold text-muted-foreground">Who is it for?</span>
         <Chip active={picked.size === 0} onClick={() => onChange({ ...value, targetKeys: [] })} title="Saved on the order only; nobody gets a pop-up">
-          Note lang
+          Just a note
         </Chip>
         {quick.map((t) => (
           <Chip key={t.key} active={picked.has(t.key)} onClick={() => toggle(t.key)} title={t.detail}>
@@ -71,12 +71,12 @@ export function NoteRecipientPicker({ orderId, value, onChange, disabled }: {
         ))}
         {others.length > 0 && (
           <select
-            aria-label="Ibang tao"
+            aria-label="Someone else"
             className="h-7 rounded-full border bg-background px-2 text-xs"
             value=""
             onChange={(e) => { if (e.target.value) toggle(e.target.value); }}
           >
-            <option value="">Iba pa…</option>
+            <option value="">Someone else…</option>
             {others.filter((t) => !picked.has(t.key)).map((t) => (
               <option key={t.key} value={t.key}>{t.label}{t.detail ? ` (${t.detail})` : ''}</option>
             ))}
@@ -87,15 +87,15 @@ export function NoteRecipientPicker({ orderId, value, onChange, disabled }: {
       {picked.size > 0 && (
         <div className="space-y-1.5 rounded-md bg-blue-50/70 p-2 dark:bg-blue-950/30">
           <div className="flex flex-wrap gap-1.5">
-            <Chip active={value.needsAnswer} onClick={() => onChange({ ...value, needsAnswer: true })}>Kailangan ng sagot</Chip>
-            <Chip active={!value.needsAnswer} onClick={() => onChange({ ...value, needsAnswer: false })}>Pasabi lang po</Chip>
+            <Chip active={value.needsAnswer} onClick={() => onChange({ ...value, needsAnswer: true })}>Needs a reply</Chip>
+            <Chip active={!value.needsAnswer} onClick={() => onChange({ ...value, needsAnswer: false })}>Just letting you know</Chip>
           </div>
           <p className="text-xs text-muted-foreground">
             {value.needsAnswer
-              ? 'Mag-pop-up sa kanila hanggang sumagot sila o mag-Tapos na. Ang sagot ay mag-pop-up sa iyo.'
-              : 'Mag-pop-up sa kanila hanggang i-tap nila ang Nakita ko.'}
-            {pickedTeams.map((t) => ` ${t.label}: ${t.detail}. Kung sino ang unang sumagot, sarado na para sa lahat.`).join('')}
-            {' '}Kung walang nakakita sa loob ng 2 oras, sasabihan ka at makikita ng owners.
+              ? 'It pops up for them until they answer or tap Done. Their answer pops up for you.'
+              : 'It pops up for them until they tap Got it.'}
+            {pickedTeams.map((t) => ` ${t.label}: ${t.detail}. Whoever answers first closes it for everyone.`).join('')}
+            {' '}If nobody sees it within 2 hours, you are told and the owners see it.
           </p>
         </div>
       )}

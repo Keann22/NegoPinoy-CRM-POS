@@ -32,7 +32,7 @@ export function OrderTasksList({ orderId, openNotesOnly = false }: { orderId: st
   if (tasks.length === 0) return null;
   const mineIds = new Set(myOpen.map((t) => t.id));
   const sentIds = new Set(sent.map((t) => t.id));
-  const heading = tasks.every((t) => t.isNote) ? 'Notes para sa tao sa order na ito' : tasks.some((t) => t.isNote) ? 'Tasks & notes on this order' : 'Tasks on this order';
+  const heading = tasks.every((t) => t.isNote) ? 'Notes to people on this order' : tasks.some((t) => t.isNote) ? 'Tasks & notes on this order' : 'Tasks on this order';
 
   return (
     <div className={openNotesOnly ? 'space-y-2' : 'space-y-2 px-6 pb-4'}>

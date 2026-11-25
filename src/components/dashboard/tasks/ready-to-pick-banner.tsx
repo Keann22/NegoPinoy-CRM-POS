@@ -26,7 +26,7 @@ export function ReadyToPickBanner() {
           <PackageCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
           <div className="space-y-0.5">
             <p className="font-semibold">
-              Picked (with issue) — May Stock na sa Warehouse
+              Picked (with issue) — Now in Stock at the Warehouse
               {!isLoading && data && (
                 <span className="ml-2 rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-medium text-white">
                   {pwiCount} ready

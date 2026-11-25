@@ -5,7 +5,7 @@ import { ALWAYS_NOTIFY_NAMES } from './staff-message-service';
  * Bell notifications for the priority list:
  *  - "now fully paid": a lay-away / installment / pending order just reached ₱0
  *    balance, so the warehouse can act on it right away (once per order).
- *  - "nagmamadali": sales marked the customer as in a hurry, so the owner can
+ *  - "urgent": sales marked the customer as in a hurry, so the owner can
  *    follow up or buy what's missing.
  * Both list the order's missing (OS) items.
  */
@@ -72,7 +72,7 @@ export async function notifyUrgent(supabase: SupabaseClient, orderId: string, no
   const { data: o } = await supabase.from('orders').select('customers(full_name)').eq('id', orderId).maybeSingle();
   const customer = (o as any)?.customers?.full_name || 'Customer';
   const names = dedupe(await staffNames(supabase, ['owner', 'admin']), byName);
-  await notify(supabase, names, 'Customer is in a hurry (nagmamadali)',
+  await notify(supabase, names, 'Customer is in a hurry',
     `#${short(orderId)} ${customer}: “${note}” — ${byName}. ${await itemSummary(supabase, orderId)}.`);
 }
 

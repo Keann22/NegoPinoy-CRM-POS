@@ -47,7 +47,7 @@ export function useOrderDialog(props: UseOrderDialogProps) {
     // "To follow" items: added from earlier orders (new order) / ticked when removed (edit).
     const [carryOverAdds, setCarryOverAdds] = useState<CarryOver[]>([]);
     const [toFollow, setToFollow] = useState<Record<string, boolean>>({});
-    // "Nagmamadali" on a new order: null = not ticked, otherwise the note.
+    // "Urgent" on a new order: null = not ticked, otherwise the note.
     const [urgentNote, setUrgentNote] = useState<string | null>(null);
     // Edit: store credit used at creation and bus shipping fee, kept on the total.
     const [carried, setCarried] = useState<OrderCarriedAmounts>({ creditApplied: 0, shippingFee: 0 });
@@ -287,7 +287,7 @@ export function useOrderDialog(props: UseOrderDialogProps) {
         // Items out at the supplier: the customer must know (or, if we stopped selling it, only what's left).
         const flagCheck = await checkSupplierFlagsBeforeSave(values.orderItems, []);
         if (flagCheck.error) {
-            toast({ variant: 'destructive', title: 'Wala sa supplier', description: flagCheck.error });
+            toast({ variant: 'destructive', title: 'Out at supplier', description: flagCheck.error });
             return;
         }
 
@@ -319,9 +319,9 @@ export function useOrderDialog(props: UseOrderDialogProps) {
                 const res = await fetch('/api/priority/events', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ orderId: newOrderId, kind: 'urgent', note: urgent.trim() || 'Nagmamadali (set on New Order)' }),
+                    body: JSON.stringify({ orderId: newOrderId, kind: 'urgent', note: urgent.trim() || 'Urgent (set on New Order)' }),
                 }).catch(() => null);
-                if (!res?.ok) toast({ variant: 'destructive', title: 'Order saved, but "nagmamadali" was not', description: 'Set it again from the order page.' });
+                if (!res?.ok) toast({ variant: 'destructive', title: 'Order saved, but "urgent" was not', description: 'Set it again from the order page.' });
             }
 
             if (props.mode === 'create' && props.onOrderAdded) {
@@ -368,7 +368,7 @@ export function useOrderDialog(props: UseOrderDialogProps) {
 
         const flagCheck = await checkSupplierFlagsBeforeSave(values.orderItems, props.orderItems || []);
         if (flagCheck.error) {
-            toast({ variant: 'destructive', title: 'Wala sa supplier', description: flagCheck.error });
+            toast({ variant: 'destructive', title: 'Out at supplier', description: flagCheck.error });
             return;
         }
 

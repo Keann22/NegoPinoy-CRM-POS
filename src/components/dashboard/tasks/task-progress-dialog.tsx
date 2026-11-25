@@ -13,8 +13,8 @@ import type { StaffTask, StaffTaskProgress } from '@/types/staff-tasks.types';
 export interface ProgressTarget { task: StaffTask; progress: StaffTaskProgress }
 
 const COPY: Record<StaffTaskProgress, { title: string; label: string; placeholder: string; save: string }> = {
-  working: { title: 'Ginagawa na', label: 'Note (optional)', placeholder: 'e.g. Ipapadala mamayang hapon', save: 'Save' },
-  problem: { title: 'May problema', label: 'Ano ang problema?', placeholder: 'e.g. Kulang ng 1 piece, wala sa shelf', save: 'Tell the owners' },
+  working: { title: 'Working on it', label: 'Note (optional)', placeholder: 'e.g. Will ship this afternoon', save: 'Save' },
+  problem: { title: 'Problem', label: "What's the problem?", placeholder: 'e.g. 1 piece short, not on the shelf', save: 'Tell the owners' },
 };
 
 /** "Ginagawa na" (optional note) or "May problema" (reason required; the owner gets a bell). */

@@ -107,7 +107,7 @@ async function openOsOrderIds(supabase: SupabaseClient, orderIds: string[]): Pro
   return new Set(rows.map((r) => r.order_id));
 }
 
-/** Orders whose customer is currently marked nagmamadali (latest urgent* event is 'urgent'). */
+/** Orders whose customer is currently marked urgent (latest urgent* event is 'urgent'). */
 async function urgentOrderIds(supabase: SupabaseClient): Promise<Set<string>> {
   try {
     const rows = await fetchAllPages<any>((f, t) =>
@@ -145,7 +145,7 @@ export async function getPriorityList(
   const isPrep = (o: any) =>
     o.payment_method === 'Lay-away' && !isFullyPaid(o) &&
     Number(o.total_amount) > 0 && Number(o.amount_paid || 0) / Number(o.total_amount) >= PRIORITY_RULES.prepPaidRatio;
-  // Anything sales marked "send today" or "nagmamadali" is on the list even if it still owes.
+  // Anything sales marked "send today" or "urgent" is on the list even if it still owes.
   const listed = (o: any) =>
     isFullyPaid(o) || shipsBeforePaid(o.payment_method) || isPrep(o) || markedIds.has(o.id) || urgentIds.has(o.id);
   // Lay-aways still being paid off join the list while they have an OS item, so

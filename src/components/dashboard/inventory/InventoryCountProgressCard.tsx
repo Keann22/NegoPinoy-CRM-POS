@@ -61,7 +61,7 @@ export function InventoryCountProgressCard({ progress }: Props) {
         <Card className="border-emerald-200 bg-emerald-50/40 dark:border-emerald-900 dark:bg-emerald-950/20">
           <CardHeader className="p-4 pb-2">
             <CardDescription className="flex items-center justify-between text-xs font-semibold text-emerald-800 dark:text-emerald-400">
-              <span>Tugma sa Shelf (Matches)</span>
+              <span>Matches shelf</span>
               <CheckCircle2 className="h-4 w-4 text-emerald-600" />
             </CardDescription>
             <CardTitle className="text-2xl font-bold text-emerald-900 dark:text-emerald-100">
@@ -72,7 +72,7 @@ export function InventoryCountProgressCard({ progress }: Props) {
             <span>Accuracy Rate: <strong>{today.accuracyRate}%</strong></span>
             {today.matchedCount > 0 && (
               <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] px-1.5 py-0 flex items-center gap-1">
-                <Sparkles className="h-3 w-3" /> May Tumugma!
+                <Sparkles className="h-3 w-3" /> Matches!
               </Badge>
             )}
           </CardContent>
@@ -82,7 +82,7 @@ export function InventoryCountProgressCard({ progress }: Props) {
         <Card className="border-amber-200 bg-amber-50/30 dark:border-amber-900 dark:bg-amber-950/20">
           <CardHeader className="p-4 pb-2">
             <CardDescription className="flex items-center justify-between text-xs font-semibold text-amber-800 dark:text-amber-400">
-              <span>May Discrepancy (Inayos)</span>
+              <span>Off (fixed)</span>
               <AlertTriangle className="h-4 w-4 text-amber-600" />
             </CardDescription>
             <CardTitle className="text-2xl font-bold text-amber-900 dark:text-amber-100">
@@ -90,7 +90,7 @@ export function InventoryCountProgressCard({ progress }: Props) {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0 text-xs text-amber-700 dark:text-amber-300">
-            Na-update ang system sa tunay na bilang sa shelf.
+            The system was updated to the real shelf count.
           </CardContent>
         </Card>
 
@@ -98,7 +98,7 @@ export function InventoryCountProgressCard({ progress }: Props) {
         <Card>
           <CardHeader className="p-4 pb-2">
             <CardDescription className="flex items-center justify-between text-xs font-semibold">
-              <span>Nabilang ng Staff Ngayon</span>
+              <span>Counted by staff today</span>
               <Users className="h-4 w-4 text-primary" />
             </CardDescription>
             <CardTitle className="text-base font-semibold">
@@ -113,10 +113,10 @@ export function InventoryCountProgressCard({ progress }: Props) {
                   className="inline-flex items-center gap-1 text-[11px] bg-muted px-2 py-0.5 rounded border"
                 >
                   <span className="font-medium">{s.staffName}:</span>
-                  <span className="text-muted-foreground">{s.totalCounted} bilang</span>
+                  <span className="text-muted-foreground">{s.totalCounted} counts</span>
                   {s.matchedCount > 0 && (
                     <span className="text-emerald-700 dark:text-emerald-400 font-semibold">
-                      ({s.matchedCount} tama)
+                      ({s.matchedCount} matched)
                     </span>
                   )}
                 </span>
@@ -132,10 +132,10 @@ export function InventoryCountProgressCard({ progress }: Props) {
           <CardHeader className="p-4 pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
-                <TrendingUp className="h-4 w-4 text-primary" /> Pag-usad ng Accuracy sa Pagbibilang (14 Araw)
+                <TrendingUp className="h-4 w-4 text-primary" /> Count accuracy (14 days)
               </CardTitle>
               <span className="text-xs text-muted-foreground">
-                Layunin: Palakihin ang porsyento ng tugma sa shelf
+                Goal: more counts that match the shelf
               </span>
             </div>
           </CardHeader>
@@ -146,7 +146,7 @@ export function InventoryCountProgressCard({ progress }: Props) {
                 return (
                   <div key={h.date} className="flex items-center gap-3 text-xs">
                     <span className={`w-24 font-mono font-medium ${isToday ? 'text-primary font-bold' : 'text-muted-foreground'}`}>
-                      {h.date} {isToday ? '(Ngayon)' : ''}
+                      {h.date} {isToday ? '(today)' : ''}
                     </span>
                     <div className="flex-1 bg-muted rounded-full h-2.5 overflow-hidden flex">
                       <div
@@ -159,7 +159,7 @@ export function InventoryCountProgressCard({ progress }: Props) {
                       />
                     </div>
                     <span className="w-28 text-right font-medium">
-                      <span className="text-emerald-700 dark:text-emerald-400 font-bold">{h.matchedCount} tama</span>
+                      <span className="text-emerald-700 dark:text-emerald-400 font-bold">{h.matchedCount} matched</span>
                       <span className="text-muted-foreground font-normal"> / {h.totalCounted} ({h.accuracyRate}%)</span>
                     </span>
                   </div>
@@ -176,10 +176,10 @@ export function InventoryCountProgressCard({ progress }: Props) {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <CardTitle className="text-base flex items-center gap-2">
-                <Target className="h-4 w-4 text-primary" /> Mga Nabilang sa Shelf
+                <Target className="h-4 w-4 text-primary" /> Shelf counts
               </CardTitle>
               <CardDescription className="text-xs">
-                Inihahambing ang physical shelf count laban sa dating unallocated stock ng system.
+                Compares each shelf count with the shelf number the system showed before it.
               </CardDescription>
             </div>
             {/* Filter Pills */}
@@ -190,7 +190,7 @@ export function InventoryCountProgressCard({ progress }: Props) {
                   filter === 'all' ? 'bg-background font-semibold shadow-sm' : 'text-muted-foreground'
                 }`}
               >
-                Lahat ({recentItems.length})
+                All ({recentItems.length})
               </button>
               <button
                 onClick={() => setFilter('matched')}
@@ -198,7 +198,7 @@ export function InventoryCountProgressCard({ progress }: Props) {
                   filter === 'matched' ? 'bg-background font-semibold text-emerald-700 shadow-sm' : 'text-muted-foreground'
                 }`}
               >
-                Tugma ({today.matchedCount})
+                Match ({today.matchedCount})
               </button>
               <button
                 onClick={() => setFilter('diff')}
@@ -206,7 +206,7 @@ export function InventoryCountProgressCard({ progress }: Props) {
                   filter === 'diff' ? 'bg-background font-semibold text-amber-700 shadow-sm' : 'text-muted-foreground'
                 }`}
               >
-                May Diff ({today.discrepancyCount})
+                Off ({today.discrepancyCount})
               </button>
             </div>
           </div>
@@ -215,7 +215,7 @@ export function InventoryCountProgressCard({ progress }: Props) {
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Hanapin ang produkto, SKU, o staff..."
+              placeholder="Search product, SKU or staff..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-8 h-9 text-xs"
@@ -226,7 +226,7 @@ export function InventoryCountProgressCard({ progress }: Props) {
         <CardContent className="p-4 pt-0">
           {filteredItems.length === 0 ? (
             <p className="text-center py-6 text-xs text-muted-foreground">
-              Walang nahanap na nabilang na item.
+              No counted items found.
             </p>
           ) : (
             <div className="divide-y text-xs">
@@ -240,7 +240,7 @@ export function InventoryCountProgressCard({ progress }: Props) {
                         {item.sku && <span className="text-[11px] text-muted-foreground font-mono">({item.sku})</span>}
                       </div>
                       <div className="flex items-center gap-2 text-muted-foreground text-[11px]">
-                        <span>Nagbilang: <strong>{item.actorName}</strong></span>
+                        <span>Counted by: <strong>{item.actorName}</strong></span>
                         <span>·</span>
                         <span className="flex items-center gap-1">
                           <Clock className="h-3 w-3" /> {phTime(item.createdAt)}
@@ -258,20 +258,20 @@ export function InventoryCountProgressCard({ progress }: Props) {
                     <div className="flex items-center gap-2 self-start sm:self-auto">
                       <div className="text-right text-[11px]">
                         <div>Physical shelf: <strong>{item.physicalCount}</strong></div>
-                        <div className="text-muted-foreground">Dati sa shelf: {item.shelfBefore ?? '-'}</div>
+                        <div className="text-muted-foreground">Shelf before: {item.shelfBefore ?? '-'}</div>
                       </div>
 
                       {isMatch ? (
                         <Badge className="bg-emerald-100 border-emerald-300 text-emerald-800 dark:bg-emerald-950 dark:border-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 gap-1 text-[11px]">
-                          <CheckCircle2 className="h-3 w-3 text-emerald-600" /> Tugma sa Shelf
+                          <CheckCircle2 className="h-3 w-3 text-emerald-600" /> Matches shelf
                         </Badge>
                       ) : item.discrepancy > 0 ? (
                         <Badge className="bg-amber-100 border-amber-300 text-amber-800 dark:bg-amber-950 dark:border-amber-800 dark:text-amber-300 hover:bg-amber-100 gap-1 text-[11px]">
-                          <AlertTriangle className="h-3 w-3 text-amber-600" /> Sobra ng +{item.discrepancy}
+                          <AlertTriangle className="h-3 w-3 text-amber-600" /> Over by +{item.discrepancy}
                         </Badge>
                       ) : (
                         <Badge className="bg-rose-100 border-rose-300 text-rose-800 dark:bg-rose-950 dark:border-rose-800 dark:text-rose-300 hover:bg-rose-100 gap-1 text-[11px]">
-                          <AlertTriangle className="h-3 w-3 text-rose-600" /> Kulang ng {item.discrepancy}
+                          <AlertTriangle className="h-3 w-3 text-rose-600" /> Short by {-item.discrepancy}
                         </Badge>
                       )}
                     </div>

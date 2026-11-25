@@ -11,7 +11,7 @@ const supabase = createClient(
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Is this order's customer marked "nagmamadali"? ?orderId= */
+/** Is this order's customer marked "urgent"? ?orderId= */
 export async function GET(req: Request) {
   try {
     if (!(await getPriorityCaller())) return NextResponse.json({ error: 'Not signed in' }, { status: 401 });

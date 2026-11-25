@@ -38,7 +38,7 @@ export default function SupplierStockPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-4 p-4">
       <div className="flex flex-wrap items-center gap-2">
-        <h1 className="flex items-center gap-2 text-2xl font-bold"><PackageX className="h-6 w-6 text-amber-600" /> Wala sa Supplier</h1>
+        <h1 className="flex items-center gap-2 text-2xl font-bold"><PackageX className="h-6 w-6 text-amber-600" /> Out at Supplier</h1>
         <Button variant="ghost" size="sm" onClick={() => reload()} className="ml-auto"><RefreshCw className="mr-1 h-4 w-4" />Refresh</Button>
       </div>
       <p className="text-sm text-muted-foreground">

@@ -40,7 +40,7 @@ const customerOf = (o: OrderRow) => one(o.customers)?.full_name || 'Customer';
 /** The text sales and the warehouse see on the order (Packed Orders → Waiting to be Shipped). */
 export function holdText(kind: ShipHoldKind, note: string, withShortIds: string[], via: ShipVia): string {
   let head = SHIP_HOLD_KINDS[kind].label;
-  if (kind === 'with_orders' && withShortIds.length) head = `Isasabay sa ${withShortIds.join(', ')}`;
+  if (kind === 'with_orders' && withShortIds.length) head = `Ships with ${withShortIds.join(', ')}`;
   if (via === 'bus') head += ' (bus)';
   return note.trim() ? `${head}: ${note.trim()}` : head;
 }
@@ -191,7 +191,7 @@ async function groupOf(supabase: SupabaseClient, holdId: string): Promise<HoldRo
   return (rows || []) as HoldRow[];
 }
 
-/** Ready na: the orders go back to Ready to ship (Packed Orders → Verify). */
+/** Ready: the orders go back to Ready to ship (Packed Orders → Verify). */
 export async function releaseShipHold(supabase: SupabaseClient, holdId: string, actorName: string): Promise<string[]> {
   const rows = await groupOf(supabase, holdId);
   const ids = rows.map((r) => r.order_id);

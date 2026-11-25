@@ -7,12 +7,12 @@ import {
 } from '@/types/pick-skips.types';
 
 /*
- * Ship later and "Hindi pa ipi-pick" (owner, 2026-11-25). We run lean: an order
+ * Ship later and "Don't pick yet" (owner, 2026-11-25). We run lean: an order
  * that ships on a later date isn't picked until 3 days before (a "date" ship
  * hold), so its shelf pieces stay free for other orders and it isn't bought for.
  * Found 2026-11-25: 7 orders sat on Ready to Pick that staff kept skipping;
  * "reserve for December" was only in the notes, and 4 had no reason at all.
- * Now staff tap "Hindi pa ipi-pick" with a reason, and the order's sales agent
+ * Now staff tap "Don't pick yet" with a reason, and the order's sales agent
  * sets the ship date or says pick it now. Server only (service role).
  */
 
@@ -53,7 +53,7 @@ export async function getDeferredPicks(supabase: SupabaseClient, orderIds?: stri
   return out;
 }
 
-/** Open "Hindi pa ipi-pick" questions per order. */
+/** Open "Don't pick yet" questions per order. */
 export async function getOpenPickSkips(supabase: SupabaseClient, orderIds?: string[]): Promise<Map<string, PickSkipInfo>> {
   let q = supabase.from(TABLE).select(COLS).is('resolved_at', null);
   if (orderIds) q = q.in('order_id', orderIds);

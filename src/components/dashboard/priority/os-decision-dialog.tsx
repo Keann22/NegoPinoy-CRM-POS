@@ -91,7 +91,7 @@ export function OsDecisionDialog({ row, item, onClose, onSaved }: Props) {
             <div className="space-y-1.5">
               <Label htmlFor="os-note">What the customer said{decision === 'wait' ? ' (optional)' : ''}</Label>
               <Textarea id="os-note" rows={2} maxLength={500} value={note} onChange={(e) => setNote(e.target.value)}
-                placeholder="e.g. Okay daw less muna, isabay sa next order" />
+                placeholder="e.g. Customer is OK with fewer now, the rest with the next order" />
             </div>
           </div>
         )}

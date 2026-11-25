@@ -297,7 +297,7 @@ export async function getProcurementDashboardData(supabase: SupabaseClient) {
     await Promise.allSettled(healingUpdates);
   }
 
-  // Mark items holding up a nagmamadali or fully paid customer, and list them first.
+  // Mark items holding up an urgent or fully paid customer, and list them first.
   const linkedOrders = new Map<string, string[]>();
   osMap.forEach((item: any, pid: string) => linkedOrders.set(pid, [
     ...(item.sourceOrders || []).map((o: any) => o.orderId),

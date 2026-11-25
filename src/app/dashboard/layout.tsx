@@ -113,7 +113,7 @@ export default function DashboardLayout({
     links.push({ href: '/dashboard/pack', label: 'Packer App', icon: Package });
     if (isManagement || isInventory) {
       // Jas's recount list (owners ask her to count products); its own item so it's easy to find.
-      links.push({ href: '/dashboard/inventory/recount', label: 'Pabilang (Recount)', icon: ListChecks });
+      links.push({ href: '/dashboard/inventory/recount', label: 'Recount', icon: ListChecks });
     }
 
     if (isManagement || isInventory) {
@@ -132,7 +132,7 @@ export default function DashboardLayout({
         { href: '/dashboard/inventory/movements', label: 'Inventory History', icon: History },
         { href: '/dashboard/inventory/returns', label: 'Returns', icon: Undo2 },
         { href: '/dashboard/inventory/supplier-returns', label: 'Supplier Returns', icon: PackageX },
-        { href: '/dashboard/inventory/supplier-stock', label: 'Wala sa Supplier', icon: PackageX }
+        { href: '/dashboard/inventory/supplier-stock', label: 'Out at Supplier', icon: PackageX }
       ];
 
       if (isManagement) {

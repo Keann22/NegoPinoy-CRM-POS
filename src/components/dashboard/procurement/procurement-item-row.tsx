@@ -317,7 +317,7 @@ export function ProcurementItemRow({
         <button 
           onClick={onReportIssue}
           className={`${supplierFlag ? "text-amber-600" : "text-slate-400"} hover:text-amber-500 transition-colors p-1`}
-          title="Can't buy it? Wala sa supplier / stop selling"
+          title="Can't buy it? Out at supplier / stop selling"
         >
           <Flag className="w-5 h-5" />
         </button>

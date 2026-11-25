@@ -31,14 +31,14 @@ function TasksContent() {
   const mine = (
     <Card>
       <CardHeader>
-        <CardTitle>Para sa&apos;yo</CardTitle>
+        <CardTitle>For you</CardTitle>
         <CardDescription>
-          Tasks from the owners: tap <b>Ginagawa na</b> when you start, <b>May problema</b> if you can&apos;t do it, and <b>Tapos na</b> when it&apos;s done.
-          Notes on orders: tap <b>Sumagot</b> to answer, or <b>Nakita ko</b>.
+          Tasks from the owners: tap <b>Working on it</b> when you start, <b>Problem</b> if you can&apos;t do it, and <b>Done</b> when it&apos;s done.
+          Notes on orders: tap <b>Answer</b>, or <b>Got it</b>.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {loaded && open.length === 0 && <p className="text-sm text-muted-foreground">Walang task ngayon.</p>}
+        {loaded && open.length === 0 && <p className="text-sm text-muted-foreground">No tasks right now.</p>}
         {open.map((t) => (
           <TaskItem key={t.id} task={t} view="staff" busy={busyId === t.id} {...handlers} />
         ))}

@@ -3,7 +3,7 @@ import { layawayItemsPaid } from './procurement-demand-service';
 
 /**
  * Which items on the Procurement Sheet are holding up a customer who is in a
- * hurry ("nagmamadali") or has already paid in full, so the buyer knows what
+ * hurry ("urgent") or has already paid in full, so the buyer knows what
  * really has to be bought first. An item counts for an order when the order
  * has an open OS issue for it or a buy request linked to it.
  */
@@ -96,7 +96,7 @@ export async function getItemPriorities(
   return result;
 }
 
-/** Nagmamadali items first, then items for fully paid orders, then the rest (stable). */
+/** Urgent items first, then items for fully paid orders, then the rest (stable). */
 export function priorityRank(p: ItemPriority | null | undefined): number {
   if (p?.urgent.length) return 0;
   if (p?.paid.length) return 1;

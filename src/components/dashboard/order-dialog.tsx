@@ -259,11 +259,11 @@ export function OrderDialog(props: OrderDialogProps) {
               <div className="rounded-md border border-red-200 p-3 text-sm dark:border-red-900">
                 <label className="flex items-center gap-2 font-medium">
                   <Checkbox checked={urgentNote !== null} onCheckedChange={(v) => setUrgentNote(v === true ? '' : null)} />
-                  Nagmamadali ang customer
+                  Customer is in a hurry
                 </label>
                 {urgentNote !== null && (
                   <Input className="mt-2 h-8" maxLength={200} value={urgentNote} onChange={(e) => setUrgentNote(e.target.value)}
-                    placeholder="Ano ang sabi ng customer? (e.g. kailangan bago Nov 5)" />
+                    placeholder="What did the customer say? (e.g. needs it before Nov 5)" />
                 )}
                 <p className="mt-1 text-xs text-muted-foreground">Moves the order up the Priority List and tells the owner/admins.</p>
               </div>

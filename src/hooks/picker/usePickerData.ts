@@ -39,12 +39,12 @@ export function usePickerData(
     // pieces can go to other orders. The picker can still go ahead.
     const later = await fetchPickDeferral(orderId);
     if (later && !window.confirm(
-      `Ipapadala pa ito sa ${shortPhtDate(later.shipOn)}${later.note ? ` (${later.note})` : ''}.
+      `This order ships on ${shortPhtDate(later.shipOn)}${later.note ? ` (${later.note})` : ''}.
 `
-      + `Huwag munang i-pick hanggang ${shortPhtDate(later.pickFrom)}: puwedeng gamitin ng ibang order ang stock.
+      + `Don't pick it until ${shortPhtDate(later.pickFrom)}: other orders can use the stock.
 
 `
-      + 'I-pick pa rin?'
+      + 'Pick it anyway?'
     )) {
       setScannedOrderId(null);
       return;

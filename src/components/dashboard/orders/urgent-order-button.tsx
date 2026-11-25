@@ -10,7 +10,7 @@ import { PriorityActionDialog } from '@/components/dashboard/priority/priority-a
 
 type Urgent = { note: string | null; byName: string | null; at: string } | null;
 
-/** "Nagmamadali" on the order page: shows the mark, and lets sales/admin/jas set or clear it. */
+/** "Urgent" on the order page: shows the mark, and lets sales/admin/jas set or clear it. */
 export function UrgentOrderButton({ orderId, customerName }: { orderId: string; customerName?: string | null }) {
   const { toast } = useToast();
   const { userProfile } = useUserProfile();
@@ -36,7 +36,7 @@ export function UrgentOrderButton({ orderId, customerName }: { orderId: string; 
     });
     const data = await res.json();
     if (!res.ok) return toast({ variant: 'destructive', title: 'Could not save', description: data.error });
-    toast({ title: 'No longer nagmamadali' });
+    toast({ title: 'No longer urgent' });
     load();
   };
 
@@ -44,7 +44,7 @@ export function UrgentOrderButton({ orderId, customerName }: { orderId: string; 
     return (
       <div className="flex items-center gap-1">
         <span className="inline-flex items-center gap-1 rounded bg-red-600 px-2 py-1 text-xs font-semibold text-white" title={`“${urgent.note}” — ${urgent.byName}`}>
-          <Flame className="h-3.5 w-3.5" />Nagmamadali
+          <Flame className="h-3.5 w-3.5" />Urgent
         </span>
         {canMark && (
           <Button variant="ghost" size="sm" className="h-8" onClick={clear}><X className="mr-1 h-4 w-4" />Not in a hurry</Button>
@@ -58,7 +58,7 @@ export function UrgentOrderButton({ orderId, customerName }: { orderId: string; 
   return (
     <>
       <Button variant="outline" size="sm" className="border-red-300 text-red-700 dark:text-red-300" onClick={() => setOpen(true)}>
-        <Flame className="mr-2 h-4 w-4" />Nagmamadali
+        <Flame className="mr-2 h-4 w-4" />Urgent
       </Button>
       <PriorityActionDialog
         row={open ? ({ id: orderId, customerName: customerName || null } as PriorityRow) : null}

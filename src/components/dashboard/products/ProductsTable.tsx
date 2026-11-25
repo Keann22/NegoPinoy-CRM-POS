@@ -26,7 +26,7 @@ function FeatureOnWebsiteItem({ product }: { product: FormattedProduct }) {
   const feature = async () => {
     try {
       await featureOnWebsite(createClient(), product.id);
-      toast({ title: 'Nasa website na', description: `"${product.name}" is now at the top of the website.` });
+      toast({ title: 'On the website', description: `"${product.name}" is now at the top of the website.` });
     } catch (e: unknown) {
       toast({ variant: 'destructive', title: 'Could not feature it', description: e instanceof Error ? e.message : String(e) });
     }
