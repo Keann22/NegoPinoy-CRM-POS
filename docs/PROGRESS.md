@@ -89,6 +89,11 @@ and new BUSINESS_WORKFLOW.md sections (Copilot, task actions).
 
 Newest first. Older history: `git log`. Feature rules: `docs/BUSINESS_WORKFLOW.md`.
 
+- **2026-11-25** Priority List: held Picked/Photo orders go On hold ("pack it while
+  waiting") instead of Ready to pack; old "Hold" button removed, 7 old holds converted
+  (`scripts/migrations/2026-11-25_convert_priority_holds.sql`, applied), 3 paid orders
+  asked of sales by task. (Claude)
+
 - **2026-11-25** Snap/Scan receipt: size-only lines ("32" under "CY-35-30") carry the
   product code forward; bare sizes never remembered as a match; a different size is never
   a name match (Antigravity + Claude review, 7301c30).

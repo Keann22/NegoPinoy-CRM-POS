@@ -89,7 +89,7 @@ export const OS_DECISIONS = {
   remove: 'Remove the item (customer cancelled it)',
 } as const;
 export type OsDecision = keyof typeof OS_DECISIONS;
-export type PriorityStep = 'send_today' | 'send_upload' | 'pack' | 'book' | 'prep' | 'stale' | 'hold' | 'ship_hold' | 'ship_later' | 'recheck' | MissingState;
+export type PriorityStep = 'send_today' | 'send_upload' | 'pack' | 'book' | 'prep' | 'stale' | 'hold' | 'ship_hold' | 'ship_hold_pack' | 'ship_later' | 'recheck' | MissingState;
 
 export interface MissingItem {
   productId: string;
@@ -215,6 +215,7 @@ export const STEP_LABELS: Record<PriorityStep, string> = {
   stale: 'No activity 30+ days — confirm with customer or cancel',
   hold: 'On hold',
   ship_hold: 'Not for shipping yet: sales is holding it',
+  ship_hold_pack: 'Not for shipping yet: pack it while waiting',
   ship_later: 'Ships on a later date: not picked until 3 days before',
 };
 
@@ -307,6 +308,8 @@ export function isHoldActive(hold: PriorityHold | null, now: Date): boolean {
 
 /** Statuses where a not-for-shipping note puts the order On hold. */
 export const SHIP_HOLD_STATUSES = ['Packed', 'For Shipping'];
+/** Picked, not packed: On hold too, but the warehouse still packs it. Not "Picked (with issue)": its OS lines still need work. */
+export const SHIP_HOLD_PACK_STATUSES = ['Picked', 'Photo'];
 
 function classify(o: PriorityOrderInput, now: Date) {
   if (o.status === 'On-Hold' || isHoldActive(o.hold, now)) {
@@ -325,11 +328,18 @@ function classify(o: PriorityOrderInput, now: Date) {
   }
 
   // Sales held it (waiting for the customer's other orders, payment, a date...):
-  // not ready to send even if it's paid and packed. Only once packed: marking
+  // not ready to send even if it's paid and packed. Only once picked: marking
   // for bus also sets the note on orders not picked yet, and those still need
-  // picking and packing.
+  // picking.
   if (o.shipHold && SHIP_HOLD_STATUSES.includes(o.status)) {
     return { group: 'hold' as const, owner: 'none' as const, step: 'ship_hold' as const, stepSince: o.shipHold.at, dueAt: null };
+  }
+  // Picked but not packed yet (owner, 2026-11-25): found #ECB5662, paid and
+  // waiting for the customer's other orders, 138 days "late" on Ready to pack.
+  // It goes On hold too; the warehouse still packs it (no deadline), because
+  // "Complete: OK to ship" waits for every order in the group to be packed.
+  if (o.shipHold && SHIP_HOLD_PACK_STATUSES.includes(o.status)) {
+    return { group: 'hold' as const, owner: 'warehouse' as const, step: 'ship_hold_pack' as const, stepSince: o.shipHold.at, dueAt: null };
   }
 
   // Missing items need someone to act (sales decides, buyer buys) even while the

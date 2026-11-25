@@ -730,6 +730,17 @@ How it works (built 2026-11-20):
   **Hindi pa** (pick the next date), **Asked customer, waiting** (back in 4
   hours), **Change hold**. Owners see what sales didn't answer for 3 days. Only
   once something in the group is picked or packed.
+- **Held from Picked onward (owner, 2026-11-25).** Found #ECB5662: paid,
+  waiting for the customer's other orders, 138 days "late" on Ready to pack,
+  because a hold only counted once Packed. Now a held **Picked / Photo** order is
+  On hold too ("pack it while waiting": the warehouse still packs it, no
+  deadline, so "Complete: OK to ship" can fire). Picked (with issue) stays on
+  Waiting for items (its OS lines still need work).
+- **The old Priority "Hold" (until a date) is gone (2026-11-25):** when it ran
+  out the order came back to Ready without asking anyone. The 7 open ones became
+  "Don't ship yet" holds (#ECB5662 ships with #C1B47D8 and #6DDF728; #C4C2A82 with
+  lay-away #E7B12D2). The 3 paid orders waiting for weeks with no hold (#A1195FB,
+  #932851A, #1F4AB9A) got a task for their sales agent: OK to ship, or Don't ship yet.
 - A hold ends by itself when the order ships, is cancelled, or Verify Shipping /
   Revert clears the note (database trigger). Bus-marked orders ("BUS SHIPPING:")
   stay with Bus Shipping.

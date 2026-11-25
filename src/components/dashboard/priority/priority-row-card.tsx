@@ -59,11 +59,12 @@ const ITEM_STATE: Record<MissingState, string> = {
 /** "Late 3d" / "Due today" / "Due in 2d" for the current step. */
 function timer(row: PriorityRow): { text: string; tone: 'late' | 'today' | 'ok' } | null {
   if (row.group === 'hold') {
-    if (row.hold) return { text: `Back on ${shortDate(row.hold.until)}`, tone: 'ok' };
+    if (row.step === 'hold' && row.hold) return { text: `Back on ${shortDate(row.hold.until)}`, tone: 'ok' };
     const detail = row.shipHold?.detail;
+    const held = row.step === 'ship_hold' || row.step === 'ship_hold_pack';
     if (row.step === 'ship_hold' && detail?.complete) return { text: 'Complete: OK to ship', tone: 'today' };
-    if (row.step === 'ship_hold' && detail) return { text: `Ask again ${shortPhtDate(detail.checkOn)}`, tone: 'ok' };
-    if (row.step === 'ship_hold' && row.shipHold?.at) return { text: `Held since ${shortDate(row.shipHold.at)}`, tone: 'ok' };
+    if (held && detail) return { text: `Ask again ${shortPhtDate(detail.checkOn)}`, tone: 'ok' };
+    if (held && row.shipHold?.at) return { text: `Held since ${shortDate(row.shipHold.at)}`, tone: 'ok' };
     return null;
   }
   if (!row.dueAt) return null;
@@ -110,6 +111,8 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
     ? (row.daysSincePaid === 0 ? 'Fully paid today' : `Fully paid ${row.daysSincePaid}d ago`)
     : null;
   const shortId = row.id.slice(0, 7).toUpperCase();
+  // An old-style hold still running (they ran out silently; none are left after 2026-11-25).
+  const oldHold = row.step === 'hold' && !!row.hold;
 
   return (
     <div className={cn('rounded-lg border bg-card p-3 sm:p-4', row.daysLate > 0 && 'border-red-300 dark:border-red-900')}>
@@ -248,12 +251,12 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
             </div>
           )}
 
-          {(row.followUps > 0 || row.hold) && (
+          {(row.followUps > 0 || oldHold) && (
             <div className="text-xs text-muted-foreground">
               {row.followUps > 0 && row.lastFollowUp && (
                 <div>Followed up {row.followUps}× · last: “{row.lastFollowUp.note}” — {row.lastFollowUp.byName}, {shortDate(row.lastFollowUp.at)}</div>
               )}
-              {row.hold && <div>Hold: “{row.hold.note}” — {row.hold.byName}</div>}
+              {oldHold && row.hold && <div>Hold: “{row.hold.note}” — {row.hold.byName}</div>}
             </div>
           )}
 
@@ -293,15 +296,12 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
                 <X className="mr-1.5 h-4 w-4" />Remove reservation
               </Button>
             )}
+            {/* The old "Hold" (until a date) is gone (2026-11-25): when it ran out the order came back
+                without asking anyone. "Don't ship yet" / "Ship on another date" ask sales instead. */}
             {canEdit && row.group !== 'hold' && (
-              <>
-                <Button size="sm" variant="outline" className="h-8" onClick={() => onAction(row, 'followup')}>
-                  <MessageSquarePlus className="mr-1.5 h-4 w-4" />Customer followed up
-                </Button>
-                <Button size="sm" variant="ghost" className="h-8" onClick={() => onAction(row, 'hold')}>
-                  <PauseCircle className="mr-1.5 h-4 w-4" />Hold
-                </Button>
-              </>
+              <Button size="sm" variant="outline" className="h-8" onClick={() => onAction(row, 'followup')}>
+                <MessageSquarePlus className="mr-1.5 h-4 w-4" />Customer followed up
+              </Button>
             )}
             {canEdit && row.shipHold?.detail && (
               <Button size="sm" className="h-8 bg-emerald-600 hover:bg-emerald-700" onClick={() => onAction(row, 'ship_release')}>
@@ -318,7 +318,7 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
                 <CalendarClock className="mr-1.5 h-4 w-4" />{row.shipHold?.detail ? 'Change hold' : 'Ship on another date'}
               </Button>
             )}
-            {canEdit && row.hold && (
+            {canEdit && oldHold && (
               <Button size="sm" variant="outline" className="h-8" onClick={() => onAction(row, 'clear_hold')}>
                 <PlayCircle className="mr-1.5 h-4 w-4" />Remove hold
               </Button>
