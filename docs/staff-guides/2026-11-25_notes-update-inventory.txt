@@ -1,22 +1,22 @@
-📌 UPDATE FOR INVENTORY: notes on orders now reach you (Nov 25)
+📌 UPDATE PARA SA INVENTORY: makikita n'yo na ang notes sa orders (Nov 25)
 
-Sales can now send a note from an order straight to Inventory. When they do, you get a pop-up right away: "A note for you".
+Pwede nang mag-send ang sales ng note galing sa order diretso sa Inventory. Pag ganun, may pop-up kayo agad: "A note for you".
 
-When it pops up, tap one:
-• Answer: reply to them (example: "Checked, 2 pcs on 3C"). Your answer pops up for them right away.
-• Got it: you saw it (for "Just letting you know" notes).
-• Done: it's taken care of.
-• Later: hides it for 30 minutes, then it comes back.
+Pag lumabas ang pop-up, pindutin ang isa:
+• Answer: sagutin sila (halimbawa: "Na-check na, 2 pcs sa 3C"). Lalabas agad sa kanila ang sagot n'yo.
+• Got it: nakita n'yo na (para sa mga note na "Just letting you know").
+• Done: tapos na o naayos na.
+• Later: tatago muna ng 30 minutes, tapos babalik ulit.
 
-A note to Inventory goes to all of us (Jas, Al, Tess, Edric, Rey). Whoever answers first closes it for everyone.
+Ang note na para sa Inventory ay para sa ating lahat (Jas, Al, Tess, Edric, Rey). Kung sino ang unang sumagot, sarado na para sa lahat.
 
-Can't do it yet? Tap Answer and say why. Don't just close it.
+Hindi pa kaya gawin? Pindutin ang Answer at sabihin kung bakit. Wag basta i-close.
 
-Open notes stay on your Dashboard (For you) and in Tasks until they're answered. They also show on the order page, and in the Picker when you scan the order.
+Nandiyan lang ang mga open na note sa Dashboard (For you) at sa Tasks hangga't hindi pa nasasagot. Makikita rin sa order page, at sa Picker pag na-scan ang order.
 
-Need something from sales? Write the note on the order, then under "Who is it for?" pick the sales agent (marked "agent"), or pick a name under "Someone else", or type @name in the note. They get a pop-up.
-• "Needs a reply": it stays with them until they answer.
-• "Just letting you know": it closes when they tap Got it.
-• "Just a note": saved on the order only. Nobody gets a pop-up.
+May kailangan kayo sa sales? Isulat ang note sa order, tapos sa "Who is it for?" piliin ang sales agent (may nakalagay na "agent"), o pumili ng pangalan sa "Someone else", o i-type ang @pangalan sa note. May pop-up sila agad.
+• "Needs a reply": nandun lang sa kanila hanggang sumagot sila.
+• "Just letting you know": sarado na pag pinindot nila ang Got it.
+• "Just a note": naka-save lang sa order. Walang makakatanggap ng pop-up.
 
-Tasks from the owners also pop up right away now.
+Yung mga task galing sa owners, lumalabas na rin agad.

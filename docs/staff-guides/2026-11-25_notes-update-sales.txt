@@ -1,25 +1,25 @@
-📌 UPDATE FOR SALES: send notes the warehouse will actually see (Nov 25)
+📌 UPDATE PARA SA SALES: notes na talagang makikita ng warehouse (Nov 25)
 
-Before, a note on an order told no one. Now you choose who gets it, and they get a pop-up right away.
+Dati, ang note sa order ay walang nasasabihan. Ngayon, kayo ang pipili kung kanino, at may pop-up sila agad.
 
-How:
-1. Open the order and go to Activity & Notes (you can also add a note from the Priority List).
-2. Write your note.
-3. Under "Who is it for?" pick:
-   • Inventory: the whole warehouse team
+Paano:
+1. Buksan ang order at pumunta sa Activity & Notes (pwede rin mag-note sa Priority List).
+2. Isulat ang note.
+3. Sa "Who is it for?" piliin:
+   • Inventory: buong warehouse team
    • Owners
-   • Someone else: one person
-   • or type @name in the note
-   "Just a note" = saved on the order only. Nobody gets a pop-up.
-4. Pick "Needs a reply" (stays with them until they answer) or "Just letting you know" (closes when they tap Got it).
-5. Tap Post Note.
+   • Someone else: isang tao lang
+   • o i-type ang @pangalan sa note
+   "Just a note" = naka-save lang sa order. Walang makakatanggap ng pop-up.
+4. Piliin ang "Needs a reply" (nandun lang sa kanila hanggang sumagot) o "Just letting you know" (sarado na pag pinindot nila ang Got it).
+5. Pindutin ang Post Note.
 
-When they answer, the answer pops up for you right away, on any page. It's also saved in the order's Activity & Notes.
+Pag sumagot sila, lalabas agad sa inyo ang sagot, kahit anong page kayo. Naka-save din ito sa Activity & Notes ng order.
 
-If nobody opens your note in 2 hours, you get a pop-up. Message them on Messenger or call them.
+Kung walang nagbukas ng note n'yo sa loob ng 2 hours, may pop-up kayo. I-message o tawagan sila sa Messenger.
 
-To see your notes: Tasks → Notes I sent (Seen / Answered). Sent the wrong one? Tap Withdraw.
+Para makita ang mga note n'yo: Tasks → Notes I sent (Seen / Answered). Mali ang na-send? Pindutin ang Withdraw.
 
-Inventory can send notes to you too. When one pops up: Answer, Got it, or Done. Later hides it for 30 minutes.
+Pwede rin mag-send ng note sa inyo ang Inventory. Pag lumabas: Answer, Got it, o Done. Ang Later ay tatago muna ng 30 minutes.
 
-You don't have to message them on Messenger too. If you picked who it's for, the pop-up reaches them.
+Hindi n'yo na kailangan i-message pa sila sa Messenger. Basta pinili n'yo kung kanino, aabot sa kanila ang pop-up.
