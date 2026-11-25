@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createWorker } from 'tesseract.js';
 import { afterReferenceRead, checkReceiver, readReceiver } from '@/lib/services/payments/payment-reference-check';
+import { extractGcashRefFromNotes, isOwnPhoneNumberRef } from '@/lib/services/payments/payment-ref-utils';
 
 export const maxDuration = 60;
 
@@ -22,12 +23,19 @@ function extractReferenceNumber(fullText: string): string | null {
     );
     const digits = stripped.replace(/\D/g, '');
     if (digits.length >= 13) {
-      return digits.slice(0, 13);
+      const candidate = digits.slice(0, 13);
+      if (!isOwnPhoneNumberRef(candidate)) {
+        return candidate;
+      }
     }
   }
   const cleaned = fullText.replace(/[\s\-]/g, '');
-  const match = cleaned.match(/\d{13}/);
-  return match ? match[0] : null;
+  for (const match of cleaned.matchAll(/\d{13}/g)) {
+    if (!isOwnPhoneNumberRef(match[0])) {
+      return match[0];
+    }
+  }
+  return null;
 }
 
 function extractOcrAmount(fullText: string): number | null {
@@ -141,6 +149,16 @@ export async function POST(request: Request) {
 
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
+    if (!referenceNumber) {
+      const { data: existingRow } = await supabase
+        .from('payments')
+        .select('notes')
+        .eq('id', paymentId)
+        .maybeSingle();
+      const fromNotes = extractGcashRefFromNotes((existingRow as { notes?: string | null } | null)?.notes);
+      if (fromNotes) referenceNumber = fromNotes;
+    }
+
     // GCash must go to one of our two numbers; flag and tell the owners if not.
     // Tesseract misses small or blurry numbers, so try Vision once before flagging.
     try {
@@ -155,7 +173,7 @@ export async function POST(request: Request) {
     }
 
     if (referenceNumber || ocrAmount !== null) {
-      const updates: any = {};
+      const updates: Record<string, unknown> = {};
       if (referenceNumber) updates.reference_number = referenceNumber;
       if (ocrAmount !== null) updates.ocr_amount = ocrAmount;
 

@@ -60,6 +60,7 @@ src/lib/services/payment-discrepancies-data.json
 # Local scratch and remittance data
 *.traineddata
 excel/
+gcash/
 scratch_*.json
 /spx delivery and remitances/
 *sale*-catalog*.html
