@@ -27,8 +27,6 @@ Both must keep this file current. Dates and times are Philippine time (UTC+8).
 
 Format: `- **Task** (Agent, started YYYY-MM-DD). Files/area. Status.`
 
-- **Tasks: dashboard stat filters + tie order tasks to holds/bus, reply Done, and working-today/reschedule** (Antigravity, started 2026-11-25). `src/components/dashboard/tasks/*`, `src/components/dashboard/ship-holds/ship-hold-dialog.tsx`, `src/components/dashboard/bus-shipping/bus-mark-form.tsx`, `src/components/dashboard/orders/*`, `src/lib/services/staff-tasks/*`, `src/lib/services/shipping/ship-hold-service.ts`, `src/app/api/tasks/*`, `src/app/api/shipping/holds/route.ts`. Status: built & typechecked (uncommitted — ready for owner review/commit).
-
 - **Wala sa Supplier: prompts card on the Dashboard** (Antigravity, found
   uncommitted 2026-11-25). `src/components/dashboard/supplier-stock/supplier-prompts-card.tsx`
   (new), `src/hooks/useSupplierFlags.ts` (shared `useSupplierPrompts`),
@@ -92,6 +90,13 @@ and new BUSINESS_WORKFLOW.md sections (Copilot, task actions).
 
 Newest first. Older history: `git log`. Feature rules: `docs/BUSINESS_WORKFLOW.md`.
 
+- **2026-11-25** Tasks close from the hold / bus dialogs (built by Antigravity,
+  reviewed and tested by Claude, 98e991a): Don't ship yet / Change hold / Ship by
+  bus on order tasks, Send & mark Done, Move deadline, working-today pause, 7
+  status tiles on the Tasks page. Known small gaps: an owner's hold from the
+  order page pre-ticks staff tasks on that order; Ship by bus from the order page
+  lists only your own tasks; the Done-needs-a-note rule is checked in the browser
+  only. (Antigravity, Claude)
 - **2026-11-25** Notes to a person tested end to end on the live site (owner ->
   Keneth Sales, fake order #68BF109, test rows deleted); staff update texts for
   inventory and sales in `docs/staff-guides/`. (Claude)
