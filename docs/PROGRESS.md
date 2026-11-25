@@ -27,6 +27,7 @@ Both must keep this file current. Dates and times are Philippine time (UTC+8).
 
 Format: `- **Task** (Agent, started YYYY-MM-DD). Files/area. Status.`
 
+
 - **Wala sa Supplier: prompts card on the Dashboard** (Antigravity, found
   uncommitted 2026-11-25). `src/components/dashboard/supplier-stock/supplier-prompts-card.tsx`
   (new), `src/hooks/useSupplierFlags.ts` (shared `useSupplierPrompts`),
@@ -57,8 +58,10 @@ and new BUSINESS_WORKFLOW.md sections (Copilot, task actions).
    analyzer, executor with undo, learning, API, sales pop-up, owner accuracy panel).
 2. **Physical stock breakdown** (On the shelf → Picked → Packed → Total). See
    BUSINESS_WORKFLOW.md "Unallocated stock is kept and counted".
-3. **Customer profile and recommendations, phase 2** (phase 1 released 151d8d9):
-   build personas for more customers, then see what sales use. BUSINESS_WORKFLOW.md.
+3. **Customer profile and recommendations, follow-up** (phase 2 released 2e3e586):
+   once AI Studio prepayment credits are topped up, run `--retry-fallback` for
+   the 356 heuristic-fallback profiles, then monitor what sales use.
+   BUSINESS_WORKFLOW.md.
 
 ## Waiting on the owners
 
@@ -89,6 +92,12 @@ and new BUSINESS_WORKFLOW.md sections (Copilot, task actions).
 ## Done recently
 
 Newest first. Older history: `git log`. Feature rules: `docs/BUSINESS_WORKFLOW.md`.
+
+- **2026-11-25** Customer persona & profile, phase 2: DB triggers (`orders`, `payments`,
+  `conversation_logs`) + on-view auto-refresh + daily cron refresh + paginated
+  2,705-row listing + full order backfill (2,705/2,705 order customers profiled:
+  2,349 Gemini + 356 heuristic fallback after AI Studio credits ran out;
+  `--retry-fallback` ready after top-up). (Antigravity, 2e3e586)
 
 - **2026-11-25** Task answer buttons for sales: OK to ship / Don't ship yet / Ship by
   bus / Customer hasn't replied (back in 4 hours) / Cancel the order (paid = owners
