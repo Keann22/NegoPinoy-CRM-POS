@@ -4,6 +4,7 @@ import {
   runTesseractBase64,
   runGoogleVisionBase64,
   parseReceiptLines,
+  expandVariantLines,
   tokenScore,
   longestToken,
   type ParsedReceiptLine,
@@ -50,7 +51,7 @@ export async function readReceiptImage(imageBase64: string): Promise<{ engine: s
       }
     }
   }
-  return { engine, lines };
+  return { engine, lines: expandVariantLines(lines) };
 }
 
 /**
@@ -100,10 +101,11 @@ export async function buildCandidates(
 /** Exact supplier code first, then the best name overlap above `threshold`. */
 export function matchLine(line: ParsedReceiptLine, candidates: Candidate[], threshold = MATCH_THRESHOLD): LineMatch | null {
   if (line.code) {
-    const codeHit = candidates.find(
-      (c) => c.existingCode && c.existingCode.toUpperCase() === line.code!.toUpperCase()
-    );
+    const target = line.code.toUpperCase();
+    const codeHit = candidates.find((c) => c.existingCode && c.existingCode.toUpperCase() === target);
     if (codeHit) return { ...codeHit, matchedBy: 'code', confidence: 1 };
+    const skuHit = candidates.find((c) => c.sku && c.sku.toUpperCase() === target);
+    if (skuHit) return { ...skuHit, matchedBy: 'sku', confidence: 1 };
   }
 
   if (line.description) {

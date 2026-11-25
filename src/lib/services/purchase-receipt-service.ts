@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { readReceiptImage, buildCandidates, matchLine, type LineMatch } from '@/lib/receipt-matching';
+import { isBareVariantText } from '@/lib/receipt-ocr';
 import { processProcurementPurchases } from '@/lib/services/procurement-purchase-service';
 
 /**
@@ -22,6 +23,13 @@ export type LineAction = 'product' | 'not_product' | 'not_in_list';
 
 export const textKey = (s: string | null | undefined) =>
   String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+// A bare size/number/color ("32", "39cm") names no product: one supplier's
+// "32" is a wok, a lid and a pan. Such text is never remembered or looked up.
+const aliasKey = (s: string | null | undefined) => {
+  const key = textKey(s);
+  return key && !isBareVariantText(key) ? key : '';
+};
 
 const supplierKeyOf = (supplierId: string | null | undefined) => supplierId || '';
 
@@ -101,7 +109,7 @@ export async function processReceiptPhoto(
     }
 
     // 3. Match: remembered staff matches first, then supplier code / strong name match.
-    const keys = lines.map((l) => textKey(l.description || l.rawText)).filter(Boolean);
+    const keys = lines.map((l) => aliasKey(l.description || l.rawText)).filter(Boolean);
     const { data: aliases } = await supabase
       .from('receipt_line_aliases').select('text_key, product_id')
       .eq('supplier_key', supplierKeyOf(supplierId)).in('text_key', keys.length ? keys : ['']);
@@ -109,7 +117,8 @@ export async function processReceiptPhoto(
     const { candidates } = await buildCandidates(supabase, supplierId);
 
     const matched = lines.map((line) => {
-      const aliasProduct = aliasByKey.get(textKey(line.description || line.rawText));
+      const lineKey = aliasKey(line.description || line.rawText);
+      const aliasProduct = lineKey ? aliasByKey.get(lineKey) : undefined;
       const m: Pick<LineMatch, 'productId' | 'matchedBy'> | null = aliasProduct
         ? { productId: aliasProduct, matchedBy: 'alias' }
         : matchLine(line, candidates, AUTO_NAME_THRESHOLD);
@@ -204,7 +213,7 @@ export async function resolveLine(
   if (uErr) throw uErr;
 
   // Remember it for next time.
-  const key = textKey(line.description);
+  const key = aliasKey(line.description);
   if (key) {
     await supabase.from('receipt_line_aliases').upsert(
       { supplier_key: supplierKeyOf(supplierId), text_key: key, product_id: productId, created_by_name: editor.name },

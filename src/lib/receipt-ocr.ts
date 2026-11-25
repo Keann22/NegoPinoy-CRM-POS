@@ -109,8 +109,14 @@ export async function runGeminiReceipt(imageBase64: string): Promise<ParsedRecei
     'Extract every PRODUCT line item. For each item return: "code" = the supplier\'s printed product ' +
     'code/SKU if any (else ""), "name" = the product name/description, "quantity" = units purchased ' +
     '(default 1 if unclear), and "unitCost" = the price per single unit in pesos (if only a line total ' +
-    'is shown, divide it by the quantity; use 0 if unreadable). Ignore subtotals, totals, VAT/tax, ' +
-    'discounts, cash/change, and any non-item lines. Return only the JSON.';
+    'is shown, divide it by the quantity; use 0 if unreadable). ' +
+    'IMPORTANT: Suppliers (especially for kitchenware like Canyi or HA Kitchenware) often write the ' +
+    'full product code/name on one line and only the variant, size, number, or color on the immediately ' +
+    'following lines (e.g. "CY-D10-5" followed by "6" and "7", or "HA-130-37cm" followed by "39cm"). ' +
+    'When a line only lists a variant/size/number/color continuing from the previous line\'s product, ' +
+    'combine the parent product prefix with that variant in both "code" and "name" (e.g. "CY-D10-6", ' +
+    '"CY-D10-7", "HA-130-39cm"). ' +
+    'Ignore subtotals, totals, VAT/tax, discounts, cash/change, and any non-item lines. Return only the JSON.';
 
   try {
     const res = await fetch(
@@ -245,12 +251,148 @@ export function parseReceiptLines(text: string): ParsedReceiptLine[] {
   return out;
 }
 
+// Sizes on real receipts are 1-3 digits ("6", "32", "25.5", "3L"); a bare
+// 4+ digit number is more likely a model number or barcode than a variant.
+const NUMERIC_OR_SIZE_VARIANT =
+  /^\d{1,3}(?:\.\d+)?\s*(?:cm|mm|m|in|inch|l|ml|oz|kg|g|pc|pcs)?$/i;
+const SHORT_WORD_VARIANT =
+  /^(?:xxs|xs|s|m|l|xl|xxl|xxxl|red|blue|blu|black|blk|white|wht|pink|pnk|green|grn|gold|gld|silver|slv|ss|gray|grey|gry|brown|brn|orange|org|yellow|ylw|purple|prp|beige|clear|clr)$/i;
+const TRAILING_SEP_VARIANT =
+  /^(.+?(?:\s*[-/]\s*|[-/]))([A-Za-z0-9.]+(?:\s*(?:cm|mm|m|in|inch|l|ml|oz|kg|g|pc|pcs))?)$/i;
+const TRAILING_SPACE_VARIANT =
+  /^(.+?\s+)(\d+(?:\.\d+)?\s*(?:cm|mm|m|in|inch|l|ml|oz|kg|g|pc|pcs)?)$/i;
+// Only a short number glued to letters ("CY-D7") is a variant; "KW1234" is a
+// model number and must not become "KW5" when a bare "5" follows it.
+const TRAILING_ATTACHED_NUM =
+  /^(.+?[A-Za-z])(\d{1,2}(?:\.\d+)?(?:\s*(?:cm|mm|m|in|inch|l|ml|oz|kg|g|pc|pcs))?)$/i;
+
+/**
+ * True when the text is only a size, number or color ("32", "39cm", "BLK"):
+ * it can't name a product by itself, so it must never be remembered as one
+ * (one supplier's "32" is a wok, a lid and a pan).
+ */
+export function isBareVariantText(s: string | null | undefined): boolean {
+  const t = String(s || '').trim();
+  return !!t && (NUMERIC_OR_SIZE_VARIANT.test(t) || SHORT_WORD_VARIANT.test(t));
+}
+
+function extractParentStem(parent: string): { stem: string; hadSeparator: boolean } | null {
+  const s = parent.trim();
+  if (!s) return null;
+
+  const sepMatch = s.match(TRAILING_SEP_VARIANT);
+  if (sepMatch) {
+    const [, stem, tail] = sepMatch;
+    if (NUMERIC_OR_SIZE_VARIANT.test(tail) || SHORT_WORD_VARIANT.test(tail)) {
+      return { stem, hadSeparator: true };
+    }
+  }
+
+  const spaceMatch = s.match(TRAILING_SPACE_VARIANT);
+  if (spaceMatch) {
+    return { stem: spaceMatch[1], hadSeparator: true };
+  }
+
+  // Also support space + short color/size word (e.g. "Blender Red" followed by "Blue")
+  const spaceWordMatch = s.match(/^(.+?\s+)([A-Za-z]+)$/);
+  if (spaceWordMatch && SHORT_WORD_VARIANT.test(spaceWordMatch[2])) {
+    return { stem: spaceWordMatch[1], hadSeparator: true };
+  }
+
+  const attachedMatch = s.match(TRAILING_ATTACHED_NUM);
+  if (attachedMatch) {
+    return { stem: attachedMatch[1], hadSeparator: false };
+  }
+
+  return null;
+}
+
+function bareVariantOf(line: ParsedReceiptLine): string | null {
+  const code = (line.code || '').trim();
+  const desc = (line.description || '').trim();
+  let candidate = '';
+  if (code && !desc) candidate = code;
+  else if (!code && desc) candidate = desc;
+  else if (code && desc && code.toUpperCase() === desc.toUpperCase()) candidate = desc;
+  else return null;
+
+  if (NUMERIC_OR_SIZE_VARIANT.test(candidate) || SHORT_WORD_VARIANT.test(candidate)) {
+    return candidate;
+  }
+  return null;
+}
+
+/**
+ * Suppliers (especially Canyi & HA Kitchenware) often write the full product
+ * code/name on one line (e.g. `CY-D10-5` or `HA-130-37cm`) and only the
+ * variant (`6`, `7`, `39cm`) on the lines below. Carry the parent stem forward
+ * so auto-matching and staff Matching see `CY-D10-6` instead of bare `6`.
+ */
+export function expandVariantLines(lines: ParsedReceiptLine[]): ParsedReceiptLine[] {
+  const out: ParsedReceiptLine[] = [];
+  let prev: ParsedReceiptLine | null = null;
+
+  for (const line of lines) {
+    const variant = bareVariantOf(line);
+    if (variant && prev) {
+      const isNumOrSize = NUMERIC_OR_SIZE_VARIANT.test(variant);
+      const codeStem = prev.code ? extractParentStem(prev.code) : null;
+      const descStem = prev.description ? extractParentStem(prev.description) : null;
+
+      const nextCode =
+        codeStem && (codeStem.hadSeparator || isNumOrSize)
+          ? (codeStem.stem + variant.replace(/\s+/g, '')).toUpperCase()
+          : null;
+      const nextDesc =
+        descStem && (descStem.hadSeparator || isNumOrSize)
+          ? descStem.stem + variant
+          : null;
+
+      // Staff match by the description, so keep the product name when only the
+      // code carried the size ("Canyi Casserole" + "6" → "Canyi Casserole 6").
+      const prevName = (prev.description || '').trim();
+      const nameDesc =
+        !nextDesc && nextCode && prevName && prevName.toUpperCase() !== (prev.code || '').toUpperCase()
+          ? `${prevName} ${variant}`
+          : null;
+
+      if (nextCode || nextDesc) {
+        const expanded: ParsedReceiptLine = {
+          ...line,
+          code: nextCode ?? line.code,
+          description: nextDesc ?? nameDesc ?? nextCode ?? line.description,
+        };
+        out.push(expanded);
+        prev = expanded;
+        continue;
+      }
+    }
+
+    out.push(line);
+    prev = line;
+  }
+
+  return out;
+}
+
 function tokens(s: string): string[] {
   return s
     .toLowerCase()
     .replace(/[^a-z0-9 ]/g, ' ')
     .split(/\s+/)
-    .filter((w) => w.length >= 2);
+    // Keep single-digit numbers (e.g. "5", "6", "7" in CY-D10-5/6/7) while
+    // ignoring single-letter noise like "x".
+    .filter((w) => w.length >= 2 || /^\d$/.test(w));
+}
+
+/** Numbers that read as a size or count: "6", "32", "39cm", "3l", "6pcs". */
+function sizeNumbers(toks: string[]): Set<string> {
+  const out = new Set<string>();
+  for (const t of toks) {
+    const m = t.match(/^(\d+)(?:cm|mm|m|in|inch|l|ml|oz|kg|g|pc|pcs)?$/);
+    if (m) out.add(String(Number(m[1])));
+  }
+  return out;
 }
 
 /**
@@ -264,12 +406,24 @@ export function tokenScore(a: string, b: string): number {
   if (!ta.length || !tb.length) return 0;
   const setB = new Set(tb);
   let hits = 0;
-  for (const t of ta) if (setB.has(t)) hits++;
+  let wordHits = 0;
+  for (const t of ta) {
+    if (!setB.has(t)) continue;
+    hits++;
+    if (!/^\d+$/.test(t)) wordHits++;
+  }
+  // Numbers only tell sizes apart; sharing just a number ("Lid 6" vs "Pan 6")
+  // is not a match.
+  if (wordHits === 0) return 0;
+  // Both name a size and they differ ("Wok 30cm" vs "Wok 32cm"): wrong variant.
+  const sa = sizeNumbers(ta);
+  const sb = sizeNumbers(tb);
+  if (sa.size && sb.size && ![...sa].some((n) => sb.has(n))) return 0;
   return hits / Math.max(ta.length, tb.length);
 }
 
 /** Longest token in a string — used to widen an unmatched line's shortlist. */
 export function longestToken(s: string): string | null {
-  const t = tokens(s).sort((a, b) => b.length - a.length);
+  const t = tokens(s).filter((w) => w.length >= 2).sort((a, b) => b.length - a.length);
   return t[0] || null;
 }
