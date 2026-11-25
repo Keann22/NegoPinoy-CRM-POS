@@ -800,6 +800,9 @@ How it works (built 2026-11-20):
 - Then **Kailangan ng sagot** (default: stays until they reply or tap Tapos na) or
   **Pasabi lang po** (closes when they tap Nakita ko). Not "FYI": it sounds
   sarcastic in Filipino (owner).
+- **Pop-ups come right away (2026-11-25):** a new task or note, a reply, a new
+  deadline or a withdrawn note shows on the person's screen within seconds (it
+  used to wait up to 3 minutes).
 - It works like a task: a **pop-up** (closing it brings it back in 30 minutes and
   on every page load), then it stays on their dashboard ("Para sa'yo") and in
   **Tasks** with a count in the menu until answered. Open notes also show on the
