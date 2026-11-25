@@ -806,7 +806,8 @@ How it works (built 2026-11-20):
   **order page** and in the **Picker** when the order is scanned.
 - A note to **Inventory** or **Owners** is one shared note: whoever answers first
   closes it for everyone.
-- The answer **pops up for the sender** (not the bell) and is added to the order's
+- The answer **pops up for the sender right away** (not the bell; any page, Tasks
+  included) and is added to the order's
   Activity & Notes. Senders see their notes under Tasks → **Mga note na pinadala
   ko** (Hindi pa nakikita / Seen by Al / Answered) and can **Bawiin** one.
 - **Not seen in 2 hours:** the sender gets a pop-up once (message them on

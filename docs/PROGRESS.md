@@ -89,6 +89,8 @@ and new BUSINESS_WORKFLOW.md sections (Copilot, task actions).
 
 Newest first. Older history: `git log`. Feature rules: `docs/BUSINESS_WORKFLOW.md`.
 
+- **2026-11-25** Answer to a note you sent pops up right away (Realtime ping from a
+  trigger on staff_tasks, no content; 3-minute check kept). (Claude, 2af97e7)
 - **2026-11-25** Answer to a note you sent now pops up on the Tasks page too (your own
   tasks still don't pop up there). (Claude, f84ada9)
 
