@@ -1,0 +1,22 @@
+📌 UPDATE PARA SA SALES: sagutin ang task gamit ang buttons (Nov 25)
+
+Pag may task kayo tungkol sa isang order (halimbawa: "Paki-check sa customer kung itutuloy pa"), may bago nang box sa task: "What did the customer say? Pick the answer:"
+
+Wag nang i-type ang sagot sa Ask o Reply. Pindutin ang tamang button. Ang button na ang mag-aayos ng order at magsasara ng task:
+
+• OK to ship: pwede nang ipadala. Kung naka-hold ang order, mare-release ito at babalik sa Ready to ship.
+• Don't ship yet: hindi pa ipapadala. Piliin kung bakit (isasabay sa ibang order, hintay bayad, mag-a-add pa, sa ibang petsa) at kailan ulit itatanong.
+• Ship by bus: sa bus ipapadala. I-tick ang mga order ng customer at piliin ang bus at terminal.
+• Customer hasn't replied: wala pang sagot ang customer. Isulat kung ano ang tinanong n'yo. Hindi ito mabibilang na late habang naghihintay, at babalik ang pop-up after 4 hours: "Customer replied yet?" Kung wala pa rin, pindutin ang Still no reply.
+• Cancel the order: ayaw na ng customer. Isulat kung bakit (kailangan ito).
+  - Kung hindi pa bayad: cancelled na agad ang order.
+  - Kung may bayad na: hindi ito ika-cancel dito. Malalaman agad ng owners, sila ang magdedesisyon kung store credit o refund.
+
+Iba ang nangyari at wala sa buttons? Pindutin ang Done (other) at isulat kung ano ang nangyari.
+
+Hindi n'yo pa magawa o may tanong kayo sa owners? Pindutin ang Problem o Ask. Wag basta i-close.
+
+Paalala:
+• Siguraduhing tamang order ang sinasagot n'yo. Nakalagay sa task ang order # at pangalan ng customer.
+• Kung lampas na sa deadline at ginagawa n'yo pa, kailangan ng maikling update (halimbawa: "Tinanong ko na, hintay sagot today").
+• Pwede ring mag-reply at isara agad ang task: sa Reply, pindutin ang Send & mark Done.

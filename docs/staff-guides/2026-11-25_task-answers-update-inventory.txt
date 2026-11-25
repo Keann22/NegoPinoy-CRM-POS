@@ -1,0 +1,11 @@
+📌 UPDATE PARA SA INVENTORY: mga task tungkol sa order (Nov 25)
+
+Ilang maliit na pagbabago sa mga task galing sa owners:
+
+• Done sa task tungkol sa order: kung wala pang hold o bus plan ang order, hihingan kayo ng maikling note bago ma-Done (halimbawa: "Na-pick at na-book na, SPX"). Para alam ng owners kung ano talaga ang nangyari.
+• Working on it pag lampas na sa deadline: kailangan ng maikling update (halimbawa: "Kulang pa ng 1 pc, hinahanap pa"). Hindi na ito mamarkahang late sa araw na iyon. Kung bukas bukas pa rin at walang bagong update, late ulit.
+• Hindi kaya gawin? Pindutin ang Problem at isulat kung bakit (halimbawa: "Wala sa 3C at 4A"). Malalaman agad ng owners. Wag basta pindutin ang Done.
+• May tanong? Pindutin ang Ask. Pag sumagot ang owners, lalabas ulit ang task sa inyo.
+• Pwede ring mag-reply at isara agad ang task: sa Reply, pindutin ang Send & mark Done.
+
+Ang mga task na para sa sales (tanong sa customer) ay may sariling buttons na sa kanila: OK to ship, Don't ship yet, Ship by bus, Customer hasn't replied, Cancel the order. Pag na-cancel nila ang order na na-pick na, may task kayo para ibalik ang pieces sa shelf, gaya ng dati.
