@@ -72,6 +72,7 @@ export interface StatementDateAmountCandidate {
   statementDesc: string;
   channelLabel: string | null;
   confidence: 'high' | 'medium';
+  confidenceScore: number;
   dayDiff: number;
   isAmbiguous: boolean;
 }

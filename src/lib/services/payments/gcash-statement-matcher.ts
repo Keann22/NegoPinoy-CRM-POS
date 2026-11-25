@@ -3,6 +3,7 @@ import {
   extractGcashRefFromNotes,
   isBankDatePrefixedRef,
   isPaymentFlagged,
+  isStandardGcashRef,
 } from './payment-ref-utils';
 import type { StatementTransaction } from './gcash-statement-parser';
 import type {
@@ -165,12 +166,25 @@ export function matchStatementPayments(params: {
     const payDate = toPhDate(payment.payment_date);
     if (!payDate) continue;
     const payAmount = Number(payment.amount);
+    const payCleanRef = cleanNumericRef(payment.reference_number);
+    const payHasStdGcashRef = isStandardGcashRef(payment.reference_number);
 
     for (const tx of remainingTxs) {
       if (!tx.date || tx.amount === null) continue;
       if (Math.abs(tx.amount - payAmount) > 1) continue;
       const diff = calendarDayDiff(tx.date, payDate);
       if (Math.abs(diff) > 2) continue;
+
+      // Do not suggest pairing a GCash-to-GCash payment with a known 13-digit ref against a DIFFERENT GCash-to-GCash transfer.
+      if (
+        payHasStdGcashRef &&
+        !tx.isBankOrRemittance &&
+        tx.refNo &&
+        isStandardGcashRef(tx.refNo) &&
+        tx.refNo !== payCleanRef
+      ) {
+        continue;
+      }
 
       rawPairs.push({ payment, tx, dayDiff: diff });
       paymentMatchCounts.set(payment.id, (paymentMatchCounts.get(payment.id) || 0) + 1);
@@ -181,16 +195,29 @@ export function matchStatementPayments(params: {
   const suggestedMatches: StatementDateAmountCandidate[] = rawPairs.map(({ payment, tx, dayDiff }) => {
     const isAmbiguous =
       (paymentMatchCounts.get(payment.id) || 0) > 1 || (txMatchCounts.get(tx.index) || 0) > 1;
+    const payAmount = Number(payment.amount);
     const looksLikeNonGcashRef =
       payment.payment_method === 'Bank Transfer' ||
       payment.payment_method === 'Other' ||
       isBankDatePrefixedRef(payment.reference_number) ||
       !cleanNumericRef(payment.reference_number);
 
-    const confidence: 'high' | 'medium' =
-      !isAmbiguous && Math.abs(dayDiff) <= 1 && (tx.isBankOrRemittance || looksLikeNonGcashRef)
-        ? 'high'
-        : 'medium';
+    let score = 50;
+    if (Math.abs(tx.amount! - payAmount) < 0.01) score += 10;
+    if (Math.round(payAmount * 100) % 10000 !== 0) score += 10;
+    else if (Math.round(payAmount) % 500 === 0) score -= 5;
+
+    const absDiff = Math.abs(dayDiff);
+    if (absDiff === 0) score += 15;
+    else if (absDiff === 1) score += 8;
+    else score -= 5;
+
+    if (tx.isBankOrRemittance) score += 12;
+    if (looksLikeNonGcashRef) score += 5;
+    score += isAmbiguous ? -25 : 8;
+
+    const confidenceScore = Math.max(25, Math.min(98, Math.round(score)));
+    const confidence: 'high' | 'medium' = confidenceScore >= 85 && !isAmbiguous ? 'high' : 'medium';
 
     return {
       paymentId: payment.id,
@@ -199,7 +226,7 @@ export function matchStatementPayments(params: {
       customerName: payment.customer_name,
       paymentDate: payment.payment_date,
       paymentMethod: payment.payment_method,
-      amount: Number(payment.amount),
+      amount: payAmount,
       ocrAmount: payment.ocr_amount,
       proofUrl: payment.proof_url,
       notes: payment.notes,
@@ -209,13 +236,14 @@ export function matchStatementPayments(params: {
       statementDesc: tx.description,
       channelLabel: tx.channelLabel,
       confidence,
+      confidenceScore,
       dayDiff,
       isAmbiguous,
     };
   });
 
   suggestedMatches.sort((a, b) => {
-    if (a.confidence !== b.confidence) return a.confidence === 'high' ? -1 : 1;
+    if (a.confidenceScore !== b.confidenceScore) return b.confidenceScore - a.confidenceScore;
     return b.statementDate.localeCompare(a.statementDate);
   });
 
