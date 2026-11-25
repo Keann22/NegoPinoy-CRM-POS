@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import type { NewOrderNote, NewStaffTask, NoteTarget, StaffTask, StaffTaskAction, StaffTaskMessage, TaskPerson } from '@/types/staff-tasks.types';
 import type { OrderShipContext } from '@/lib/services/order-ship-context-service';
+import type { RealtimeChannel } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/client';
 
 const API = '/api/tasks';
 /** Fired after any task change, so lists that load their own copy can reload. */
@@ -30,6 +32,26 @@ let sent: StaffTask[] = [];
 let loaded = false;
 const listeners = new Set<() => void>();
 let timer: number | null = null;
+let live: RealtimeChannel | null = null;
+
+/*
+ * Right away instead of the 3-minute check (owner, 2026-11-25): a database
+ * trigger broadcasts on "staff-tasks:<my user id>" when a note I sent is
+ * answered (scripts/migrations/2026-11-25_note_answer_realtime_ping.sql).
+ */
+async function listenLive() {
+  try {
+    const supabase = createClient();
+    const { data } = await supabase.auth.getUser();
+    if (!data.user || listeners.size === 0 || live) return;
+    live = supabase
+      .channel(`staff-tasks:${data.user.id}`)
+      .on('broadcast', { event: 'changed' }, () => { void loadMine(); })
+      .subscribe();
+  } catch {
+    // No live updates: the 3-minute check still runs.
+  }
+}
 
 async function loadMine() {
   try {
@@ -49,6 +71,7 @@ function subscribe(listener: () => void) {
     void loadMine();
     timer = window.setInterval(loadMine, POLL_MS);
     window.addEventListener('focus', loadMine);
+    void listenLive();
   }
   return () => {
     listeners.delete(listener);
@@ -56,6 +79,8 @@ function subscribe(listener: () => void) {
       if (timer) window.clearInterval(timer);
       timer = null;
       window.removeEventListener('focus', loadMine);
+      if (live) void createClient().removeChannel(live);
+      live = null;
     }
   };
 }
