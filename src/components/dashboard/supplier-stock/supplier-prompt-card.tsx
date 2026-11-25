@@ -69,7 +69,7 @@ export function SupplierPromptCard({
         )}
         {(p.kind === 'decide' || p.kind === 'still_waiting') && (
           <>
-            {p.status === 'other_variant' && p.altProductName && change(`Switch to ${p.altProductName}`)}
+            {p.status === 'other_variant' && p.altProductName && change(p.altProductNames.length > 1 ? 'Switch to available color/size' : `Switch to ${p.altProductName}`)}
             {p.status === 'price_up' && (
               <Button size="sm" disabled={busy} onClick={() => onAnswer(p, 'wait')}>{spin}Customer agrees to the new price</Button>
             )}

@@ -32,7 +32,7 @@ async function flagRowsForPrompts(supabase: SupabaseClient): Promise<FlagRow[]> 
   const since = new Date(Date.now() - SUPPLIER_FLAG_RULES.moneyAfterClearDays * DAY).toISOString();
   const { data, error } = await supabase
     .from('supplier_stock_flags')
-    .select('id, product_id, status, note, alt_product_id, new_price, check_again_on, set_by_name, set_at, cleared_at')
+    .select('id, product_id, status, note, alt_product_id, alt_product_ids, new_price, check_again_on, set_by_name, set_at, cleared_at')
     .or(`cleared_at.is.null,cleared_at.gt.${since}`);
   if (error) throw error;
   return (data || []) as FlagRow[];
@@ -41,7 +41,7 @@ async function flagRowsForPrompts(supabase: SupabaseClient): Promise<FlagRow[]> 
 function basePrompt(f: SupplierFlag, l: WaitingLine, kind: SupplierPromptKind, amount = 0): SupplierPrompt {
   return {
     key: `${f.id}:${l.orderId}`, kind, flagId: f.id, orderId: l.orderId, status: f.status,
-    productName: f.productName, note: f.note, altProductName: f.altProductName, newPrice: f.newPrice,
+    productName: f.productName, note: f.note, altProductName: f.altProductName, altProductNames: f.altProductNames, newPrice: f.newPrice,
     customerName: l.customerName, agent: l.agent, orderStatus: l.orderStatus, qty: l.qty,
     paid: l.paid, total: l.total, amount, flaggedAt: f.setAt, waitingCustomerAt: null, escalated: false,
   };

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Loader2, PackageX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -38,7 +39,7 @@ export function SupplierFlagDialog({
   const { variants, currentPrice } = useSiblingVariants(open ? product?.id : null);
   const [status, setStatus] = useState<SupplierFlagStatus>('waiting_restock');
   const [note, setNote] = useState('');
-  const [altId, setAltId] = useState('');
+  const [altIds, setAltIds] = useState<string[]>([]);
   const [newPrice, setNewPrice] = useState('');
   const [checkOn, setCheckOn] = useState('');
   const [busy, setBusy] = useState(false);
@@ -47,23 +48,26 @@ export function SupplierFlagDialog({
     if (!open) return;
     setStatus(current?.status || 'waiting_restock');
     setNote(current?.note || oldIssue?.note || '');
-    setAltId(current?.altProductId || '');
+    setAltIds(current?.altProductIds?.length ? current.altProductIds : current?.altProductId ? [current.altProductId] : []);
     setNewPrice(current?.newPrice ? String(current.newPrice) : '');
     setCheckOn(current?.checkAgainOn || phtDatePlus(SUPPLIER_FLAG_RULES.checkAgainDays));
   }, [open, current, oldIssue]);
 
   if (!product) return null;
 
+  const toggleAlt = (id: string) =>
+    setAltIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
   const save = async () => {
-    if (status === 'other_variant' && !altId) {
-      toast({ title: 'Pick the color/size we can get', variant: 'destructive' });
+    if (status === 'other_variant' && variants.length > 0 && altIds.length === 0) {
+      toast({ title: 'Pick at least one color/size we can get', variant: 'destructive' });
       return;
     }
     setBusy(true);
     try {
       await setSupplierFlag({
         productId: product.id, status, note,
-        altProductId: status === 'other_variant' ? altId : null,
+        altProductIds: status === 'other_variant' ? altIds : [],
         newPrice: status === 'price_up' && newPrice ? Number(newPrice) : null,
         checkAgainOn: status === 'stop_selling' ? null : checkOn || null,
         oldIssueId: oldIssue?.id || null,
@@ -119,17 +123,28 @@ export function SupplierFlagDialog({
         </div>
 
         {status === 'other_variant' && (
-          <div className="space-y-1">
-            <Label htmlFor="sf-alt">What we can get instead</Label>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <Label>What we can get instead</Label>
+              {variants.length > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  {altIds.length} selected
+                </span>
+              )}
+            </div>
             {variants.length === 0 ? (
               <p className="text-xs text-muted-foreground">This item has no other colors or sizes. Write it in the note.</p>
             ) : (
-              <select id="sf-alt" value={altId} onChange={(e) => setAltId(e.target.value)} className="h-9 w-full rounded-md border bg-background px-2 text-sm">
-                <option value="">Choose…</option>
+              <div className="max-h-44 space-y-1 overflow-y-auto rounded-md border p-2">
                 {variants.map((v) => (
-                  <option key={v.id} value={v.id}>{v.name}{v.price != null ? ` — ₱${v.price.toLocaleString('en-PH')}` : ''}</option>
+                  <label key={v.id} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-muted">
+                    <Checkbox checked={altIds.includes(v.id)} onCheckedChange={() => toggleAlt(v.id)} />
+                    <span className="min-w-0 flex-1 break-words">
+                      {v.name}{v.price != null ? ` — ₱${v.price.toLocaleString('en-PH')}` : ''}
+                    </span>
+                  </label>
                 ))}
-              </select>
+              </div>
             )}
           </div>
         )}

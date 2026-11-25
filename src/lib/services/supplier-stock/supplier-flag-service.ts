@@ -16,7 +16,7 @@ import type {
 export class SupplierFlagError extends Error {}
 
 const STATUSES: SupplierFlagStatus[] = ['waiting_restock', 'other_variant', 'price_up', 'stop_selling'];
-const FLAG_COLUMNS = 'id, product_id, status, note, alt_product_id, new_price, check_again_on, set_by_name, set_at, cleared_at';
+const FLAG_COLUMNS = 'id, product_id, status, note, alt_product_id, alt_product_ids, new_price, check_again_on, set_by_name, set_at, cleared_at';
 
 export interface FlagRow {
   id: string;
@@ -24,6 +24,7 @@ export interface FlagRow {
   status: SupplierFlagStatus;
   note: string | null;
   alt_product_id: string | null;
+  alt_product_ids?: string[] | null;
   new_price: number | string | null;
   check_again_on: string | null;
   set_by_name: string | null;
@@ -73,22 +74,33 @@ export async function getActiveFlagRows(supabase: SupabaseClient, productIds?: s
   return (data || []) as FlagRow[];
 }
 
+function resolveAltIds(r: FlagRow): string[] {
+  const raw = r.alt_product_ids?.length ? r.alt_product_ids : (r.alt_product_id ? [r.alt_product_id] : []);
+  return Array.from(new Set(raw.filter(Boolean)));
+}
+
 export async function toFlags(supabase: SupabaseClient, rows: FlagRow[]): Promise<SupplierFlag[]> {
-  const names = await productNames(supabase, rows.flatMap((r) => [r.product_id, r.alt_product_id || '']));
-  return rows.map((r) => ({
-    id: r.id,
-    productId: r.product_id,
-    productName: names.get(r.product_id)?.name || 'Item',
-    status: r.status,
-    note: r.note,
-    altProductId: r.alt_product_id,
-    altProductName: r.alt_product_id ? names.get(r.alt_product_id)?.name || null : null,
-    newPrice: r.new_price == null ? null : Number(r.new_price),
-    checkAgainOn: r.check_again_on,
-    setByName: r.set_by_name,
-    setAt: r.set_at,
-    freeToSell: Math.max(0, names.get(r.product_id)?.stock ?? 0),
-  }));
+  const names = await productNames(supabase, rows.flatMap((r) => [r.product_id, ...resolveAltIds(r)]));
+  return rows.map((r) => {
+    const altIds = resolveAltIds(r);
+    const altNames = altIds.map((id) => names.get(id)?.name || null).filter((n): n is string => Boolean(n));
+    return {
+      id: r.id,
+      productId: r.product_id,
+      productName: names.get(r.product_id)?.name || 'Item',
+      status: r.status,
+      note: r.note,
+      altProductId: altIds[0] ?? null,
+      altProductName: altNames.length > 0 ? altNames.join(', ') : null,
+      altProductIds: altIds,
+      altProductNames: altNames,
+      newPrice: r.new_price == null ? null : Number(r.new_price),
+      checkAgainOn: r.check_again_on,
+      setByName: r.set_by_name,
+      setAt: r.set_at,
+      freeToSell: Math.max(0, names.get(r.product_id)?.stock ?? 0),
+    };
+  });
 }
 
 /** Active statuses (for New Order, the Procurement Sheet and badges). Optionally only some products. */
@@ -199,7 +211,15 @@ export async function listFlagsWithOrders(supabase: SupabaseClient): Promise<Sup
 export async function setSupplierFlag(supabase: SupabaseClient, input: SetSupplierFlagInput, actorName: string): Promise<string> {
   if (!input.productId) throw new SupplierFlagError('Choose a product.');
   if (!STATUSES.includes(input.status)) throw new SupplierFlagError('Choose a status.');
-  if (input.status === 'other_variant' && input.altProductId === input.productId) {
+  const rawAltIds = input.altProductIds?.length
+    ? input.altProductIds
+    : input.altProductId
+      ? [input.altProductId]
+      : [];
+  const altIds = input.status === 'other_variant'
+    ? Array.from(new Set(rawAltIds.filter(Boolean)))
+    : [];
+  if (input.status === 'other_variant' && altIds.includes(input.productId)) {
     throw new SupplierFlagError('The other color/size must be a different variant.');
   }
   const { data: kids } = await supabase.from('products').select('id').eq('parent_id', input.productId).limit(1);
@@ -215,7 +235,8 @@ export async function setSupplierFlag(supabase: SupabaseClient, input: SetSuppli
     product_id: input.productId,
     status: input.status,
     note: input.note?.trim() || null,
-    alt_product_id: input.status === 'other_variant' ? input.altProductId || null : null,
+    alt_product_id: altIds[0] ?? null,
+    alt_product_ids: altIds,
     new_price: input.status === 'price_up' && input.newPrice ? Number(input.newPrice) : null,
     check_again_on: input.status === 'stop_selling' ? null : input.checkAgainOn || null,
     set_by_name: actorName,

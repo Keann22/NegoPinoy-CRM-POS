@@ -19,6 +19,8 @@ export interface SupplierFlag {
   note: string | null;
   altProductId: string | null;
   altProductName: string | null;
+  altProductIds: string[];
+  altProductNames: string[];
   newPrice: number | null;
   /** YYYY-MM-DD (PHT). */
   checkAgainOn: string | null;
@@ -49,6 +51,7 @@ export interface SetSupplierFlagInput {
   status: SupplierFlagStatus;
   note?: string | null;
   altProductId?: string | null;
+  altProductIds?: string[] | null;
   newPrice?: number | null;
   checkAgainOn?: string | null;
   /** Old free-text report (procurement_issues) this replaces; it gets closed. */
@@ -76,6 +79,7 @@ export interface SupplierPrompt {
   productName: string;
   note: string | null;
   altProductName: string | null;
+  altProductNames: string[];
   newPrice: number | null;
   customerName: string;
   agent: string | null;
