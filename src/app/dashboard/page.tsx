@@ -27,6 +27,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { OrderChangesCard } from '@/components/dashboard/orders/order-changes-card';
 import { MyTasksCard } from '@/components/dashboard/tasks/my-tasks-card';
 import { OwnerTasksSummary } from '@/components/dashboard/tasks/owner-tasks-summary';
+import { OwnerTodoCard } from '@/components/dashboard/owner-todo/owner-todo-card';
 import { useUserProfile } from '@/hooks/useUserProfile';
 
 export default function DashboardPage() {
@@ -211,6 +212,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Owner to-do: what only the owners can do (owner, 2026-11-25). */}
+      {isManagement && <div className="mb-8"><OwnerTodoCard /></div>}
       {/* Tasks from the owners; renders nothing when there are none. */}
       <div className="mb-8 empty:hidden"><MyTasksCard /></div>
       {isManagement && <div className="mb-8 empty:hidden"><OwnerTasksSummary /></div>}

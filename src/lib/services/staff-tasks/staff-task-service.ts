@@ -136,14 +136,18 @@ export async function listAllTasks(supabase: SupabaseClient, days = 14): Promise
   const since = new Date(Date.now() - days * 86400000).toISOString();
   const { data, error } = await supabase
     .from('staff_tasks')
-    .select(SELECT)
+    .select(`${SELECT}, assignee_ids, assigned_by_id`)
     .or(`status.eq.open,created_at.gte.${since}`)
     // Order notes have their own lists (sent by me / not seen in 2 hours).
     .or('kind.is.null,kind.neq.note')
     .order('created_at', { ascending: false })
     .limit(500);
   if (error) throw error;
-  return withOrderContext(supabase, ((data || []) as unknown as TaskRow[]).map(toTask));
+  // A task an owner gave themselves is a reminder, not a staff task: it shows
+  // under their own "My tasks", not in "Tasks for staff" (owner, 2026-11-25).
+  const rows = ((data || []) as unknown as (TaskRow & { assignee_ids: string[] | null; assigned_by_id: string | null })[])
+    .filter((r) => !(r.assigned_by_id && (r.assignee_ids || []).includes(r.assigned_by_id)));
+  return withOrderContext(supabase, rows.map(toTask));
 }
 
 /** Open and recent tasks on one order (shown on the order page). */
@@ -175,9 +179,13 @@ export async function createTask(
 
   // Several people: each gets their own copy (own seen / done), linked by group_id.
   const groupId = chosen.length > 1 ? crypto.randomUUID() : null;
+  const now = new Date().toISOString();
   const { data, error } = await supabase
     .from('staff_tasks')
     .insert(chosen.map((person) => ({
+      // A task to yourself (owner, 2026-11-25): already seen, so it doesn't pop
+      // up on your own screen; it still comes back once it's past the deadline.
+      ...(person.ids.includes(by.id) ? { seen_at: now, seen_by_name: by.name } : {}),
       message,
       order_id: input.orderId || null,
       assignee_ids: person.ids,

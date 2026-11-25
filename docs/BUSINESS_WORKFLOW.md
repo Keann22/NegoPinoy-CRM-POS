@@ -870,6 +870,35 @@ How it works (built 2026-11-20):
   function, `scripts/migrations/2026-11-25_put_back_task_english.sql`); tasks made
   before 2026-11-25 keep their old text.
 
+## Owner to-do: only you can do these (owner, 2026-11-25; built 2026-11-25)
+
+- Some work only the owners can do, and it was being missed: checked 2026-11-25,
+  **only 6 GCash payments were verified in November** (297 waiting) and **no SPX
+  remittance file since Oct 30** (187 delivered COD orders still owing ₱293k).
+  The owners don't read the bell (500+ unread in 30 days, mostly "Order Packed" /
+  "Order Issue Reported"), so it has to be a list on the Dashboard.
+- **Dashboard and Tasks page (owners): "Only you can do these"**. Each line has a
+  count, what it's about and a button to the screen; red = overdue. It's worked out
+  from live data each time, so **a line clears by itself once it's done** (nothing
+  to tick off). Both owners see the same list.
+- Lines: **Upload the GCash statement** (payments since the last upload; red after
+  7 days), **Check flagged payments** (not sent to our GCash / reference used twice,
+  with the list), **Upload the SPX remittance file** (COD orders delivered in the last
+  90 days still owing; red after 7 days), **Picker counted more than the shelf:
+  decide** (all held counts on one page, `/dashboard/owner-todo/held-counts`),
+  **Decide on returns**, **Staff are waiting on you** (task problems, unread
+  replies), **Supplier returns** (to bring back, suppliers late), **Finish Payment
+  Fix**, **Enter costs** (deliveries in the last 30 days with no cost), **Collect
+  from shipped orders (bus / no tracking)**.
+- **Uploads are remembered now** (`owner_uploads`): the GCash statement (Payments →
+  Verify) and the SPX file save when and by whom. Before 2026-11-25 neither was
+  saved, so the GCash line starts from the newest payment a statement verified
+  (Nov 15). The GCash statement check is owners only now (the page already was).
+- **Task for me**: owners can give themselves a task (button on the card, or **Me**
+  at the top of Assign a task). It doesn't pop up (it starts as seen), stays under
+  **My tasks** until Done, pops up if it passes the deadline, and isn't counted in
+  "Tasks for staff".
+
 ## Being decided (not built yet)
 
 - **Customer purchase planner (owner, 2026-11-01)**: a premium feature on the

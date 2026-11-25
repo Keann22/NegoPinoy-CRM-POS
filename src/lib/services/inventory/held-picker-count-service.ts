@@ -224,3 +224,17 @@ export async function getOpenHeldCounts(supabase: SupabaseClient, productIds: st
   });
   return out;
 }
+
+/** Every held count still waiting for the owners, oldest first (Owner to-do → Decide). */
+export async function listOpenHeldPickerCounts(supabase: SupabaseClient): Promise<HeldPickerCount[]> {
+  const { data, error } = await supabase
+    .from('inventory_guardian_memory')
+    .select('id')
+    .eq('action_type', HELD_ACTION)
+    .eq('metadata->>status', 'open')
+    .order('created_at', { ascending: true })
+    .limit(100);
+  if (error) throw error;
+  const all = await Promise.all(((data || []) as { id: string }[]).map((r) => getHeldPickerCount(supabase, r.id)));
+  return all.filter((h): h is HeldPickerCount => !!h);
+}

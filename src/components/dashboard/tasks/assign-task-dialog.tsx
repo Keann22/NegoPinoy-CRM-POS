@@ -14,6 +14,7 @@ import type { OrderShipContext } from '@/lib/services/order-ship-context-service
 import { shipsBeforePaid } from '@/lib/priority/priority-rules';
 import { OrderSearch } from '@/components/dashboard/order-search';
 import { dueFromPick, phtDateString, type DuePick } from '@/lib/services/staff-tasks/task-dates';
+import { useUser } from '@/lib/supabase/hooks';
 import { cn } from '@/lib/utils';
 
 export interface TaskOrderRef { id: string; label: string }
@@ -66,18 +67,31 @@ interface Props {
   /** Opened from an order: it's attached and can't be changed. */
   order?: TaskOrderRef | null;
   onCreated?: () => void;
+  /** "Task for me" (owner, 2026-11-25): starts with yourself picked. */
+  forSelf?: boolean;
 }
 
 /** Owners give a staff member a task, optionally about an order, with an optional deadline. */
-export function AssignTaskDialog({ open, onOpenChange, order: fixedOrder, onCreated }: Props) {
+export function AssignTaskDialog({ open, onOpenChange, order: fixedOrder, onCreated, forSelf = false }: Props) {
   const { toast } = useToast();
-  const people = useTaskPeople(open);
-  const [personKeys, setPersonKeys] = useState<string[]>([]);
+  const { user } = useUser();
+  const allPeople = useTaskPeople(open);
+  // You (your own accounts) come first, as "Me": a task to yourself is a reminder
+  // that stays on your dashboard until you tap Done.
+  const myKey = allPeople.find((p) => !!user?.uid && p.key.split(',').includes(user.uid))?.key || null;
+  const people = myKey
+    ? [{ ...allPeople.find((p) => p.key === myKey)!, name: 'Me', roles: [] }, ...allPeople.filter((p) => p.key !== myKey)]
+    : allPeople;
+  const [pickedKeys, setPickedKeys] = useState<string[] | null>(null);
   const [message, setMessage] = useState('');
   const [pickedOrder, setPickedOrder] = useState<TaskOrderRef | null>(null);
   const [due, setDue] = useState<DuePick>('none');
   const [dueDate, setDueDate] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Nobody tapped yet: "Task for me" starts with you picked.
+  const personKeys = pickedKeys ?? (forSelf && myKey ? [myKey] : []);
+  const onlyMe = personKeys.length === 1 && personKeys[0] === myKey;
 
   const order = fixedOrder || pickedOrder;
   const shipContext = useOrderShipContext(open ? order?.id : null);
@@ -86,7 +100,7 @@ export function AssignTaskDialog({ open, onOpenChange, order: fixedOrder, onCrea
 
   const close = (next: boolean) => {
     if (!next) {
-      setPersonKeys([]); setMessage(''); setPickedOrder(null); setDue('none'); setDueDate('');
+      setPickedKeys(null); setMessage(''); setPickedOrder(null); setDue('none'); setDueDate('');
     }
     onOpenChange(next);
   };
@@ -96,8 +110,10 @@ export function AssignTaskDialog({ open, onOpenChange, order: fixedOrder, onCrea
     setSaving(true);
     try {
       await createStaffTask({ personKeys, message: message.trim(), orderId: order?.id || null, dueAt: dueFromPick(due, dueDate) });
-      const who = people.filter((p) => personKeys.includes(p.key)).map((p) => p.name).join(', ') || 'Staff';
-      toast({ title: `Task sent to ${who}`, description: 'They get a pop-up. You get a bell when it\'s done.' });
+      const who = onlyMe ? 'yourself' : people.filter((p) => personKeys.includes(p.key)).map((p) => p.name).join(', ') || 'Staff';
+      toast(onlyMe
+        ? { title: 'Added to your tasks', description: 'It stays on your dashboard until you tap Done.' }
+        : { title: `Task sent to ${who}`, description: 'They get a pop-up. You get a bell when it\'s done.' });
       onCreated?.();
       close(false);
     } catch (e) {
@@ -111,8 +127,12 @@ export function AssignTaskDialog({ open, onOpenChange, order: fixedOrder, onCrea
     <Dialog open={open} onOpenChange={close}>
       <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><ClipboardCheck className="h-5 w-5" /> Assign a task</DialogTitle>
-          <DialogDescription>They get a pop-up, then it stays on their dashboard until they tap Done.</DialogDescription>
+          <DialogTitle className="flex items-center gap-2"><ClipboardCheck className="h-5 w-5" /> {forSelf ? 'Task for me' : 'Assign a task'}</DialogTitle>
+          <DialogDescription>
+            {onlyMe
+              ? 'A reminder for yourself: it stays on your dashboard until you tap Done (and pops up if it passes the deadline).'
+              : 'They get a pop-up, then it stays on their dashboard until they tap Done.'}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -126,7 +146,7 @@ export function AssignTaskDialog({ open, onOpenChange, order: fixedOrder, onCrea
                   type="button"
                   aria-pressed={personKeys.includes(p.key)}
                   className={chip(personKeys.includes(p.key))}
-                  onClick={() => setPersonKeys((ks) => (ks.includes(p.key) ? ks.filter((k) => k !== p.key) : [...ks, p.key]))}
+                  onClick={() => setPickedKeys(personKeys.includes(p.key) ? personKeys.filter((k) => k !== p.key) : [...personKeys, p.key])}
                 >
                   {p.name}
                   {p.roles.length > 0 && <span className="ml-1 text-xs opacity-70">· {p.roles.join(', ')}</span>}
@@ -171,7 +191,7 @@ export function AssignTaskDialog({ open, onOpenChange, order: fixedOrder, onCrea
               rows={3}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="e.g. Jas, this one can ship now"
+              placeholder={onlyMe ? 'e.g. Ask the supplier when the egg pan is back' : 'e.g. Jas, this one can ship now'}
             />
             {warnings.length > 0 && (
               <div role="alert" className="flex gap-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-200">
@@ -205,7 +225,7 @@ export function AssignTaskDialog({ open, onOpenChange, order: fixedOrder, onCrea
 
         <DialogFooter>
           <Button variant="outline" onClick={() => close(false)}>Cancel</Button>
-          <Button onClick={save} disabled={!canSave || saving}>{saving ? 'Sending…' : personKeys.length > 1 ? `Assign to ${personKeys.length} people` : 'Assign task'}</Button>
+          <Button onClick={save} disabled={!canSave || saving}>{saving ? 'Saving…' : onlyMe ? 'Add to my tasks' : personKeys.length > 1 ? `Assign to ${personKeys.length} people` : 'Assign task'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

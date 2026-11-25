@@ -90,6 +90,10 @@ and new BUSINESS_WORKFLOW.md sections (Copilot, task actions).
 
 Newest first. Older history: `git log`. Feature rules: `docs/BUSINESS_WORKFLOW.md`.
 
+- **2026-11-25** Owner to-do "Only you can do these" on the owners' Dashboard and Tasks
+  page (GCash statement, SPX file, flagged payments, held counts page, returns, staff
+  waiting, supplier returns, Payment Fix, costs, bus unpaid); GCash/SPX uploads saved in
+  `owner_uploads`; "Task for me" (Me in Assign a task). (Claude)
 - **2026-11-25** Tasks close from the hold / bus dialogs (built by Antigravity,
   reviewed and tested by Claude, 98e991a): Don't ship yet / Change hold / Ship by
   bus on order tasks, Send & mark Done, Move deadline, working-today pause, 7

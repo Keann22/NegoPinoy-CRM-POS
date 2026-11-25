@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getTaskCaller } from '@/lib/services/staff-tasks/task-caller';
+import { recordOwnerUpload } from '@/lib/services/owner-todo/owner-todo-service';
 
 // Use Node.js runtime so we can use pdfjs-dist
 export const runtime = 'nodejs';
@@ -45,6 +47,11 @@ function extractRows(items: any[]): string[] {
 
 export async function POST(request: Request) {
   try {
+    // Verifying payments is the owners' job (the Payments page is owners only).
+    const caller = await getTaskCaller();
+    if (!caller?.isManagement) {
+      return NextResponse.json({ error: 'Only the owners can verify payments.' }, { status: 403 });
+    }
     const formData = await request.formData();
     const file = formData.get('file') as Blob;
     const password = formData.get('password') as string;
@@ -178,6 +185,14 @@ export async function POST(request: Request) {
     }
 
     const verifiedCount = verifiedIds.length;
+
+    // Owner to-do: remember when the statement was last uploaded.
+    await recordOwnerUpload(supabase, {
+      kind: 'gcash_statement',
+      byName: caller.name,
+      matched: verifiedCount,
+      fileName: (file as File).name || null,
+    }).catch((e) => console.error('Could not save the GCash upload time:', e));
 
     return NextResponse.json({ success: true, verifiedCount });
 

@@ -313,6 +313,12 @@ export function useSPXRemittance() {
       setResults(syncResults);
 
       const successes = syncResults.filter(r => r.category === 'success').length;
+      // Owner to-do: remember when the file was last uploaded ("last upload 9 days ago").
+      fetch('/api/owner-todo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: 'spx_remittance', matched: successes, fileName: file.name }),
+      }).catch(() => {});
       toast({
         title: 'Remittance Synced',
         description: `Successfully processed ${successes} payments.`
