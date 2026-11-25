@@ -5,7 +5,7 @@ import { ClipboardCheck } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useMyTasks, useSentNotes } from '@/hooks/useStaffTasks';
 import { useTaskActions } from '@/hooks/useTaskActions';
-import { isLate } from '@/lib/services/staff-tasks/task-dates';
+import { isTaskLate } from '@/lib/services/staff-tasks/task-dates';
 import { TASKS_PAGE_PATH } from './tasks-nav-badge';
 import { TaskItem } from './task-item';
 
@@ -25,7 +25,7 @@ export function MyTasksCard() {
 
   // Late first, then by deadline, then newest.
   const sorted = [...open].sort((a, b) => {
-    const late = Number(isLate(b.dueAt)) - Number(isLate(a.dueAt));
+    const late = Number(isTaskLate(b)) - Number(isTaskLate(a));
     if (late) return late;
     if (a.dueAt && b.dueAt) return a.dueAt.localeCompare(b.dueAt);
     if (a.dueAt || b.dueAt) return a.dueAt ? -1 : 1;

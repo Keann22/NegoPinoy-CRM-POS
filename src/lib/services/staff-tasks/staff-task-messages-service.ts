@@ -76,7 +76,8 @@ export async function postTaskMessage(
   taskId: string,
   caller: TaskCaller,
   bodyIn: string,
-  photoUrlIn?: unknown
+  photoUrlIn?: unknown,
+  markDone = false,
 ): Promise<void> {
   const body = String(bodyIn || '').trim();
   const photoUrl = taskPhoto(photoUrlIn);
@@ -89,6 +90,7 @@ export async function postTaskMessage(
   const isNote = task.kind === 'note';
   // Answering a note closes it (for everyone, when it went to a team).
   const answers = isNote && isAssignee && task.status === 'open';
+  const closesTask = answers || (markDone && task.status === 'open' && (isAssignee || caller.isManagement));
 
   const { error } = await supabase.from('staff_task_messages').insert({
     task_id: taskId,
@@ -105,10 +107,12 @@ export async function postTaskMessage(
     .update({
       last_message_at: now,
       last_message_from_owner: fromOwner,
-      ...(fromOwner ? { owner_read_at: now } : { staff_read_at: now }),
-      // Asking about the task means they saw it.
-      ...(!fromOwner && !task.seen_at ? { seen_at: now, seen_by_name: caller.name } : {}),
-      ...(answers ? { status: 'done', done_at: now, done_by_name: caller.name } : {}),
+      ...(fromOwner || (closesTask && caller.isManagement) ? { owner_read_at: now } : {}),
+      ...(!fromOwner ? { staff_read_at: now } : {}),
+      // Asking or closing the task means it was seen.
+      ...((!fromOwner || closesTask) && !task.seen_at ? { seen_at: now, seen_by_name: caller.name } : {}),
+      ...(closesTask ? { status: 'done', done_at: now, done_by_name: caller.name } : {}),
+      ...(closesTask && !isNote ? { done_note: body || null, done_photo_url: photoUrl } : {}),
     })
     .eq('id', taskId);
   if (upErr) throw upErr;
@@ -122,12 +126,12 @@ export async function postTaskMessage(
     return;
   }
 
-  if (!fromOwner && task.assigned_by_name && task.assigned_by_name !== caller.name) {
+  if (!fromOwner && !(task.kind === 'put_back' && closesTask) && task.assigned_by_name && task.assigned_by_name !== caller.name) {
     const order = task.order_id ? ` (#${String(task.order_id).slice(0, 7).toUpperCase()})` : '';
     const text = `${caller.name}${order} on "${task.message}": ${body || ''}${photoUrl ? `${body ? ' ' : ''}(photo)` : ''}`;
     await supabase.from('notifications').insert({
       sales_person_name: task.assigned_by_name,
-      title: 'Task reply',
+      title: closesTask ? 'Task done' : 'Task reply',
       message: text.length > 240 ? `${text.slice(0, 237)}...` : text,
       link: `${TASKS_PAGE}?task=${taskId}`,
       is_read: false,

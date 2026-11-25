@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Camera, MessageCircle, Send, X } from 'lucide-react';
+import Link from 'next/link';
+import { Bus, Camera, CheckCircle2, MessageCircle, PauseCircle, Send, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { fetchTaskMessages, sendTaskMessage, uploadTaskPhoto } from '@/hooks/useStaffTasks';
+import { actOnTask, fetchTaskMessages, sendTaskMessage, uploadTaskPhoto } from '@/hooks/useStaffTasks';
 import { phtWhen } from '@/lib/services/staff-tasks/task-dates';
 import { cn } from '@/lib/utils';
 import type { StaffTask, StaffTaskMessage } from '@/types/staff-tasks.types';
@@ -15,11 +16,12 @@ import type { StaffTask, StaffTaskMessage } from '@/types/staff-tasks.types';
  * Questions and replies on a task. Staff ask ("Saan ilalagay?"), owners answer.
  * Opening it marks the replies read; sending tells the other side.
  */
-export function TaskThreadDialog({ task, view, onOpenChange }: {
+export function TaskThreadDialog({ task, view, onOpenChange, onHold }: {
   task: StaffTask | null;
   /** staff: the person the task is for; owner: the owners. */
   view: 'staff' | 'owner';
   onOpenChange: (open: boolean) => void;
+  onHold?: (task: StaffTask) => void;
 }) {
   const { toast } = useToast();
   const [messages, setMessages] = useState<StaffTaskMessage[]>([]);
@@ -65,17 +67,36 @@ export function TaskThreadDialog({ task, view, onOpenChange }: {
     onOpenChange(next);
   };
 
-  const send = async () => {
+  const send = async (markDone = false) => {
     if (!task || (!text.trim() && !photo)) return;
     setSending(true);
     try {
       const photoUrl = photo ? await uploadTaskPhoto(photo) : null;
-      await sendTaskMessage(task.id, text.trim(), photoUrl);
+      await sendTaskMessage(task.id, text.trim(), photoUrl, markDone);
       setText('');
       clearPhoto();
+      if (markDone) {
+        toast({ title: 'Sent & marked Done' });
+        close(false);
+        return;
+      }
       setMessages(await fetchTaskMessages(task.id));
     } catch (e) {
       toast({ variant: 'destructive', title: 'Not sent', description: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const markDoneOnly = async () => {
+    if (!task) return;
+    setSending(true);
+    try {
+      await actOnTask(task.id, 'done');
+      toast({ title: 'Task marked Done' });
+      close(false);
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Not saved', description: e instanceof Error ? e.message : String(e) });
     } finally {
       setSending(false);
     }
@@ -135,28 +156,90 @@ export function TaskThreadDialog({ task, view, onOpenChange }: {
             </button>
           </div>
         )}
+        {task?.status === 'open' && !task.isNote && !task.auto && task.orderId && task.orderContext && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/40 px-2.5 py-2 text-xs">
+            <span className="text-muted-foreground">
+              <span className="font-semibold text-foreground">{task.orderShortId}</span>
+              {task.orderContext.hold
+                ? ` · ${task.orderContext.hold.bus ? 'Marked for bus' : `On hold: ${task.orderContext.hold.reason}`}`
+                : ' · No hold / bus plan yet'}
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {onHold && (
+                <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => onHold(task)}>
+                  <PauseCircle className="mr-1 h-3.5 w-3.5" />
+                  {task.orderContext.hold ? 'Change hold' : "Don't ship yet"}
+                </Button>
+              )}
+              {!task.orderContext.hold?.bus && (
+                <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-xs" asChild>
+                  <Link href={`/dashboard/bus-shipping?mark=${encodeURIComponent(task.orderId)}&task=${encodeURIComponent(task.id)}`} onClick={() => close(false)}>
+                    <Bus className="mr-1 h-3.5 w-3.5" /> Ship by bus
+                  </Link>
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
         {task?.status !== 'cancelled' && (
-          <div className="flex items-end gap-2">
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => setPhoto(e.target.files?.[0] || null)}
-            />
-            <Button type="button" variant="outline" size="icon" onClick={() => fileRef.current?.click()} aria-label="Add a photo" disabled={sending}>
-              <Camera className="h-4 w-4" />
-            </Button>
-            <Textarea
-              rows={2}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder={view === 'staff' ? 'Ask or answer…' : `Reply to ${other}…`}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); } }}
-            />
-            <Button onClick={send} disabled={(!text.trim() && !photo) || sending} aria-label="Send">
-              <Send className="h-4 w-4" />
-            </Button>
+          <div className="space-y-2">
+            <div className="flex items-end gap-2">
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => setPhoto(e.target.files?.[0] || null)}
+              />
+              <Button type="button" variant="outline" size="icon" onClick={() => fileRef.current?.click()} aria-label="Add a photo" disabled={sending}>
+                <Camera className="h-4 w-4" />
+              </Button>
+              <Textarea
+                rows={2}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder={view === 'staff' ? 'Ask or answer…' : `Reply to ${other}…`}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(false); } }}
+              />
+              <Button onClick={() => void send(false)} disabled={(!text.trim() && !photo) || sending} aria-label="Send">
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+            {task?.status === 'open' && !task.isNote && (
+              <div className="flex justify-end">
+                {view === 'staff' ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void send(true)}
+                    disabled={(!text.trim() && !photo) || sending}
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                  >
+                    <CheckCircle2 className="mr-1.5 h-4 w-4" /> Send &amp; mark Done
+                  </Button>
+                ) : (text.trim() || photo) ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void send(true)}
+                    disabled={sending}
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                  >
+                    <CheckCircle2 className="mr-1.5 h-4 w-4" /> Send &amp; mark Done
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void markDoneOnly()}
+                    disabled={sending}
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                  >
+                    <CheckCircle2 className="mr-1.5 h-4 w-4" /> Mark Done
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
         )}
       </DialogContent>

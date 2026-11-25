@@ -25,13 +25,13 @@ export async function GET(req: Request) {
   }
 }
 
-// { taskId, body, photoUrl? }: a question or reply (text and/or photo) from the staff member or an owner.
+// { taskId, body, photoUrl?, markDone? }: a question or reply (text and/or photo) from the staff member or an owner.
 export async function POST(req: Request) {
   try {
     const caller = await getTaskCaller();
     if (!caller) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
     const body = await req.json();
-    await postTaskMessage(supabase, String(body.taskId || ''), caller, String(body.body || ''), body.photoUrl);
+    await postTaskMessage(supabase, String(body.taskId || ''), caller, String(body.body || ''), body.photoUrl, Boolean(body.markDone));
     return NextResponse.json({ ok: true });
   } catch (e) {
     return fail(e);

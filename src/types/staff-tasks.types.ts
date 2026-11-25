@@ -102,4 +102,4 @@ export interface NewStaffTask {
 }
 
 /** 'ack': the sender read the answer / the 2-hour alert on a note. */
-export type StaffTaskAction = 'seen' | 'working' | 'problem' | 'done' | 'cancel' | 'ack';
+export type StaffTaskAction = 'seen' | 'working' | 'problem' | 'done' | 'cancel' | 'ack' | 'reschedule';

@@ -8,7 +8,7 @@ import { usePopupSnooze } from '@/hooks/usePopupSnooze';
 import { actOnTask, useMyTasks, useSentNotes } from '@/hooks/useStaffTasks';
 import { useTaskActions } from '@/hooks/useTaskActions';
 import { useSentNoteActions } from '@/hooks/useSentNoteActions';
-import { isLate } from '@/lib/services/staff-tasks/task-dates';
+import { isTaskLate } from '@/lib/services/staff-tasks/task-dates';
 import { TASKS_PAGE_PATH } from './tasks-nav-badge';
 import { TaskItem } from './task-item';
 import { SentNoteItem } from './sent-note-item';
@@ -35,14 +35,14 @@ export function StaffTaskPopup() {
   // answer to a note they sent still does (owner, 2026-11-25).
   const onTasksPage = !!pathname?.startsWith(TASKS_PAGE_PATH);
   const shown = onTasksPage ? [] : active.filter((t) =>
-    t.staffUnread || (t.status === 'open' && (!t.seenAt || (isLate(t.dueAt) && t.progress !== 'problem'))));
+    t.staffUnread || (t.status === 'open' && (!t.seenAt || (isTaskLate(t) && t.progress !== 'problem'))));
 
   if (dialogOpen) return dialogs;
   if (sentActions.dialogOpen) return sentActions.dialogs;
   const total = shown.length + needsMe.length;
   if (total === 0 || minimized) return null;
 
-  const anyLate = shown.some((t) => t.status === 'open' && t.seenAt && isLate(t.dueAt));
+  const anyLate = shown.some((t) => t.status === 'open' && t.seenAt && isTaskLate(t));
   const notes = shown.filter((t) => t.isNote);
   const tasks = shown.filter((t) => !t.isNote);
   const title = needsMe.length && !shown.length

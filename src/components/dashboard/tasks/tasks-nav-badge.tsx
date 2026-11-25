@@ -1,7 +1,7 @@
 'use client';
 
 import { useMyTasks, useSentNotes } from '@/hooks/useStaffTasks';
-import { isLate } from '@/lib/services/staff-tasks/task-dates';
+import { isTaskLate } from '@/lib/services/staff-tasks/task-dates';
 import { cn } from '@/lib/utils';
 
 export const TASKS_PAGE_PATH = '/dashboard/tasks';
@@ -16,7 +16,7 @@ export function TasksNavBadge() {
   const { needsMe } = useSentNotes();
   const count = open.length + needsMe.length;
   if (count === 0) return null;
-  const late = open.some((t) => t.status === 'open' && isLate(t.dueAt));
+  const late = open.some((t) => isTaskLate(t));
   return (
     <span className={cn(
       'ml-auto rounded-full px-2 py-0.5 text-xs font-semibold',

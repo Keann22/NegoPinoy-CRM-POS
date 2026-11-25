@@ -45,7 +45,12 @@ export function OrderTasksList({ orderId, openNotesOnly = false }: { orderId: st
           busy={staff.busyId === t.id}
           {...(mineIds.has(t.id) ? staff.handlers
             : sentIds.has(t.id) ? { onReply: sender.handlers.onRead, onCancel: sender.handlers.onCancel }
-              : isManagement ? { onReply: owner.handlers.onReply } : {})}
+              : isManagement ? {
+                onReply: owner.handlers.onReply,
+                onDone: owner.handlers.onDone,
+                onHold: owner.handlers.onHold,
+                onReschedule: owner.handlers.onReschedule,
+              } : {})}
         />
       ))}
       {staff.dialogs}

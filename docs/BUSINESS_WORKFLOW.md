@@ -672,6 +672,26 @@ How it works (built 2026-11-20):
 - **Dashboard summary (owners):** "Tasks for staff" on the owners' Dashboard:
   open, not seen yet, working on it, problem, late, new replies, done today; a
   "Waiting on you" list (problems and replies); and a per-staff table.
+  The Tasks tab (`/dashboard/tasks`) shares the same 7 clickable status tiles.
+- **Order-linked actions, reply close, and working-today updates (owner, 2026-11-25):**
+  - Open tasks about an order have direct **Don't ship yet / Change hold** and
+    **Ship by bus** actions right on the task card and reply dialog (and on the
+    Order page). Both dialogs show checked-by-default open regular tasks on
+    that order so saving a hold, releasing a hold (**Ready: ship it**), or
+    marking for bus updates the order and closes those tasks together with the
+    real outcome saved as the Done note.
+  - Clicking **Done** on an open order task that still has no active hold or
+    bus plan warns staff and requires a note explaining what happened (with
+    one-tap **Don't ship yet** / **Ship by bus** shortcuts). This applies to
+    every order task, warehouse ones like "Please pick and book" included
+    (owner confirmed 2026-11-25).
+  - Staff and owners can click **Send & mark Done** in Replies; owners can also
+    click **Done** directly on tasks/replies and **Move deadline** on open
+    tasks.
+  - Logging a **Working on it** update on a past-due task requires a note and
+    pauses the late pop-up and red Late count for **that Philippine day only**
+    (`Past due · updated today`); if still open tomorrow without a fresh
+    update, it alerts as Late again.
 
 ## Put back the pieces of a cancelled order (owner, 2026-11-23; built 2026-11-23)
 

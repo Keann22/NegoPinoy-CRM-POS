@@ -25,12 +25,16 @@ const unique = (xs: string[]) => Array.from(new Set(xs.filter(Boolean)));
 function BusShippingPage() {
   const params = useSearchParams();
   const urlOrderId = params.get('order');
+  const markOrderId = params.get('mark');
+  const markTaskId = params.get('task');
   const { trips, loading: tripsLoading, reload: reloadTrips } = useBusTrips();
   const queue = useBusQueue();
-  const [tab, setTab] = useState(params.get('tab') === 'rates' ? 'rates' : urlOrderId ? 'record' : 'waiting');
+  const [tab, setTab] = useState(params.get('tab') === 'rates' ? 'rates' : !markOrderId && urlOrderId ? 'record' : 'waiting');
 
   // Mark for bus (sales).
-  const [mark, setMark] = useState<{ key: number; orderId?: string; seed?: BusCandidateOrder[] } | null>(null);
+  const [mark, setMark] = useState<{ key: number; orderId?: string; taskId?: string; seed?: BusCandidateOrder[] } | null>(() => (
+    markOrderId ? { key: 1, orderId: markOrderId, taskId: markTaskId || undefined } : null
+  ));
   // Record fee (terminal).
   const [recordSeed, setRecordSeed] = useState<BusCandidateOrder[] | undefined>(undefined);
   const [recordOrderId, setRecordOrderId] = useState<string | null>(urlOrderId);
@@ -86,6 +90,7 @@ function BusShippingPage() {
               <BusMarkForm
                 key={mark.key}
                 initialOrderId={mark.orderId}
+                taskId={mark.taskId}
                 seedOrders={mark.seed}
                 companies={companies}
                 destinations={destinations}

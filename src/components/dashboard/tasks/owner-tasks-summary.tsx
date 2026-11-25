@@ -8,8 +8,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { actOnTask, TASKS_CHANGED_EVENT, useAllTasks } from '@/hooks/useStaffTasks';
 import { useTaskActions } from '@/hooks/useTaskActions';
-import { isLate, phtDateString } from '@/lib/services/staff-tasks/task-dates';
+import { isTaskLate, phtDateString } from '@/lib/services/staff-tasks/task-dates';
 import { cn } from '@/lib/utils';
+import { countStats, inStat, STAT_LABEL, TaskStatGrid, type StatKey } from './task-stat-cards';
 import { TaskItem } from './task-item';
 import { UnseenNotesAlert } from './unseen-notes-list';
 import { TASKS_PAGE_PATH } from './tasks-nav-badge';
@@ -18,64 +19,6 @@ import type { StaffTask } from '@/types/staff-tasks.types';
 interface PersonRow { name: string; open: number; late: number; problem: number; doneToday: number }
 
 const PICKED_LIST_ID = 'owner-tasks-picked';
-
-type StatKey = 'open' | 'notSeen' | 'working' | 'problem' | 'late' | 'replies' | 'doneToday';
-
-const STAT_LABEL: Record<StatKey, string> = {
-  open: 'Open',
-  notSeen: 'Not seen yet',
-  working: 'Working on it',
-  problem: 'Problem',
-  late: 'Late',
-  replies: 'New replies',
-  doneToday: 'Done today',
-};
-
-/** Which tasks each number counts. The numbers and the lists both use this, so they always agree. */
-function inStat(key: StatKey, t: StaffTask, today: string): boolean {
-  const open = t.status === 'open';
-  switch (key) {
-    case 'open': return open;
-    case 'notSeen': return open && !t.seenAt;
-    case 'working': return open && t.progress === 'working';
-    case 'problem': return open && t.progress === 'problem';
-    case 'late': return open && isLate(t.dueAt);
-    case 'replies': return t.ownerUnread;
-    case 'doneToday': return t.status === 'done' && !!t.doneAt && phtDateString(new Date(t.doneAt)) === today;
-  }
-}
-
-function Stat({ label, value, tone, active, onClick }: {
-  label: string;
-  value: number;
-  tone?: 'red' | 'orange' | 'blue' | 'green';
-  active: boolean;
-  onClick: () => void;
-}) {
-  const color = value === 0 ? 'text-muted-foreground' : {
-    red: 'text-red-700 dark:text-red-400',
-    orange: 'text-orange-700 dark:text-orange-400',
-    blue: 'text-blue-700 dark:text-blue-400',
-    green: 'text-emerald-700 dark:text-emerald-400',
-  }[tone || 'blue'] || '';
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={value === 0}
-      aria-pressed={active}
-      title={value === 0 ? undefined : 'Show these tasks'}
-      className={cn(
-        'rounded-lg border p-3 text-left transition-colors',
-        value > 0 ? 'cursor-pointer hover:bg-muted' : 'cursor-default',
-        active && 'border-primary bg-muted ring-2 ring-primary'
-      )}
-    >
-      <div className={cn('text-2xl font-bold tabular-nums', tone ? color : '')}>{value}</div>
-      <div className="text-xs text-muted-foreground">{label}</div>
-    </button>
-  );
-}
 
 /** A number in the per-staff table: tap to list that person's tasks. */
 function PersonCount({ value, className, onClick }: { value: number; className?: string; onClick: () => void }) {
@@ -119,22 +62,13 @@ export function OwnerTasksSummary() {
     open.forEach((t) => {
       const r = row(t.assigneeName);
       r.open += 1;
-      if (isLate(t.dueAt)) r.late += 1;
+      if (isTaskLate(t, today)) r.late += 1;
       if (t.progress === 'problem') r.problem += 1;
       byPerson.set(t.assigneeName, r);
     });
     doneToday.forEach((t) => { const r = row(t.assigneeName); r.doneToday += 1; byPerson.set(t.assigneeName, r); });
-    const count = (key: StatKey) => tasks.filter((t) => inStat(key, t, today)).length;
     return {
-      counts: {
-        open: open.length,
-        notSeen: count('notSeen'),
-        working: count('working'),
-        problem: count('problem'),
-        late: count('late'),
-        replies: count('replies'),
-        doneToday: doneToday.length,
-      } as Record<StatKey, number>,
+      counts: countStats(tasks, today),
       needsYou,
       people: Array.from(byPerson.values()).sort((a, b) => b.late - a.late || b.open - a.open),
     };
@@ -182,13 +116,6 @@ export function OwnerTasksSummary() {
 
   if (tasks.length === 0) return null;
 
-  const statProps = (key: StatKey) => ({
-    label: STAT_LABEL[key],
-    value: s.counts[key],
-    active: picked?.key === key && !picked.person,
-    onClick: () => pick(key),
-  });
-
   return (
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0 pb-3">
@@ -202,15 +129,11 @@ export function OwnerTasksSummary() {
       </CardHeader>
       <CardContent className="space-y-4">
         <UnseenNotesAlert />
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-7">
-          <Stat {...statProps('open')} />
-          <Stat {...statProps('notSeen')} tone="orange" />
-          <Stat {...statProps('working')} tone="blue" />
-          <Stat {...statProps('problem')} tone="orange" />
-          <Stat {...statProps('late')} tone="red" />
-          <Stat {...statProps('replies')} tone="blue" />
-          <Stat {...statProps('doneToday')} tone="green" />
-        </div>
+        <TaskStatGrid
+          counts={s.counts}
+          activeKey={picked && !picked.person ? picked.key : null}
+          onPick={(key) => pick(key)}
+        />
 
         {picked && (
           <div id={PICKED_LIST_ID} className="space-y-2 rounded-lg border bg-muted/30 p-3">
@@ -232,6 +155,9 @@ export function OwnerTasksSummary() {
                   busy={busyId === t.id}
                   onCancel={cancel}
                   onReply={thread.handlers.onReply}
+                  onDone={thread.handlers.onDone}
+                  onHold={thread.handlers.onHold}
+                  onReschedule={thread.handlers.onReschedule}
                   groupProgress={t.groupId ? groups.get(t.groupId) : null}
                 />
               ))}

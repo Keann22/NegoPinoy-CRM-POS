@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { PauseCircle, Users } from 'lucide-react';
+import { phtToday, shortPhtDate } from '@/lib/shipping/ship-hold-rules';
 import { cn } from '@/lib/utils';
 import type { ShipHold, SiblingOrder } from '@/lib/services/order-ship-context-service';
 
@@ -63,6 +64,12 @@ export function ShipContextBlock({ hold, others, self, onNavigate, className }: 
             &ldquo;{hold.reason}&rdquo;
             {(hold.byName || hold.at) && (
               <span className="opacity-80"> ({[hold.byName, hold.at && shortDate(hold.at)].filter(Boolean).join(', ')})</span>
+            )}
+            {hold.detail?.checkOn && (
+              <span className="opacity-90">
+                {' '}· ask again {shortPhtDate(hold.detail.checkOn)}
+                {hold.detail.checkOn <= phtToday() && <span className="font-semibold text-red-700 dark:text-red-300"> (due now)</span>}
+              </span>
             )}
           </span>
         </div>

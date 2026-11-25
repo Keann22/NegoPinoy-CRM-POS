@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { reloadMyTasks, TASKS_CHANGED_EVENT } from './useStaffTasks';
 import type { NewShipHold, ShipHoldAnswer, ShipHoldFormData, ShipHoldPrompt } from '@/types/ship-holds.types';
 
 const API = '/api/shipping/holds';
@@ -12,6 +13,8 @@ async function post<T>(body: Record<string, unknown>): Promise<T> {
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json.error || 'Could not save');
   window.dispatchEvent(new Event(SHIP_HOLDS_CHANGED_EVENT));
+  void reloadMyTasks();
+  window.dispatchEvent(new Event(TASKS_CHANGED_EVENT));
   return json as T;
 }
 
@@ -25,8 +28,10 @@ export async function fetchShipHoldPrompts(): Promise<ShipHoldPrompt[]> {
   }
 }
 
-export const saveShipHold = (input: NewShipHold) => post<{ ok: true }>({ action: 'hold', ...input });
-export const releaseShipHold = (holdId: string) => post<{ ok: true; orderIds: string[] }>({ action: 'release', holdId });
+export const saveShipHold = (input: NewShipHold) =>
+  post<{ ok: true; closedTaskIds?: string[] }>({ action: 'hold', ...input });
+export const releaseShipHold = (holdId: string, closeTaskIds?: string[]) =>
+  post<{ ok: true; orderIds: string[]; closedTaskIds?: string[] }>({ action: 'release', holdId, closeTaskIds });
 export const answerShipHold = (holdId: string, answer: ShipHoldAnswer, checkOn?: string) =>
   post<{ ok: true }>({ action: 'answer', holdId, answer, checkOn });
 

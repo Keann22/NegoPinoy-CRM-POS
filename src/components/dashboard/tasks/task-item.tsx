@@ -1,11 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { AlertTriangle, CheckCircle2, Clock, Eye, EyeOff, Hammer, MessageCircle, NotebookPen, Package, Users, XCircle } from 'lucide-react';
+import {
+  AlertTriangle, Bus, CalendarClock, CheckCircle2, Clock, Eye, EyeOff, Hammer, MessageCircle, NotebookPen,
+  Package, PauseCircle, Users, XCircle,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { dueLabel, phtWhen } from '@/lib/services/staff-tasks/task-dates';
+import { dueLabel, isWorkingToday, phtWhen } from '@/lib/services/staff-tasks/task-dates';
+import { OPEN_ORDER_STATUSES } from '@/lib/shipping/ship-hold-rules';
 import type { StaffTask, StaffTaskProgress } from '@/types/staff-tasks.types';
 import { ShipContextBlock } from '@/components/dashboard/orders/ship-context-block';
 
@@ -19,6 +23,8 @@ interface Props {
   onDone?: (t: StaffTask) => void;
   onCancel?: (t: StaffTask) => void;
   onReply?: (t: StaffTask) => void;
+  onHold?: (t: StaffTask) => void;
+  onReschedule?: (t: StaffTask) => void;
   onOpenOrder?: () => void;
   /** Same task given to several people: "2 of 3 done". */
   groupProgress?: { done: number; total: number } | null;
@@ -45,18 +51,21 @@ function Progress({ task }: { task: StaffTask }) {
 }
 
 /** One task: what to do, the order it's about, the deadline, where it stands, and its buttons. */
-export function TaskItem({ task, view, busy, onSeen, onProgress, onDone, onCancel, onReply, onOpenOrder, groupProgress }: Props) {
+export function TaskItem({ task, view, busy, onSeen, onProgress, onDone, onCancel, onReply, onHold, onReschedule, onOpenOrder, groupProgress }: Props) {
   const due = task.dueAt && task.status === 'open' ? dueLabel(task.dueAt) : null;
   const open = task.status === 'open';
   const problem = open && task.progress === 'problem';
+  const workingToday = isWorkingToday(task);
+  const showRedLate = !!due?.late && !workingToday;
   const newReply = view === 'staff' ? task.staffUnread : task.ownerUnread;
   const canReply = !!onReply && task.status !== 'cancelled';
   const note = task.isNote;
+  const closedOrder = open && !note && !task.auto && !!task.orderId && !!task.orderStatus && !OPEN_ORDER_STATUSES.includes(task.orderStatus);
   return (
     <div className={cn(
       'space-y-2 rounded-lg border p-3',
       note && open && 'border-amber-300 bg-amber-50/60 dark:border-amber-900 dark:bg-amber-950/30',
-      due?.late && 'border-red-300 bg-red-50/60 dark:border-red-900 dark:bg-red-950/30',
+      showRedLate && 'border-red-300 bg-red-50/60 dark:border-red-900 dark:bg-red-950/30',
       problem && 'border-orange-300 bg-orange-50/60 dark:border-orange-900 dark:bg-orange-950/30',
       !open && 'opacity-75'
     )}>
@@ -70,8 +79,19 @@ export function TaskItem({ task, view, busy, onSeen, onProgress, onDone, onCance
       <div className="flex flex-wrap items-start justify-between gap-2">
         <p className="whitespace-pre-wrap font-medium">{task.message}</p>
         {due && (
-          <Badge variant="outline" className={cn('shrink-0', due.late ? 'border-red-400 text-red-700 dark:text-red-300' : 'text-muted-foreground')}>
-            <Clock className="mr-1 h-3 w-3" />{due.text}
+          <Badge
+            variant="outline"
+            className={cn(
+              'shrink-0',
+              due.late && workingToday
+                ? 'border-sky-300 text-sky-800 dark:border-sky-800 dark:text-sky-300'
+                : due.late
+                  ? 'border-red-400 text-red-700 dark:text-red-300'
+                  : 'text-muted-foreground',
+            )}
+          >
+            <Clock className="mr-1 h-3 w-3" />
+            {due.late && workingToday ? 'Past due · updated today' : due.text}
           </Badge>
         )}
       </div>
@@ -87,6 +107,11 @@ export function TaskItem({ task, view, busy, onSeen, onProgress, onDone, onCance
           {task.orderCustomer && <span>· {task.orderCustomer}</span>}
           {task.orderStatus && <span className="text-muted-foreground">· {task.orderStatus}</span>}
         </Link>
+      )}
+      {closedOrder && (
+        <p className="rounded-md bg-emerald-50 px-2.5 py-1.5 text-xs text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
+          Order {task.orderShortId} is now {task.orderStatus} — tap Done if nothing else is needed.
+        </p>
       )}
       {open && task.orderContext && (
         <ShipContextBlock
@@ -129,12 +154,12 @@ export function TaskItem({ task, view, busy, onSeen, onProgress, onDone, onCance
         </div>
       )}
 
-      {((open && (onSeen || onProgress || onDone || onCancel)) || canReply) && (
+      {((open && (onSeen || onProgress || onDone || onCancel || onHold || onReschedule)) || canReply) && (
         <div className="flex flex-wrap gap-2 pt-1">
           {canReply && (
             <Button size="sm" variant={newReply ? 'default' : 'outline'} disabled={busy} onClick={() => onReply?.(task)}>
               <MessageCircle className="mr-1.5 h-4 w-4" />
-              {newReply ? 'Read reply' : view === 'staff' ? (note ? 'Answer' : 'Ask') : 'Reply'}
+              {newReply ? 'Read reply' : view === 'staff' ? (note ? 'Answer' : task.messageCount > 0 ? 'Reply' : 'Ask') : 'Reply'}
               {task.messageCount > 0 && <span className="ml-1 opacity-70">({task.messageCount})</span>}
             </Button>
           )}
@@ -143,14 +168,35 @@ export function TaskItem({ task, view, busy, onSeen, onProgress, onDone, onCance
               <Eye className="mr-1.5 h-4 w-4" />Got it
             </Button>
           )}
-          {open && onProgress && !note && task.progress !== 'working' && (
+          {open && onProgress && !note && (task.progress !== 'working' || !workingToday) && (
             <Button size="sm" variant="outline" disabled={busy} className="border-sky-300 text-sky-800 dark:text-sky-300" onClick={() => onProgress(task, 'working')}>
-              <Hammer className="mr-1.5 h-4 w-4" />Working on it
+              <Hammer className="mr-1.5 h-4 w-4" />{task.progress === 'working' ? 'Update' : 'Working on it'}
             </Button>
           )}
           {open && onProgress && !note && task.progress !== 'problem' && (
             <Button size="sm" variant="outline" disabled={busy} className="border-orange-300 text-orange-800 dark:text-orange-300" onClick={() => onProgress(task, 'problem')}>
               <AlertTriangle className="mr-1.5 h-4 w-4" />Problem
+            </Button>
+          )}
+          {open && !note && !task.auto && task.orderId && task.orderContext && (
+            <>
+              {onHold && (
+                <Button size="sm" variant="outline" disabled={busy} className="border-amber-300 text-amber-800 dark:border-amber-800 dark:text-amber-300" onClick={() => onHold(task)}>
+                  <PauseCircle className="mr-1.5 h-4 w-4" />{task.orderContext.hold ? 'Change hold' : "Don't ship yet"}
+                </Button>
+              )}
+              {!task.orderContext.hold?.bus && (
+                <Button size="sm" variant="outline" disabled={busy} asChild>
+                  <Link href={`/dashboard/bus-shipping?mark=${encodeURIComponent(task.orderId)}&task=${encodeURIComponent(task.id)}`} onClick={onOpenOrder}>
+                    <Bus className="mr-1.5 h-4 w-4" />Ship by bus
+                  </Link>
+                </Button>
+              )}
+            </>
+          )}
+          {open && onReschedule && !note && (
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => onReschedule(task)}>
+              <CalendarClock className="mr-1.5 h-4 w-4" />Move deadline
             </Button>
           )}
           {open && onDone && (!note || task.needsAnswer) && (

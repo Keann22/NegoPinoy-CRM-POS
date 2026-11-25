@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Bus, PauseCircle, Truck } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Bus, CheckCircle2, PauseCircle, Truck } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { saveShipHold, useShipHoldForm } from '@/hooks/useShipHolds';
+import { releaseShipHold, saveShipHold, useShipHoldForm } from '@/hooks/useShipHolds';
 import {
   DEFAULT_CHECK_DAYS, NOT_PICKED_STATUSES, PICK_LEAD_DAYS, addDaysPht, paidEnough, pickStartsOn, shortPhtDate,
 } from '@/lib/shipping/ship-hold-rules';
@@ -34,6 +34,8 @@ interface Props {
   onSaved?: () => void;
   /** Reason picked when the order has no hold yet (the "Don't pick yet" answer opens it on "Ship on a date"). */
   defaultKind?: ShipHoldKind;
+  /** Task this dialog was opened from, so it can be marked Done together with saving the hold. */
+  task?: { id: string; message: string; assigneeName?: string } | null;
 }
 
 /**
@@ -41,7 +43,7 @@ interface Props {
  * is asked again, and which of the customer's orders ship with it. Replaces the
  * free-text Delay box on Packed Orders.
  */
-export function ShipHoldDialog({ orderId, open, onOpenChange, onSaved, defaultKind }: Props) {
+export function ShipHoldDialog({ orderId, open, onOpenChange, onSaved, defaultKind, task }: Props) {
   const { form, error, loading } = useShipHoldForm(open ? orderId : null);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -54,13 +56,19 @@ export function ShipHoldDialog({ orderId, open, onOpenChange, onSaved, defaultKi
         </DialogHeader>
         {loading && <p className="text-sm text-muted-foreground">Loading the order…</p>}
         {error && <p className="text-sm text-destructive">{error}</p>}
-        {form && <HoldForm key={form.orderId} form={form} defaultKind={defaultKind} onCancel={() => onOpenChange(false)} onSaved={() => { onSaved?.(); onOpenChange(false); }} />}
+        {form && <HoldForm key={`${form.orderId}:${task?.id || ''}`} form={form} defaultKind={defaultKind} task={task} onCancel={() => onOpenChange(false)} onSaved={() => { onSaved?.(); onOpenChange(false); }} />}
       </DialogContent>
     </Dialog>
   );
 }
 
-function HoldForm({ form, defaultKind, onCancel, onSaved }: { form: ShipHoldFormData; defaultKind?: ShipHoldKind; onCancel: () => void; onSaved: () => void }) {
+function HoldForm({ form, defaultKind, task, onCancel, onSaved }: {
+  form: ShipHoldFormData;
+  defaultKind?: ShipHoldKind;
+  task?: { id: string; message: string; assigneeName?: string } | null;
+  onCancel: () => void;
+  onSaved: () => void;
+}) {
   const { toast } = useToast();
   const h = form.hold;
   const busHint = /bus/i.test(form.holdText || '');
@@ -74,6 +82,15 @@ function HoldForm({ form, defaultKind, onCancel, onSaved }: { form: ShipHoldForm
   const [withIds, setWithIds] = useState<string[]>(
     h?.groupId ? h.orders.map((o) => o.id).filter((id) => id !== form.orderId) : form.others.map((o) => o.id),
   );
+  const linkableTasks = useMemo(() => {
+    const map = new Map<string, { id: string; message: string; assigneeName?: string }>();
+    if (task) map.set(task.id, task);
+    (form.openTasks || []).forEach((t) => {
+      if (!map.has(t.id)) map.set(t.id, t);
+    });
+    return Array.from(map.values());
+  }, [task, form.openTasks]);
+  const [closeTaskIds, setCloseTaskIds] = useState<string[]>(() => linkableTasks.map((t) => t.id));
   const [saving, setSaving] = useState(false);
 
   const pickKind = (k: ShipHoldKind) => {
@@ -94,11 +111,42 @@ function HoldForm({ form, defaultKind, onCancel, onSaved }: { form: ShipHoldForm
     if (!canSave || !kind) return;
     setSaving(true);
     try {
-      await saveShipHold({ orderId: form.orderId, kind, note, checkOn, shipVia, withOrderIds: kind === 'with_orders' ? withIds : [] });
-      toast({ title: 'On hold', description: shipLater ? `Not picked until ${shortPhtDate(pickStartsOn(checkOn))}, ships ${shortPhtDate(checkOn)}.` : `We'll ask again on ${shortPhtDate(checkOn)}${kind === 'with_orders' ? ', or as soon as every order is packed and paid' : kind === 'payment' ? ', or as soon as it is paid' : ''}.` });
+      const res = await saveShipHold({
+        orderId: form.orderId,
+        kind,
+        note,
+        checkOn,
+        shipVia,
+        withOrderIds: kind === 'with_orders' ? withIds : [],
+        closeTaskIds,
+      });
+      const closedCount = res.closedTaskIds?.length || 0;
+      const taskNote = closedCount > 0 ? ` ${closedCount === 1 ? 'Task' : `${closedCount} tasks`} marked Done.` : '';
+      toast({
+        title: 'On hold',
+        description: (shipLater
+          ? `Not picked until ${shortPhtDate(pickStartsOn(checkOn))}, ships ${shortPhtDate(checkOn)}.`
+          : `We'll ask again on ${shortPhtDate(checkOn)}${kind === 'with_orders' ? ', or as soon as every order is packed and paid' : kind === 'payment' ? ', or as soon as it is paid' : ''}.`) + taskNote,
+      });
       onSaved();
     } catch (e) {
       toast({ variant: 'destructive', title: 'Not saved', description: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const release = async () => {
+    if (!h) return;
+    setSaving(true);
+    try {
+      const res = await releaseShipHold(h.id, closeTaskIds);
+      const closedCount = res.closedTaskIds?.length || 0;
+      const taskNote = closedCount > 0 ? ` ${closedCount === 1 ? 'Task' : `${closedCount} tasks`} marked Done.` : '';
+      toast({ title: 'Hold released', description: `Order is back to Ready to ship.${taskNote}` });
+      onSaved();
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Not released', description: e instanceof Error ? e.message : String(e) });
     } finally {
       setSaving(false);
     }
@@ -171,7 +219,7 @@ function HoldForm({ form, defaultKind, onCancel, onSaved }: { form: ShipHoldForm
           {checkOn && checkOn < tomorrow && <p className="text-xs font-medium text-amber-800 dark:text-amber-300">Pick a date after today.</p>}
           {notPicked && kind === 'date' && (
             <p className="rounded-md bg-sky-50 px-2 py-1.5 text-xs text-sky-900 dark:bg-sky-950/40 dark:text-sky-200">
-              It isn't picked yet, so it won't be picked for now.{' '}
+              It isn&apos;t picked yet, so it won&apos;t be picked for now.{' '}
               {shipLater
                 ? `Back on the pick list on ${shortPhtDate(pickStartsOn(checkOn))} (${PICK_LEAD_DAYS} days before).`
                 : `Back on the pick list ${PICK_LEAD_DAYS} days before the date.`}{' '}
@@ -182,10 +230,50 @@ function HoldForm({ form, defaultKind, onCancel, onSaved }: { form: ShipHoldForm
             The sales agent gets a pop-up that day (&ldquo;Ready to ship?&rdquo;). Owners see it if there&apos;s no answer after 3 days.
           </p>
         </div>
+
+        {linkableTasks.length > 0 && (
+          <div className="space-y-2 rounded-md border border-emerald-300 bg-emerald-50/60 p-3 dark:border-emerald-900 dark:bg-emerald-950/30">
+            <div className="flex items-center gap-1.5 text-sm font-medium text-emerald-900 dark:text-emerald-200">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+              Also mark {linkableTasks.length === 1 ? 'open task' : 'open tasks'} Done when saved
+            </div>
+            <ul className="space-y-1.5">
+              {linkableTasks.map((t) => (
+                <li key={t.id}>
+                  <label className="flex cursor-pointer items-start gap-2 text-xs">
+                    <Checkbox
+                      checked={closeTaskIds.includes(t.id)}
+                      onCheckedChange={(v) => setCloseTaskIds((ids) => (v ? [...ids, t.id] : ids.filter((x) => x !== t.id)))}
+                      className="mt-0.5"
+                    />
+                    <span className="min-w-0">
+                      <span className="line-clamp-2 text-foreground">{t.message}</span>
+                      {t.assigneeName && <span className="text-muted-foreground">For {t.assigneeName}</span>}
+                    </span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+            <p className="text-[11px] text-muted-foreground">
+              The hold reason and check-again date are saved as the Done note.
+            </p>
+          </div>
+        )}
       </div>
 
-      <DialogFooter>
-        <Button variant="outline" onClick={onCancel}>Cancel</Button>
+      <DialogFooter className="gap-2 sm:gap-0">
+        {h && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={release}
+            disabled={saving}
+            className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-800 dark:text-emerald-300"
+          >
+            Ready: ship it
+          </Button>
+        )}
+        <Button variant="outline" onClick={onCancel} disabled={saving}>Cancel</Button>
         <Button onClick={save} disabled={!canSave || saving}>{saving ? 'Saving…' : h ? 'Save changes' : 'Hold it'}</Button>
       </DialogFooter>
     </>

@@ -1,7 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   ASK_AGAIN_HOURS, OPEN_ORDER_STATUSES, OWNER_AFTER_DAYS, addDaysPht, holdComplete, orderReadiness, phtToday, shortOrderId,
+  shortPhtDate,
 } from '@/lib/shipping/ship-hold-rules';
+import { listOpenRegularTasksForOrder, type TaskCaller } from '@/lib/services/staff-tasks/staff-task-service';
 import {
   SHIP_HOLD_KINDS, type NewShipHold, type ShipHoldAnswer, type ShipHoldDetail, type ShipHoldFormData,
   type ShipHoldKind, type ShipHoldPrompt, type ShipVia,
@@ -103,16 +105,17 @@ export async function getHoldDetails(supabase: SupabaseClient, orderIds: string[
   return buildDetails(holds, orders);
 }
 
-export async function getHoldForm(supabase: SupabaseClient, orderId: string): Promise<ShipHoldFormData> {
+export async function getHoldForm(supabase: SupabaseClient, orderId: string, caller?: TaskCaller): Promise<ShipHoldFormData> {
   const { data: o, error } = await supabase.from('orders').select(ORDER_COLS).eq('id', orderId).single();
   if (error || !o) throw new ShipHoldError('Order not found.');
   const order = o as unknown as OrderRow;
-  const [details, siblings] = await Promise.all([
+  const [details, siblings, openTasks] = await Promise.all([
     getHoldDetails(supabase, [orderId]),
     order.customer_id
       ? supabase.from('orders').select('id, status, balance_due, payment_method, order_date')
         .eq('customer_id', order.customer_id).in('status', OPEN_ORDER_STATUSES).neq('id', orderId).order('order_date')
       : Promise.resolve({ data: [] as { id: string; status: string; balance_due: number | null; payment_method: string | null }[] }),
+    caller ? listOpenRegularTasksForOrder(supabase, orderId, caller) : Promise.resolve([]),
   ]);
   return {
     orderId,
@@ -123,6 +126,7 @@ export async function getHoldForm(supabase: SupabaseClient, orderId: string): Pr
     hold: details.get(orderId) || null,
     others: ((siblings.data || []) as { id: string; status: string; balance_due: number | null; payment_method: string | null }[])
       .map((s) => ({ id: s.id, shortId: shortOrderId(s.id), status: s.status, balanceDue: Number(s.balance_due || 0), paymentMethod: s.payment_method })),
+    openTasks,
   };
 }
 
@@ -132,7 +136,7 @@ async function logOrders(supabase: SupabaseClient, orderIds: string[], status: s
 }
 
 /** Hold (or change the hold on) an order and, when shipping together, the customer's chosen orders. */
-export async function setShipHold(supabase: SupabaseClient, input: NewShipHold, actorName: string): Promise<void> {
+export async function setShipHold(supabase: SupabaseClient, input: NewShipHold, actorName: string): Promise<string> {
   if (!SHIP_HOLD_KINDS[input.kind]) throw new ShipHoldError('Pick a reason.');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.checkOn)) throw new ShipHoldError('Pick when to ask again.');
   if (input.checkOn < phtToday()) throw new ShipHoldError('The check-again date is in the past.');
@@ -171,12 +175,14 @@ export async function setShipHold(supabase: SupabaseClient, input: NewShipHold, 
     const { error: e3 } = await supabase.from('orders').update({ not_for_shipping_reason: text }).eq('id', id);
     if (e3) throw e3;
   }
+  const summary = `${holdText(input.kind, input.note, withIds.map(shortOrderId), input.shipVia)} (ask again ${shortPhtDate(input.checkOn)})`;
   await logOrders(supabase, ids, 'Marked Not Ready to Ship', actorName, {
     reason: holdText(input.kind, input.note, withIds.map(shortOrderId), input.shipVia),
     kind: input.kind, checkOn: input.checkOn, shipVia: input.shipVia, groupId,
   });
   // Answers the warehouse's "Hindi pa ipi-pick" question, if there was one.
   await resolvePickSkips(supabase, ids, 'held', actorName);
+  return summary;
 }
 
 /** The hold's whole group (or just the hold). */

@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import {
-  cancelTask, createTask, getOrderContext, listAllTasks, listMyTasks, listOrderTasks, listPeople, markDone, markSeen, setProgress,
-  TaskError,
+  cancelTask, createTask, getOrderContext, listAllTasks, listMyTasks, listOrderTasks, listPeople, markDone, markSeen,
+  rescheduleTask, setProgress, TaskError,
 } from '@/lib/services/staff-tasks/staff-task-service';
 import { getTaskCaller } from '@/lib/services/staff-tasks/task-caller';
 import { ackNote, createNote, listNoteTargets, listSentNotes, listUnseenNotes } from '@/lib/services/staff-tasks/staff-note-service';
@@ -83,7 +83,7 @@ export async function POST(req: Request) {
   }
 }
 
-// { id, action: 'seen' | 'working' | 'problem' | 'done' | 'cancel' | 'ack', note?, photoUrl? }
+// { id, action: 'seen' | 'working' | 'problem' | 'done' | 'cancel' | 'ack' | 'reschedule', note?, photoUrl?, dueAt? }
 export async function PATCH(req: Request) {
   try {
     const caller = await getCaller();
@@ -95,6 +95,7 @@ export async function PATCH(req: Request) {
     else if (body.action === 'done') await markDone(supabase, id, caller, { note: body.note, photoUrl: body.photoUrl });
     else if (body.action === 'cancel') await cancelTask(supabase, id, caller);
     else if (body.action === 'ack') await ackNote(supabase, id, caller);
+    else if (body.action === 'reschedule') await rescheduleTask(supabase, id, caller, body.dueAt ? String(body.dueAt) : null);
     else return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
     return NextResponse.json({ ok: true });
   } catch (e) {

@@ -53,6 +53,8 @@ export interface NewShipHold {
   shipVia: ShipVia;
   /** Other orders of the same customer that ship with this one (kind with_orders). */
   withOrderIds: string[];
+  /** Open regular tasks on this order to mark Done when the hold is saved. */
+  closeTaskIds?: string[];
 }
 
 /** A pop-up card for the order's sales agent (owners: after 3 days with no answer). */
@@ -84,4 +86,5 @@ export interface ShipHoldFormData {
   holdText: string | null;
   hold: ShipHoldDetail | null;
   others: { id: string; shortId: string; status: string; balanceDue: number; paymentMethod: string | null }[];
+  openTasks?: { id: string; message: string; assigneeName: string }[];
 }

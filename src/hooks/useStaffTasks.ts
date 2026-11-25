@@ -88,12 +88,18 @@ function subscribe(listener: () => void) {
 const EMPTY: StaffTask[] = [];
 
 /** Actions on a task; reloads my tasks afterwards. */
-export async function actOnTask(id: string, action: StaffTaskAction, extra: { note?: string; photoUrl?: string | null } = {}) {
+export async function actOnTask(
+  id: string,
+  action: StaffTaskAction,
+  extra: { note?: string; photoUrl?: string | null; dueAt?: string | null } = {},
+) {
   await call({ method: 'PATCH', body: JSON.stringify({ id, action, ...extra }) });
   await loadMine();
   // Owner list and order page reload on this.
   window.dispatchEvent(new Event(TASKS_CHANGED_EVENT));
 }
+
+export const reloadMyTasks = loadMine;
 
 export async function uploadTaskPhoto(file: File): Promise<string> {
   const form = new FormData();
@@ -245,11 +251,11 @@ export async function fetchTaskMessages(taskId: string): Promise<StaffTaskMessag
   return json.messages || [];
 }
 
-export async function sendTaskMessage(taskId: string, body: string, photoUrl?: string | null): Promise<void> {
+export async function sendTaskMessage(taskId: string, body: string, photoUrl?: string | null, markDone = false): Promise<void> {
   const res = await fetch(`${API}/messages`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ taskId, body, photoUrl: photoUrl || null }),
+    body: JSON.stringify({ taskId, body, photoUrl: photoUrl || null, markDone }),
   });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json.error || 'Not sent');

@@ -1,7 +1,11 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { staffRoleNames } from '@/lib/auth/staff-roles';
-import type { NewStaffTask, StaffTask, TaskPerson } from '@/types/staff-tasks.types';
+import type { NewStaffTask, StaffTask } from '@/types/staff-tasks.types';
 import { getShipContexts, OPEN_ORDER_STATUSES, type OrderShipContext } from '@/lib/services/order-ship-context-service';
+import {
+  fullName, listPeople, ownerNames, people, staffAccounts, type AuthUser, type Person,
+} from './task-people';
+
+export { fullName, listPeople, people, staffAccounts, type AuthUser, type Person };
 
 /*
  * Staff tasks (owner, 2026-11-23): instead of messaging Jas "pwede na yang
@@ -14,64 +18,9 @@ export class TaskError extends Error {}
 
 export const TASKS_PAGE = '/dashboard/tasks';
 
-/** Accounts that are one person (Jas has three). Everyone else: same full name = same person. */
-const SAME_PERSON: { label: string; emails: string[] }[] = [
-  { label: 'Jas', emails: ['jas@gmail.com', 'jas@usares.com', 'jassy@gmail.com'] },
-];
-
 export const SELECT = 'id, message, order_id, assignee_name, assigned_by_name, due_at, status, seen_at, seen_by_name, progress, progress_note, progress_at, progress_by_name, done_at, done_by_name, done_note, done_photo_url, created_at, last_message_at, last_message_from_owner, staff_read_at, owner_read_at, group_id, kind, needs_answer, team, sender_nudged_at, staff_task_messages(count), orders(status, customers(full_name))';
 
-export interface AuthUser {
-  id: string;
-  email?: string;
-  app_metadata?: unknown;
-  user_metadata?: Record<string, unknown>;
-  last_sign_in_at?: string | null;
-}
-
-export type Person = TaskPerson & { ids: string[]; lastSignIn: string };
-
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
-
-export function fullName(u: AuthUser): string {
-  const m = u.user_metadata || {};
-  return `${m.first_name || ''} ${m.last_name || ''}`.trim() || u.email || 'Staff';
-}
-
-export async function staffAccounts(supabase: SupabaseClient): Promise<AuthUser[]> {
-  const { data, error } = await supabase.auth.admin.listUsers({ perPage: 1000 });
-  if (error) throw error;
-  return (data.users as AuthUser[]).filter((u) =>
-    staffRoleNames(u).length > 0 && !String(u.email || '').toLowerCase().endsWith('.test'));
-}
-
-/** Staff to assign to, most recently active first. */
-export async function people(supabase: SupabaseClient): Promise<Person[]> {
-  const groups = new Map<string, { label: string; known: boolean; users: AuthUser[] }>();
-  for (const u of await staffAccounts(supabase)) {
-    const email = String(u.email || '').toLowerCase();
-    const known = SAME_PERSON.find((g) => g.emails.includes(email));
-    const groupKey = known ? `known:${known.label}` : `name:${fullName(u).toLowerCase()}`;
-    const g = groups.get(groupKey) || { label: known?.label || fullName(u), known: !!known, users: [] };
-    g.users.push(u);
-    groups.set(groupKey, g);
-  }
-  return Array.from(groups.values())
-    .map(({ label, known, users }) => {
-      const ids = users.map((u) => u.id).sort();
-      // Same-name accounts: show the name as written on the most recently used one.
-      const latest = [...users].sort((x, y) => String(y.last_sign_in_at || '').localeCompare(String(x.last_sign_in_at || '')))[0];
-      const name = known ? label : fullName(latest);
-      const roles = Array.from(new Set(users.flatMap((u) => staffRoleNames(u))));
-      const lastSignIn = users.map((u) => u.last_sign_in_at || '').sort().pop() || '';
-      return { key: ids.join(','), name, roles, ids, lastSignIn };
-    })
-    .sort((a, b) => b.lastSignIn.localeCompare(a.lastSignIn));
-}
-
-export async function listPeople(supabase: SupabaseClient): Promise<TaskPerson[]> {
-  return (await people(supabase)).map(({ key, name, roles }) => ({ key, name, roles }));
-}
 
 export interface TaskRow {
   id: string; message: string; order_id: string | null; assignee_name: string; assigned_by_name: string;
@@ -246,7 +195,7 @@ export async function createTask(
 export async function getRow(supabase: SupabaseClient, id: string) {
   const { data, error } = await supabase
     .from('staff_tasks')
-    .select('id, message, status, assignee_ids, assignee_name, assigned_by_name, seen_at, order_id, kind, needs_answer, sender_ids')
+    .select('id, message, status, due_at, assignee_ids, assignee_name, assigned_by_name, seen_at, order_id, kind, needs_answer, sender_ids')
     .eq('id', id)
     .maybeSingle();
   if (error) throw error;
@@ -273,13 +222,6 @@ export async function markSeen(supabase: SupabaseClient, id: string, caller: Tas
     })
     .eq('id', id);
   if (error) throw error;
-}
-
-/** Owner (Admin) names, for bells about automatic tasks nobody assigned by hand. */
-async function ownerNames(supabase: SupabaseClient): Promise<string[]> {
-  const owners = (await staffAccounts(supabase)).filter((u) =>
-    staffRoleNames(u).some((r) => r === 'Admin' || r === 'Owner'));
-  return Array.from(new Set(owners.map(fullName)));
 }
 
 type BellRow = { id: string; message: string; order_id: string | null; assigned_by_name: string; kind?: string | null };
@@ -323,6 +265,9 @@ export async function setProgress(
   if (row.status !== 'open') throw new TaskError(row.status === 'done' ? 'Already done' : 'This task was cancelled');
   const note = String(noteIn || '').trim().slice(0, 1000) || null;
   if (progress === 'problem' && !note) throw new TaskError('Write what the problem is');
+  if (progress === 'working' && row.due_at && new Date(row.due_at).getTime() < Date.now() && !note) {
+    throw new TaskError('Write a short update (e.g. waiting for customer reply)');
+  }
   const now = new Date().toISOString();
   const { error } = await supabase
     .from('staff_tasks')
@@ -362,6 +307,7 @@ export async function markDone(
       done_photo_url: extra.photoUrl || null,
       seen_at: row.seen_at || now,
       seen_by_name: row.seen_at ? undefined : caller.name,
+      ...(caller.isManagement ? { owner_read_at: now } : {}),
     })
     .eq('id', id)
     .eq('status', 'open');
@@ -377,9 +323,56 @@ export async function cancelTask(supabase: SupabaseClient, id: string, caller: T
   const isSender = row.kind === 'note' && (row.sender_ids || []).includes(caller.id);
   if (!caller.isManagement && !isSender) throw new TaskError('Only the owners can cancel a task');
   if (row.status !== 'open') throw new TaskError('Only open tasks can be cancelled');
+  const now = new Date().toISOString();
   const { error } = await supabase
     .from('staff_tasks')
-    .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
+    .update({
+      status: 'cancelled',
+      cancelled_at: now,
+      ...(caller.isManagement ? { owner_read_at: now } : {}),
+    })
     .eq('id', id);
   if (error) throw error;
+}
+
+/** Owners move or clear a task's deadline. */
+export async function rescheduleTask(
+  supabase: SupabaseClient,
+  id: string,
+  caller: TaskCaller,
+  dueAtIn: string | null,
+): Promise<void> {
+  if (!caller.isManagement) throw new TaskError('Only the owners can change the deadline');
+  const row = await getRow(supabase, id);
+  if (row.status !== 'open') throw new TaskError('Only open tasks can be rescheduled');
+  const dueAt = dueAtIn ? new Date(dueAtIn) : null;
+  if (dueAt && Number.isNaN(dueAt.getTime())) throw new TaskError('The deadline is not a valid date');
+  const { error } = await supabase
+    .from('staff_tasks')
+    .update({ due_at: dueAt ? dueAt.toISOString() : null })
+    .eq('id', id)
+    .eq('status', 'open');
+  if (error) throw error;
+}
+
+/** Open regular tasks on an order (for ShipHoldDialog's "Also mark Done" list). */
+export async function listOpenRegularTasksForOrder(
+  supabase: SupabaseClient,
+  orderId: string,
+  caller: TaskCaller,
+): Promise<{ id: string; message: string; assigneeName: string }[]> {
+  let q = supabase
+    .from('staff_tasks')
+    .select('id, message, assignee_name')
+    .eq('order_id', orderId)
+    .eq('status', 'open')
+    .is('kind', null);
+  if (!caller.isManagement) q = q.contains('assignee_ids', [caller.id]);
+  const { data, error } = await q.order('created_at', { ascending: false }).limit(20);
+  if (error) throw error;
+  return (data || []).map((r) => ({
+    id: r.id as string,
+    message: r.message as string,
+    assigneeName: r.assignee_name as string,
+  }));
 }

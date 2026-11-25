@@ -1,10 +1,11 @@
 /* Deadlines for staff tasks, in Philippine time (UTC+8, no daylight saving). Browser-safe. */
+import type { StaffTask } from '@/types/staff-tasks.types';
 
 const PHT_MS = 8 * 3600000;
 /** "Today" / "Tomorrow" / a picked date mean by the end of work, 6 PM. */
 const END_OF_WORK = '18:00:00';
 
-export type DuePick = 'none' | 'hour' | 'today' | 'tomorrow' | 'date';
+export type DuePick = 'none' | 'hour' | 'today' | 'tomorrow' | 'threeDays' | 'date';
 
 export function phtDateString(d: Date = new Date()): string {
   return new Date(d.getTime() + PHT_MS).toISOString().slice(0, 10);
@@ -28,6 +29,7 @@ export function dueFromPick(pick: DuePick, pickedDate?: string): string | null {
     return (sixPm > now ? sixPm : new Date(`${today}T23:59:00+08:00`)).toISOString();
   }
   if (pick === 'tomorrow') return new Date(`${addDays(today, 1)}T${END_OF_WORK}+08:00`).toISOString();
+  if (pick === 'threeDays') return new Date(`${addDays(today, 3)}T${END_OF_WORK}+08:00`).toISOString();
   if (!pickedDate) return null;
   return new Date(`${pickedDate}T${END_OF_WORK}+08:00`).toISOString();
 }
@@ -55,4 +57,24 @@ export function dueLabel(dueAt: string): { text: string; late: boolean } {
 
 export function isLate(dueAt: string | null): boolean {
   return !!dueAt && new Date(dueAt).getTime() < Date.now();
+}
+
+/** True when staff logged a "Working on it" update today with a note (pauses late pop-up/flag for today only). */
+export function isWorkingToday(
+  t: Pick<StaffTask, 'status' | 'progress' | 'progressNote' | 'progressAt'>,
+  today: string = phtDateString(),
+): boolean {
+  return t.status === 'open'
+    && t.progress === 'working'
+    && !!t.progressNote
+    && !!t.progressAt
+    && phtDateString(new Date(t.progressAt)) === today;
+}
+
+/** Open, past deadline, and not already updated with a "Working on it" note today. */
+export function isTaskLate(
+  t: Pick<StaffTask, 'status' | 'dueAt' | 'progress' | 'progressNote' | 'progressAt'>,
+  today: string = phtDateString(),
+): boolean {
+  return t.status === 'open' && isLate(t.dueAt) && !isWorkingToday(t, today);
 }
