@@ -27,6 +27,10 @@ Both must keep this file current. Dates and times are Philippine time (UTC+8).
 
 Format: `- **Task** (Agent, started YYYY-MM-DD). Files/area. Status.`
 
+- **Tasks: dashboard stat filters + tie order tasks to holds/bus, reply Done, and working-today/reschedule** (Antigravity, started 2026-11-25). `src/components/dashboard/tasks/*`, `src/components/dashboard/ship-holds/ship-hold-dialog.tsx`, `src/components/dashboard/bus-shipping/bus-mark-form.tsx`, `src/components/dashboard/orders/*`, `src/lib/services/staff-tasks/*`, `src/lib/services/shipping/ship-hold-service.ts`, `src/app/api/tasks/*`, `src/app/api/shipping/holds/route.ts`. Status: built & typechecked (uncommitted — ready for owner review/commit).
+
+- **Snap Receipt: carry forward parent product for variant-only lines** (Antigravity, started 2026-11-25). `src/lib/receipt-ocr.ts`, `src/lib/receipt-matching.ts`. Status: built, typechecked & unit-tested (uncommitted — ready for owner review/commit).
+
 - **Wala sa Supplier: prompts card on the Dashboard** (Antigravity, found
   uncommitted 2026-11-25). `src/components/dashboard/supplier-stock/supplier-prompts-card.tsx`
   (new), `src/hooks/useSupplierFlags.ts` (shared `useSupplierPrompts`),
@@ -49,7 +53,7 @@ Format: `- **Task** (Agent, started YYYY-MM-DD). Files/area. Status.`
 
 Other uncommitted files seen 2026-11-25: `.claude/launch.json`,
 `docs/staff-guides/connect-messenger-chat.html`, `scripts/reports/1-week-buy-list.html`,
-and new BUSINESS_WORKFLOW.md sections (Customer profile, Copilot).
+and new BUSINESS_WORKFLOW.md sections (Copilot, task actions).
 
 ## Next up
 
@@ -57,8 +61,8 @@ and new BUSINESS_WORKFLOW.md sections (Customer profile, Copilot).
    analyzer, executor with undo, learning, API, sales pop-up, owner accuracy panel).
 2. **Physical stock breakdown** (On the shelf → Picked → Packed → Total). See
    BUSINESS_WORKFLOW.md "Unallocated stock is kept and counted".
-3. **Customer profile and recommendations** from orders + Messenger chats
-   (agents see only customers worth messaging today). BUSINESS_WORKFLOW.md.
+3. **Customer profile and recommendations, phase 2** (phase 1 released 151d8d9):
+   build personas for more customers, then see what sales use. BUSINESS_WORKFLOW.md.
 
 ## Waiting on the owners
 
@@ -67,6 +71,8 @@ and new BUSINESS_WORKFLOW.md sections (Customer profile, Copilot).
 - **Orders on a main product**: #A435801 (5-layer rack filed under the 6-layer 120cm
   rack) and #DD58459 (HK Bank has no plain variant). The rest wait for sales (colors).
 - **Copilot open decisions** (plan section 6).
+- **Customer persona: delivered installment still owing** = overdue (payment
+  follow-up, no pitch)? BUSINESS_WORKFLOW.md "Customer profile".
 - **Customer website** (`website/`): not launched; owner not happy with the look;
   hosting, claims, hulugan terms still open.
 
@@ -84,6 +90,14 @@ and new BUSINESS_WORKFLOW.md sections (Customer profile, Copilot).
 ## Done recently
 
 Newest first. Older history: `git log`. Feature rules: `docs/BUSINESS_WORKFLOW.md`.
+
+- **2026-11-25** Customer persona & sales playbook, phase 1: Customer Detail, Live Chat
+  (Insert into Chat), Customers CRM filters and +5 builder. Claude tested it and fixed 4
+  bugs before release (filters only saw the newest 1,000 customers, default SPX note read
+  as a clue, catalog capped at 1,000, stale 24h badge). (Antigravity + Claude, 151d8d9)
+
+- **2026-11-25** Wala sa Supplier: multi-select other variants (`alt_product_ids`) and
+  With/No waiting orders tabs on the Out at Supplier list. (Antigravity, 5f8c7c4)
 
 - **2026-11-25** Every staff screen in English (labels, pop-ups, toasts, Telegram recount
   messages, put-back task text): glossary in BUSINESS_WORKFLOW.md "Screens in English".

@@ -515,6 +515,45 @@ receipt). One save:
 - Sales and commission reports leave out the shipping fee (it passes through to
   the bus company). Profit & Loss keeps it in sales and in expenses, so it nets out.
 
+## Customer profile and recommendations (owner, 2026-11-12; phase 1 built 2026-11-25)
+
+- Messenger chats are now readable by the system (connection fixed 2026-11-12).
+  Goal: a profile per customer of what she likes and what we can sell her,
+  from order history plus the chats (what she asked about but didn't buy,
+  what was out of stock, clues like "may baby", "para sa tindahan").
+- **Sales staff send the recommendation, not the system.** The system finds the
+  opportunity and drafts the message; the agent sends, edits or skips it.
+  (Facebook only allows promo messages within 24 hours of the customer's last
+  message, and a wrong suggestion costs trust.)
+- **Agents only see the customers worth messaging today**, not a suggestion
+  for every customer.
+- **Overdue lay-away: remind / follow up, don't recommend.** For a customer
+  behind on a lay-away, the card is a payment follow-up, not a new item.
+- **Phase 1 (built 2026-11-25):** **Customer Persona & Sales Playbook** stored
+  in `customer_profiles` (never overwrites staff's `ai_summary_notes`), shown on
+  Customer Detail, Live Chat (`CustomerInfoTab` with 1-tap **Insert into Chat**
+  into `ChatComposer` for manual review/sending), and Customers CRM (persona
+  badges, *"Worth Messaging Today"* & persona filter pills, and **"Build AI
+  Personas (+5)"** batch builder). Overdue lay-aways automatically force
+  `payment_followup` with zero product pitches, and staff can mark a persona
+  **Tama** or **Correct** (`staff_correction_note` feeds into future refreshes).
+- **Fixed in testing (2026-11-25, released 151d8d9):** the SPX rider note that
+  Verify Shipping puts on every order ("Kuya wag nyo po sabihin na galing
+  Shopee!…") is ours, so it is removed before the AI reads orders (it showed up
+  as a customer "clue"). The 24h promo window is worked out from the customer's
+  last message each time, not saved. Recommendations use the whole catalog.
+- **Open question for the owners:** should an installment that was delivered
+  but still owes count as overdue (payment follow-up, no pitch)? Today only
+  lay-aways and installments not yet shipped count. Found 2026-11-25: Marilyn
+  Valderama owes ₱530 due Sep 24 on a delivered installment and was pitched new
+  items; but some delivered orders show balances that look wrong.
+- Chat history in the system (checked 2026-11-12): ~9,300 customer messages from
+  May-Jul 2026 (customer side only, no agent replies), only ~170 a month from
+  Aug-Oct, and full two-way messages only from 2026-11-11. The regular sync
+  pulls just the 15 latest conversations.
+- Gamified customer wishlist app: owner raised it again 2026-11-12; parked behind
+  the website launch (see the planner below).
+
 ## Out of stock at the supplier (owner, 2026-11-20; built 2026-11-20)
 
 - We run **lean**: we usually buy only after a customer orders.
