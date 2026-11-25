@@ -29,8 +29,6 @@ Format: `- **Task** (Agent, started YYYY-MM-DD). Files/area. Status.`
 
 - **Tasks: dashboard stat filters + tie order tasks to holds/bus, reply Done, and working-today/reschedule** (Antigravity, started 2026-11-25). `src/components/dashboard/tasks/*`, `src/components/dashboard/ship-holds/ship-hold-dialog.tsx`, `src/components/dashboard/bus-shipping/bus-mark-form.tsx`, `src/components/dashboard/orders/*`, `src/lib/services/staff-tasks/*`, `src/lib/services/shipping/ship-hold-service.ts`, `src/app/api/tasks/*`, `src/app/api/shipping/holds/route.ts`. Status: built & typechecked (uncommitted — ready for owner review/commit).
 
-- **Snap Receipt: carry forward parent product for variant-only lines** (Antigravity, started 2026-11-25). `src/lib/receipt-ocr.ts`, `src/lib/receipt-matching.ts`. Status: built, typechecked & unit-tested (uncommitted — ready for owner review/commit).
-
 - **Wala sa Supplier: prompts card on the Dashboard** (Antigravity, found
   uncommitted 2026-11-25). `src/components/dashboard/supplier-stock/supplier-prompts-card.tsx`
   (new), `src/hooks/useSupplierFlags.ts` (shared `useSupplierPrompts`),
@@ -91,6 +89,9 @@ and new BUSINESS_WORKFLOW.md sections (Copilot, task actions).
 
 Newest first. Older history: `git log`. Feature rules: `docs/BUSINESS_WORKFLOW.md`.
 
+- **2026-11-25** Snap/Scan receipt: size-only lines ("32" under "CY-35-30") carry the
+  product code forward; bare sizes never remembered as a match; a different size is never
+  a name match (Antigravity + Claude review, 7301c30).
 - **2026-11-25** Customer persona & sales playbook, phase 1: Customer Detail, Live Chat
   (Insert into Chat), Customers CRM filters and +5 builder. Claude tested it and fixed 4
   bugs before release (filters only saw the newest 1,000 customers, default SPX note read
