@@ -89,6 +89,9 @@ and new BUSINESS_WORKFLOW.md sections (Copilot, task actions).
 
 Newest first. Older history: `git log`. Feature rules: `docs/BUSINESS_WORKFLOW.md`.
 
+- **2026-11-25** Answer to a note you sent now pops up on the Tasks page too (your own
+  tasks still don't pop up there). (Claude, f84ada9)
+
 - **2026-11-25** Priority List: held Picked/Photo orders go On hold ("pack it while
   waiting") instead of Ready to pack; old "Hold" button removed, 7 old holds converted
   (`scripts/migrations/2026-11-25_convert_priority_holds.sql`, applied), 3 paid orders
