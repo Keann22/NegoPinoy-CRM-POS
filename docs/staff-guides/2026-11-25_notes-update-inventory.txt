@@ -1,0 +1,22 @@
+📌 UPDATE FOR INVENTORY: notes on orders now reach you (Nov 25)
+
+Sales can now send a note from an order straight to Inventory. When they do, you get a pop-up right away: "A note for you".
+
+When it pops up, tap one:
+• Answer: reply to them (example: "Checked, 2 pcs on 3C"). Your answer pops up for them right away.
+• Got it: you saw it (for "Just letting you know" notes).
+• Done: it's taken care of.
+• Later: hides it for 30 minutes, then it comes back.
+
+A note to Inventory goes to all of us (Jas, Al, Tess, Edric, Rey). Whoever answers first closes it for everyone.
+
+Can't do it yet? Tap Answer and say why. Don't just close it.
+
+Open notes stay on your Dashboard (For you) and in Tasks until they're answered. They also show on the order page, and in the Picker when you scan the order.
+
+Need something from sales? Write the note on the order, then under "Who is it for?" pick the sales agent (marked "agent"), or pick a name under "Someone else", or type @name in the note. They get a pop-up.
+• "Needs a reply": it stays with them until they answer.
+• "Just letting you know": it closes when they tap Got it.
+• "Just a note": saved on the order only. Nobody gets a pop-up.
+
+Tasks from the owners also pop up right away now.

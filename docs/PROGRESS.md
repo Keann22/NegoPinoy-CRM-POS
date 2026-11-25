@@ -64,6 +64,9 @@ and new BUSINESS_WORKFLOW.md sections (Copilot, task actions).
 
 ## Waiting on the owners
 
+- **Send staff the notes update**: `docs/staff-guides/2026-11-25_notes-update-inventory.txt`
+  and `..._sales.txt` (paste into Messenger). No real tagged note sent yet as of
+  2026-11-25 4:45 PM; check use after a few days.
 - **18 historical store-credit gap orders**: fix after owners review the dry-run
   (BUSINESS_WORKFLOW.md "Store credit").
 - **Orders on a main product**: #A435801 (5-layer rack filed under the 6-layer 120cm
@@ -89,6 +92,9 @@ and new BUSINESS_WORKFLOW.md sections (Copilot, task actions).
 
 Newest first. Older history: `git log`. Feature rules: `docs/BUSINESS_WORKFLOW.md`.
 
+- **2026-11-25** Notes to a person tested end to end on the live site (owner ->
+  Keneth Sales, fake order #68BF109, test rows deleted); staff update texts for
+  inventory and sales in `docs/staff-guides/`. (Claude)
 - **2026-11-25** New tasks and notes (and replies, deadlines, withdrawals) pop up for
   the person right away: live ping on every staff_tasks change. (Claude, 126e30c)
 - **2026-11-25** Answer to a note you sent pops up right away (Realtime ping from a
