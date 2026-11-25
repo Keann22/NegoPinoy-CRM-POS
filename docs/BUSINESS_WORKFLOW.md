@@ -676,10 +676,12 @@ How it works (built 2026-11-20):
 - **Order-linked actions, reply close, and working-today updates (owner, 2026-11-25):**
   - Open tasks about an order have direct **Don't ship yet / Change hold** and
     **Ship by bus** actions right on the task card and reply dialog (and on the
-    Order page). Both dialogs show checked-by-default open regular tasks on
-    that order so saving a hold, releasing a hold (**Ready: ship it**), or
-    marking for bus updates the order and closes those tasks together with the
-    real outcome saved as the Done note.
+    Order page). Both dialogs list the open regular tasks on that order so
+    saving a hold, releasing a hold (**Ready: ship it**), or marking for bus
+    updates the order and closes the ticked tasks together with the real
+    outcome saved as the Done note. Ticked to start: the task it was opened
+    from and your own tasks; someone else's task (an owner holding from the
+    order page) is listed but unticked (owner, 2026-11-25).
   - Clicking **Done** on an open order task that still has no active hold or
     bus plan warns staff and requires a note explaining what happened (with
     one-tap **Don't ship yet** / **Ship by bus** shortcuts). This applies to

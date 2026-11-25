@@ -90,7 +90,12 @@ function HoldForm({ form, defaultKind, task, onCancel, onSaved }: {
     });
     return Array.from(map.values());
   }, [task, form.openTasks]);
-  const [closeTaskIds, setCloseTaskIds] = useState<string[]>(() => linkableTasks.map((t) => t.id));
+  // Start ticked: the task this was opened from and the caller's own tasks. Someone
+  // else's task (an owner holding from the order page) is listed but left unticked.
+  const [closeTaskIds, setCloseTaskIds] = useState<string[]>(() => [
+    ...(task ? [task.id] : []),
+    ...(form.openTasks || []).filter((t) => t.mine && t.id !== task?.id).map((t) => t.id),
+  ]);
   const [saving, setSaving] = useState(false);
 
   const pickKind = (k: ShipHoldKind) => {

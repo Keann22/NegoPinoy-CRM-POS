@@ -86,5 +86,6 @@ export interface ShipHoldFormData {
   holdText: string | null;
   hold: ShipHoldDetail | null;
   others: { id: string; shortId: string; status: string; balanceDue: number; paymentMethod: string | null }[];
-  openTasks?: { id: string; message: string; assigneeName: string }[];
+  /** `mine`: assigned to the caller (starts ticked); other people's tasks start unticked. */
+  openTasks?: { id: string; message: string; assigneeName: string; mine?: boolean }[];
 }

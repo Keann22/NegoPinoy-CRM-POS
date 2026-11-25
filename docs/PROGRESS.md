@@ -93,8 +93,8 @@ Newest first. Older history: `git log`. Feature rules: `docs/BUSINESS_WORKFLOW.m
 - **2026-11-25** Tasks close from the hold / bus dialogs (built by Antigravity,
   reviewed and tested by Claude, 98e991a): Don't ship yet / Change hold / Ship by
   bus on order tasks, Send & mark Done, Move deadline, working-today pause, 7
-  status tiles on the Tasks page. Known small gaps: an owner's hold from the
-  order page pre-ticks staff tasks on that order; Ship by bus from the order page
+  status tiles on the Tasks page. Owner holds no longer pre-tick staff tasks
+  (follow-up commit). Known small gaps: Ship by bus from the order page
   lists only your own tasks; the Done-needs-a-note rule is checked in the browser
   only. (Antigravity, Claude)
 - **2026-11-25** Notes to a person tested end to end on the live site (owner ->

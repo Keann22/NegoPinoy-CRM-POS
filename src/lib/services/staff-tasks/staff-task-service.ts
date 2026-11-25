@@ -360,10 +360,10 @@ export async function listOpenRegularTasksForOrder(
   supabase: SupabaseClient,
   orderId: string,
   caller: TaskCaller,
-): Promise<{ id: string; message: string; assigneeName: string }[]> {
+): Promise<{ id: string; message: string; assigneeName: string; mine: boolean }[]> {
   let q = supabase
     .from('staff_tasks')
-    .select('id, message, assignee_name')
+    .select('id, message, assignee_name, assignee_ids')
     .eq('order_id', orderId)
     .eq('status', 'open')
     .is('kind', null);
@@ -374,5 +374,7 @@ export async function listOpenRegularTasksForOrder(
     id: r.id as string,
     message: r.message as string,
     assigneeName: r.assignee_name as string,
+    // Owners see everyone's tasks on the order; only their own start ticked (owner, 2026-11-25).
+    mine: ((r.assignee_ids as string[] | null) || []).includes(caller.id),
   }));
 }
