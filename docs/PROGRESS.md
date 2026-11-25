@@ -93,6 +93,10 @@ and new BUSINESS_WORKFLOW.md sections (Copilot, task actions).
 
 Newest first. Older history: `git log`. Feature rules: `docs/BUSINESS_WORKFLOW.md`.
 
+- **2026-11-25** Payments Log: unverified payments from before Jul 1, 2026 (testing
+  period) hidden from Pending, its count, statement matching and owner to-do
+  (`payment-review-cutoff.ts`). 60 pending payments verified by hand against the
+  0917/0923 statements; Cash payments that were really GCash/BDO relabeled.
 - **2026-11-25** Customer persona & profile, phase 2: DB triggers (`orders`, `payments`,
   `conversation_logs`) + on-view auto-refresh + daily cron refresh + paginated
   2,705-row listing + full order backfill (2,705/2,705 order customers profiled:

@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { getTaskCaller } from '@/lib/services/staff-tasks/task-caller';
 import { fetchAllProofPayments } from '@/lib/services/payments/payment-log-queries';
 import { isOwnPhoneNumberRef } from '@/lib/services/payments/payment-ref-utils';
+import { PAYMENT_REVIEW_START_UTC } from '@/lib/services/payments/payment-review-cutoff';
 import type { PaymentLogCounts, PaymentStatus } from '@/types/payment-log.types';
 
 function serviceClient() {
@@ -16,13 +17,15 @@ async function countByStatus(
   supabase: ReturnType<typeof serviceClient>,
   status: PaymentStatus,
 ): Promise<number> {
-  const { count, error } = await supabase
+  let query = supabase
     .from('payments')
     .select('id', { count: 'exact', head: true })
     .eq('status', status)
     .not('proof_url', 'is', null)
     .neq('proof_url', '')
     .neq('payment_method', 'SPX COD Remittance');
+  if (status === 'Pending') query = query.gte('payment_date', PAYMENT_REVIEW_START_UTC);
+  const { count, error } = await query;
   if (error) throw error;
   return count || 0;
 }

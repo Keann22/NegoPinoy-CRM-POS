@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { listCustomerReturns } from '@/lib/services/customer-returns/customer-return-service';
 import { listSupplierReturns } from '@/lib/services/supplier-return-service';
 import { HELD_ACTION } from '@/lib/services/inventory/held-picker-count-service';
+import { PAYMENT_REVIEW_START_UTC } from '@/lib/services/payments/payment-review-cutoff';
 import type { FlaggedPayment, OwnerTodoItem, OwnerTodoResponse, OwnerUploadKind } from '@/types/owner-todo.types';
 
 /**
@@ -93,6 +94,7 @@ async function gcashRow(supabase: SupabaseClient, now: number): Promise<OwnerTod
       .from('payments')
       .select('amount, created_at')
       .eq('status', 'Pending')
+      .gte('payment_date', PAYMENT_REVIEW_START_UTC)
       .not('reference_number', 'is', null)
       .not('payment_method', 'in', NOT_MANUAL);
     if (since) q = q.gt('created_at', since);
@@ -103,6 +105,7 @@ async function gcashRow(supabase: SupabaseClient, now: number): Promise<OwnerTod
       .from('payments')
       .select('id', { count: 'exact', head: true })
       .eq('status', 'Pending')
+      .gte('payment_date', PAYMENT_REVIEW_START_UTC)
       .not('reference_number', 'is', null)
       .not('payment_method', 'in', NOT_MANUAL)
       .lte('created_at', since)
@@ -139,6 +142,7 @@ async function flaggedRow(supabase: SupabaseClient): Promise<OwnerTodoItem | nul
     .from('payments')
     .select('id, order_id, amount, payment_method, created_at, notes')
     .eq('status', 'Pending')
+    .gte('payment_date', PAYMENT_REVIEW_START_UTC)
     .or(`notes.ilike.%${RECEIVER_MARK}%,notes.ilike.%${REF_REUSED_MARK}%`)
     .order('created_at', { ascending: false })
     .limit(200);

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { PaymentLogItem, PaymentStatus } from '@/types/payment-log.types';
+import { PAYMENT_REVIEW_START_UTC } from './payment-review-cutoff';
 
 interface RawPaymentRow {
   id: string;
@@ -53,6 +54,9 @@ export async function fetchAllProofPayments(
     if (options.status) {
       query = query.eq('status', options.status);
     }
+    if (options.status === 'Pending') {
+      query = query.gte('payment_date', PAYMENT_REVIEW_START_UTC);
+    }
 
     const { data, error } = await query;
     if (error) throw error;
@@ -74,7 +78,7 @@ export async function fetchPaymentsForStatement(supabase: SupabaseClient): Promi
       .select(
         'id, order_id, amount, payment_date, created_at, payment_method, notes, reference_number, proof_url, ocr_amount, ocr_payment_date, ocr_payment_time, status, transfer_id, transfer_amount',
       )
-      .in('status', ['Pending', 'Verified'])
+      .or(`status.eq.Verified,and(status.eq.Pending,payment_date.gte.${PAYMENT_REVIEW_START_UTC})`)
       .neq('payment_method', 'SPX COD Remittance')
       .range(from, from + PAGE_SIZE - 1);
 

@@ -912,6 +912,18 @@ How it works (built 2026-11-20):
   **My tasks** until Done, pops up if it passes the deadline, and isn't counted in
   "Tasks for staff".
 
+## Payments from the testing period (owner, 2026-11-25)
+
+- Payments made **before July 1, 2026** were logged while the app was still being
+  tested. If they were never verified, they **don't show** on Payments Log →
+  Pending (or its count), aren't matched against GCash statements, and don't count
+  on the owners' to-do. They aren't deleted: the orders and the Verified / Rejected
+  tabs still have them. The date is in
+  `src/lib/services/payments/payment-review-cutoff.ts`.
+- Checked 2026-11-25: 60 pending payments were verified against the 0917 and 0923
+  GCash statements (misread reference numbers, one transfer split over several
+  orders); 143 pending ones from before July were hidden by this rule.
+
 ## Being decided (not built yet)
 
 - **Customer purchase planner (owner, 2026-11-01)**: a premium feature on the

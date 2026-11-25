@@ -18,6 +18,7 @@ import { PaymentHistoryTable } from '@/components/dashboard/accounting/payment-h
 import { PaymentLogToolbar } from '@/components/dashboard/accounting/payment-log-toolbar';
 import { usePaymentsLog } from '@/hooks/usePaymentsLog';
 import type { PaymentStatus, VerifyPdfResponse } from '@/types/payment-log.types';
+import { PAYMENT_REVIEW_START_LABEL } from '@/lib/services/payments/payment-review-cutoff';
 
 export default function PaymentsPage() {
   const { userProfile } = useUserProfile();
@@ -115,6 +116,11 @@ export default function PaymentsPage() {
           <CardTitle className="font-headline">Payments Log</CardTitle>
           <CardDescription>
             View all logged payments, filter by issue or method, verify against GCash statements (including bank &amp; remittance matches), and update statuses.
+            {log.activeTab === 'Pending' && (
+              <span className="block mt-1">
+                Payments made before {PAYMENT_REVIEW_START_LABEL} are from the testing period and aren&apos;t listed here.
+              </span>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent>
