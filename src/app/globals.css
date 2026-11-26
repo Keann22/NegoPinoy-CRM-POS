@@ -118,6 +118,17 @@
   .printable-area, .printable-area * {
     visibility: visible;
   }
+  /* A list printed on its own (printOnly in print-portal.tsx): the page behind it
+     takes no space, so a long page doesn't add blank pages (found 2026-11-26). */
+  body.printing-portal > *:not(.print-portal) {
+    display: none !important;
+  }
+  body.printing-portal > .print-portal {
+    display: block !important;
+  }
+  .print-portal, .print-portal * {
+    visibility: visible;
+  }
   .printable-area {
     position: absolute;
     left: 0;

@@ -16,6 +16,7 @@ import { useUserProfile } from '@/hooks/useUserProfile';
 import { JAS_EMAILS, LAYER_LABELS, OWNER_LABELS, layerOf, type MissingItem, type PriorityGroup, type PriorityOwner, type PriorityRow } from '@/lib/priority/priority-rules';
 import { PriorityRowCard, type RowAction } from '@/components/dashboard/priority/priority-row-card';
 import { PriorityPrintList } from '@/components/dashboard/priority/priority-print-list';
+import { printOnly } from '@/components/print-portal';
 import { PriorityActionDialog, type PriorityAction } from '@/components/dashboard/priority/priority-action-dialog';
 import { OsDecisionDialog } from '@/components/dashboard/priority/os-decision-dialog';
 import { PriorityNoteDialog } from '@/components/dashboard/priority/priority-note-dialog';
@@ -253,7 +254,7 @@ export default function PriorityListPage() {
           <Switch id="ok-only" checked={okOnly} onCheckedChange={setOkOnly} />
           <Label htmlFor="ok-only" className="whitespace-nowrap">OK to ship only <span className="tabular-nums text-muted-foreground">({(ranked.get(group as PriorityGroup) || []).filter(({ row }) => row.okToShip).length})</span></Label>
         </div>
-        <Button variant="outline" size="sm" className="print:hidden" onClick={() => window.print()} disabled={visible.length === 0}>
+        <Button variant="outline" size="sm" className="print:hidden" onClick={printOnly} disabled={visible.length === 0}>
           <Printer className="mr-2 h-4 w-4" />Print list
         </Button>
         </>)}

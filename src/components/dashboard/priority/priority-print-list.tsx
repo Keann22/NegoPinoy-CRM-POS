@@ -1,11 +1,13 @@
 'use client';
 
 import { STEP_LABELS, type PriorityRow } from '@/lib/priority/priority-rules';
+import { PrintPortal } from '@/components/print-portal';
 
 /*
  * Printable copy of the Priority List as filtered on screen (owner, 2026-11-26):
  * e.g. Ready to pack → "OK to ship only", printed for the warehouse to tick off.
- * Hidden on screen; globals.css shows only .printable-area when printing.
+ * Printed on its own through PrintPortal (printOnly()), so the long page behind it
+ * doesn't add blank pages.
  */
 
 const when = (iso: string) =>
@@ -19,7 +21,8 @@ export function PriorityPrintList({ items, title, filters }: {
   filters: string[];
 }) {
   return (
-    <div className="printable-area hidden bg-white text-black print:block">
+    <PrintPortal>
+    <div className="bg-white p-5 text-black">
       <div className="mb-3">
         <h1 className="text-lg font-bold">Priority List: {title}</h1>
         <p className="text-xs">
@@ -60,5 +63,6 @@ export function PriorityPrintList({ items, title, filters }: {
         </tbody>
       </table>
     </div>
+    </PrintPortal>
   );
 }
