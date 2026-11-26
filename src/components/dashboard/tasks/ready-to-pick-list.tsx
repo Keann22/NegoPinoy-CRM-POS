@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input';
 import { PickSkipDialog } from '@/components/dashboard/tasks/pick-skip-dialog';
 import { ReadyToPickOrderCard } from '@/components/dashboard/tasks/ready-to-pick-order-card';
 import { ReadyToPickParkedLists } from '@/components/dashboard/tasks/ready-to-pick-parked';
+import { ReadyToPickPrintList } from '@/components/dashboard/tasks/ready-to-pick-print-list';
+import { printOnly } from '@/components/print-portal';
 import { useReadyToPick } from '@/hooks/useReadyToPick';
 import { useReprintOrders } from '@/hooks/useReprintOrders';
 import { useStaffDirectory } from '@/hooks/useStaffDirectory';
@@ -43,6 +45,21 @@ export function ReadyToPickList() {
         o.items.some((i) => i.name.toLowerCase().includes(q))
     );
   }, [activeOrders, query]);
+
+  const rankedFiltered = useMemo(
+    () => filtered.map((order, idx) => ({ order, rank: idx + 1 })),
+    [filtered]
+  );
+  const selectedRanked = useMemo(
+    () => rankedFiltered.filter(({ order }) => selectedIds.has(order.id)),
+    [rankedFiltered, selectedIds]
+  );
+  const listToPrint = selectedRanked.length > 0 ? selectedRanked : rankedFiltered;
+  const tabLabel = tab === 'pwi' ? 'Picked (with issue)' : 'Processing — New';
+  const printFilters = [
+    selectedRanked.length > 0 && `Selected (${selectedRanked.length} of ${filtered.length})`,
+    query.trim() && `Search: ${query.trim()}`,
+  ].filter(Boolean) as string[];
 
   const switchTab = (next: TabKey) => {
     setTab(next);
@@ -112,6 +129,7 @@ export function ReadyToPickList() {
   return (
     <div className="mx-auto max-w-4xl space-y-4 p-4 md:p-6">
       {printView}
+      <ReadyToPickPrintList items={listToPrint} tabLabel={tabLabel} filters={printFilters} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
           <Link
@@ -129,10 +147,27 @@ export function ReadyToPickList() {
             Orders disappear here automatically once picked.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => void reload()} disabled={isLoading}>
-          <RefreshCw className={cn('mr-1.5 h-4 w-4', isLoading && 'animate-spin')} />
-          Refresh
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="print:hidden"
+            onClick={printOnly}
+            disabled={filtered.length === 0 || printingBatch}
+            title={
+              selectedRanked.length > 0
+                ? 'Print a checklist of the selected orders (not full order forms)'
+                : 'Print a checklist of the orders shown below (not full order forms)'
+            }
+          >
+            <Printer className="mr-1.5 h-4 w-4" />
+            {selectedRanked.length > 0 ? `Print List (${selectedRanked.length} selected)` : 'Print List'}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => void reload()} disabled={isLoading}>
+            <RefreshCw className={cn('mr-1.5 h-4 w-4', isLoading && 'animate-spin')} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
