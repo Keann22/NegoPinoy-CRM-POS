@@ -1,7 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { bundleQtyPerUnit, getUnpickedQtyForProduct, PICKED_WITH_ISSUE, shelfNumberOf } from './shelf-stock-service';
 import { applyPhysicalShelfCount } from './inventory-guardian-action-service';
-import { holdPickerCount } from './held-picker-count-service';
 import type { PickerShelfInfo, WaitingOrder } from '@/types/inventory-guardian.types';
 
 /*
@@ -10,8 +9,8 @@ import type { PickerShelfInfo, WaitingOrder } from '@/types/inventory-guardian.t
  *
  *   - A picker can't tap Found for more than unallocated stock without counting
  *     the Unit 1 shelf; the count is saved like a Guardian count.
- *   - A count HIGHER than the shelf number isn't added: it is held for the owners
- *     (record the purchase or approve it). Owner 2026-11-12.
+ *   - As of 2026-11-26, a count higher than the shelf number saves right away
+ *     (no owner hold) and sends the owners a non-blocking notification.
  *   - A picker can't borrow while unallocated stock is above 0 until they
  *     confirm Unit 1 and Unit 2 are both empty (saved as a count of 0).
  *
@@ -197,16 +196,6 @@ export async function savePickerShelfCount(
       total = n + before.unit2;
       note = `Counted by picker ${actorName} while picking${orderTag}: 3C ${n}${before.unit2 ? ` + 4A ${before.unit2} (kept)` : ''}.`;
     }
-  }
-
-  // More than the shelf number: the extra is held for the owners, not added
-  // (owner 2026-11-12, held-picker-count-service.ts). Owners' own counts go through.
-  if (total > before.unallocated && !input.isManagement) {
-    await holdPickerCount(supabase, {
-      productId, counted: total, systemHad: before.unallocated, unit1Count: n,
-      unit2Empty: !!input.unit2Empty, orderId: input.orderId || null, actorName, note,
-    });
-    return { before: before.unallocated, after: before.unallocated, held: total - before.unallocated };
   }
 
   if (unit2Why) await zeroUnit2(supabase, productId, unit2Why, actorName);

@@ -19,6 +19,7 @@ interface Props {
 }
 
 const shortId = (id: string) => `#${id.slice(0, 7).toUpperCase()}`;
+const TYPO_CONFIRM_THRESHOLD = 50;
 
 /**
  * Asked when a picker taps OS but the system says the shelf still has some
@@ -29,6 +30,7 @@ const shortId = (id: string) => `#${id.slice(0, 7).toUpperCase()}`;
  */
 export function OsShelfCheck({ prompt, saving, onSave, onFindOrders, onGiveAway, onBack }: Props) {
   const [count, setCount] = useState('');
+  const [confirmCount, setConfirmCount] = useState<number | null>(null);
   const [unit2Checked, setUnit2Checked] = useState(false);
   const [checking, setChecking] = useState(false);
   const [choice, setChoice] = useState<{ pieces: number; orders: WaitingOrder[] } | null>(null);
@@ -38,6 +40,10 @@ export function OsShelfCheck({ prompt, saving, onSave, onFindOrders, onGiveAway,
 
   const save = async () => {
     const n = Math.round(Number(count));
+    if (n >= TYPO_CONFIRM_THRESHOLD && confirmCount !== n) {
+      setConfirmCount(n);
+      return;
+    }
     if (n > 0 && n < prompt.needed) {
       // Too few for this order: could they finish another one instead?
       setChecking(true);
@@ -106,8 +112,7 @@ export function OsShelfCheck({ prompt, saving, onSave, onFindOrders, onGiveAway,
           <Label htmlFor="os-count" className="font-semibold">Found some, or none? Count them</Label>
           <p className="text-xs text-muted-foreground">
             How many did you find in total? Count the ones in your hand, on the 3C shelf, in nearby bins and in 4A.
-            Type 0 if there are none. This fixes the system&apos;s number (if you find more than the system has, the extra
-            waits for the owners to record the purchase).
+            Type 0 if there are none. This fixes the system&apos;s number.
           </p>
           {needsUnit2 && (
             <label className="flex items-start gap-2 rounded-md bg-blue-50 p-2 text-xs text-blue-950">
@@ -118,11 +123,28 @@ export function OsShelfCheck({ prompt, saving, onSave, onFindOrders, onGiveAway,
             </label>
           )}
           <div className="flex gap-2">
-            <Input id="os-count" type="number" inputMode="numeric" min={0} value={count} onChange={(e) => setCount(e.target.value)} className="w-28" />
+            <Input
+              id="os-count"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              value={count}
+              onChange={(e) => { setCount(e.target.value); setConfirmCount(null); }}
+              className="w-28"
+            />
             <Button variant="destructive" onClick={save} disabled={!canSave}>
-              {busy && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}Save count
+              {busy && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+              {confirmCount !== null ? `Confirm ${confirmCount}` : 'Save count'}
             </Button>
           </div>
+          {confirmCount !== null && (
+            <div className="flex items-center justify-between gap-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+              <span>You typed <strong>{confirmCount} pcs</strong> — double-check and tap Confirm {confirmCount} to save.</span>
+              <Button type="button" size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setConfirmCount(null)}>
+                Change
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </>

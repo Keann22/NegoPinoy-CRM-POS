@@ -1,7 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { listCustomerReturns } from '@/lib/services/customer-returns/customer-return-service';
 import { listSupplierReturns } from '@/lib/services/supplier-return-service';
-import { HELD_ACTION } from '@/lib/services/inventory/held-picker-count-service';
 import { PAYMENT_REVIEW_START_UTC } from '@/lib/services/payments/payment-review-cutoff';
 import type { FlaggedPayment, OwnerTodoItem, OwnerTodoResponse, OwnerUploadKind } from '@/types/owner-todo.types';
 
@@ -222,30 +221,6 @@ async function spxRow(supabase: SupabaseClient, now: number): Promise<OwnerTodoI
   };
 }
 
-/** Picker counts above the shelf number, waiting for the owners (record purchase / add / ignore). */
-async function heldCountsRow(supabase: SupabaseClient, now: number): Promise<OwnerTodoItem | null> {
-  const { data, error } = await supabase
-    .from('inventory_guardian_memory')
-    .select('created_at')
-    .eq('action_type', HELD_ACTION)
-    .eq('metadata->>status', 'open')
-    .order('created_at', { ascending: true });
-  if (error) throw error;
-  const rows = (data || []) as { created_at: string }[];
-  if (rows.length === 0) return null;
-  const oldest = daysSince(rows[0].created_at, now);
-  return {
-    key: 'held_counts',
-    title: 'Picker counted more than the shelf: decide',
-    detail: `${plural(rows.length, 'count')} not added to stock yet (oldest ${ago(oldest)}). Record the purchase, add the pieces, or ignore.`,
-    count: rows.length,
-    amount: null,
-    level: oldest >= 3 ? 'red' : 'amber',
-    href: '/dashboard/owner-todo/held-counts',
-    actionLabel: 'Decide',
-  };
-}
-
 /** Payment Fix rows (GCash mismatches) not reconciled yet. */
 async function paymentFixRow(supabase: SupabaseClient): Promise<OwnerTodoItem | null> {
   const rows = await allRows<{ payment_id: string }>((a, b) => supabase.from('payment_discrepancies').select('payment_id').range(a, b));
@@ -396,7 +371,6 @@ export async function getOwnerTodo(supabase: SupabaseClient): Promise<OwnerTodoR
     gcashRow(supabase, now),
     flaggedRow(supabase),
     spxRow(supabase, now),
-    heldCountsRow(supabase, now),
     returnsRow(supabase, now),
     staffWaitingRow(supabase),
     supplierReturnsRow(supabase),

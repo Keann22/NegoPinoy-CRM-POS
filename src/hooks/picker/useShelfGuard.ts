@@ -25,12 +25,8 @@ export type ShelfPrompt =
   | { kind: 'borrow'; rowKey: string; productId: string; productName: string; available: number; unit2: number }
   | { kind: 'reserved'; rowKey: string; productId: string; productName: string; needed: number; free: number; orders: ReservedOrder[] };
 
-/**
- * What a saved count led to (for the picker's message). 'held': the count was
- * higher than the shelf number, so the extra waits for the owners (not added) and
- * the rest is OS. Owner 2026-11-12.
- */
-export type CountOutcome = 'found' | 'os' | 'reserved' | 'held';
+/** What a saved count led to (for the picker's message). */
+export type CountOutcome = 'found' | 'os' | 'reserved';
 
 interface Marks {
   markFound: (rowKey: string) => void;
@@ -135,7 +131,7 @@ export function useShelfGuard(orderId: string | null, rows: PickRow[], marks: Ma
     if (prompt?.kind !== 'count' && prompt?.kind !== 'os') return;
     const { rowKey, needed } = prompt;
     const row = rows.find((r) => r.key === rowKey);
-    const { after, held } = await post({ productId: prompt.productId, unit1Count, unit2Empty: !!opts.unit2Empty });
+    const { after } = await post({ productId: prompt.productId, unit1Count, unit2Empty: !!opts.unit2Empty });
     const usable = Math.max(0, after - reservedQty(prompt.productId));
     if (usable >= needed) {
       marks.markFound(rowKey);
@@ -154,7 +150,7 @@ export function useShelfGuard(orderId: string | null, rows: PickRow[], marks: Ma
     }
     setPrompt(null);
     await load();
-    return held ? 'held' : 'os';
+    return 'os';
   };
 
   /** Leave the reserved pieces: the line is OS for what the free pieces don't cover. */

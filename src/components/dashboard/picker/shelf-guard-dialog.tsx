@@ -24,13 +24,7 @@ interface Props {
   onClose: () => void;
 }
 
-/** The count was higher than the shelf number: the extra waits for the owners (owner 2026-11-12). */
-const HELD_TOAST = {
-  title: 'Sent to the owners: not added yet',
-  description: "You counted more than the system has. The extra pieces can't be picked until the owners record the purchase. "
-    + 'Marked OS: set the pieces aside with the order number and message the owners.',
-  duration: 15000,
-};
+const TYPO_CONFIRM_THRESHOLD = 50;
 
 /**
  * Asked when a picker taps Found for more than the shelf has, OS while the
@@ -40,9 +34,10 @@ const HELD_TOAST = {
 export function ShelfGuardDialog({ prompt, onCount, onNotReceived, onBothEmpty, onLeaveReserved, onOverrideReserved, onFindOrders, onGiveAway, onClose }: Props) {
   const { toast } = useToast();
   const [count, setCount] = useState('');
+  const [confirmCount, setConfirmCount] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { setCount(''); setSaving(false); }, [prompt]);
+  useEffect(() => { setCount(''); setConfirmCount(null); setSaving(false); }, [prompt]);
 
   if (!prompt) return null;
   if (prompt.kind === 'reserved') {
@@ -59,24 +54,31 @@ export function ShelfGuardDialog({ prompt, onCount, onNotReceived, onBothEmpty, 
     }
   };
 
-  const saveCount = () => run(async () => {
+  const saveCount = () => {
     const n = Math.round(Number(count));
-    if (count.trim() === '' || !(n >= 0)) throw new Error('Type how many you counted.');
-    const outcome = await onCount(n);
-    if (outcome === 'reserved') return; // the "reserved for a replacement" dialog takes over
-    if (outcome === 'held') return toast(HELD_TOAST);
-    toast({
-      title: 'Count saved',
-      description: outcome === 'found' ? 'Marked Found.' : 'Not enough on the shelf: the rest is marked OS.',
+    if (count.trim() === '' || !(n >= 0)) {
+      toast({ title: 'Could not save', description: 'Type how many you counted.', variant: 'destructive' });
+      return;
+    }
+    if (n >= TYPO_CONFIRM_THRESHOLD && confirmCount !== n) {
+      setConfirmCount(n);
+      return;
+    }
+    return run(async () => {
+      const outcome = await onCount(n);
+      if (outcome === 'reserved') return; // the "reserved for a replacement" dialog takes over
+      toast({
+        title: 'Count saved',
+        description: outcome === 'found' ? 'Marked Found.' : 'Not enough on the shelf: the rest is marked OS.',
+      });
     });
-  });
+  };
 
   // Tapped OS but the system says there should be some: the count (everything they found) fixes the number.
   const saveOsCount = (n: number) => run(async () => {
     const needed = prompt?.kind === 'os' ? prompt.needed : 0;
     const outcome = await onCount(n, { unit2Empty: true });
     if (outcome === 'reserved') return;
-    if (outcome === 'held') return toast(HELD_TOAST);
     toast({
       title: 'Count saved',
       description: outcome === 'found' ? 'You counted enough for this order: take it from the shelf. Marked Found.'
@@ -120,15 +122,31 @@ export function ShelfGuardDialog({ prompt, onCount, onNotReceived, onBothEmpty, 
                 <Label htmlFor="sg-count" className="font-semibold">It&apos;s on the shelf: count it</Label>
                 <p className="text-xs text-muted-foreground">
                   How many are on the 3C shelf now, including the ones in your hand? Leave out anything from a delivery that isn&apos;t received yet.
-                  If you count more than the system has, the extra isn&apos;t added until the owners record the purchase.
                   {prompt.unit2 > 0 && ` 4A reserve is recorded with ${prompt.unit2}: check there too, but leave those out of this count.`}
                 </p>
                 <div className="flex gap-2">
-                  <Input id="sg-count" type="number" inputMode="numeric" min={0} value={count} onChange={(e) => setCount(e.target.value)} className="w-28" />
+                  <Input
+                    id="sg-count"
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    value={count}
+                    onChange={(e) => { setCount(e.target.value); setConfirmCount(null); }}
+                    className="w-28"
+                  />
                   <Button onClick={saveCount} disabled={saving || count.trim() === ''}>
-                    {saving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}Save count
+                    {saving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+                    {confirmCount !== null ? `Confirm ${confirmCount}` : 'Save count'}
                   </Button>
                 </div>
+                {confirmCount !== null && (
+                  <div className="flex items-center justify-between gap-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+                    <span>You typed <strong>{confirmCount} pcs</strong> — double-check and tap Confirm {confirmCount} to save.</span>
+                    <Button type="button" size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setConfirmCount(null)}>
+                      Change
+                    </Button>
+                  </div>
+                )}
               </div>
               <Button variant="outline" className="w-full justify-start h-auto py-2 text-left whitespace-normal" disabled={saving}
                 onClick={() => { onNotReceived(); toast({ title: 'Marked OS', description: 'Note it on Receiving ("Arrived but not on the list?") and message the owners to record the purchase.' }); }}>
