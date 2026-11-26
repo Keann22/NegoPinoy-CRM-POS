@@ -93,6 +93,14 @@ and new BUSINESS_WORKFLOW.md sections (Copilot, task actions).
 
 Newest first. Older history: `git log`. Feature rules: `docs/BUSINESS_WORKFLOW.md`.
 
+- **2026-11-25** Inventory staff activity history ("My Activity"): dedicated
+  `/dashboard/inventory/my-activity` page, "My Activity Today" card on
+  `InventoryDashboard`, and `GET /api/inventory/activity` aggregating picking, Second
+  Check, packing, receiving, shelf counts (with shelf-match scoring), transfers,
+  returns, tasks/notes, and bus shipments retroactively across multi-account profiles
+  with strict role isolation and zero supplier/cost fields. Migration
+  `2026-11-25_activity_history_indexes.sql` (applied). (Antigravity, 1f2a1b4)
+
 - **2026-11-25** Payments Log: unverified payments from before Jul 1, 2026 (testing
   period) hidden from Pending, its count, statement matching and owner to-do
   (`payment-review-cutoff.ts`). 60 pending payments verified by hand against the
