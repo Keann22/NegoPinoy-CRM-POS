@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { RefreshCw, Search } from 'lucide-react';
+import { Printer, RefreshCw, Search } from 'lucide-react';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { JAS_EMAILS, LAYER_LABELS, OWNER_LABELS, layerOf, type MissingItem, type PriorityGroup, type PriorityOwner, type PriorityRow } from '@/lib/priority/priority-rules';
 import { PriorityRowCard, type RowAction } from '@/components/dashboard/priority/priority-row-card';
+import { PriorityPrintList } from '@/components/dashboard/priority/priority-print-list';
 import { PriorityActionDialog, type PriorityAction } from '@/components/dashboard/priority/priority-action-dialog';
 import { OsDecisionDialog } from '@/components/dashboard/priority/os-decision-dialog';
 import { PriorityNoteDialog } from '@/components/dashboard/priority/priority-note-dialog';
@@ -250,10 +251,28 @@ export default function PriorityListPage() {
         </div>
         <div className="flex items-center gap-2 px-1">
           <Switch id="ok-only" checked={okOnly} onCheckedChange={setOkOnly} />
-          <Label htmlFor="ok-only">OK to ship only <span className="tabular-nums text-muted-foreground">({(ranked.get(group as PriorityGroup) || []).filter(({ row }) => row.okToShip).length})</span></Label>
+          <Label htmlFor="ok-only" className="whitespace-nowrap">OK to ship only <span className="tabular-nums text-muted-foreground">({(ranked.get(group as PriorityGroup) || []).filter(({ row }) => row.okToShip).length})</span></Label>
         </div>
+        <Button variant="outline" size="sm" className="print:hidden" onClick={() => window.print()} disabled={visible.length === 0}>
+          <Printer className="mr-2 h-4 w-4" />Print list
+        </Button>
         </>)}
       </div>
+      {!isSideTab && (
+        <PriorityPrintList
+          items={visible}
+          title={GROUPS.find((g) => g.key === group)?.label || ''}
+          filters={[
+            okOnly && 'OK to ship only',
+            urgentOnly && 'Urgent only',
+            lateOnly && 'Late only',
+            salesPerson !== 'all' && `Sales: ${salesPerson}`,
+            owner !== 'all' && `Owner: ${OWNER_LABELS[owner]}`,
+            statusFilter !== 'all' && `Status: ${statusFilter}`,
+            search.trim() && `Search: ${search.trim()}`,
+          ].filter(Boolean) as string[]}
+        />
+      )}
 
       {/* Always mounted (hidden) so the Returns tab shows its count before it is opened. */}
       <div className={group === 'returns' ? '' : 'hidden'}>

@@ -721,6 +721,8 @@ How it works (built 2026-11-20):
   On the **Priority List** every order sales OK'd shows a green **OK to ship ·
   agent, date** tag, and an **OK to ship only** switch lists just those (owner,
   2026-11-26).
+  **Print list** prints the tab as filtered on screen (e.g. Ready to pack → OK to
+  ship only) as a table with a tick box per order, for the warehouse.
 
 ## Put back the pieces of a cancelled order (owner, 2026-11-23; built 2026-11-23)
 
