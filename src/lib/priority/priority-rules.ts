@@ -178,6 +178,8 @@ export interface PriorityOrderInput {
   urgent: { note: string | null; byName: string | null; at: string } | null;
   /** Sales reserved incoming stock for this order (a replacement): pickers can't give its items to other orders. */
   reserved: { note: string | null; byName: string | null; at: string } | null;
+  /** Sales answered OK to ship on a task about this order (owner, 2026-11-26): latest answer. */
+  okToShip?: { byName: string | null; at: string } | null;
   /** Active send-today mark (latest send_today* event is a mark). */
   sendToday: SendTodayMark | null;
   /** The warehouse said it can't send this today (latest send_today* event, today only). */

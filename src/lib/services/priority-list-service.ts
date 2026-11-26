@@ -158,7 +158,7 @@ export async function getPriorityList(
   const ids = eligible.map((o) => o.id);
 
   // 2. Everything else, keyed by order.
-  const [payments, issues, sources, events, borrows, logs, lines, shipContexts] = await Promise.all([
+  const [payments, issues, sources, events, borrows, logs, lines, shipContexts, okAnswers] = await Promise.all([
     inChunks(ids, (c) => fetchAllPages<any>((f, t) =>
       supabase.from('payments').select('order_id, payment_date, created_at').in('order_id', c).order('id').range(f, t))),
     inChunks(ids, (c) => fetchAllPages<any>((f, t) =>
@@ -173,7 +173,16 @@ export async function getPriorityList(
     inChunks(ids, (c) => fetchAllPages<any>((f, t) =>
       supabase.from('order_items').select('order_id, product_id, product_name, quantity, is_packed, products(name, variant_name, shelf_stock, stock_level, assembly_recipe)').in('order_id', c).order('id').range(f, t))),
     getShipContexts(supabase, ids),
+    // Sales' OK to ship answers on tasks (task-answer-service.ts).
+    inChunks(ids, (c) => fetchAllPages<any>((f, t) =>
+      supabase.from('staff_tasks').select('order_id, done_by_name, done_at').in('order_id', c)
+        .eq('status', 'done').is('kind', null).like('done_note', 'OK to ship%').order('id').range(f, t))),
   ]);
+  const okToShip = new Map<string, { byName: string | null; at: string }>();
+  for (const a of okAnswers) {
+    const prev = okToShip.get(a.order_id);
+    if (!prev || prev.at < a.done_at) okToShip.set(a.order_id, { byName: a.done_by_name || null, at: a.done_at });
+  }
   const lineCount = new Map<string, number>();
   lines.forEach((l) => lineCount.set(l.order_id, (lineCount.get(l.order_id) || 0) + 1));
   const linesByOrder = groupBy(lines, (l) => l.order_id);
@@ -278,6 +287,7 @@ export async function getPriorityList(
       sendTodayBlock,
       urgent,
       reserved,
+      okToShip: okToShip.get(o.id) || null,
       recentNotes: notes.slice(-RECENT_NOTES).reverse(),
       noteCount: notes.length,
       itemCount,

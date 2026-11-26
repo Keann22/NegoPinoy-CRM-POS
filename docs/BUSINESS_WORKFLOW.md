@@ -718,6 +718,9 @@ How it works (built 2026-11-20):
   whoever books it taps Done and the agent gets the bell. A warehouse copy the
   owners cancelled (e.g. Jas taken off Photo orders) is left alone. The order's
   Activity notes it. Code: `ok-to-ship-service.ts`.
+  On the **Priority List** every order sales OK'd shows a green **OK to ship ·
+  agent, date** tag, and an **OK to ship only** switch lists just those (owner,
+  2026-11-26).
 
 ## Put back the pieces of a cancelled order (owner, 2026-11-23; built 2026-11-23)
 

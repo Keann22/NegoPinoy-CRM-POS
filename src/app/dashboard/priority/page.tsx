@@ -59,6 +59,7 @@ export default function PriorityListPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [lateOnly, setLateOnly] = useState(false);
   const [urgentOnly, setUrgentOnly] = useState(false);
+  const [okOnly, setOkOnly] = useState(false);
   const [search, setSearch] = useState('');
   const [dialog, setDialog] = useState<{ row: PriorityRow; action: PriorityAction } | null>(null);
   const [shipHoldOrderId, setShipHoldOrderId] = useState<string | null>(null);
@@ -156,9 +157,10 @@ export default function PriorityListPage() {
       (statusFilter === 'all' || row.status === statusFilter) &&
       (!lateOnly || row.daysLate > 0) &&
       (!urgentOnly || !!row.urgent) &&
+      (!okOnly || !!row.okToShip) &&
       (!q || row.id.toLowerCase().startsWith(q) || (row.customerName || '').toLowerCase().includes(q))
     );
-  }, [ranked, group, owner, salesPerson, statusFilter, lateOnly, urgentOnly, search]);
+  }, [ranked, group, owner, salesPerson, statusFilter, lateOnly, urgentOnly, okOnly, search]);
 
   const lateCount = (g: PriorityGroup) => (ranked.get(g) || []).filter(({ row }) => row.daysLate > 0).length;
   const hint = group === 'to_follow' ? TO_FOLLOW_HINT : group === 'returns' ? RETURNS_HINT : GROUPS.find((g) => g.key === group)!.hint;
@@ -245,6 +247,10 @@ export default function PriorityListPage() {
         <div className="flex items-center gap-2 px-1">
           <Switch id="urgent-only" checked={urgentOnly} onCheckedChange={setUrgentOnly} />
           <Label htmlFor="urgent-only">Urgent only</Label>
+        </div>
+        <div className="flex items-center gap-2 px-1">
+          <Switch id="ok-only" checked={okOnly} onCheckedChange={setOkOnly} />
+          <Label htmlFor="ok-only">OK to ship only <span className="tabular-nums text-muted-foreground">({(ranked.get(group as PriorityGroup) || []).filter(({ row }) => row.okToShip).length})</span></Label>
         </div>
         </>)}
       </div>

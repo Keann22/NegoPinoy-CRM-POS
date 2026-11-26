@@ -93,6 +93,8 @@ and new BUSINESS_WORKFLOW.md sections (Copilot, task actions).
 
 Newest first. Older history: `git log`. Feature rules: `docs/BUSINESS_WORKFLOW.md`.
 
+- **2026-11-26** Priority List: green OK to ship tag on orders sales OK'd, plus an
+  "OK to ship only" switch (from done tasks with an OK to ship answer).
 - **2026-11-26** OK to ship tells the warehouse: Jas's copy of the task pops up again
   with a green OK to ship tag, or a shared Inventory task when only sales had it
   (`ok-to-ship-service.ts`, columns `staff_tasks.ok_to_ship_at/by`). Backfilled 33

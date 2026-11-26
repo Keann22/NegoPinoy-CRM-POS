@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Ban, BadgeCheck, CalendarClock, ChevronDown, Clock, Flame, MessageSquarePlus, PauseCircle, PlayCircle, Truck, X, Lock } from 'lucide-react';
+import { Ban, BadgeCheck, CalendarClock, CheckCircle2, ChevronDown, Clock, Flame, MessageSquarePlus, PauseCircle, PlayCircle, Truck, X, Lock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -125,7 +125,7 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
         </div>
 
         <div className="min-w-0 flex-1 space-y-2">
-          {(row.urgent || paidBadge || row.reserved) && (
+          {(row.urgent || paidBadge || row.reserved || row.okToShip) && (
             <div className="flex flex-wrap gap-1.5">
               {row.urgent && (
                 <span className="inline-flex items-center gap-1 rounded bg-red-600 px-2 py-0.5 text-xs font-semibold text-white">
@@ -135,6 +135,11 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
               {row.reserved && (
                 <span className="inline-flex items-center gap-1 rounded bg-violet-600 px-2 py-0.5 text-xs font-semibold text-white">
                   <Lock className="h-3 w-3" />Reserved for replacement
+                </span>
+              )}
+              {row.okToShip && (
+                <span className="inline-flex items-center gap-1 rounded bg-emerald-600 px-2 py-0.5 text-xs font-semibold text-white" title="Sales confirmed with the customer: pick, pack and book">
+                  <CheckCircle2 className="h-3 w-3" />OK to ship{row.okToShip.byName ? ` · ${row.okToShip.byName}` : ''}, {shortDate(row.okToShip.at)}
                 </span>
               )}
               {paidBadge && (
