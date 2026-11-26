@@ -958,3 +958,10 @@ How it works (built 2026-11-20):
   - **The SF is added to the COD at SPX booking, not by our file** (found 2026-11-10: SPX collected more than the balance on 2,284 of 2,502 COD orders; a paid lay-away sent with ₱0 COD was collected ₱410). So for free-shipping orders the SPX file's delivery instruction says "FREE SHIPPING: SF already paid … do not add SF", and Verify Shipping warns. Whoever books in SPX must not add the SF.
   - Add SPX SF works **once, before the order ships** (2026-11-10).
   - The SPX file never asks the courier to collect more than the order still owes, so a payment logged after Verify Shipping lowers the COD (2026-11-10).
+
+## Inventory staff activity history (staff request, built 2026-11-25)
+
+- Inventory staff can check what they did on **My Activity** (`/dashboard/inventory/my-activity`, in the top-level menu right under **Recount**) and see a **My Activity Today** card on their Dashboard.
+- **Staff see only their own activity**, automatically combined across all accounts belonging to the same person (e.g. Jas's three accounts, Tess's two, Edric's two). **Owners/Admins** can view **All Inventory Staff** (default), **My Activity**, or any individual staff member.
+- Covers existing warehouse actions retroactively: picking (`Picked`, `Picked (with issue)`, OS items, borrowed stock, resolved issues), Second Check (`Photo`), packing (`Packed`, `For Shipping`, `Shipped`), receiving and stock adjustments, shelf counts (Guardian, Recount/Pabilang, Picker, Procurement Sheet) with shelf-match scoring, manual `3C ⇄ 4A` transfers, customer & supplier return events, tasks & notes done/replied, and bus shipments.
+- **Confidentiality:** supplier names, unit costs, refund amounts, and receipt photos are excluded server-side (`GET /api/inventory/activity`).

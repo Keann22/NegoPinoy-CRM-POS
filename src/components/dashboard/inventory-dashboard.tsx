@@ -8,6 +8,7 @@ import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OrderChangesCard } from "@/components/dashboard/orders/order-changes-card";
 import { MyTasksCard } from "@/components/dashboard/tasks/my-tasks-card";
+import { TodayActivityCard } from "@/components/dashboard/inventory/today-activity-card";
 
 export function InventoryDashboard() {
   const supabase = useSupabase();
@@ -69,6 +70,8 @@ export function InventoryDashboard() {
       <MyTasksCard />
 
       <OrderChangesCard />
+
+      <TodayActivityCard />
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>

@@ -114,6 +114,7 @@ export default function DashboardLayout({
     if (isManagement || isInventory) {
       // Jas's recount list (owners ask her to count products); its own item so it's easy to find.
       links.push({ href: '/dashboard/inventory/recount', label: 'Recount', icon: ListChecks });
+      links.push({ href: '/dashboard/inventory/my-activity', label: 'My Activity', icon: History });
     }
 
     if (isManagement || isInventory) {
@@ -196,7 +197,10 @@ export default function DashboardLayout({
   }, [isManagement, isSales, isInventory, openInventory, openAccounting]);
 
   useEffect(() => {
-    if (pathname.startsWith('/dashboard/inventory')) {
+    const isTopLevelInventoryRoute =
+      pathname === '/dashboard/inventory/recount' ||
+      pathname === '/dashboard/inventory/my-activity';
+    if (pathname.startsWith('/dashboard/inventory') && !isTopLevelInventoryRoute) {
       setOpenInventory(true);
     }
     if (pathname.startsWith('/dashboard/accounting')) {

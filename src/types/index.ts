@@ -26,3 +26,4 @@ export * from './procurement-search.types';
 export * from './supplier-returns.types';
 export * from './customer-returns.types';
 export * from './customer-profile.types';
+export * from './staff-activity.types';
