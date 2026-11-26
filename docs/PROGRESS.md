@@ -93,6 +93,10 @@ and new BUSINESS_WORKFLOW.md sections (Copilot, task actions).
 
 Newest first. Older history: `git log`. Feature rules: `docs/BUSINESS_WORKFLOW.md`.
 
+- **2026-11-26** Priority List: Ready to pack checks the shelf for unpicked orders
+  (paid first, then oldest, same as Ready to Pick); short ones go to Waiting as
+  "Not on the shelf" or Bought. Was 180 ready, 60 short. c0dca34 (Claude).
+
 - **2026-11-25** Inventory staff activity history ("My Activity"): dedicated
   `/dashboard/inventory/my-activity` page, "My Activity Today" card on
   `InventoryDashboard`, and `GET /api/inventory/activity` aggregating picking, Second
