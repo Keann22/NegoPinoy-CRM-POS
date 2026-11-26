@@ -820,6 +820,22 @@ How it works (built 2026-11-20):
 - **Free to sell still counts ship-later orders** (it comes from `stock_level`,
   which orders lower when they're made). Not changed yet.
 
+## Ready to pack means the shelf has it (owner, 2026-11-26; built 2026-11-26)
+
+- Found 2026-11-26: the Priority List's **Ready to pack** had 180 orders, but 60 of
+  the 96 not picked yet were missing items on the shelf (e.g. #2C9F0D5: 25
+  perfumes, shelf 0). An item only counted as missing once a picker reported it
+  OS, so unpicked orders went to Ready to pack without a shelf check.
+- Now an order not picked yet is Ready to pack only if the **shelf covers every
+  item**. The shelf is shared out like the Ready to Pick page: **paid orders
+  first, then the oldest**, and an order only takes pieces if the shelf covers all
+  of it. The two pages now list the same unpicked orders.
+- The rest go to **Waiting for items**: **Not on the shelf** (buyer: buy it, it's on
+  Need to Buy, or count the shelf if the number looks wrong), or **Bought** with
+  the ETA when a purchase on the way covers it.
+- Lay-aways still being paid off aren't flagged (they're not bought for), and
+  ship-later orders don't take shelf pieces until 3 days before.
+
 ## Notes for a person or team (owner, 2026-11-25; built 2026-11-25)
 
 - Sales wrote requests for the warehouse as **order notes** ("meron na daw stock,

@@ -5,6 +5,8 @@ import { staffNotes } from './order-trail-service';
 import { getOwedReplacements } from './supplier-return-service';
 import { applyOwedReplacements } from '@/lib/priority/owed-replacements';
 import { getShipContexts } from './order-ship-context-service';
+import { getShelfShortages, shortageToMissing, type ShelfShortage } from './priority-shelf-service';
+import { isPickDeferred } from '@/lib/shipping/ship-hold-rules';
 import {
   PRIORITY_RULES, rankOrder, compareRows, transitState, phtDate, shipsBeforePaid,
   type MissingItem, type PriorityOrderInput, type PriorityRow, type PriorityHold,
@@ -169,7 +171,7 @@ export async function getPriorityList(
     inChunks(ids, (c) => fetchAllPages<any>((f, t) =>
       supabase.from('order_logs').select('order_id, created_at').in('order_id', c).order('id').range(f, t))),
     inChunks(ids, (c) => fetchAllPages<any>((f, t) =>
-      supabase.from('order_items').select('order_id, product_id, product_name, products(stock_level, assembly_recipe)').in('order_id', c).order('id').range(f, t))),
+      supabase.from('order_items').select('order_id, product_id, product_name, quantity, is_packed, products(name, variant_name, shelf_stock, stock_level, assembly_recipe)').in('order_id', c).order('id').range(f, t))),
     getShipContexts(supabase, ids),
   ]);
   const lineCount = new Map<string, number>();
@@ -211,6 +213,18 @@ export async function getPriorityList(
   issues.forEach((i) => touch(i.order_id, i.created_at));
   events.rows.forEach((e) => touch(e.order_id, e.created_at));
 
+  // Orders not picked yet: what the shelf can't cover (paid first, then oldest).
+  // Skipped for the send-today pop-up (a few orders can't share out the shelf).
+  const shortages = opts.onlyOrderIds ? new Map<string, ShelfShortage[]>() : await getShelfShortages(supabase,
+    eligible.map((o) => ({
+      id: o.id,
+      status: o.status,
+      paid: isFullyPaid(o),
+      orderDate: o.order_date || o.created_at,
+      pickDeferred: isPickDeferred(shipContexts.get(o.id)?.hold?.detail, o.status, phtDate(now)),
+    })),
+    lines, issues);
+
   const issuesByOrder = groupBy(issues, (i) => i.order_id);
   const sourcesByOrder = groupBy(sources, (s) => s.order_id);
   const eventsByOrder = groupBy(events.rows, (e) => e.order_id);
@@ -223,7 +237,14 @@ export async function getPriorityList(
       : isFullyPaid(o) ? maxIso(lastPayment.get(o.id) || null, o.order_date || o.created_at) : null;
 
     const orderIssues = issuesByOrder.get(o.id) || [];
-    const missing = applyOwedReplacements(missingItems(orderIssues, sourcesByOrder.get(o.id) || [], poiById, receivedAt, productById, eventsByOrder.get(o.id) || [], borrowsByOrder.get(o.id) || [], now), owed);
+    const osMissing = applyOwedReplacements(missingItems(orderIssues, sourcesByOrder.get(o.id) || [], poiById, receivedAt, productById, eventsByOrder.get(o.id) || [], borrowsByOrder.get(o.id) || [], now), owed);
+    // Shelf shortages only once the order is due (paid, COD or installment):
+    // a lay-away still being paid off isn't bought for.
+    const osIds = new Set(osMissing.map((m) => m.productId));
+    const shelfMissing = paidAt && NOT_PICKED_STATUSES.includes(o.status)
+      ? (shortages.get(o.id) || []).filter((s) => !osIds.has(s.productId)).map((s) => shortageToMissing(s, paidAt, now))
+      : [];
+    const missing = [...osMissing, ...shelfMissing];
     const osRounds = new Set(orderIssues.map((i) => String(i.created_at).slice(0, 16))).size;
     const { followUps, lastFollowUp, hold, sendToday, sendTodayBlock, urgent, reserved } = summarizeEvents(eventsByOrder.get(o.id) || [], now);
     const itemCount = lineCount.get(o.id) || 0;

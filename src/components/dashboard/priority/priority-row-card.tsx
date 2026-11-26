@@ -50,6 +50,7 @@ const ITEM_STATE: Record<MissingState, string> = {
   decide: 'OS — waiting for sales to decide',
   remove_item: 'Remove it from the order',
   buy: 'To buy',
+  not_on_shelf: 'Not on the shelf',
   supplier_return: 'Supplier owes a replacement',
   in_transit: 'Bought',
   transit_late: 'Bought — late',
@@ -187,6 +188,7 @@ export function PriorityRowCard({ row, rank, perms, onAction, onDecide }: Props)
                   <span className="text-muted-foreground">
                     — {ITEM_STATE[m.state]}
                     {m.state === 'decide' && ` since ${shortDate(m.since)}`}
+                    {m.onShelf != null && m.onShelf > 0 && ` (${m.onShelf} left on the shelf)`}
                     {(m.state === 'in_transit' || m.state === 'transit_late') && m.eta && `, ETA ${shortDate(m.eta)}`}
                     {m.state === 'supplier_return' && m.eta && `, due ${shortDate(m.eta)}`}
                     {m.stageLabel && ` (${m.stageLabel})`}

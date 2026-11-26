@@ -14,7 +14,7 @@ import { isPickDeferred } from '@/lib/shipping/ship-hold-rules';
 const DAY = 24 * 60 * 60 * 1000;
 
 export const PRIORITY_RULES = {
-  /** Paid and everything in stock: booked within this many days of full payment. */
+  /** Paid and everything picked or on the shelf: booked within this many days of full payment. */
   packDays: 2,
   /** Packed: booked (SPX Excel sync → For Pick-up) within this many days. */
   bookDays: 1,
@@ -80,7 +80,8 @@ export type BlockReason = keyof typeof BLOCK_REASONS;
 
 export type PriorityGroup = 'send_today' | 'ready' | 'waiting' | 'prep' | 'stale' | 'hold';
 export type PriorityOwner = 'warehouse' | 'sales' | 'buyer' | 'none';
-export type MissingState = 'decide' | 'remove_item' | 'buy' | 'supplier_return' | 'in_transit' | 'transit_late' | 'arrived';
+/** not_on_shelf: not picked yet and the shelf can't cover it, nothing bought yet (no OS report needed). */
+export type MissingState = 'decide' | 'remove_item' | 'buy' | 'not_on_shelf' | 'supplier_return' | 'in_transit' | 'transit_late' | 'arrived';
 
 /** Sales' answer for an OS item. */
 export const OS_DECISIONS = {
@@ -104,6 +105,8 @@ export interface MissingItem {
   stageLabel: string | null;
   /** This item was taken from this order to fill another order. */
   borrowedFor?: { toOrderId: string; byName: string | null; at: string } | null;
+  /** Not picked yet: pieces the shelf has for it (taken by orders ahead, or not enough). */
+  onShelf?: number;
   /** Sales' latest decision for this item on this order. */
   decision: { kind: OsDecision; note: string | null; byName: string | null; at: string } | null;
 }
@@ -206,6 +209,7 @@ export const STEP_LABELS: Record<PriorityStep, string> = {
   decide: 'OS — sales to decide (wait, send the rest, or remove)',
   remove_item: 'Decided — sales to remove the item from the order (Edit order)',
   buy: 'OS — to buy',
+  not_on_shelf: 'Not enough on the shelf — buy it (on Need to Buy) or count the shelf',
   supplier_return: 'Waiting for supplier replacement — chase the supplier',
   in_transit: 'Bought — waiting for delivery',
   transit_late: 'Bought — delivery is late',
@@ -227,12 +231,13 @@ export const OWNER_LABELS: Record<PriorityOwner, string> = {
 };
 
 /** Which blocked item decides the order's next step, most urgent first. */
-const STATE_PRECEDENCE: MissingState[] = ['decide', 'remove_item', 'buy', 'supplier_return', 'transit_late', 'in_transit', 'arrived'];
+const STATE_PRECEDENCE: MissingState[] = ['decide', 'remove_item', 'buy', 'not_on_shelf', 'supplier_return', 'transit_late', 'in_transit', 'arrived'];
 
 const STATE_OWNER: Record<MissingState, PriorityOwner> = {
   decide: 'sales',
   remove_item: 'sales',
   buy: 'buyer',
+  not_on_shelf: 'buyer',
   supplier_return: 'buyer',
   transit_late: 'buyer',
   in_transit: 'none',
@@ -243,6 +248,7 @@ const STATE_DAYS: Record<MissingState, number | null> = {
   decide: PRIORITY_RULES.decideDays,
   remove_item: PRIORITY_RULES.decideDays,
   buy: PRIORITY_RULES.buyDays,
+  not_on_shelf: PRIORITY_RULES.buyDays,
   supplier_return: null, // due = supplier's replacement limit
   transit_late: null, // due = eta
   in_transit: null, // due = eta
