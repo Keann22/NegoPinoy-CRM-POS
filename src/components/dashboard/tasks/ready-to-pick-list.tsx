@@ -147,27 +147,10 @@ export function ReadyToPickList() {
             Orders disappear here automatically once picked.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="print:hidden"
-            onClick={printOnly}
-            disabled={filtered.length === 0 || printingBatch}
-            title={
-              selectedRanked.length > 0
-                ? 'Print a checklist of the selected orders (not full order forms)'
-                : 'Print a checklist of the orders shown below (not full order forms)'
-            }
-          >
-            <Printer className="mr-1.5 h-4 w-4" />
-            {selectedRanked.length > 0 ? `Print List (${selectedRanked.length} selected)` : 'Print List'}
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => void reload()} disabled={isLoading}>
-            <RefreshCw className={cn('mr-1.5 h-4 w-4', isLoading && 'animate-spin')} />
-            Refresh
-          </Button>
-        </div>
+        <Button variant="outline" size="sm" onClick={() => void reload()} disabled={isLoading}>
+          <RefreshCw className={cn('mr-1.5 h-4 w-4', isLoading && 'animate-spin')} />
+          Refresh
+        </Button>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -207,7 +190,24 @@ export function ReadyToPickList() {
               </button>
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Button
+              size="sm"
+              className="print:hidden bg-emerald-600 text-white hover:bg-emerald-700"
+              onClick={printOnly}
+              disabled={filtered.length === 0 || printingBatch}
+              title={
+                selectedRanked.length > 0
+                  ? 'Print a checklist of the selected orders (not full order forms)'
+                  : 'Print a checklist of all orders shown below (not full order forms)'
+              }
+            >
+              <Printer className="mr-1.5 h-4 w-4" />
+              {selectedRanked.length > 0
+                ? `Print List (${selectedRanked.length})`
+                : `Print List (All ${filtered.length})`}
+            </Button>
+            <span className="hidden h-5 w-px bg-border sm:inline-block" aria-hidden="true" />
             <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
               <Checkbox checked={compactPrint} onCheckedChange={(v) => setCompactPrint(Boolean(v))} />
               <span>Compact (combine on same paper)</span>
@@ -223,7 +223,7 @@ export function ReadyToPickList() {
               ) : (
                 <Printer className="mr-1.5 h-4 w-4" />
               )}
-              Reprint Selected ({selectedIds.size})
+              Reprint Order Forms ({selectedIds.size})
             </Button>
           </div>
         </div>
