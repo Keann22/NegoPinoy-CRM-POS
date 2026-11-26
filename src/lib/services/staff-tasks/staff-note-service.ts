@@ -39,6 +39,12 @@ async function teams(supabase: SupabaseClient): Promise<Team[]> {
   ];
 }
 
+/** All accounts of the Inventory team (Jas, Al, Tess, Edric, Rey). */
+export async function inventoryTeam(supabase: SupabaseClient): Promise<{ ids: string[]; names: string }> {
+  const t = (await teams(supabase)).find((x) => x.team === 'inventory')!;
+  return { ids: t.ids, names: t.names };
+}
+
 async function orderAgent(supabase: SupabaseClient, orderId: string | null, all: Person[]): Promise<Person | null> {
   if (!orderId) return null;
   const { data } = await supabase.from('orders').select('sales_person_name').eq('id', orderId).maybeSingle();

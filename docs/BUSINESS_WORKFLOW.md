@@ -707,6 +707,17 @@ How it works (built 2026-11-20):
   **paid** order isn't cancelled from the task: it becomes a Problem so the owners
   decide store credit or refund. Warehouse staff keep Working on it / Done. Owners'
   Tasks page counts **Waiting for customer**.
+- **OK to ship tells the warehouse (owner, 2026-11-26).** Found 2026-11-26: the
+  owner gave "Please pick and book" to Jas and the sales agent together; sales
+  tapped OK to ship on 25 orders in half an hour, but only their own copy closed,
+  so Jas never knew. Now OK to ship also goes to the warehouse: Jas's (or any
+  Inventory staff's) open copy of a task on that order gets it as a reply, pops up
+  again and shows a green **OK to ship · agent · time** tag until she taps Done
+  (no note needed). A task only sales had gets one shared task for the Inventory
+  team ("OK to ship: pick, pack and book", due 6 PM, or noon tomorrow after 4 PM);
+  whoever books it taps Done and the agent gets the bell. A warehouse copy the
+  owners cancelled (e.g. Jas taken off Photo orders) is left alone. The order's
+  Activity notes it. Code: `ok-to-ship-service.ts`.
 
 ## Put back the pieces of a cancelled order (owner, 2026-11-23; built 2026-11-23)
 

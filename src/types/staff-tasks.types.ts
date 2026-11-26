@@ -59,6 +59,9 @@ export interface StaffTask {
   unseenTooLong: boolean;
   /** The sender already saw the "not seen in 2 hours" alert. */
   senderNudged: boolean;
+  /** Sales answered OK to ship (owner, 2026-11-26): the warehouse copy shows a green tag. */
+  okToShipAt: string | null;
+  okToShipBy: string | null;
 }
 
 export type NoteTeam = 'inventory' | 'owners';

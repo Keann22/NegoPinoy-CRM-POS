@@ -18,7 +18,7 @@ export class TaskError extends Error {}
 
 export const TASKS_PAGE = '/dashboard/tasks';
 
-export const SELECT = 'id, message, order_id, assignee_name, assigned_by_name, due_at, status, seen_at, seen_by_name, progress, progress_note, progress_at, progress_by_name, done_at, done_by_name, done_note, done_photo_url, created_at, last_message_at, last_message_from_owner, staff_read_at, owner_read_at, group_id, kind, needs_answer, team, sender_nudged_at, staff_task_messages(count), orders(status, customers(full_name))';
+export const SELECT = 'id, message, order_id, assignee_name, assigned_by_name, due_at, status, seen_at, seen_by_name, progress, progress_note, progress_at, progress_by_name, done_at, done_by_name, done_note, done_photo_url, created_at, last_message_at, last_message_from_owner, staff_read_at, owner_read_at, group_id, kind, needs_answer, team, sender_nudged_at, ok_to_ship_at, ok_to_ship_by, staff_task_messages(count), orders(status, customers(full_name))';
 
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
 
@@ -31,6 +31,7 @@ export interface TaskRow {
   group_id: string | null;
   kind: string | null;
   needs_answer?: boolean | null; team?: string | null; sender_nudged_at?: string | null;
+  ok_to_ship_at?: string | null; ok_to_ship_by?: string | null;
   last_message_at: string | null; last_message_from_owner: boolean | null; staff_read_at: string | null; owner_read_at: string | null;
   staff_task_messages?: { count: number }[] | null;
   orders?: OrderJoin | OrderJoin[] | null;
@@ -87,6 +88,8 @@ export function toTask(r: TaskRow): StaffTask {
     ),
     unseenTooLong: isNote && r.status === 'open' && !r.seen_at && Date.now() - new Date(r.created_at).getTime() > NOTE_UNSEEN_MS,
     senderNudged: !!r.sender_nudged_at,
+    okToShipAt: r.ok_to_ship_at || null,
+    okToShipBy: r.ok_to_ship_by || null,
   };
 }
 
@@ -203,7 +206,7 @@ export async function createTask(
 export async function getRow(supabase: SupabaseClient, id: string) {
   const { data, error } = await supabase
     .from('staff_tasks')
-    .select('id, message, status, due_at, assignee_ids, assignee_name, assigned_by_name, seen_at, order_id, kind, needs_answer, sender_ids')
+    .select('id, message, status, due_at, assignee_ids, assignee_name, assigned_by_name, seen_at, order_id, kind, needs_answer, sender_ids, group_id')
     .eq('id', id)
     .maybeSingle();
   if (error) throw error;

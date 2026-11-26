@@ -29,7 +29,8 @@ export function TaskDoneDialog({ task, view = 'staff', onOpenChange, onDone, onH
   const orderClosed = isOrderTask && !!task.orderStatus && !OPEN_ORDER_STATUSES.includes(task.orderStatus);
   const hold = isOrderTask ? task.orderContext?.hold || null : null;
   const holdExpired = !!hold?.detail && hold.detail.checkOn <= phtToday();
-  const hasActivePlan = !!hold && !holdExpired;
+  // Sales said OK to ship: Done means it was booked, no explanation needed.
+  const hasActivePlan = (!!hold && !holdExpired) || !!task?.okToShipAt;
   const needsActionWarning = isOrderTask && !!task.orderContext && !orderClosed && !hasActivePlan;
   const needsNote = view === 'staff' && needsActionWarning;
   const canSave = !needsNote || note.trim().length > 0;

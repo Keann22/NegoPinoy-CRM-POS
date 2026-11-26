@@ -6,13 +6,15 @@ import { releaseShipHold } from '@/lib/services/shipping/ship-hold-service';
 import { OPEN_ORDER_STATUSES, shortOrderId } from '@/lib/shipping/ship-hold-rules';
 import type { TaskAnswer } from '@/types/staff-tasks.types';
 import { getRow, markDone, setProgress, TaskError, type TaskCaller } from './staff-task-service';
+import { tellWarehouseOkToShip } from './ok-to-ship-service';
 
 /*
  * Answer buttons on a task about an order (owner, 2026-11-25). Sales answered
  * "check with the customer: ship or cancel?" tasks with free-text replies, so
  * the task stayed open and nothing changed on the order. Each button now does
  * the real thing and closes the task with the outcome as its Done note:
- *   OK to ship          releases the order's hold (if any), then Done.
+ *   OK to ship          releases the order's hold (if any), then Done, and tells
+ *                       the warehouse (ok-to-ship-service.ts, owner 2026-11-26).
  *   Customer hasn't
  *   replied             progress 'waiting': no late flag, back in 4 hours.
  *   Cancel the order    unpaid: cancels it (stock back, put-back task if picked).
@@ -94,7 +96,9 @@ export async function answerTask(
     if (hold) await releaseShipHold(supabase, hold.id as string, caller.name);
     const parts = ['OK to ship', hold ? 'hold released' : null, note || null].filter(Boolean);
     await markDone(supabase, taskId, caller, { note: parts.join(' · ') });
-    return { outcome: hold ? 'Hold released: the order is back on Ready to ship.' : `${short} is marked OK to ship.` };
+    const told = await tellWarehouseOkToShip(supabase, row, { id: caller.id, name: caller.name }, note || null);
+    const warehouse = told.told.length || told.created ? ' The warehouse was told.' : '';
+    return { outcome: (hold ? 'Hold released: the order is back on Ready to ship.' : `${short} is marked OK to ship.`) + warehouse };
   }
 
   // answer === 'cancel'

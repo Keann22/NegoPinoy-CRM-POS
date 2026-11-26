@@ -124,6 +124,13 @@ export function TaskItem({ task, view, busy, onSeen, onProgress, onDone, onCance
           {task.orderStatus && <span className="text-muted-foreground">· {task.orderStatus}</span>}
         </Link>
       )}
+      {task.okToShipAt && (
+        <p className="flex flex-wrap items-center gap-1.5 rounded-md bg-emerald-100 px-2.5 py-1.5 text-sm font-medium text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-200">
+          <CheckCircle2 className="h-4 w-4" />
+          OK to ship{task.okToShipBy ? ` · ${task.okToShipBy}` : ''} · {phtWhen(task.okToShipAt)}
+          {open && view === 'staff' && <span className="font-normal">: pick, pack and book, then tap Done.</span>}
+        </p>
+      )}
       {closedOrder && (
         <p className="rounded-md bg-emerald-50 px-2.5 py-1.5 text-xs text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
           Order {task.orderShortId} is now {task.orderStatus} — tap Done if nothing else is needed.
