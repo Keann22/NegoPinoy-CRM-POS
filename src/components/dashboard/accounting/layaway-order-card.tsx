@@ -36,6 +36,7 @@ interface LayawayOrderCardProps {
   onSaveNotes: (orderId: string, notes: string) => Promise<boolean>;
   onAppendNote: (orderId: string, newNoteText: string, authorName: string) => Promise<boolean>;
   onUpdateStatus: (orderId: string, status: string, reason?: string) => Promise<boolean>;
+  onRequestCancel?: (order: LayawayReviewOrder) => void;
   onViewHistory: (customerId?: string, customerName?: string) => void;
 }
 
@@ -46,6 +47,7 @@ export function LayawayOrderCard({
   onSaveNotes,
   onAppendNote,
   onUpdateStatus,
+  onRequestCancel,
   onViewHistory,
 }: LayawayOrderCardProps) {
   // Existing notes edit state
@@ -350,6 +352,10 @@ export function LayawayOrderCard({
                   variant="outline"
                   disabled={isUpdating}
                   onClick={() => {
+                    if (onRequestCancel) {
+                      onRequestCancel(order);
+                      return;
+                    }
                     const reason = window.prompt(
                       `Cancel Order #${order.id.substring(0, 8)}?\nEnter reason (e.g. 'Customer abandoned lay-away'):`,
                       'Abandoned lay-away (>90 days)'

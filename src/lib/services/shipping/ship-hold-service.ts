@@ -24,14 +24,14 @@ export class ShipHoldError extends Error {}
 
 const TABLE = 'order_ship_holds';
 const HOLD_COLS = 'id, order_id, group_id, kind, ship_via, note, check_on, ask_again_at, created_by_name, created_at';
-const ORDER_COLS = 'id, status, balance_due, payment_method, sales_person_name, customer_id, not_for_shipping_reason, customers(full_name)';
+const ORDER_COLS = 'id, status, balance_due, amount_paid, payment_method, sales_person_name, customer_id, not_for_shipping_reason, customers(full_name)';
 
 interface HoldRow {
   id: string; order_id: string; group_id: string | null; kind: ShipHoldKind; ship_via: ShipVia;
   note: string | null; check_on: string; ask_again_at: string | null; created_by_name: string | null; created_at: string;
 }
 interface OrderRow {
-  id: string; status: string; balance_due: number | string | null; payment_method: string | null;
+  id: string; status: string; balance_due: number | string | null; amount_paid?: number | string | null; payment_method: string | null;
   sales_person_name: string | null; customer_id: string | null; not_for_shipping_reason: string | null;
   customers?: { full_name: string | null } | { full_name: string | null }[] | null;
 }
@@ -55,7 +55,7 @@ function buildDetails(holds: HoldRow[], orders: Map<string, OrderRow>): Map<stri
   byKey.forEach((rows) => {
     const first = [...rows].sort((a, b) => a.created_at.localeCompare(b.created_at))[0];
     const groupOrders = rows.map((h) => orders.get(h.order_id)).filter((o): o is OrderRow => !!o).map((o) => {
-      const base = { status: o.status, balanceDue: Number(o.balance_due || 0), paymentMethod: o.payment_method };
+      const base = { status: o.status, balanceDue: Number(o.balance_due || 0), amountPaid: Number(o.amount_paid || 0), paymentMethod: o.payment_method };
       return { id: o.id, shortId: shortOrderId(o.id), ...base, ...orderReadiness(base, first.ship_via) };
     });
     const detail: ShipHoldDetail = {

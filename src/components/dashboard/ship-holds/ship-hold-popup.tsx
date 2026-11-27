@@ -14,6 +14,7 @@ import type { ShipHoldAnswer, ShipHoldKind, ShipHoldPrompt } from '@/types/ship-
 import { PickQuestionCard } from './pick-question-card';
 import { ShipHoldDialog } from './ship-hold-dialog';
 import { ShipHoldPromptCard } from './ship-hold-prompt-card';
+import { CancelOrderDialog, type CancelOrderTarget } from '@/components/dashboard/orders/cancel-order-dialog';
 
 const REFRESH_MS = 5 * 60 * 1000;
 
@@ -32,6 +33,7 @@ export function ShipHoldPopup() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editOrderId, setEditOrderId] = useState<string | null>(null);
   const [editKind, setEditKind] = useState<ShipHoldKind | undefined>(undefined);
+  const [cancelTarget, setCancelTarget] = useState<CancelOrderTarget | null>(null);
 
   const load = useCallback(() => Promise.all([
     fetchShipHoldPrompts().then(setPrompts),
@@ -79,13 +81,22 @@ export function ShipHoldPopup() {
 
   const openEdit = (orderId: string | null, kind?: ShipHoldKind) => { setEditKind(kind); setEditOrderId(orderId); };
   const editDialog = (
-    <ShipHoldDialog
-      orderId={editOrderId}
-      open={!!editOrderId}
-      defaultKind={editKind}
-      onOpenChange={(o) => { if (!o) setEditOrderId(null); }}
-      onSaved={load}
-    />
+    <>
+      <ShipHoldDialog
+        orderId={editOrderId}
+        open={!!editOrderId}
+        defaultKind={editKind}
+        onOpenChange={(o) => { if (!o) setEditOrderId(null); }}
+        onSaved={load}
+      />
+      <CancelOrderDialog
+        order={cancelTarget}
+        open={!!cancelTarget}
+        onOpenChange={(o) => { if (!o) setCancelTarget(null); }}
+        source="ship hold popup"
+        onCancelled={() => load()}
+      />
+    </>
   );
 
   const total = prompts.length + questions.length;
@@ -109,7 +120,7 @@ export function ShipHoldPopup() {
   const complete = prompts.filter((p) => p.reason === 'complete').length;
   return (
     <>
-      <Dialog open={!editOrderId} onOpenChange={(o) => { if (!o) setMinimized(true); }}>
+      <Dialog open={!editOrderId && !cancelTarget} onOpenChange={(o) => { if (!o) setMinimized(true); }}>
         <DialogContent
           className="max-h-[90vh] max-w-lg overflow-y-auto"
           onPointerDownOutside={(e) => e.preventDefault()}
@@ -140,6 +151,12 @@ export function ShipHoldPopup() {
                 busy={busyId === p.id}
                 onAnswer={(a, checkOn) => answer(p, a, checkOn)}
                 onEdit={() => openEdit(p.detail.orders[0]?.id || null)}
+                onCancel={p.detail.orders[0] ? () => setCancelTarget({
+                  id: p.detail.orders[0].id,
+                  customerName: p.customerName,
+                  status: p.detail.orders[0].status,
+                  amountPaid: p.detail.orders[0].amountPaid,
+                }) : undefined}
               />
             ))}
           </ul>

@@ -24,6 +24,7 @@ import { MarkShippedDialog } from '@/components/dashboard/mark-shipped-dialog';
 import { WaybillSummaryDialog } from '@/components/dashboard/waybill-summary-dialog';
 import { OnHoldReasonDialog } from '@/components/dashboard/on-hold-reason-dialog';
 import { OpenReturnDialog } from '@/components/dashboard/customer-returns/open-return-dialog';
+import { CancelOrderDialog, type CancelOrderTarget } from '@/components/dashboard/orders/cancel-order-dialog';
 import type { CustomerReturnSource } from '@/types/customer-returns.types';
 
 import { OrdersFilterBar } from '@/components/dashboard/orders/OrdersFilterBar';
@@ -62,6 +63,7 @@ export default function OrdersPage() {
   const [viewWaybillOrder, setViewWaybillOrder] = useState<Order | null>(null);
   const [onHoldOrder, setOnHoldOrder] = useState<Order | null>(null);
   const [processReturnOrder, setProcessReturnOrder] = useState<{ order: Order; source: CustomerReturnSource } | null>(null);
+  const [cancelOrderTarget, setCancelOrderTarget] = useState<CancelOrderTarget | null>(null);
 
   // ── Filter/selection state ─────────────────────────────────────────────────
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
@@ -161,6 +163,10 @@ export default function OrdersPage() {
       toast({ variant: 'destructive', title: 'Cannot bulk-return', description: 'Process returns individually so the item, quantity, and reason can be captured.' });
       return;
     }
+    if (newStatus === 'Cancelled') {
+      toast({ variant: 'destructive', title: 'Cannot bulk-cancel', description: 'Cancel orders one by one so the reason, paid amount, and warehouse put-back task are handled properly.' });
+      return;
+    }
     try {
       for (const orderId of selectedOrderIds) {
         const currentStatus = orders?.find(o => o.id === orderId)?.orderStatus;
@@ -189,6 +195,14 @@ export default function OrdersPage() {
         order={processReturnOrder?.order ?? null}
         defaultSource={processReturnOrder?.source}
         onOpened={() => refetch()}
+      />
+
+      <CancelOrderDialog
+        order={cancelOrderTarget}
+        open={!!cancelOrderTarget}
+        onOpenChange={(open) => !open && setCancelOrderTarget(null)}
+        source="orders list"
+        onCancelled={() => refetch()}
       />
 
       <Card>
@@ -245,6 +259,17 @@ export default function OrdersPage() {
               } else if (newStatus === 'Returned') {
                 const order = orders?.find(o => o.id === id);
                 if (order) setProcessReturnOrder({ order, source: 'rts' });
+              } else if (newStatus === 'Cancelled') {
+                const order = orders?.find(o => o.id === id);
+                if (order) {
+                  setCancelOrderTarget({
+                    id: order.id,
+                    customerName: customerMap.get(order.customerId) || null,
+                    status: order.orderStatus,
+                    amountPaid: order.amountPaid,
+                    totalAmount: order.totalAmount,
+                  });
+                }
               } else {
                 handleStatusChange(id, newStatus);
               }

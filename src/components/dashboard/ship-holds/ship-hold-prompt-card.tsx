@@ -18,10 +18,11 @@ interface Props {
   busy: boolean;
   onAnswer: (answer: ShipHoldAnswer, checkOn?: string) => void;
   onEdit: () => void;
+  onCancel?: () => void;
 }
 
 /** One held order (or ship-together group) in the pop-up, with the agent's answers. */
-export function ShipHoldPromptCard({ prompt: p, busy, onAnswer, onEdit }: Props) {
+export function ShipHoldPromptCard({ prompt: p, busy, onAnswer, onEdit, onCancel }: Props) {
   const [askDate, setAskDate] = useState<string | null>(null);
   const d = p.detail;
   const title = p.reason === 'complete'
@@ -56,6 +57,11 @@ export function ShipHoldPromptCard({ prompt: p, busy, onAnswer, onEdit }: Props)
           <Button size="sm" variant="outline" disabled={busy} onClick={() => setAskDate(addDaysPht(DEFAULT_CHECK_DAYS))}>Not yet</Button>
           <Button size="sm" variant="ghost" disabled={busy} onClick={() => onAnswer('waiting')}>Asked customer, waiting</Button>
           <Button size="sm" variant="ghost" disabled={busy} onClick={onEdit}>Change hold</Button>
+          {onCancel && (
+            <Button size="sm" variant="ghost" disabled={busy} onClick={onCancel} className="text-destructive hover:text-destructive hover:bg-destructive/10">
+              Cancel order
+            </Button>
+          )}
           <Button size="sm" variant="link" asChild className="px-1">
             <Link href={`/dashboard/orders/${d.orders[0]?.id}`}>Open order</Link>
           </Button>

@@ -1,35 +1,31 @@
 'use client';
 
-import Link from 'next/link';
-import { useState, useMemo } from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useEffect, useMemo, useState } from 'react';
+import { Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CheckCircle2, XCircle, Search, RotateCcw, Bus } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { useSupabase } from '@/lib/supabase/hooks';
-import { useEffect } from 'react';
-import { Skeleton } from '@/components/ui/skeleton';
-import { format, differenceInDays } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { VerifyShippingDialog } from '@/components/dashboard/verify-shipping-dialog';
-import { ShipHoldDialog } from '@/components/dashboard/ship-holds/ship-hold-dialog';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RevertPendingDialog } from '@/components/dashboard/revert-pending-dialog';
-import { Order } from '@/app/dashboard/orders/page';
-
-type PackedOrder = Order & {
-  customerName: string;
-  daysPacked: number;
-  packedDate: string;
-};
+import { ShipHoldDialog } from '@/components/dashboard/ship-holds/ship-hold-dialog';
+import { VerifyShippingDialog } from '@/components/dashboard/verify-shipping-dialog';
+import { CancelOrderDialog, type CancelOrderTarget } from '@/components/dashboard/orders/cancel-order-dialog';
+import { PackedOrderRow } from '@/components/dashboard/packed-orders/packed-order-row';
+import { AssignTaskDialog, type TaskOrderRef } from '@/components/dashboard/tasks/assign-task-dialog';
+import { usePackedOrders, type PackedOrderRowData } from '@/hooks/usePackedOrders';
+import { useRoleCheck } from '@/hooks/useRoleCheck';
+import type { Order } from '@/types';
 
 export default function PackedOrdersPage() {
-  const supabase = useSupabase();
+  const { orders: rawOrders, isLoading, refetch } = usePackedOrders();
+  const { isManagement, isSales } = useRoleCheck();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSalesPerson, setFilterSalesPerson] = useState<string>('All');
-  
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [activeTab, setActiveTab] = useState('ready');
@@ -41,123 +37,60 @@ export default function PackedOrdersPage() {
   const [verifyOrder, setVerifyOrder] = useState<Order | null>(null);
   const [notForShippingOrder, setNotForShippingOrder] = useState<Order | null>(null);
   const [revertOrder, setRevertOrder] = useState<Order | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<CancelOrderTarget | null>(null);
+  const [askSalesTarget, setAskSalesTarget] = useState<{
+    order: TaskOrderRef;
+    assigneeName: string | null;
+    defaultMessage: string;
+  } | null>(null);
 
-  const [rawOrders, setRawOrders] = useState<Order[]>([]);
-  const [isLoadingOrders, setIsLoadingOrders] = useState(true);
-  const [refetchTrigger, setRefetchTrigger] = useState(0);
-  const refetchOrders = () => setRefetchTrigger(n => n + 1);
-
-  useEffect(() => {
-    if (!supabase) return;
-    const fetch = async () => {
-      setIsLoadingOrders(true);
-      try {
-        const { data, error } = await supabase
-          .from('orders')
-          .select('*')
-          .eq('status', 'Packed')
-          .order('order_date', { ascending: false });
-        if (error) throw error;
-        setRawOrders((data || []).map((o: any) => ({
-          id: o.id,
-          customerId: o.customer_id,
-          orderDate: o.order_date,
-          status: o.status,
-          orderStatus: o.status, // map DB status to typed orderStatus
-          subtotal: o.subtotal || o.total_amount || 0,
-          totalDiscount: o.discount_amount || 0,
-          totalAmount: o.total_amount,
-          discountAmount: o.discount_amount,
-          paymentMethod: o.payment_method,
-          paymentType: o.payment_method, // Maps db payment_method to expected paymentType
-          amountPaid: o.amount_paid || 0,
-          balanceDue: o.balance_due || 0,
-          monthlyPayment: o.monthly_payment || 0,
-          installmentMonths: o.installment_months || 0,
-          courierName: o.courier_name,
-          shippingFee: o.shipping_fee,
-          deliveryAddress: o.delivery_address,
-          contactNumber: o.contact_number,
-          trackingNumber: o.tracking_number,
-          proofOfPayment: o.proof_of_payment,
-          paymentDetails: o.payment_details,
-          notes: o.notes,
-          salesRepId: o.sales_rep_id,
-          salesPersonName: o.sales_person_name,
-          not_for_shipping_reason: o.not_for_shipping_reason,
-          boxes_config: o.boxes_config,
-          // Set ahead of time on replacement orders from Customer Returns (free shipping / SF only).
-          shipping_payment_type: o.shipping_payment_type,
-          packedDate: o.packed_at || o.order_date,
-        })));
-      } catch (err) { console.error('Packed orders fetch error:', err); }
-      finally { setIsLoadingOrders(false); }
-    };
-    fetch();
-  }, [supabase, refetchTrigger]);
-
-  const [customerMap, setCustomerMap] = useState<Map<string, string>>(new Map());
-  const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
-
-  // Fetch customers for the packed orders
-  useMemo(() => {
-    if (!rawOrders || rawOrders.length === 0 || !supabase) return;
-    const fetchCustomers = async () => {
-      setIsLoadingCustomers(true);
-      try {
-        const customerIds = Array.from(new Set(rawOrders.map(o => o.customerId)));
-        const { data, error } = await supabase.from('customers').select('id, full_name').in('id', customerIds);
-        if (error) throw error;
-        const map = new Map<string, string>();
-        if (data) (data as { id: string; full_name: string | null }[]).forEach(c => map.set(c.id, c.full_name || 'Unknown'));
-        setCustomerMap(map);
-      } catch (err) {
-        console.error('Error fetching customers:', err);
-      } finally {
-        setIsLoadingCustomers(false);
-      }
-    };
-    fetchCustomers();
-  }, [rawOrders, supabase]);
-
-  const isLoading = isLoadingOrders || isLoadingCustomers;
-
-  // Enhance orders with customer name and days packed
-  const formattedOrders: PackedOrder[] = useMemo(() => {
-    if (!rawOrders) return [];
+  const formattedOrders: PackedOrderRowData[] = useMemo(() => {
     let filtered = rawOrders;
-    
     if (searchQuery.trim() !== '') {
       const q = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter(o => 
-        (o.id || '').toLowerCase().includes(q) ||
-        (customerMap.get(o.customerId) || '').toLowerCase().includes(q)
+      filtered = filtered.filter((o) =>
+        (o.id || '').toLowerCase().includes(q) || o.customerName.toLowerCase().includes(q)
       );
     }
-
     if (filterSalesPerson !== 'All') {
-      filtered = filtered.filter((o: any) => o.salesPersonName === filterSalesPerson);
+      filtered = filtered.filter((o) => o.salesPersonName === filterSalesPerson);
     }
+    return filtered;
+  }, [rawOrders, searchQuery, filterSalesPerson]);
 
-    return filtered.map(order => ({
-      ...order,
-      customerName: customerMap.get(order.customerId) || 'Unknown Customer',
-      daysPacked: differenceInDays(new Date(), new Date((order as any).packedDate)),
-      packedDate: (order as any).packedDate
-    }));
-  }, [rawOrders, customerMap, searchQuery, filterSalesPerson]);
+  const uniqueSalesPersons = useMemo(
+    () => Array.from(new Set(rawOrders.map((o) => o.salesPersonName).filter(Boolean))).sort() as string[],
+    [rawOrders]
+  );
 
-  const uniqueSalesPersons = Array.from(new Set(rawOrders.map((o: any) => o.salesPersonName).filter(Boolean))).sort() as string[];
-
-  // Split into Ready and Waiting
-  const readyOrders = formattedOrders.filter(o => !(o as any).not_for_shipping_reason);
-  const waitingOrders = formattedOrders.filter(o => !!(o as any).not_for_shipping_reason);
+  const readyOrders = formattedOrders.filter((o) => !o.not_for_shipping_reason);
+  const waitingOrders = formattedOrders.filter((o) => !!o.not_for_shipping_reason);
 
   const currentOrders = activeTab === 'ready' ? readyOrders : waitingOrders;
   const totalPages = Math.max(1, Math.ceil(currentOrders.length / rowsPerPage));
   const paginatedData = currentOrders.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
 
-  const renderTable = (ordersToRender: PackedOrder[], isWaitingTab: boolean) => (
+  const handleOpenAskSales = (order: PackedOrderRowData) => {
+    const short = `#${order.id.slice(0, 7).toUpperCase()}`;
+    const paidPart = Number(order.amountPaid || 0) <= 0.009 ? ', ₱0 paid' : '';
+    setAskSalesTarget({
+      order: { id: order.id, label: `${short} · ${order.customerName}` },
+      assigneeName: order.salesPersonName || null,
+      defaultMessage: `Please check with customer: ship or cancel? (Packed ${order.daysPacked} days ago${paidPart})`,
+    });
+  };
+
+  const handleOpenCancel = (order: PackedOrderRowData) => {
+    setCancelTarget({
+      id: order.id,
+      customerName: order.customerName,
+      status: order.orderStatus,
+      amountPaid: order.amountPaid,
+      totalAmount: order.totalAmount,
+    });
+  };
+
+  const renderTable = (ordersToRender: PackedOrderRowData[], isWaitingTab: boolean) => (
     <Table>
       <TableHeader>
         <TableRow>
@@ -189,59 +122,19 @@ export default function PackedOrdersPage() {
             </TableCell>
           </TableRow>
         )}
-        {!isLoading && ordersToRender.map(order => (
-          <TableRow key={order.id}>
-            <TableCell className="font-mono text-sm">
-              <Link href={`/dashboard/orders/${order.id}`} className="font-semibold text-primary hover:underline">
-                {order.id.split('-')[0].toUpperCase()}
-              </Link>
-            </TableCell>
-            <TableCell className="font-medium">
-              {order.customerId ? (
-                <Link href={`/dashboard/customers/${order.customerId}`} className="text-primary hover:underline">
-                  {order.customerName}
-                </Link>
-              ) : order.customerName}
-            </TableCell>
-            <TableCell className="text-muted-foreground text-sm">{(order as any).salesPersonName || '-'}</TableCell>
-            <TableCell>
-              <div className="flex flex-col">
-                <span>{format(new Date(order.orderDate), 'MMM d, yyyy')}</span>
-                <span className="text-xs text-muted-foreground">
-                  {format(new Date(order.orderDate), 'p')}
-                </span>
-              </div>
-            </TableCell>
-            <TableCell>
-              <div className="flex flex-col">
-                <span>{format(new Date(order.packedDate), 'MMM d, yyyy')}</span>
-                <span className={order.daysPacked > 3 ? 'text-amber-600 text-xs font-semibold' : 'text-xs text-muted-foreground'}>
-                  {order.daysPacked} days ago
-                </span>
-              </div>
-            </TableCell>
-            {isWaitingTab && (
-              <TableCell className="text-muted-foreground text-sm max-w-[200px] truncate" title={(order as any).not_for_shipping_reason}>
-                {(order as any).not_for_shipping_reason}
-              </TableCell>
-            )}
-            <TableCell className="text-right">
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={() => setRevertOrder(order)} title="Revert to Processing">
-                  <RotateCcw className="h-4 w-4 mr-1" /> Revert
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setNotForShippingOrder(order)} className="text-destructive hover:text-destructive hover:bg-destructive/10" title="Not for shipping yet: why, and when to ask again">
-                  <XCircle className="h-4 w-4 mr-1" /> {isWaitingTab ? 'Change hold' : 'Delay'}
-                </Button>
-                <Button variant="outline" size="sm" asChild title="Went by bus: record the fee we paid">
-                  <Link href={`/dashboard/bus-shipping?order=${order.id}`}><Bus className="h-4 w-4 mr-1" /> Ship by bus</Link>
-                </Button>
-                <Button variant="default" size="sm" onClick={() => setVerifyOrder(order)} className="bg-emerald-600 hover:bg-emerald-700" title="Verify for shipping">
-                  <CheckCircle2 className="h-4 w-4 mr-1" /> Verify
-                </Button>
-              </div>
-            </TableCell>
-          </TableRow>
+        {!isLoading && ordersToRender.map((order) => (
+          <PackedOrderRow
+            key={order.id}
+            order={order}
+            isWaitingTab={isWaitingTab}
+            canCancel={isSales}
+            canAskSales={isManagement}
+            onRevert={setRevertOrder}
+            onHold={setNotForShippingOrder}
+            onVerify={setVerifyOrder}
+            onCancel={handleOpenCancel}
+            onAskSales={handleOpenAskSales}
+          />
         ))}
       </TableBody>
     </Table>
@@ -278,7 +171,7 @@ export default function PackedOrdersPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="All">All Sales Reps</SelectItem>
-                {uniqueSalesPersons.map(sp => (
+                {uniqueSalesPersons.map((sp) => (
                   <SelectItem key={sp} value={sp}>{sp}</SelectItem>
                 ))}
               </SelectContent>
@@ -294,12 +187,8 @@ export default function PackedOrdersPage() {
                 Waiting to be Shipped <Badge variant="secondary" className="ml-2 bg-background">{waitingOrders.length}</Badge>
               </TabsTrigger>
             </TabsList>
-            <TabsContent value="ready">
-              {renderTable(paginatedData, false)}
-            </TabsContent>
-            <TabsContent value="waiting">
-              {renderTable(paginatedData, true)}
-            </TabsContent>
+            <TabsContent value="ready">{renderTable(paginatedData, false)}</TabsContent>
+            <TabsContent value="waiting">{renderTable(paginatedData, true)}</TabsContent>
           </Tabs>
         </CardContent>
         {currentOrders.length > 0 && (
@@ -309,9 +198,7 @@ export default function PackedOrdersPage() {
             </div>
             <div className="flex items-center gap-2">
               <Select value={rowsPerPage.toString()} onValueChange={(val) => { setRowsPerPage(Number(val)); setCurrentPage(1); }}>
-                <SelectTrigger className="w-[70px] h-9">
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger className="w-[70px] h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="10">10</SelectItem>
                   <SelectItem value="20">20</SelectItem>
@@ -319,32 +206,47 @@ export default function PackedOrdersPage() {
                 </SelectContent>
               </Select>
               <div className="flex items-center border rounded-md h-9 px-1">
-                <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Prev</Button>
+                <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>Prev</Button>
                 <span className="text-sm mx-2 min-w-[3rem] text-center">{currentPage} / {totalPages}</span>
-                <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Next</Button>
+                <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Next</Button>
               </div>
             </div>
           </CardFooter>
         )}
       </Card>
 
-      <VerifyShippingDialog 
-        order={verifyOrder} 
-        open={!!verifyOrder} 
-        onOpenChange={(open) => !open && setVerifyOrder(null)} 
-        onSuccess={refetchOrders} 
+      <VerifyShippingDialog
+        order={verifyOrder}
+        open={!!verifyOrder}
+        onOpenChange={(open) => !open && setVerifyOrder(null)}
+        onSuccess={refetch}
       />
       <ShipHoldDialog
         orderId={notForShippingOrder?.id || null}
         open={!!notForShippingOrder}
         onOpenChange={(open) => !open && setNotForShippingOrder(null)}
-        onSaved={refetchOrders}
+        onSaved={refetch}
       />
       <RevertPendingDialog
         order={revertOrder}
         open={!!revertOrder}
         onOpenChange={(open) => !open && setRevertOrder(null)}
-        onSuccess={refetchOrders}
+        onSuccess={refetch}
+      />
+      <CancelOrderDialog
+        order={cancelTarget}
+        open={!!cancelTarget}
+        onOpenChange={(open) => !open && setCancelTarget(null)}
+        source="packed orders"
+        onCancelled={() => refetch()}
+      />
+      <AssignTaskDialog
+        open={!!askSalesTarget}
+        onOpenChange={(open) => !open && setAskSalesTarget(null)}
+        order={askSalesTarget?.order || null}
+        defaultAssigneeName={askSalesTarget?.assigneeName || null}
+        defaultMessage={askSalesTarget?.defaultMessage || ''}
+        onCreated={refetch}
       />
     </>
   );

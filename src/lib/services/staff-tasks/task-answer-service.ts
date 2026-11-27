@@ -1,11 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { addOrderNote } from '@/lib/services/order-trail-service';
-import { resolveOpenOrderIssues } from '@/lib/services/order-issues-service';
-import { handleStockStatusTransition } from '@/lib/services/orders/order-update';
+import { cancelOrder, OrderCancelError } from '@/lib/services/orders/order-cancel-service';
 import { releaseShipHold } from '@/lib/services/shipping/ship-hold-service';
-import { OPEN_ORDER_STATUSES, shortOrderId } from '@/lib/shipping/ship-hold-rules';
+import { shortOrderId } from '@/lib/shipping/ship-hold-rules';
 import type { TaskAnswer } from '@/types/staff-tasks.types';
-import { getRow, markDone, setProgress, TaskError, type TaskCaller } from './staff-task-service';
+import { getRow, markDone, TaskError, TASKS_PAGE, type TaskCaller } from './staff-task-service';
 import { tellWarehouseOkToShip } from './ok-to-ship-service';
 
 /*
@@ -103,37 +101,45 @@ export async function answerTask(
 
   // answer === 'cancel'
   if (!note) throw new TaskError('Write why the order is cancelled (what the customer said).');
-  const paid = Number(order.amount_paid || 0);
-  if (paid > 0.009) {
-    // Paid money has to go somewhere (store credit or refund): the owners decide.
-    await setProgress(supabase, taskId, caller, 'problem',
-      `Customer wants to cancel ${short}, but ₱${paid.toLocaleString('en-PH')} is paid: store credit or refund? (${note})`);
-    return { outcome: 'The owners were told (it has a payment). They decide store credit or refund.' };
-  }
-  if (!OPEN_ORDER_STATUSES.includes(order.status)) {
-    throw new TaskError(`${short} is ${order.status}: cancel it from the order page.`);
-  }
+  try {
+    const result = await cancelOrder(
+      supabase,
+      { orderId: order.id, reason: note, source: 'task answer', taskId },
+      { ...caller, canCancel: caller.canAnswer },
+    );
+    if (!result.cancelled) {
+      return { outcome: result.outcome };
+    }
+    // trg_zz_order_cancel_cleanup cancelled open non-put-back tasks during the status update;
+    // flip this answered task to 'done' with the outcome note and notify the assigner.
+    const now = new Date().toISOString();
+    const doneNote = `Cancelled the order: ${note}`;
+    await supabase
+      .from('staff_tasks')
+      .update({
+        status: 'done',
+        cancelled_at: null,
+        done_at: now,
+        done_by_name: caller.name,
+        done_note: doneNote,
+        seen_at: row.seen_at || now,
+        seen_by_name: row.seen_at ? undefined : caller.name,
+        ...(caller.isManagement ? { owner_read_at: now } : {}),
+      })
+      .eq('id', taskId);
 
-  // Log first: the put-back trigger skips its own nameless "Cancelled" row when one exists.
-  const { data: log } = await supabase.from('order_logs').insert({
-    order_id: order.id,
-    status: 'Cancelled',
-    user_name: caller.name,
-    snapshot_data: { from_status: order.status, reason: note, via: 'task answer' },
-  }).select('id').maybeSingle();
-  const { error: upErr } = await supabase
-    .from('orders')
-    .update({ status: 'Cancelled', completed_at: null })
-    .eq('id', order.id)
-    .eq('status', order.status);
-  if (upErr) {
-    if (log?.id) await supabase.from('order_logs').delete().eq('id', log.id);
-    throw upErr;
+    if (row.assigned_by_name && row.assigned_by_name !== caller.name) {
+      await supabase.from('notifications').insert({
+        sales_person_name: row.assigned_by_name,
+        title: 'Task done',
+        message: `${caller.name} (${short}): ${row.message} — "${doneNote}"`.slice(0, 240),
+        link: `${TASKS_PAGE}?task=${row.id}`,
+        is_read: false,
+      });
+    }
+    return { outcome: result.outcome };
+  } catch (e) {
+    if (e instanceof OrderCancelError) throw new TaskError(e.message);
+    throw e;
   }
-  // Same as Orders → status Cancelled: stock goes back (it was taken when the order was made).
-  await handleStockStatusTransition(supabase, order.id, order.status, 'Cancelled');
-  await resolveOpenOrderIssues(supabase, order.id, caller.name);
-  await addOrderNote(supabase, order.id, `Cancelled: ${note}`, caller.name);
-  await markDone(supabase, taskId, caller, { note: `Cancelled the order: ${note}` });
-  return { outcome: `${short} is cancelled.` };
 }

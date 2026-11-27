@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertTriangle, ClipboardCheck, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -69,10 +69,22 @@ interface Props {
   onCreated?: () => void;
   /** "Task for me" (owner, 2026-11-25): starts with yourself picked. */
   forSelf?: boolean;
+  /** Optional prefilled task text (e.g. from Packed Orders → Ask Sales). */
+  defaultMessage?: string;
+  /** Optional staff name to pre-select when opening. */
+  defaultAssigneeName?: string | null;
 }
 
 /** Owners give a staff member a task, optionally about an order, with an optional deadline. */
-export function AssignTaskDialog({ open, onOpenChange, order: fixedOrder, onCreated, forSelf = false }: Props) {
+export function AssignTaskDialog({
+  open,
+  onOpenChange,
+  order: fixedOrder,
+  onCreated,
+  forSelf = false,
+  defaultMessage = '',
+  defaultAssigneeName = null,
+}: Props) {
   const { toast } = useToast();
   const { user } = useUser();
   const allPeople = useTaskPeople(open);
@@ -83,14 +95,22 @@ export function AssignTaskDialog({ open, onOpenChange, order: fixedOrder, onCrea
     ? [{ ...allPeople.find((p) => p.key === myKey)!, name: 'Me', roles: [] }, ...allPeople.filter((p) => p.key !== myKey)]
     : allPeople;
   const [pickedKeys, setPickedKeys] = useState<string[] | null>(null);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState(defaultMessage);
   const [pickedOrder, setPickedOrder] = useState<TaskOrderRef | null>(null);
   const [due, setDue] = useState<DuePick>('none');
   const [dueDate, setDueDate] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Nobody tapped yet: "Task for me" starts with you picked.
-  const personKeys = pickedKeys ?? (forSelf && myKey ? [myKey] : []);
+  useEffect(() => {
+    if (open && defaultMessage) setMessage(defaultMessage);
+  }, [open, defaultMessage]);
+
+  const matchedDefaultKey = defaultAssigneeName
+    ? allPeople.find((p) => p.name.trim().toLowerCase() === defaultAssigneeName.trim().toLowerCase())?.key || null
+    : null;
+
+  // Nobody tapped yet: "Task for me" starts with you picked; otherwise optional default assignee.
+  const personKeys = pickedKeys ?? (forSelf && myKey ? [myKey] : matchedDefaultKey ? [matchedDefaultKey] : []);
   const onlyMe = personKeys.length === 1 && personKeys[0] === myKey;
 
   const order = fixedOrder || pickedOrder;

@@ -23,6 +23,7 @@ export interface ShipHoldOrder {
   shortId: string;
   status: string;
   balanceDue: number;
+  amountPaid?: number;
   paymentMethod: string | null;
   /** Packed and paid enough to go (COD counts as unpaid when going by bus). */
   ready: boolean;

@@ -304,6 +304,28 @@ export function useLayawayReview() {
     if (!supabase) return false;
     setIsUpdating(orderId);
     try {
+      if (newStatus === 'Cancelled') {
+        const res = await fetch('/api/orders/cancel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId,
+            reason: (customReason || 'Cancelled from Lay-away Review').trim(),
+            source: 'layaway review',
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Could not cancel order');
+        if (data.cancelled) {
+          setOrders((prev) => prev.filter((o) => o.id !== orderId));
+        }
+        toast({
+          title: data.requiresOwnerApproval ? 'Sent to Owners' : 'Order Cancelled',
+          description: data.outcome,
+        });
+        return true;
+      }
+
       const updatePayload: Record<string, unknown> = { status: newStatus };
       if (newStatus === 'Shipped') {
         updatePayload.shipped_at = new Date().toISOString();

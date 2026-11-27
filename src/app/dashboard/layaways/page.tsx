@@ -8,6 +8,7 @@ import { useLayawayCustomerHistory } from '@/hooks/useLayawayCustomerHistory';
 import { LayawayOrderCard } from '@/components/dashboard/accounting/layaway-order-card';
 import { LayawayHistoryDialog } from '@/components/dashboard/accounting/layaway-history-dialog';
 import { LayawayMetricCards } from '@/components/dashboard/accounting/layaway-metric-cards';
+import { CancelOrderDialog, type CancelOrderTarget } from '@/components/dashboard/orders/cancel-order-dialog';
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from '@/components/ui/card';
@@ -62,6 +63,7 @@ export default function LayawaysPage() {
   const [selectedAgent, setSelectedAgent] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
+  const [cancelOrderTarget, setCancelOrderTarget] = useState<CancelOrderTarget | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
@@ -306,6 +308,13 @@ export default function LayawaysPage() {
               onSaveNotes={updateOrderNotes}
               onAppendNote={appendOrderNote}
               onUpdateStatus={updateOrderStatus}
+              onRequestCancel={(o) => setCancelOrderTarget({
+                id: o.id,
+                customerName: o.customerName,
+                status: o.status,
+                amountPaid: o.amountPaid,
+                totalAmount: o.totalAmount,
+              })}
               onViewHistory={handleViewCustomerHistory}
             />
           ))}
@@ -346,6 +355,17 @@ export default function LayawaysPage() {
         customerName={historyCustomerName}
         orders={historyOrders}
         isLoading={isHistoryLoading}
+      />
+
+      <CancelOrderDialog
+        order={cancelOrderTarget}
+        open={!!cancelOrderTarget}
+        onOpenChange={(open) => !open && setCancelOrderTarget(null)}
+        source="layaway review"
+        defaultReason="Abandoned lay-away (>90 days)"
+        onCancelled={(res) => {
+          if (res.cancelled) refreshLayaways();
+        }}
       />
     </div>
   );
