@@ -87,8 +87,9 @@ Newest first. Older history: `git log`. Feature rules: `docs/BUSINESS_WORKFLOW.m
 - **2026-11-27** Cancel work-chain tested (Claude, rollback-only tests on live DB): works,
   except Edit Order on an already-cancelled order added phantom stock (fixed live,
   `2026-11-27_edit_cancelled_order_stock_fix.sql`) and #97F28E7's answered task was
-  closed as cancelled during the 11:16–14:41 DB/app gap (repaired to Done). Open for
-  owners: auto-reject of Pending payments on cancel vs store credit.
+  closed as cancelled during the 11:16–14:41 DB/app gap (repaired to Done).
+  2026-11-28: cancelling no longer auto-rejects Pending payments (owner decision,
+  `2026-11-28_cancel_keeps_pending_payments.sql`, applied live).
 - **2026-11-27** Messenger AI Sales Copilot (Phase 1) + Payment Detection
   Auto-Scan & Receipt Archiving: native Next.js + Supabase + Gemini 2.5 Flash
   pipeline (zero n8n, zero Meta Send API calls); Phase 1 Core 5 actions

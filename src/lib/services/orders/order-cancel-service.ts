@@ -58,7 +58,8 @@ const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ?
  * - Owners choose paid-amount disposition (store credit / refund / already handled).
  * - Writes order_logs first, guards status update, restores stock_level, and lets
  *   DB triggers restore shelf_stock, create the Al & Edric put-back task, and clean up
- *   open tasks, alerts, issues, pick skips, STAFF_DRAFT demand, pending payments, and siblings.
+ *   open tasks, alerts, issues, pick skips, STAFF_DRAFT demand, and siblings.
+ *   Pending payments stay Pending so owners still verify them against the GCash statement.
  */
 export async function cancelOrder(
   supabase: SupabaseClient,
