@@ -27,9 +27,12 @@ Both must keep this file current. Dates and times are Philippine time (UTC+8).
 
 Format: `- **Task** (Agent, started YYYY-MM-DD). Files/area. Status.`
 
-- **Messenger AI Sales Copilot: planning** (started 2026-11-24). Plan:
-  `docs/handover/2026-11-24_messenger_ai_sales_copilot_plan.md` (not committed yet).
-  Status: waiting on the open decisions in section 6 of the plan before step 1.
+- **Messenger AI Sales Copilot (Phase 1)** (Antigravity, started 2026-11-27).
+  `scripts/migrations/2026-11-27_messenger_ai_copilot.sql`,
+  `src/types/messenger-ai.types.ts`, `src/lib/services/messenger-ai/*`,
+  `src/app/api/messenger-ai/*`, `src/hooks/useMessengerAiActions.ts`,
+  `src/components/dashboard/messenger-ai/*`, `src/app/dashboard/approval-queue/page.tsx`,
+  `src/app/dashboard/layout.tsx`. Status: Phase 1 built (Core 5 actions, 1-tap multi-order switcher, Copy Reply for Meta Business Suite, zero n8n, `show_sales_popup = false` for owner dry-run first), DB migrated, typechecked & smoke-tested (uncommitted — ready for owner review/commit).
 
 Other uncommitted files seen 2026-11-25: `.claude/launch.json`,
 `docs/staff-guides/connect-messenger-chat.html`, `scripts/reports/1-week-buy-list.html`,
@@ -76,6 +79,15 @@ and new BUSINESS_WORKFLOW.md sections (Copilot, task actions).
 
 Newest first. Older history: `git log`. Feature rules: `docs/BUSINESS_WORKFLOW.md`.
 
+- **2026-11-27** Order Cancellation Work-Chain & Packed Orders upgrades: put-back
+  tasks assigned to Al & Edric only; fixed `process_order_transaction` cancel
+  double-deduct and `shelf_order_targets` re-packed RTS edge case; added
+  `trg_zz_order_cancel_cleanup` (auto-closes open tasks/alerts/pick-skips/issues,
+  resets `is_packed`, cleans `STAFF_DRAFT` demand, rejects `Pending` payments,
+  updates ship-together siblings); added canonical `POST /api/orders/cancel` +
+  `CancelOrderDialog` wired into Orders, Layaway Review, Ship-Hold pop-up,
+  Task Answer, and Packed Orders (plus Unpaid/Paid badges, hold check dates,
+  and Ask Sales on Waiting to be Shipped). (Antigravity, 10bd17b)
 - **2026-11-27** Out at Supplier: Dashboard prompts card (`SupplierPromptsCard`,
   shared `useSupplierPrompts` hook, cross-view sync) and top-level Out at Supplier
   menu item (`layout.tsx`). (Antigravity, 31443a2)
