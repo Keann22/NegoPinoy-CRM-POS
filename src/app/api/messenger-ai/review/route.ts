@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { CopilotError, reviewCopilotAction } from '@/lib/services/messenger-ai/messenger-copilot-service';
-import { getTaskCaller } from '@/lib/services/staff-tasks/task-caller';
+import { createClient as createSessionClient } from '@/lib/supabase/server';
+import { isStaffUser, staffRoleNames } from '@/lib/auth/staff-roles';
+import { isManagementUser } from '@/lib/services/purchase-summary-service';
+import type { ExecutorCaller } from '@/lib/services/messenger-ai/messenger-action-executor';
 import type { CopilotActionPayload, MessengerAiErrorCategory, MessengerAiVerdict } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -12,9 +15,24 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+/** Signed-in staff member; canCancel matches /api/orders/cancel (Sales or owners). */
+async function getCaller(): Promise<ExecutorCaller | null> {
+  const session = await createSessionClient();
+  const { data: { user } } = await session.auth.getUser();
+  if (!user || !isStaffUser(user)) return null;
+  const meta: Record<string, unknown> = user.user_metadata || {};
+  const isManagement = isManagementUser(user);
+  return {
+    id: user.id,
+    name: `${meta.first_name || ''} ${meta.last_name || ''}`.trim() || user.email || 'Staff',
+    isManagement,
+    canCancel: isManagement || staffRoleNames(user).includes('Sales'),
+  };
+}
+
 export async function POST(req: Request) {
   try {
-    const caller = await getTaskCaller();
+    const caller = await getCaller();
     if (!caller) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
 
     const body = (await req.json()) as {

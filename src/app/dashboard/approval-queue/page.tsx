@@ -26,7 +26,7 @@ export default function ApprovalQueuePage() {
 
   const handleScan = async () => {
     try {
-      const res = await scanNow({ maxBursts: 6, quietSeconds: 0, lookbackHours: 72 });
+      const res = await scanNow({ maxBursts: 6, quietSeconds: 0, lookbackHours: 2 });
       if (res.creditError) {
         toast({ variant: 'destructive', title: 'Gemini credits depleted', description: res.creditError });
         return;

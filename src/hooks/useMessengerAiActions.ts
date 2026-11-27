@@ -101,7 +101,7 @@ export function useMessengerAiDashboard() {
         const res = await fetch('/api/messenger-ai', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(opts || { maxBursts: 6, quietSeconds: 0, lookbackHours: 72 }),
+          body: JSON.stringify(opts || { maxBursts: 6, quietSeconds: 0, lookbackHours: 2 }),
         });
         const json = (await res.json()) as {
           scannedBursts: number;

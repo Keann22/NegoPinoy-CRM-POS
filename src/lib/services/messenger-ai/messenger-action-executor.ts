@@ -3,7 +3,8 @@ import type { OrderFormValues } from '@/lib/schemas/order';
 import { createOrder } from '@/lib/services/orders/order-creation';
 import { diffOrderItems } from '@/lib/services/orders/order-change-rules';
 import { recordOrderChange } from '@/lib/services/orders/order-change-service';
-import { editOrder, handleStockStatusTransition } from '@/lib/services/orders/order-update';
+import { cancelOrder, OrderCancelError } from '@/lib/services/orders/order-cancel-service';
+import { editOrder } from '@/lib/services/orders/order-update';
 import { setShipHold } from '@/lib/services/shipping/ship-hold-service';
 import { addDaysPht, phtToday, shortOrderId } from '@/lib/shipping/ship-hold-rules';
 import type {
@@ -25,6 +26,9 @@ import {
 export interface ExecutorCaller {
   id: string;
   name: string;
+  isManagement?: boolean;
+  /** Sales or owners; needed to cancel an order. */
+  canCancel?: boolean;
 }
 
 const VALID_PAY_TYPES = new Set(['Full Payment', 'Lay-away', 'Installment', 'COD', 'Pending']);
@@ -222,23 +226,35 @@ async function applyOrderCancel(supabase: SupabaseClient, payload: OrderCancelPa
   if (!payload.orderId) throw new CopilotError('Pick which order to cancel.');
   const { data: ord, error } = await supabase
     .from('orders')
-    .select('id, status, amount_paid, payment_method, order_items(product_id, quantity)')
+    .select('id, status, amount_paid')
     .eq('id', payload.orderId)
-    .single();
+    .maybeSingle();
   if (error || !ord) throw new CopilotError('Order not found.');
   if (ord.status === 'Cancelled') return `${shortOrderId(payload.orderId)} was already cancelled`;
-  if (Number(ord.amount_paid || 0) > 0) {
-    throw new CopilotError(`Order ${shortOrderId(payload.orderId)} has ₱${Number(ord.amount_paid).toLocaleString()} paid — use the Cancel dialog to pick Store Credit or Refund.`);
+  const paid = Number(ord.amount_paid || 0);
+  if (paid > 0.009 && caller.isManagement) {
+    throw new CopilotError(
+      `Order ${shortOrderId(payload.orderId)} has ₱${paid.toLocaleString('en-PH')} paid. Cancel it from the order page to choose store credit or refund.`
+    );
   }
-  await handleStockStatusTransition(supabase, payload.orderId, String(ord.status), 'Cancelled');
-  await supabase.from('orders').update({ status: 'Cancelled', cancelled_reason: payload.reason || 'Cancelled via Messenger AI Copilot' }).eq('id', payload.orderId);
-  await supabase.from('order_logs').insert({
-    order_id: payload.orderId,
-    status: 'Cancelled',
-    user_name: caller.name,
-    snapshot_data: { reason: payload.reason || 'Cancelled via Messenger AI Copilot', via: 'messenger_ai' },
-  });
-  return `Cancelled ${shortOrderId(payload.orderId)} (stock restored)`;
+  // Same path as every other cancel: guarded status update, stock, put-back task,
+  // cleanup triggers, and paid orders from sales go to the owners.
+  try {
+    const result = await cancelOrder(
+      supabase,
+      {
+        orderId: payload.orderId,
+        reason: (payload.reason || '').trim() || 'Customer asked to cancel on Messenger',
+        source: 'messenger_ai',
+      },
+      { id: caller.id, name: caller.name, isManagement: Boolean(caller.isManagement), canCancel: Boolean(caller.canCancel) }
+    );
+    if (!result.cancelled) return result.outcome;
+    return `Cancelled ${shortOrderId(payload.orderId)}`;
+  } catch (err) {
+    if (err instanceof OrderCancelError) throw new CopilotError(err.message, err.status);
+    throw err;
+  }
 }
 
 export async function executeCopilotAction(

@@ -104,6 +104,8 @@ export interface PaymentProofPayload {
   referenceNumber: string | null;
   receiverVerified?: boolean | null;
   receiverNote?: string | null;
+  /** Text the AI read on the screenshot (phones, ref); only set when there was a photo. Used for the GCash receiver check. */
+  receiptText?: string | null;
   shares: PaymentSplitShare[];
   note?: string | null;
 }

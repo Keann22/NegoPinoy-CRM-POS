@@ -22,6 +22,7 @@ export async function psidsMessagedWithin24h(supabase: SupabaseClient): Promise<
       .from('conversation_logs')
       .select('customer_psid')
       .eq('sender_type', 'customer')
+      .not('message_text', 'like', '[System]%') // Meta chatbot handover notices, not the customer
       .gte('created_at', since)
       .order('created_at', { ascending: false })
       .range(from, from + 999);

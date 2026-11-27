@@ -149,6 +149,7 @@ export function parseAnalyzedPayload(params: {
               ? `Shows ${recv.others.map((n) => `0${n}`).join(', ')} (not our GCash)`
               : 'Receiver number not visible'
             : null,
+        receiptText: hasInlineImage ? ocrText.slice(0, 1500) : null,
         shares,
         note: typeof rawPayload.note === 'string' ? rawPayload.note : null,
       },

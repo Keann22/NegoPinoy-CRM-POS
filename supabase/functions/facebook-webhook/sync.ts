@@ -127,7 +127,8 @@ export async function syncRecentConversations(
 ) {
   // Background sync is a backstop for the webhook: keep it small (8 chats x 6 messages,
   // the sizes that worked before 2026-11-12). Asking for 15 x 50 with attachment fields
-  // made every background sync fail. Only text is saved here, so no attachment fields.
+  // made every background sync fail. So no attachment fields here: photo-only messages
+  // are fetched one at a time in processConversations.
   const msgLimit = targetPsid ? 100 : 6;
   const userFilter = targetPsid ? `user_id=${encodeURIComponent(targetPsid)}&` : "limit=8&";
   const url = `https://graph.facebook.com/v19.0/me/conversations?${userFilter}fields=participants,messages.limit(${msgLimit}){message,from,created_time,id}&access_token=${encodeURIComponent(pageToken)}`;
@@ -139,7 +140,9 @@ export async function syncRecentConversations(
   }
 
   const conversations = data.data ?? [];
-  const insertedCount = await processConversations(supabase, conversations, Boolean(targetPsid));
+  // Photo-only customer messages (GCash screenshots) are fetched one by one; the
+  // Messenger AI Copilot reads them (2026-11-28). Backfill stays text-only.
+  const insertedCount = await processConversations(supabase, conversations, Boolean(targetPsid), pageToken);
   return { syncedConversations: conversations.length, insertedCount };
 }
 
@@ -224,10 +227,42 @@ export async function backfillConversations(
   };
 }
 
+/**
+ * Image link of one photo-only message. The conversations list is asked for text only
+ * (asking it for attachments made every background sync fail, 2026-11-12), so photos are
+ * fetched one message at a time. Null on any error: the photo is skipped, as before.
+ */
+const PHOTO_MAX_AGE_MS = 48 * 3600 * 1000;
+
+async function fetchMessageAttachment(
+  messageId: string,
+  pageToken: string,
+): Promise<{ type: string; imageUrl: string | null } | null> {
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/v19.0/${encodeURIComponent(messageId)}?fields=attachments&access_token=${encodeURIComponent(pageToken)}`,
+    );
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      console.warn("Graph API attachment error:", JSON.stringify(data.error ?? { status: res.status }));
+      return null;
+    }
+    const att = data.attachments?.data?.[0];
+    if (!att) return null;
+    const imageUrl: string | null = att.image_data?.url ?? null;
+    const mime = String(att.mime_type || "");
+    return { type: imageUrl || mime.startsWith("image/") ? "image" : mime.split("/")[0] || "file", imageUrl };
+  } catch (err) {
+    console.warn("Graph API attachment fetch failed:", err);
+    return null;
+  }
+}
+
 async function processConversations(
   supabase: SupabaseClient,
   conversations: any[],
-  paginateMessages: boolean
+  paginateMessages: boolean,
+  photoToken: string | null = null,
 ): Promise<number> {
   let insertedCount = 0;
 
@@ -281,24 +316,50 @@ async function processConversations(
     }
 
     const messages = allRawMessages.reverse();
+    const consumedLogIds = new Set<string>();
 
     for (const msg of messages) {
-      const text = msg.message?.trim();
-      if (!text) continue;
-
+      let text: string | undefined = msg.message?.trim();
       const fbMid = msg.id;
       const msgTimeMs = new Date(msg.created_time).getTime();
       const isFromPage = msg.from?.id === PAGE_ID;
       const senderType = isFromPage ? "agent" : "customer";
+      let imageUrl: string | null = null;
+      let alreadyExists = false;
 
-      const alreadyExists = existingList.some((log: any) => {
-        if (log.metadata?.fb_mid && log.metadata.fb_mid === fbMid) return true;
-        if (log.message_text === text) {
-          const logTimeMs = new Date(log.created_at).getTime();
-          if (Math.abs(logTimeMs - msgTimeMs) < 120000) return true;
+      if (!text) {
+        // Photo-only customer message (e.g. a GCash screenshot). Only the live sync asks for it,
+        // one small request per photo (see syncRecentConversations).
+        // Recent ones only: opening an old thread shouldn't fetch dozens of old photos.
+        if (!photoToken || isFromPage || Date.now() - msgTimeMs > PHOTO_MAX_AGE_MS) continue;
+        if (existingList.some((log: any) => log.metadata?.fb_mid === fbMid)) continue;
+        const att = await fetchMessageAttachment(fbMid, photoToken);
+        if (!att) continue;
+        text = att.imageUrl ? "[Sent a photo]" : `[Sent an attachment: ${att.type}]`;
+        imageUrl = att.imageUrl;
+        // The webhook may have logged this photo already (no fb_mid). Match each webhook row
+        // once, so 3 screenshots sent together aren't collapsed into one.
+        const webhookRow = existingList.find(
+          (log: any) =>
+            !log.metadata?.fb_mid &&
+            !consumedLogIds.has(log.id) &&
+            log.message_text === text &&
+            Math.abs(new Date(log.created_at).getTime() - msgTimeMs) < 120000,
+        );
+        if (webhookRow) {
+          consumedLogIds.add(webhookRow.id);
+          alreadyExists = true;
         }
-        return false;
-      });
+      } else {
+        alreadyExists = existingList.some((log: any) => {
+          if (log.metadata?.fb_mid && log.metadata.fb_mid === fbMid) return true;
+          if (log.message_text === text) {
+            const logTimeMs = new Date(log.created_at).getTime();
+            if (Math.abs(logTimeMs - msgTimeMs) < 120000) return true;
+          }
+          return false;
+        });
+      }
 
       if (!alreadyExists) {
         const { data: inserted } = await supabase
@@ -310,7 +371,7 @@ async function processConversations(
               message_text: text,
               sender_type: senderType,
               created_at: msg.created_time,
-              metadata: { fb_mid: fbMid },
+              metadata: imageUrl ? { fb_mid: fbMid, image_url: imageUrl } : { fb_mid: fbMid },
             },
           ])
           .select("id, message_text, created_at, metadata")

@@ -4,6 +4,7 @@ import { shelfNumberOf } from '@/lib/services/inventory/shelf-stock-service';
 import { listPeople } from '@/lib/services/staff-tasks/staff-task-service';
 import { OPEN_ORDER_STATUSES, shortOrderId } from '@/lib/shipping/ship-hold-rules';
 import { getHoldDetails } from '@/lib/services/shipping/ship-hold-service';
+import { isMetaSystemNotice } from '@/lib/meta-system-notice';
 import type {
   CopilotOpenOrderOption,
   CopilotWaitingPrompt,
@@ -47,6 +48,11 @@ export interface BurstContext {
   assigneeName: string | null;
 }
 
+/** Owner, 2026-11-28: scan only chats from the last 2 hours. */
+export const COPILOT_LOOKBACK_HOURS = 2;
+/** A burst that fails this many scans is given up (no more Gemini calls). */
+export const COPILOT_MAX_SCAN_ATTEMPTS = 3;
+
 const TRIVIAL_RE = /^(hi+|hello+|hey+|po|opo|((yes+|oo|ok+|okay|oke|sige|ge|ty|thank\s*you|thanks|salamat|noted)(\s*po)?)|amen|god\s*bless|welcome|👍+|🙏+|❤️+|\[sent\s+a\s+sticker\]|\[thumbs\s+up\])[.!?\s👍🙏❤️]*$/i;
 
 export function isTrivialBurst(
@@ -67,27 +73,35 @@ export async function findReadyMessageBursts(
 ): Promise<{ readyBursts: ReadyMessageBurst[]; trivialLogIds: string[] }> {
   const maxBursts = Math.min(20, Math.max(1, opts.maxBursts ?? 6));
   const quietMs = Math.max(0, opts.quietSeconds ?? 75) * 1000;
-  const lookbackHours = Math.min(168, Math.max(1, opts.lookbackHours ?? 48));
+  // Owner, 2026-11-28: only the last 2 hours. Older chats are treated as handled by sales.
+  const lookbackHours = Math.min(168, Math.max(1, opts.lookbackHours ?? COPILOT_LOOKBACK_HOURS));
   const since = new Date(Date.now() - lookbackHours * 3600 * 1000).toISOString();
 
+  // Newest first so a fresh payment isn't stuck behind older chats; regrouped oldest-first below.
   const { data, error } = await supabase
     .from('conversation_logs')
     .select('id, customer_psid, message_text, created_at, metadata')
     .eq('sender_type', 'customer')
     .is('ai_analyzed_at', null)
+    .lt('ai_scan_attempts', COPILOT_MAX_SCAN_ATTEMPTS)
     .gte('created_at', since)
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
     .limit(400);
   if (error) throw error;
+  const trivialLogIds: string[] = [];
 
   const byPsid = new Map<
     string,
     Array<{ id: string; text: string; createdAt: string; imageUrl: string | null }>
   >();
 
-  for (const row of data ?? []) {
+  for (const row of [...(data ?? [])].reverse()) {
     const psid = String(row.customer_psid || '').trim();
     if (!psid) continue;
+    if (isMetaSystemNotice(row.message_text)) {
+      trivialLogIds.push(String(row.id));
+      continue;
+    }
     const meta = (row.metadata && typeof row.metadata === 'object' ? row.metadata : null) as Record<string, unknown> | null;
     const imageUrl = typeof meta?.image_url === 'string' ? meta.image_url : null;
     const list = byPsid.get(psid) || [];
@@ -102,7 +116,6 @@ export async function findReadyMessageBursts(
 
   const now = Date.now();
   const candidates: Array<ReadyMessageBurst & { sortMs: number }> = [];
-  const trivialLogIds: string[] = [];
 
   for (const [psid, msgs] of byPsid.entries()) {
     const firstMs = new Date(msgs[0].createdAt).getTime();

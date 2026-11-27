@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { isMetaSystemNotice } from '@/lib/meta-system-notice';
 import type { CustomerPersonaMetrics } from '@/types';
 import {
   computeOrderMetricsAndCategories,
@@ -231,12 +232,13 @@ export async function buildCustomerProfileContext(
     })),
   }));
 
-  const rawLogs = (chatRes.data ?? []) as Array<{
+  // Meta's chatbot handover notices are saved as customer messages; the customer didn't write them.
+  const rawLogs = ((chatRes.data ?? []) as Array<{
     sender_type: string;
     message_text: string | null;
     created_at: string;
     metadata: Record<string, unknown> | null;
-  }>;
+  }>).filter((m) => !isMetaSystemNotice(m.message_text));
   const messages: ChatMessageForAi[] = [...rawLogs]
     .reverse()
     .map((m) => ({

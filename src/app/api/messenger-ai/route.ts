@@ -52,6 +52,8 @@ export async function POST(req: Request) {
   try {
     const caller = await getTaskCaller();
     if (!caller) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
+    // Scan Recent Chats lives on the owners' Copilot dashboard; each scan costs Gemini calls.
+    if (!caller.isManagement) return NextResponse.json({ error: 'Owners only' }, { status: 403 });
 
     const body = (await req.json().catch(() => ({}))) as {
       maxBursts?: number;

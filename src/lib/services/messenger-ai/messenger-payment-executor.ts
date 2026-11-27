@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { saveTransfer } from '@/lib/services/payments/gcash-transfer-service';
 import { paymentEffect, round2 } from '@/lib/services/payments/order-payment-rules';
-import { afterReferenceRead } from '@/lib/services/payments/payment-reference-check';
+import { afterReferenceRead, checkReceiver } from '@/lib/services/payments/payment-reference-check';
 import { createTask, listPeople } from '@/lib/services/staff-tasks/staff-task-service';
 import { shortOrderId } from '@/lib/shipping/ship-hold-rules';
 import type { MessengerAiAction, PaymentPromisePayload, PaymentProofPayload } from '@/types';
@@ -21,6 +21,16 @@ export async function applyPaymentProof(
     : null;
   const proofUrl = persistedUrl || 'messenger-chat-no-photo';
   const todayIso = new Date().toISOString();
+  // Same rule as Log Payment: GCash must go to our two numbers, else flag it and tell the owners.
+  // Only when there was a screenshot; chat text alone can't show the receiver.
+  const proposed = action.proposedPayload.kind === 'payment_proof' ? action.proposedPayload : null;
+  const receiptText = payload.receiptText ?? proposed?.receiptText ?? null;
+  const runReceiverCheck = async (paymentId: string) => {
+    if (!persistedUrl || !receiptText) return;
+    await checkReceiver(supabase, paymentId, receiptText).catch((e) =>
+      console.warn('Copilot receiver check skipped:', e)
+    );
+  };
 
   if (shares.length >= 2) {
     const transferAmount = round2(
@@ -44,6 +54,7 @@ export async function applyPaymentProof(
         () => undefined
       );
     }
+    await runReceiverCheck(res.mainPaymentId);
     return `Logged ₱${transferAmount.toLocaleString()} across ${shares.length} orders`;
   }
 
@@ -107,6 +118,7 @@ export async function applyPaymentProof(
       payload.totalAmount || target.amount
     ).catch(() => undefined);
   }
+  if (payRow?.id) await runReceiverCheck(String(payRow.id));
   return `Logged ₱${round2(target.amount).toLocaleString()} (${payload.paymentMethod}) on ${shortOrderId(target.orderId)}`;
 }
 

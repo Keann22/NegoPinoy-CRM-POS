@@ -68,6 +68,8 @@ and new BUSINESS_WORKFLOW.md sections (Copilot, task actions).
 - Ready to Pick page is marked "temporary" (2026-11-23): decide keep or remove.
 - **Messenger AI Sales Copilot — Future Backlog (Phase 3+)** (requested 2026-11-27; `docs/handover/2026-11-24_messenger_ai_sales_copilot_plan.md`):
   - Hot-lead & unanswered inquiry reminders before Facebook's 24-hour messaging window expires.
+    Meta's "[System] Your AI agent transferred this…" notice = the chatbot handed the
+    customer to sales; a natural start time for "no reply yet" (owner, 2026-11-28).
   - *"Nasaan na po order ko?"* tracking / ETA follow-up tasks.
   - *"Pa-inform po pag may stock na"* restock notification queue tied to Receiving / *May stock na*.
 
@@ -77,6 +79,12 @@ and new BUSINESS_WORKFLOW.md sections (Copilot, task actions).
 
 Newest first. Older history: `git log`. Feature rules: `docs/BUSINESS_WORKFLOW.md`.
 
+- **2026-11-28** Messenger AI Copilot fixes (Claude): AI cancel uses `cancelOrder`
+  (was leaving orders open with stock put back), one apply per card, GCash receiver
+  flag, skip Meta "[System]" notices, 2-hour newest-first scans with claim + 3-try
+  cap (`ai_scan_attempts`), owners-only manual scan. `facebook-webhook` v33: sync
+  saves customer photo messages (also shipped the undeployed 4b082a2 backfill).
+  Photo saving not yet seen live (deployed after midnight).
 - **2026-11-27** Messenger AI Sales Copilot (Phase 2): enabled all 9 action types
   (`bus_shipping_request`, `damage_or_complaint` with `customer-returns` photo
   archiving, `waiting_prompt_reply` for RTS / Supplier / Ship Hold, and OFW-safe

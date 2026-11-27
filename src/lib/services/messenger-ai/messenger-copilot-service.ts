@@ -8,11 +8,12 @@ import type {
   MessengerAiExecutionMode,
   MessengerAiVerdict,
 } from '@/types';
-import { executeCopilotAction, isActionSuperseded } from './messenger-action-executor';
+import { executeCopilotAction, isActionSuperseded, type ExecutorCaller } from './messenger-action-executor';
 import { analyzeMessengerBurst } from './messenger-ai-analyzer';
 import {
   buildBurstContext,
   CopilotError,
+  COPILOT_LOOKBACK_HOURS,
   findReadyMessageBursts,
 } from './messenger-context-builder';
 import {
@@ -22,6 +23,7 @@ import {
   toRule,
 } from './messenger-copilot-queries';
 import { computePayloadDiff, recordReviewLearning } from './messenger-learning-service';
+import { claimBurstLogs, releaseBurstLogs } from './messenger-scan-claims';
 import {
   AUTO_APPLY_SAFE_TYPES,
   captureBeforeSnapshot,
@@ -66,12 +68,12 @@ export async function scanAndAnalyzeBursts(
   let creditError: string | undefined;
 
   for (const burst of readyBursts) {
+    if (!(await claimBurstLogs(supabase, burst.logIds).catch(() => false))) continue;
     try {
       const ctx = await buildBurstContext(supabase, burst, catalog);
       const result = await analyzeMessengerBurst(ctx, enabledTypes);
       if (result.actionType === 'none' || !result.proposedPayload) {
         noActionCount++;
-        await markLogsAnalyzed(supabase, burst.logIds);
         continue;
       }
 
@@ -172,10 +174,11 @@ export async function scanAndAnalyzeBursts(
       });
       if (insErr) throw insErr;
       actionsCreated++;
-      await markLogsAnalyzed(supabase, burst.logIds);
     } catch (err) {
-      if (err instanceof CopilotError && err.status === 402) {
-        creditError = err.message;
+      const outOfCredits = err instanceof CopilotError && err.status === 402;
+      await releaseBurstLogs(supabase, burst.logIds, !outOfCredits).catch(() => undefined);
+      if (outOfCredits) {
+        creditError = (err as CopilotError).message;
         break;
       }
       console.warn(`Copilot burst skipped for PSID ${burst.psid}:`, err);
@@ -193,7 +196,7 @@ export async function scanAndAnalyzeBursts(
 
 export async function runThrottledAutoScan(supabase: SupabaseClient): Promise<boolean> {
   return maybeAutoScanBursts(supabase, () =>
-    scanAndAnalyzeBursts(supabase, { maxBursts: 3, quietSeconds: 60, lookbackHours: 24 })
+    scanAndAnalyzeBursts(supabase, { maxBursts: 3, quietSeconds: 60, lookbackHours: COPILOT_LOOKBACK_HOURS })
   );
 }
 
@@ -239,7 +242,7 @@ export async function reviewCopilotAction(
     finalPayload?: CopilotActionPayload;
     errorCategory?: MessengerAiErrorCategory | null;
     staffNote?: string | null;
-    caller: { id: string; name: string };
+    caller: ExecutorCaller;
   }
 ): Promise<{ action: MessengerAiAction; appliedSummary: string | null; draftReply: string | null }> {
   const { data: row, error } = await supabase
@@ -255,52 +258,72 @@ export async function reviewCopilotAction(
     throw new CopilotError('This check was already handled.');
   }
 
+  // Claim the card first so two taps (two people, or Jas on two accounts) can't apply it twice.
+  // A claim older than 2 minutes is treated as abandoned (e.g. a timed-out request).
+  const staleClaim = new Date(Date.now() - 120_000).toISOString();
+  const { data: claimed, error: claimErr } = await supabase
+    .from('messenger_ai_actions')
+    .update({ reviewed_by_id: input.caller.id, reviewed_by_name: input.caller.name, reviewed_at: new Date().toISOString() })
+    .eq('id', action.id)
+    .eq('status', action.status)
+    .or(`reviewed_at.is.null,reviewed_at.lt.${staleClaim}`)
+    .select('id');
+  if (claimErr) throw claimErr;
+  if (!claimed || claimed.length === 0) {
+    throw new CopilotError('Someone else is already handling this check.', 409);
+  }
+  const releaseClaim = () =>
+    supabase
+      .from('messenger_ai_actions')
+      .update({ reviewed_by_id: null, reviewed_by_name: null, reviewed_at: null })
+      .eq('id', action.id)
+      .eq('status', action.status);
+
   let appliedSummary: string | null = null;
   let nextStatus: MessengerAiActionStatus = 'rejected';
   let finalPayload: CopilotActionPayload | null = null;
   let diffFields: string[] = [];
 
-  if (input.verdict === 'correct' || input.verdict === 'edited') {
-    finalPayload = input.finalPayload || action.proposedPayload;
-    diffFields = computePayloadDiff(action.proposedPayload, finalPayload);
-    const effectiveVerdict: MessengerAiVerdict = diffFields.length > 0 ? 'edited' : input.verdict;
-    if (action.status === 'auto_applied_pending_check') {
-      if (effectiveVerdict === 'correct') {
-        appliedSummary = action.appliedSummary || 'Confirmed auto-applied action';
+  try {
+    if (input.verdict === 'correct' || input.verdict === 'edited') {
+      finalPayload = input.finalPayload || action.proposedPayload;
+      diffFields = computePayloadDiff(action.proposedPayload, finalPayload);
+      const effectiveVerdict: MessengerAiVerdict = diffFields.length > 0 ? 'edited' : input.verdict;
+      if (action.status === 'auto_applied_pending_check') {
+        if (effectiveVerdict === 'correct') {
+          appliedSummary = action.appliedSummary || 'Confirmed auto-applied action';
+        } else {
+          await undoAutoAppliedAction(supabase, action, input.caller).catch(() => undefined);
+          appliedSummary = await executeCopilotAction(supabase, action, finalPayload, input.caller);
+        }
       } else {
-        await undoAutoAppliedAction(supabase, action, input.caller).catch(() => undefined);
         appliedSummary = await executeCopilotAction(supabase, action, finalPayload, input.caller);
       }
+      nextStatus = effectiveVerdict === 'edited' ? 'edited_and_applied' : 'confirmed';
     } else {
-      appliedSummary = await executeCopilotAction(supabase, action, finalPayload, input.caller);
+      if (action.status === 'auto_applied_pending_check') {
+        appliedSummary = await undoAutoAppliedAction(supabase, action, input.caller);
+        nextStatus = 'undone';
+      } else {
+        nextStatus = 'rejected';
+      }
     }
-    nextStatus = effectiveVerdict === 'edited' ? 'edited_and_applied' : 'confirmed';
-    await recordReviewLearning(supabase, {
-      action,
-      verdict: effectiveVerdict,
-      finalPayload,
-      diffFields,
-      errorCategory: null,
-      staffNote: input.staffNote ?? null,
-      staffName: input.caller.name,
-    });
-  } else {
-    if (action.status === 'auto_applied_pending_check') {
-      appliedSummary = await undoAutoAppliedAction(supabase, action, input.caller);
-      nextStatus = 'undone';
-    } else {
-      nextStatus = 'rejected';
-    }
-    await recordReviewLearning(supabase, {
-      action,
-      verdict: 'rejected',
-      finalPayload: null,
-      diffFields: [],
-      errorCategory: input.errorCategory ?? 'other',
-      staffNote: input.staffNote ?? null,
-      staffName: input.caller.name,
-    });
+  } catch (err) {
+    await releaseClaim();
+    throw err;
   }
+
+  // The action is applied now: a learning failure must not release the claim (that would allow a second apply).
+  const accepted = nextStatus === 'confirmed' || nextStatus === 'edited_and_applied';
+  await recordReviewLearning(supabase, {
+    action,
+    verdict: accepted ? (nextStatus === 'edited_and_applied' ? 'edited' : 'correct') : 'rejected',
+    finalPayload: accepted ? finalPayload : null,
+    diffFields: accepted ? diffFields : [],
+    errorCategory: accepted ? null : input.errorCategory ?? 'other',
+    staffNote: input.staffNote ?? null,
+    staffName: input.caller.name,
+  }).catch((e) => console.warn('Copilot learning skipped:', e));
 
   const now = new Date().toISOString();
   const { data: updated, error: updErr } = await supabase
