@@ -138,8 +138,98 @@ export async function syncRecentConversations(
     throw new Error(data.error?.message || "Failed to fetch conversations from Graph API");
   }
 
-  let insertedCount = 0;
   const conversations = data.data ?? [];
+  const insertedCount = await processConversations(supabase, conversations, Boolean(targetPsid));
+  return { syncedConversations: conversations.length, insertedCount };
+}
+
+export interface BackfillOptions {
+  nextUrl?: string;
+  convLimit?: number;
+  msgLimit?: number;
+  maxPages?: number;
+  minDate?: string;
+  maxDate?: string;
+}
+
+/**
+ * Paginates Graph API conversations backwards from most-recently-updated until
+ * `minDate` (default 2026-08-01) or `maxPages` per invocation, inserting any missing messages.
+ */
+export async function backfillConversations(
+  supabase: SupabaseClient,
+  pageToken: string,
+  opts: BackfillOptions = {}
+) {
+  const convLimit = opts.convLimit ?? 15;
+  const msgLimit = opts.msgLimit ?? 30;
+  const maxPages = opts.maxPages ?? 2;
+  const minDateMs = new Date(opts.minDate ?? "2026-08-01T00:00:00Z").getTime();
+  const maxDateMs = opts.maxDate ? new Date(opts.maxDate).getTime() : null;
+
+  let currentUrl: string | null =
+    opts.nextUrl ||
+    `https://graph.facebook.com/v19.0/me/conversations?limit=${convLimit}&fields=participants,updated_time,messages.limit(${msgLimit}){message,from,created_time,id}&access_token=${encodeURIComponent(pageToken)}`;
+
+  let syncedConversations = 0;
+  let insertedCount = 0;
+  let oldestUpdatedTime: string | null = null;
+  let reachedMinDate = false;
+  let page = 0;
+
+  while (currentUrl && page < maxPages && !reachedMinDate) {
+    page++;
+    const res = await fetch(currentUrl);
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      console.error("Graph API backfill error:", JSON.stringify(data.error ?? { status: res.status }));
+      throw new Error(data.error?.message || "Failed to fetch conversations from Graph API");
+    }
+
+    const conversations = data.data ?? [];
+    if (conversations.length === 0) {
+      currentUrl = null;
+      break;
+    }
+
+    const toProcess: any[] = [];
+    for (const c of conversations) {
+      if (c.updated_time) {
+        oldestUpdatedTime = c.updated_time;
+        const ts = new Date(c.updated_time).getTime();
+        if (ts < minDateMs) {
+          reachedMinDate = true;
+          continue;
+        }
+        if (maxDateMs !== null && ts > maxDateMs) {
+          continue;
+        }
+      }
+      toProcess.push(c);
+    }
+
+    if (toProcess.length > 0) {
+      insertedCount += await processConversations(supabase, toProcess, false);
+    }
+    syncedConversations += conversations.length;
+    currentUrl = reachedMinDate ? null : (data.paging?.next ?? null);
+  }
+
+  return {
+    syncedConversations,
+    insertedCount,
+    oldestUpdatedTime,
+    nextUrl: currentUrl,
+    done: !currentUrl || reachedMinDate,
+  };
+}
+
+async function processConversations(
+  supabase: SupabaseClient,
+  conversations: any[],
+  paginateMessages: boolean
+): Promise<number> {
+  let insertedCount = 0;
 
   for (const conv of conversations) {
     const participants = conv.participants?.data ?? [];
@@ -176,7 +266,7 @@ export async function syncRecentConversations(
     const allRawMessages = [...(conv.messages?.data ?? [])];
 
     // If syncing a specific customer thread, paginate up to 3 pages (300 messages) from the start
-    let nextUrl: string | undefined = targetPsid ? conv.messages?.paging?.next : undefined;
+    let nextUrl: string | undefined = paginateMessages ? conv.messages?.paging?.next : undefined;
     let pageCount = 0;
     while (nextUrl && pageCount < 3) {
       pageCount++;
@@ -237,7 +327,7 @@ export async function syncRecentConversations(
     }
   }
 
-  return { syncedConversations: conversations.length, insertedCount };
+  return insertedCount;
 }
 
 async function extractCustomerDetailsFromSync(

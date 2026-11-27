@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { syncRecentConversations, autoLinkChatCustomerIfExactMatch, fillMissingCustomerDetails } from "./sync.ts";
+import { syncRecentConversations, backfillConversations, autoLinkChatCustomerIfExactMatch, fillMissingCustomerDetails } from "./sync.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -66,8 +66,13 @@ Deno.serve(async (req: Request) => {
       const bodyText = new TextDecoder().decode(rawBody);
       const body = JSON.parse(bodyText);
 
-      // --- 1. CRM ACTIONS (send_reply / sync_messages) ---
-      if (body.action === "send_reply" || body.action === "sync_messages") {
+      // --- 1. CRM ACTIONS (send_reply / sync_messages / backfill_conversations) ---
+      if (
+        body.action === "send_reply" ||
+        body.action === "sync_messages" ||
+        body.action === "backfill_conversations" ||
+        body.action === "comments_check"
+      ) {
         // Require a valid logged-in staff JWT or service role key
         const authHeader = req.headers.get("Authorization");
         if (!authHeader) {
@@ -94,6 +99,38 @@ Deno.serve(async (req: Request) => {
             status: 500,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
+        }
+
+        if (body.action === "comments_check") {
+          const result = await checkCommentAccess(pageToken);
+          return new Response(JSON.stringify(result), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        if (body.action === "backfill_conversations") {
+          try {
+            const result = await backfillConversations(supabase, pageToken, {
+              nextUrl: body.nextUrl,
+              convLimit: body.convLimit,
+              msgLimit: body.msgLimit,
+              maxPages: body.maxPages,
+              minDate: body.minDate,
+              maxDate: body.maxDate,
+            });
+            return new Response(JSON.stringify({ success: true, ...result }), {
+              status: 200,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          } catch (bfErr) {
+            const message = bfErr instanceof Error ? bfErr.message : String(bfErr);
+            console.error("backfill_conversations failed:", message);
+            return new Response(JSON.stringify({ success: false, error: message }), {
+              status: 502,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
         }
 
         if (body.action === "sync_messages") {
@@ -259,6 +296,50 @@ async function processWebhookBody(body: any) {
   } catch (syncErr) {
     console.error("Background conversation sync warning:", syncErr);
   }
+}
+
+/**
+ * Can the page token read post comments, and who wrote them? (Diagnostic for the
+ * comments-in-Live-Chat feature.) Returns the token's permissions, the page's webhook
+ * fields, and a few recent comments with whether the commenter is a known Messenger PSID.
+ */
+async function checkCommentAccess(pageToken: string) {
+  const g = async (path: string) => {
+    const sep = path.includes("?") ? "&" : "?";
+    const r = await fetch(`https://graph.facebook.com/v19.0/${path}${sep}access_token=${encodeURIComponent(pageToken)}`);
+    return await r.json();
+  };
+  const debug = await g(`debug_token?input_token=${encodeURIComponent(pageToken)}`);
+  const subscribed = await g(`me/subscribed_apps`);
+  const posts = await g(`me/posts?limit=5&fields=id,created_time,message,comments.limit(5).summary(true){id,from,message,created_time}`);
+  const fromIds: string[] = [];
+  for (const p of posts?.data ?? []) {
+    for (const c of p.comments?.data ?? []) if (c.from?.id) fromIds.push(c.from.id);
+  }
+  let knownPsids: string[] = [];
+  if (fromIds.length) {
+    const { data } = await supabase.from("customers").select("psid").in("psid", fromIds);
+    knownPsids = (data ?? []).map((r: any) => r.psid);
+  }
+  return {
+    scopes: debug?.data?.scopes ?? null,
+    token_type: debug?.data?.type ?? null,
+    debug_error: debug?.error?.message ?? null,
+    subscribed_fields: subscribed?.data?.map((a: any) => ({ name: a.name, fields: a.subscribed_fields })) ?? subscribed?.error?.message,
+    posts_error: posts?.error?.message ?? null,
+    posts: (posts?.data ?? []).map((p: any) => ({
+      id: p.id,
+      created_time: p.created_time,
+      message: (p.message ?? "").slice(0, 60),
+      comment_total: p.comments?.summary?.total_count ?? null,
+      comments: (p.comments?.data ?? []).map((c: any) => ({
+        has_from: !!c.from,
+        from_name: c.from?.name ?? null,
+        from_is_known_psid: c.from?.id ? knownPsids.includes(c.from.id) : null,
+        message: (c.message ?? "").slice(0, 60),
+      })),
+    })),
+  };
 }
 
 /**
