@@ -27,21 +27,16 @@ Both must keep this file current. Dates and times are Philippine time (UTC+8).
 
 Format: `- **Task** (Agent, started YYYY-MM-DD). Files/area. Status.`
 
-- **Messenger AI Sales Copilot (Phase 1)** (Antigravity, started 2026-11-27).
-  `scripts/migrations/2026-11-27_messenger_ai_copilot.sql`,
-  `src/types/messenger-ai.types.ts`, `src/lib/services/messenger-ai/*`,
-  `src/app/api/messenger-ai/*`, `src/hooks/useMessengerAiActions.ts`,
-  `src/components/dashboard/messenger-ai/*`, `src/app/dashboard/approval-queue/page.tsx`,
-  `src/app/dashboard/layout.tsx`. Status: Phase 1 built (Core 5 actions, 1-tap multi-order switcher, Copy Reply for Meta Business Suite, zero n8n, `show_sales_popup = false` for owner dry-run first), DB migrated, typechecked & smoke-tested (uncommitted — ready for owner review/commit).
-
 Other uncommitted files seen 2026-11-25: `.claude/launch.json`,
 `docs/staff-guides/connect-messenger-chat.html`, `scripts/reports/1-week-buy-list.html`,
 and new BUSINESS_WORKFLOW.md sections (Copilot, task actions).
 
 ## Next up
 
-1. **Messenger AI Sales Copilot**, steps 1-9 in the plan (database, context builder,
-   analyzer, executor with undo, learning, API, sales pop-up, owner accuracy panel).
+1. **Messenger AI Sales Copilot (Phase 2)**: remaining 4 actions (damage/return,
+   bus shipping, waiting prompt reply, delivery/receiver note), `auto_apply`
+   tuning after owner dry-run accuracy review, and Meta Send API wiring once
+   Meta permissions are approved (`docs/handover/2026-11-24_messenger_ai_sales_copilot_plan.md`).
 2. **Physical stock breakdown** (On the shelf → Picked → Packed → Total). See
    BUSINESS_WORKFLOW.md "Unallocated stock is kept and counted".
 3. **Customer profile and recommendations, follow-up** (phase 2 released 2e3e586):
@@ -58,7 +53,6 @@ and new BUSINESS_WORKFLOW.md sections (Copilot, task actions).
   (BUSINESS_WORKFLOW.md "Store credit").
 - **Orders on a main product**: #A435801 (5-layer rack filed under the 6-layer 120cm
   rack) and #DD58459 (HK Bank has no plain variant). The rest wait for sales (colors).
-- **Copilot open decisions** (plan section 6).
 - **Customer persona: delivered installment still owing** = overdue (payment
   follow-up, no pitch)? BUSINESS_WORKFLOW.md "Customer profile".
 - **Customer website** (`website/`): not launched; owner not happy with the look;
@@ -79,6 +73,17 @@ and new BUSINESS_WORKFLOW.md sections (Copilot, task actions).
 
 Newest first. Older history: `git log`. Feature rules: `docs/BUSINESS_WORKFLOW.md`.
 
+- **2026-11-27** Messenger AI Sales Copilot (Phase 1) + Payment Detection
+  Auto-Scan & Receipt Archiving: native Next.js + Supabase + Gemini 2.5 Flash
+  pipeline (zero n8n, zero Meta Send API calls); Phase 1 Core 5 actions
+  (`order_edit_items` + create new order, `order_hold_or_reschedule`,
+  `order_cancel`, `payment_proof`, `payment_promise`) in Approval First
+  (`stage_confirm`) mode with 1-tap multi-order switcher, Copy Reply for Meta
+  Business Suite, learning loop (mistake lessons + variant-only product aliases),
+  owner Dry-Run & Accuracy Dashboard at `/dashboard/approval-queue` (replaces old
+  n8n queue), `proof_of_payment` permanent screenshot archiving, photo-burst
+  prioritization, `CRON_SECRET` `/api/cron/messenger-ai-scan`, and 90s DB-throttled
+  auto-scan (`show_sales_popup` defaults to `false`). (Antigravity, c3f018e)
 - **2026-11-27** Order Cancellation Work-Chain & Packed Orders upgrades: put-back
   tasks assigned to Al & Edric only; fixed `process_order_transaction` cancel
   double-deduct and `shelf_order_targets` re-packed RTS edge case; added
