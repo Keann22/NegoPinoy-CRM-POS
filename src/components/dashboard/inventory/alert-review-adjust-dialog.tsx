@@ -41,6 +41,14 @@ export function AlertReviewAdjustDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!item || isNaN(Number(shelfCount))) return;
+    const count = Math.round(Number(shelfCount));
+    if (count < 0) return;
+    if (count >= 500) {
+      const confirmed = window.confirm(
+        `You entered ${count.toLocaleString()} pcs on the shelf for "${item.name}".\n\nThat looks unusually high — please double-check this isn't a typo before saving.`
+      );
+      if (!confirmed) return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -51,7 +59,7 @@ export function AlertReviewAdjustDialog({
           action: 'set_physical_count',
           payload: {
             productId: item.productId,
-            physicalShelfCount: Number(shelfCount),
+            physicalShelfCount: count,
             notes: notes || 'Physical count verified from Alert Review Sheet',
             actorName: 'Admin Review'
           }
@@ -61,7 +69,7 @@ export function AlertReviewAdjustDialog({
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Failed to update stock');
 
-      onSuccess(item.productId, data.newStockLevel, Number(shelfCount), notes);
+      onSuccess(item.productId, data.newStockLevel, count, notes);
       onClose();
     } catch (err: any) {
       alert(err.message || 'Failed to update physical count');

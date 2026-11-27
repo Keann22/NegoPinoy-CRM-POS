@@ -78,7 +78,17 @@ export async function migrateLeakedBundleDrafts(supabase: SupabaseClient) {
     .select('id, assembly_recipe')
     .in('id', staffDraftItems.map(i => i.product_id));
 
-  const recipeMap = new Map((products || []).map(p => [p.id, Array.isArray(p.assembly_recipe) ? p.assembly_recipe : []]));
+  // Filter out self-referential components so a misconfigured recipe pointing
+  // to itself can never re-create its own draft line and loop forever.
+  const recipeMap = new Map(
+    (products || []).map(p => [
+      p.id,
+      (Array.isArray(p.assembly_recipe) ? p.assembly_recipe : []).filter((c: any) => {
+        const cid = c.productId || c.component_id;
+        return Boolean(cid && cid !== p.id);
+      }),
+    ])
+  );
   const leaked = staffDraftItems.filter(i => (recipeMap.get(i.product_id) || []).length > 0);
 
   for (const leak of leaked) {

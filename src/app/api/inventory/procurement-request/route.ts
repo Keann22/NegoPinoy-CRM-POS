@@ -111,7 +111,7 @@ export async function POST(req: Request) {
           if (bundle && Array.isArray(bundle.assembly_recipe)) {
             for (const comp of bundle.assembly_recipe) {
               const compId = comp.component_id || comp.productId;
-              if (compId) {
+              if (compId && compId !== item.product_id) {
                 const compQty = comp.quantity || 1;
                 maxAllowedMap.set(compId, (maxAllowedMap.get(compId) || 0) + (item.quantity * compQty));
               }
@@ -206,8 +206,15 @@ export async function POST(req: Request) {
         .eq('id', r.productId)
         .single();
 
-      if (prodData && prodData.assembly_recipe && Array.isArray(prodData.assembly_recipe) && prodData.assembly_recipe.length > 0) {
-        for (const comp of prodData.assembly_recipe) {
+      const validComponents = Array.isArray(prodData?.assembly_recipe)
+        ? prodData.assembly_recipe.filter((comp: any) => {
+            const cid = comp.component_id || comp.productId;
+            return Boolean(cid && cid !== r.productId);
+          })
+        : [];
+
+      if (validComponents.length > 0) {
+        for (const comp of validComponents) {
           expandedRequests.push({
             productId: comp.component_id || comp.productId,
             requestedQty: r.requestedQty * (comp.quantity || 1),

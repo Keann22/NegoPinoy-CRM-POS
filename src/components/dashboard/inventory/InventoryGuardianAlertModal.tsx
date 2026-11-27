@@ -103,9 +103,17 @@ export function InventoryGuardianAlertModal() {
   const handlePhysicalCountSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!shelfCountInput || isNaN(Number(shelfCountInput))) return;
+    const count = Math.round(Number(shelfCountInput));
+    if (count < 0) return;
+    if (count >= 500) {
+      const confirmed = window.confirm(
+        `You entered ${count.toLocaleString()} pcs on the shelf for "${currentAnomaly.productName}".\n\nThat looks unusually high — please double-check this isn't a typo before saving.`
+      );
+      if (!confirmed) return;
+    }
     setIsSubmitting(true);
     try {
-      await resolvePhysicalCount(currentAnomaly.productId, Number(shelfCountInput), notesInput);
+      await resolvePhysicalCount(currentAnomaly.productId, count, notesInput);
       // Index is kept in range by the clamp effect after the list shrinks.
     } finally {
       setIsSubmitting(false);
