@@ -1,0 +1,43 @@
+🤖 UPDATE PARA SA SALES: Messenger AI Check (bagong katulong sa chats)
+
+Binabasa na ng system ang Messenger chats ng customers. Pag may hiningi ang customer (dagdag item, hold, cancel, nagbayad, bus, sira ang item...), inihahanda na ng AI ang gagawin sa CRM. Kayo na lang ang magche-check at pipindot.
+
+Bakit makakatulong sa inyo:
+• Hindi n'yo na ita-type isa-isa. Naka-fill na ang order, item, halaga at petsa.
+• Binabasa ng AI ang GCash screenshot: amount, reference #, at kung sa number natin napunta. Kaya rin hatiin ang bayad sa ilang orders.
+• May handa nang reply sa customer (Copy Reply), i-paste n'yo na lang sa Messenger / Business Suite.
+• Hindi na makakalimutan ang "sa 15 po ako magbabayad": may reminder kayo sa petsang sinabi niya.
+• Natututo ang AI sa bawat Edit at Mali n'yo. Habang tumatagal, lalong tumatama.
+
+Ano ang kaya niyang ihanda:
+1. Dagdag / bawas / palit ng item, o bagong order
+2. Hold / ipadala sa ibang petsa / isabay sa ibang order
+3. Cancel ng order
+4. Bayad (GCash / bank screenshot)
+5. Pangako ng bayad (petsa)
+6. Bus shipping (bus company at terminal)
+7. Sira / reklamo (gagawa ng Return case, kasama ang photo)
+8. Sagot ng customer sa hinihintay nating tanong (RTS: resend o cancel, out at supplier, hold)
+9. Delivery note / ibang tatanggap (hindi papalitan ang number ng customer)
+
+Paano:
+1. May lalabas na pop-up: "Messenger AI Check". Makikita ang sinabi ng customer at ang gagawin ng AI.
+2. Basahin at i-check: tamang order ba, tamang item/kulay/size, tamang halaga?
+   Kung ilan ang open orders ng customer, piliin ang tama. Kung bagong order pala, piliin ang "+ Create New Order".
+3. Pindutin:
+   • Tama: tama lahat, gagawin na ng system.
+   • Edit: may mali, ayusin muna tapos i-save.
+   • Mali: hindi dapat gawin. Piliin kung bakit (Nagtanong lang, Maling item / kulay, Maling order, Maling bayad / halaga, Nagawa ko na, Iba pa).
+4. Pindutin ang Copy Reply at i-send sa customer. Kayo pa rin ang magse-send, hindi ang system.
+   "Open Chat" kung gusto n'yo munang basahin ang buong usapan.
+
+Tandaan:
+• Walang nangyayari hangga't hindi kayo pumipindot ng Tama o Edit.
+• Nagtanong lang ang customer ("magkano po?", "meron pa?")? Mali → Nagtanong lang. Hindi pa ito order.
+• Nagawa n'yo na mano-mano? Kusa nang mawawala ang card, o pindutin ang Mali → Nagawa ko na.
+• Bayad: naka-Pending pa rin hanggang ma-verify ng owners, gaya ng dati.
+• Cancel ng order na may bayad na: hindi kayo ang magdedesisyon. Sasabihan ang owners (store credit o refund).
+• "Later": tatago ng 30 minutes, tapos babalik.
+• Mas maganda ang Edit kaysa Mali kung halos tama na. Doon pinakamabilis matuto ang AI.
+
+Ang AI ay katulong lang. Kayo pa rin ang huling titingin bago gawin.

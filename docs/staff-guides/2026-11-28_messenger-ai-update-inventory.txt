@@ -1,0 +1,22 @@
+🤖 UPDATE PARA SA INVENTORY: Messenger AI Check (para sa sales)
+
+May bagong katulong ang sales: binabasa ng AI ang Messenger chats ng customers at inihahanda ang gagawin sa order (dagdag item, hold, cancel, bayad, bus, sira ang item...). Sales ang nagche-check at pumipindot. Wala kayong bagong pop-up dito.
+
+Bakit makakatulong sa inyo:
+• Mas mabilis maa-update ng sales ang order pag may hiningi ang customer, kaya mas kaunti ang mali sa pick at pack.
+• Mas maaga n'yong malalaman kung hold muna, sa bus ipapadala, o cancel na, bago pa kayo mag-pick o mag-pack.
+• Mas mabilis sumagot ang sales sa RTS (resend o cancel).
+
+Ano ang mapapansin n'yo (pareho ng dati, mas madalas lang):
+1. "Orders changed after printing" sa Inventory dashboard: may dinagdag o binawas ang sales. Pindutin ang Reprint (o Got it) at sundin ang bagong form. Ang may tag na bago = i-pick pa; naka-strike = wag i-pack.
+2. Put-back task (Al at Edric): na-cancel ang order na na-pick na. Ibalik sa shelf, tapos Done.
+3. On hold / Ship on another date: wag munang ipadala. Kung hindi pa na-pick, wala muna sa Ready to Pick hanggang 3 araw bago ang petsa.
+4. Bus Shipping → Waiting for bus: naka-mark na ang order para sa bus, kasama ang bus company at terminal.
+5. Returns: may bagong case pag nag-report ang customer ng sira, kasama ang photo niya.
+6. Delivery note sa Activity & Notes ng order ("Delivery note (Messenger): ..."), halimbawa ibang tatanggap o landmark. Basahin bago i-pack.
+
+Sa history ng order, pangalan ng sales agent na nag-check ang nakalagay, hindi "AI".
+
+Tandaan:
+• Pag may mukhang mali (maling item o kulay, sobrang dami), wag hulaan. Mag-note sa order, tapos sa "Who is it for?" piliin ang sales agent, at "Needs a reply".
+• Lagi pa ring sundin ang pinakabagong order form. Pag "Updated order" ang naka-print, palitan na ang luma.
