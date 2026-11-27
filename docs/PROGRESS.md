@@ -33,10 +33,10 @@ and new BUSINESS_WORKFLOW.md sections (Copilot, task actions).
 
 ## Next up
 
-1. **Messenger AI Sales Copilot (Phase 2)**: remaining 4 actions (damage/return,
-   bus shipping, waiting prompt reply, delivery/receiver note), `auto_apply`
-   tuning after owner dry-run accuracy review, and Meta Send API wiring once
-   Meta permissions are approved (`docs/handover/2026-11-24_messenger_ai_sales_copilot_plan.md`).
+1. **Messenger AI Sales Copilot — Owner Dry-Run & Meta Send API**: dry-run on
+   `/dashboard/approval-queue`, enable `show_sales_popup` when ready, tune
+   `auto_apply` at ≥ 95% accuracy, and wire Meta Send API once Meta approves
+   permissions (`docs/handover/2026-11-24_messenger_ai_sales_copilot_plan.md`).
 2. **Physical stock breakdown** (On the shelf → Picked → Packed → Total). See
    BUSINESS_WORKFLOW.md "Unallocated stock is kept and counted".
 3. **Customer profile and recommendations, follow-up** (phase 2 released 2e3e586):
@@ -66,6 +66,10 @@ and new BUSINESS_WORKFLOW.md sections (Copilot, task actions).
 - Telegram morning digest for the Priority List.
 - Security follow-ups: lock the side-app tables; RLS for customer log-ins.
 - Ready to Pick page is marked "temporary" (2026-11-23): decide keep or remove.
+- **Messenger AI Sales Copilot — Future Backlog (Phase 3+)** (requested 2026-11-27; `docs/handover/2026-11-24_messenger_ai_sales_copilot_plan.md`):
+  - Hot-lead & unanswered inquiry reminders before Facebook's 24-hour messaging window expires.
+  - *"Nasaan na po order ko?"* tracking / ETA follow-up tasks.
+  - *"Pa-inform po pag may stock na"* restock notification queue tied to Receiving / *May stock na*.
 
 ---
 
@@ -73,6 +77,13 @@ and new BUSINESS_WORKFLOW.md sections (Copilot, task actions).
 
 Newest first. Older history: `git log`. Feature rules: `docs/BUSINESS_WORKFLOW.md`.
 
+- **2026-11-27** Messenger AI Sales Copilot (Phase 2): enabled all 9 action types
+  (`bus_shipping_request`, `damage_or_complaint` with `customer-returns` photo
+  archiving, `waiting_prompt_reply` for RTS / Supplier / Ship Hold, and OFW-safe
+  `delivery_or_order_note`), added `before_snapshot` + safe `auto_apply` / 1-tap
+  `Undo / Mali`, split services & UI components cleanly (< 400 lines), and saved
+  3 Phase 3+ backlog ideas under Parked/ideas. All 9 rules stay in `stage_confirm`
+  with `show_sales_popup = false` for owner dry-run first. (Antigravity, 758c4d8)
 - **2026-11-27** Cancel work-chain tested (Claude, rollback-only tests on live DB): works,
   except Edit Order on an already-cancelled order added phantom stock (fixed live,
   `2026-11-27_edit_cancelled_order_stock_fix.sql`) and #97F28E7's answered task was
