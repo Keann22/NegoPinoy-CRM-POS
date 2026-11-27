@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
 import { createClient } from '@/lib/supabase/client';
 import { checkOrderAgainstFlags } from '@/lib/supplier-stock/order-flag-check';
 import type {
@@ -30,8 +32,20 @@ export async function fetchSupplierFlags(productIds?: string[]): Promise<Supplie
   return res.ok ? json.flags || [] : [];
 }
 
-export const setSupplierFlag = (input: SetSupplierFlagInput) => send('POST', API, input);
-export const clearSupplierFlag = (productId: string) => send('PATCH', API, { action: 'clear', productId });
+export function notifySupplierPromptsUpdated() {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(PROMPTS_UPDATED_EVENT));
+}
+
+export const setSupplierFlag = async (input: SetSupplierFlagInput) => {
+  const res = await send('POST', API, input);
+  notifySupplierPromptsUpdated();
+  return res;
+};
+export const clearSupplierFlag = async (productId: string) => {
+  const res = await send('PATCH', API, { action: 'clear', productId });
+  notifySupplierPromptsUpdated();
+  return res;
+};
 export const closeOldIssue = (issueId: string) => send('PATCH', API, { action: 'close_old', issueId });
 
 export async function fetchSupplierPrompts(): Promise<SupplierPrompt[]> {
@@ -115,4 +129,77 @@ export function useSupplierFlagPage() {
   }, []);
   useEffect(() => { reload(); }, [reload]);
   return { flags, oldIssues, canSetStatus, loading, error, reload };
+}
+
+const PROMPT_REFRESH_MS = 5 * 60 * 1000;
+const PROMPTS_UPDATED_EVENT = 'supplier-prompts-updated';
+
+const PROMPT_DONE_TOAST: Record<SupplierPromptAnswer, string> = {
+  wait: 'Saved: customer will wait',
+  waiting_customer: 'Okay, we’ll ask again in 4 hours',
+  editing: 'Change the order, then save it',
+  keep_credit: 'Kept as store credit',
+  refund: 'Owners told to refund it',
+  credit_added: 'Put in store credit',
+  handled: 'Saved',
+};
+
+/**
+ * Shared state for "Wala sa supplier" prompts (used by the pop-up, the sales
+ * dashboard card, and the Wala sa Supplier page so answering in one refreshes all).
+ */
+export function useSupplierPrompts(options?: { onAnswered?: () => void; onBeforeNavigate?: () => void }) {
+  const { toast } = useToast();
+  const router = useRouter();
+  const [prompts, setPrompts] = useState<SupplierPrompt[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+
+  const reload = useCallback(async () => {
+    const list = await fetchSupplierPrompts();
+    setPrompts(list);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchSupplierPrompts().then((list) => {
+      if (cancelled) return;
+      setPrompts(list);
+      setLoading(false);
+    });
+    const timer = setInterval(reload, PROMPT_REFRESH_MS);
+    const onSync = () => { reload(); };
+    window.addEventListener(PROMPTS_UPDATED_EVENT, onSync);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      window.removeEventListener(PROMPTS_UPDATED_EVENT, onSync);
+    };
+  }, [reload]);
+
+  const answer = async (p: SupplierPrompt, a: SupplierPromptAnswer) => {
+    if (a === 'credit_added' && !confirm(`Add the ${p.amount.toLocaleString('en-PH')} pesos to ${p.customerName}'s store credit?`)) return;
+    setBusyKey(p.key);
+    try {
+      await answerSupplierPrompt(p.flagId, p.orderId, a);
+      toast({ title: PROMPT_DONE_TOAST[a], description: `${p.customerName} #${p.orderId.slice(0, 7).toUpperCase()}` });
+      await reload();
+      window.dispatchEvent(new Event(PROMPTS_UPDATED_EVENT));
+      options?.onAnswered?.();
+    } catch (e) {
+      toast({ title: 'Could not save', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  /** Change, remove or cancel happens on the order itself; the pop-up checks back in an hour. */
+  const openOrder = async (p: SupplierPrompt, edit: boolean) => {
+    await answer(p, 'editing');
+    options?.onBeforeNavigate?.();
+    router.push(`/dashboard/orders/${p.orderId}${edit ? '?edit=1' : ''}`);
+  };
+
+  return { prompts, loading, busyKey, reload, answer, openOrder };
 }

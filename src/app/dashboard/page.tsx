@@ -25,6 +25,7 @@ import { InventoryDashboard } from '@/components/dashboard/inventory-dashboard';
 import { ComplianceWidget } from '@/components/dashboard/compliance-widget';
 import { Skeleton } from '@/components/ui/skeleton';
 import { OrderChangesCard } from '@/components/dashboard/orders/order-changes-card';
+import { SupplierPromptsCard } from '@/components/dashboard/supplier-stock/supplier-prompts-card';
 import { MyTasksCard } from '@/components/dashboard/tasks/my-tasks-card';
 import { OwnerTasksSummary } from '@/components/dashboard/tasks/owner-tasks-summary';
 import { OwnerTodoCard } from '@/components/dashboard/owner-todo/owner-todo-card';
@@ -218,6 +219,7 @@ export default function DashboardPage() {
       <div className="mb-8 empty:hidden"><MyTasksCard /></div>
       {isManagement && <div className="mb-8 empty:hidden"><OwnerTasksSummary /></div>}
       {(isManagement || userProfile?.roles.includes('Inventory')) && <div className="mb-8"><OrderChangesCard /></div>}
+      {(isManagement || isSales) && <div className="mb-8"><SupplierPromptsCard /></div>}
 
       <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
 

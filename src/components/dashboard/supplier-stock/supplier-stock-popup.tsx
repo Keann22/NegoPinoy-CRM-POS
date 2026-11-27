@@ -1,27 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { PackageX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { useToast } from '@/hooks/use-toast';
 import { usePopupSnooze } from '@/hooks/usePopupSnooze';
-import { answerSupplierPrompt, fetchSupplierPrompts } from '@/hooks/useSupplierFlags';
+import { useSupplierPrompts } from '@/hooks/useSupplierFlags';
 import { SupplierPromptCard } from './supplier-prompt-card';
-import type { SupplierPrompt, SupplierPromptAnswer } from '@/types/supplier-stock.types';
-
-const REFRESH_MS = 5 * 60 * 1000;
-
-const DONE: Record<SupplierPromptAnswer, string> = {
-  wait: 'Saved: customer will wait',
-  waiting_customer: 'Okay, we’ll ask again in 4 hours',
-  editing: 'Change the order, then save it',
-  keep_credit: 'Kept as store credit',
-  refund: 'Owners told to refund it',
-  credit_added: 'Put in store credit',
-  handled: 'Saved',
-};
 
 /**
  * Orders waiting on an item we can't get from the supplier (owner, 2026-11-20).
@@ -30,41 +14,12 @@ const DONE: Record<SupplierPromptAnswer, string> = {
  * every 30 minutes until each order is answered.
  */
 export function SupplierStockPopup() {
-  const { toast } = useToast();
-  const router = useRouter();
-  const [prompts, setPrompts] = useState<SupplierPrompt[]>([]);
-  const [busyKey, setBusyKey] = useState<string | null>(null);
-
-  const load = useCallback(() => fetchSupplierPrompts().then(setPrompts), []);
-  useEffect(() => {
-    fetchSupplierPrompts().then(setPrompts);
-    const t = setInterval(load, REFRESH_MS);
-    return () => clearInterval(t);
-  }, [load]);
-  const { minimized, setMinimized } = usePopupSnooze('supplier-stock', load);
+  const { prompts, busyKey, reload, answer, openOrder } = useSupplierPrompts({
+    onBeforeNavigate: () => setMinimized(true),
+  });
+  const { minimized, setMinimized } = usePopupSnooze('supplier-stock', reload);
 
   if (prompts.length === 0) return null;
-
-  const answer = async (p: SupplierPrompt, a: SupplierPromptAnswer) => {
-    if (a === 'credit_added' && !confirm(`Add the ${p.amount.toLocaleString('en-PH')} pesos to ${p.customerName}'s store credit?`)) return;
-    setBusyKey(p.key);
-    try {
-      await answerSupplierPrompt(p.flagId, p.orderId, a);
-      toast({ title: DONE[a], description: `${p.customerName} #${p.orderId.slice(0, 7).toUpperCase()}` });
-      await load();
-    } catch (e) {
-      toast({ title: 'Could not save', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
-    } finally {
-      setBusyKey(null);
-    }
-  };
-
-  /** Change, remove or cancel happens on the order itself; the pop-up checks back in an hour. */
-  const openOrder = async (p: SupplierPrompt, edit: boolean) => {
-    await answer(p, 'editing');
-    setMinimized(true);
-    router.push(`/dashboard/orders/${p.orderId}${edit ? '?edit=1' : ''}`);
-  };
 
   // "Later": nothing on screen until the 30 minutes are up (owner, 2026-11-23:
   // the corner button covered the menu and felt like the pop-up never left).

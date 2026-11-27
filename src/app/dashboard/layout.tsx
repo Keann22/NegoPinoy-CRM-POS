@@ -86,6 +86,7 @@ export default function DashboardLayout({
       links.push({ href: '/dashboard/priority', label: 'Priority List', icon: ListOrdered });
       // Tasks the owners give staff (owner, 2026-11-23); the badge is my open-task count.
       links.push({ href: '/dashboard/tasks', label: 'Tasks', icon: ClipboardCheck, badge: true });
+      links.push({ href: '/dashboard/inventory/supplier-stock', label: 'Out at Supplier', icon: PackageX });
     }
 
     // Sales answer resend / cancel on returned parcels there (they don't see Inventory Management).
@@ -132,8 +133,7 @@ export default function DashboardLayout({
         { href: '/dashboard/inventory/batches', label: 'Stock Batch List', icon: ListChecks },
         { href: '/dashboard/inventory/movements', label: 'Inventory History', icon: History },
         { href: '/dashboard/inventory/returns', label: 'Returns', icon: Undo2 },
-        { href: '/dashboard/inventory/supplier-returns', label: 'Supplier Returns', icon: PackageX },
-        { href: '/dashboard/inventory/supplier-stock', label: 'Out at Supplier', icon: PackageX }
+        { href: '/dashboard/inventory/supplier-returns', label: 'Supplier Returns', icon: PackageX }
       ];
 
       if (isManagement) {
@@ -198,6 +198,7 @@ export default function DashboardLayout({
 
   useEffect(() => {
     const isTopLevelInventoryRoute =
+      pathname === '/dashboard/inventory/supplier-stock' ||
       pathname === '/dashboard/inventory/recount' ||
       pathname === '/dashboard/inventory/my-activity';
     if (pathname.startsWith('/dashboard/inventory') && !isTopLevelInventoryRoute) {
@@ -230,7 +231,7 @@ export default function DashboardLayout({
       const Icon = link.icon;
 
       if ('subItems' in link && link.subItems) {
-        const isParentActive = pathname.startsWith(`/dashboard/${link.id}`);
+        const isParentActive = link.subItems.some(sub => pathname === sub.href);
         return (
           <Collapsible key={link.id} open={link.isOpen} onOpenChange={link.setIsOpen}>
             <CollapsibleTrigger

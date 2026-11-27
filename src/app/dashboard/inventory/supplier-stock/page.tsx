@@ -4,10 +4,11 @@ import { useState } from 'react';
 import { Loader2, PackageX, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { closeOldIssue, useSupplierFlagPage } from '@/hooks/useSupplierFlags';
+import { closeOldIssue, notifySupplierPromptsUpdated, useSupplierFlagPage } from '@/hooks/useSupplierFlags';
 import { ProductPicker } from '@/components/dashboard/procurement/product-picker';
 import { SupplierFlagDialog } from '@/components/dashboard/supplier-stock/supplier-flag-dialog';
 import { SupplierFlagList } from '@/components/dashboard/supplier-stock/supplier-flag-list';
+import { SupplierPromptsCard } from '@/components/dashboard/supplier-stock/supplier-prompts-card';
 import { OldIssuesList } from '@/components/dashboard/supplier-stock/old-issues-list';
 import type { SupplierFlag } from '@/types/supplier-stock.types';
 
@@ -39,12 +40,14 @@ export default function SupplierStockPage() {
     <div className="mx-auto max-w-4xl space-y-4 p-4">
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="flex items-center gap-2 text-2xl font-bold"><PackageX className="h-6 w-6 text-amber-600" /> Out at Supplier</h1>
-        <Button variant="ghost" size="sm" onClick={() => reload()} className="ml-auto"><RefreshCw className="mr-1 h-4 w-4" />Refresh</Button>
+        <Button variant="ghost" size="sm" onClick={() => { reload(); notifySupplierPromptsUpdated(); }} className="ml-auto"><RefreshCw className="mr-1 h-4 w-4" />Refresh</Button>
       </div>
       <p className="text-sm text-muted-foreground">
         Items we can&apos;t buy right now. Sales get a pop-up for every order waiting on one, and New Order warns before adding it.
         {unanswered > 0 && <span className="font-semibold text-red-700 dark:text-red-400"> {unanswered} order{unanswered === 1 ? '' : 's'} not answered yet.</span>}
       </p>
+
+      <SupplierPromptsCard hideWhenEmpty showAllLink={false} onAnswered={reload} />
 
       {canSetStatus && (
         <div className="max-w-sm">
