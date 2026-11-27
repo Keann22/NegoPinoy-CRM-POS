@@ -1,12 +1,11 @@
-import { readReceiver } from '@/lib/services/payments/payment-reference-check';
-import { addDaysPht, phtToday } from '@/lib/shipping/ship-hold-rules';
+import { KNOWN_BUS_COMPANIES } from '@/types/bus-shipping.types';
+import { phtToday } from '@/lib/shipping/ship-hold-rules';
 import type {
   CopilotActionPayload,
   MessengerAiActionType,
-  OrderEditItemChange,
-  PaymentSplitShare,
 } from '@/types';
 import { CopilotError, type BurstContext } from './messenger-context-builder';
+import { parseAnalyzedPayload } from './messenger-payload-parser';
 
 export interface AnalyzedBurstAction {
   actionType: MessengerAiActionType | 'none';
@@ -41,43 +40,57 @@ async function fetchImageInline(url: string): Promise<{ mimeType: string; data: 
 }
 
 function buildAnalyzerPrompt(ctx: BurstContext, enabledTypes: MessengerAiActionType[]): string {
-  const ordersText = ctx.openOrders.length
-    ? ctx.openOrders
+  const formatOrders = (list: typeof ctx.openOrders, emptyMsg: string) =>
+    list.length
+      ? list
+          .map(
+            (o) =>
+              `- id="${o.id}" (${o.shortId}) | ${o.orderDate} | ${o.paymentMethod} | ${o.status} | printed=${o.isPrinted} | total=₱${o.totalAmount} | bal=₱${o.balanceDue} | items: ${o.items
+                .map((i) => `${i.quantity}x ${i.productName} [productId=${i.productId}, ₱${i.unitPrice}]`)
+                .join('; ')}`
+          )
+          .join('\n')
+      : emptyMsg;
+
+  const ordersText = formatOrders(ctx.openOrders, 'None (customer has 0 open orders)');
+  const closedOrdersText = formatOrders(ctx.recentClosedOrders, 'None');
+  const promptsText = ctx.waitingPrompts.length
+    ? ctx.waitingPrompts
         .map(
-          (o) =>
-            `- id="${o.id}" (${o.shortId}) | ${o.orderDate} | ${o.paymentMethod} | ${o.status} | printed=${o.isPrinted} | total=₱${o.totalAmount} | bal=₱${o.balanceDue} | items: ${o.items
-              .map((i) => `${i.quantity}x ${i.productName} [productId=${i.productId}, ₱${i.unitPrice}]`)
-              .join('; ')}`
+          (p) =>
+            `- promptId="${p.promptId}" | type=${p.promptType} | orderId="${p.orderId}" (${p.shortOrderId}) | ${p.summary} | choices: ${p.allowedChoices.join(', ')}`
         )
         .join('\n')
-    : 'None (customer has 0 open orders)';
+    : 'None';
 
   const variantsText = ctx.candidateVariants.length
-    ? ctx.candidateVariants
-        .map((v) => `- id="${v.id}" | ${v.name} | ₱${v.sellingPrice} | shelf=${v.shelfStock}`)
-        .join('\n')
+    ? ctx.candidateVariants.map((v) => `- id="${v.id}" | ${v.name} | ₱${v.sellingPrice} | shelf=${v.shelfStock}`).join('\n')
     : 'None matched';
-
   const aliasText = ctx.matchedAliases.length
     ? ctx.matchedAliases.map((a) => `- "${a.phrase}" => ${a.productName} (id="${a.productId}")`).join('\n')
     : 'None';
-
   const lessonsText = ctx.lessons.length
     ? ctx.lessons.map((l) => `- [${l.actionType} / ${l.verdict}] ${l.lessonText}`).join('\n')
     : 'None yet';
-
   const threadText = ctx.recentThread
     .map((m) => `[${m.senderType === 'customer' ? 'CUSTOMER' : 'STAFF'}]: ${m.text}`)
     .join('\n');
 
-  const today = phtToday();
   return `You are the AI Sales Copilot for NegosyantengPinoy.Ph (Philippine cookware/appliances on Facebook Messenger: COD, Lay-away/Hulugan, Installment, GCash).
 Analyze the customer's LATEST MESSAGE BURST and decide if it requires a CRM action from this allowed list: ${enabledTypes.join(', ')}, or "none" if it is just an inquiry ("magkano", "available pa?"), casual chat, or not actionable yet.
 
-TODAY (PHT): ${today}
+TODAY (PHT): ${phtToday()}
 CUSTOMER: ${ctx.customer.fullName || 'Unknown'} (id=${ctx.customer.id || 'unlinked'})
 OPEN ORDERS:
 ${ordersText}
+
+RECENT DELIVERED/SHIPPED/RETURNED ORDERS (last 30d, use for damage_or_complaint / RTS replies):
+${closedOrdersText}
+
+OPEN WAITING PROMPTS (RTS / Supplier Stock / Ship Hold):
+${promptsText}
+
+KNOWN BUS COMPANIES: ${KNOWN_BUS_COMPANIES.join(', ')}
 
 LEARNED PRODUCT ALIASES:
 ${aliasText}
@@ -93,13 +106,16 @@ ${threadText}
 
 LATEST CUSTOMER BURST TO ANALYZE:
 ${ctx.burst.chatExcerpt}
-${ctx.burst.attachmentUrl ? '(Customer attached a photo — inspect it carefully if payment receipt.)' : ''}
+${ctx.burst.attachmentUrl ? '(Customer attached a photo — inspect carefully for payment receipt OR damaged/wrong item.)' : ''}
 
 CRITICAL RULES:
-1. If the customer is ONLY asking price/availability without confirming an order, change, cancel, hold, payment, or payment date, return action_type="none".
+1. If the customer is ONLY asking price/availability without confirming an order, change, cancel, hold, payment, complaint, or reply, return action_type="none".
 2. MULTI-ORDER RULE: If customer has 2+ open orders and it's unclear which order they mean, set ambiguous_order=true and still pick your best guess in orderId. For add-ons ("pahabol", "dagdag"): if their only open order is already Packed/For Shipping or an older Lay-away and they want a new COD item, set createNewOrder=true.
-3. For payment_proof: if image shows GCash/bank receipt, read totalAmount, 13-digit referenceNumber, ocrRawText snippet (incl. receiver phone if visible), and split shares across open orders if they said "kasama yung isang order/layaway".
-4. Always write summary_taglish (clear 1-line summary in Taglish/English) and draft_reply (polite 1-2 sentence Taglish reply for sales to copy & send).
+3. For payment_proof: read totalAmount, 13-digit referenceNumber, ocrText snippet (incl. receiver phone), and split shares across open orders if mentioned.
+4. For waiting_prompt_reply: ONLY match if OPEN WAITING PROMPTS has an active prompt for this customer/order; reuse its exact promptId and one of its allowedChoices.
+5. For damage_or_complaint: match against delivered/shipped/open order items ("basag", "sira", "kulang", "maling item").
+6. For delivery_or_order_note: capture delivery gate/landmark notes or alternate receiver name/phone (never change main customer profile).
+7. Always write summary_taglish (clear 1-line headline) and draft_reply (warm 1-2 sentence Taglish reply for sales to copy & send).
 
 Return ONLY JSON:
 {
@@ -112,12 +128,15 @@ Return ONLY JSON:
   "draft_reply": "warm Taglish reply for sales to copy & send, or null if none",
   "payload": {
     "kind": "same as action_type",
-    ...fields for that kind:
     - order_edit_items: { "kind":"order_edit_items", "orderId":"uuid|null", "createNewOrder":bool, "newOrderPaymentType":"COD|Lay-away|Full Payment", "items":[{"op":"add|remove|set_qty|swap","productId":"uuid|null","productName":"string","replaceProductId":"uuid|null","replaceProductName":"string|null","quantity":1,"unitPrice":0,"phraseUsed":"customer words"}], "note":"string|null" }
     - order_hold_or_reschedule: { "kind":"order_hold_or_reschedule", "orderId":"uuid|null", "holdKind":"with_orders|payment|adding|date|other", "shipVia":"courier|bus", "checkOn":"YYYY-MM-DD", "withOrderIds":["uuid"], "note":"string" }
     - order_cancel: { "kind":"order_cancel", "orderId":"uuid|null", "reason":"string" }
     - payment_proof: { "kind":"payment_proof", "orderId":"uuid|null", "totalAmount":0, "paymentMethod":"GCash|Bank Transfer|Cash|Other", "referenceNumber":"string|null", "ocrText":"any phone/ref text seen on receipt", "shares":[{"orderId":"uuid","amount":0}], "note":"string|null" }
     - payment_promise: { "kind":"payment_promise", "orderId":"uuid|null", "promisedDate":"YYYY-MM-DD", "promisedAmount":0, "note":"string" }
+    - bus_shipping_request: { "kind":"bus_shipping_request", "orderId":"uuid|null", "orderIds":["uuid"], "busCompany":"string", "destination":"bus station/city", "note":"string|null" }
+    - damage_or_complaint: { "kind":"damage_or_complaint", "orderId":"uuid|null", "source":"damage_report|shipped_back", "reason":"Damaged in transit|Defective / not working|Wrong item|Missing item or part|Other", "items":[{"productName":"string","quantity":1}], "notes":"string", "attachPhoto":true }
+    - waiting_prompt_reply: { "kind":"waiting_prompt_reply", "orderId":"uuid|null", "promptType":"rts|supplier_stock|ship_hold", "promptId":"string|null", "choice":"string", "checkOn":"YYYY-MM-DD|null", "shippingPayer":"us|customer|null", "note":"string|null" }
+    - delivery_or_order_note: { "kind":"delivery_or_order_note", "orderId":"uuid|null", "deliveryNote":"string", "receiverName":"string|null", "receiverPhone":"string|null" }
   }
 }`;
 }
@@ -210,112 +229,26 @@ export async function analyzeMessengerBurst(
 
   const actionType = rawType as MessengerAiActionType;
   const openOrderIds = new Set(ctx.openOrders.map((o) => o.id));
+  const allOrders = [...ctx.openOrders, ...ctx.recentClosedOrders];
+  const allOrderIds = new Set(allOrders.map((o) => o.id));
   const variantMap = new Map(ctx.candidateVariants.map((v) => [v.id, v]));
-  ctx.openOrders.forEach((o) => o.items.forEach((it) => {
-    if (!variantMap.has(it.productId)) {
-      variantMap.set(it.productId, { id: it.productId, name: it.productName, sellingPrice: it.unitPrice, shelfStock: 0 });
-    }
-  }));
+  allOrders.forEach((o) =>
+    o.items.forEach((it) => {
+      if (!variantMap.has(it.productId)) {
+        variantMap.set(it.productId, { id: it.productId, name: it.productName, sellingPrice: it.unitPrice, shelfStock: 0 });
+      }
+    })
+  );
 
-  let orderId = typeof parsed.order_id === 'string' && openOrderIds.has(parsed.order_id) ? parsed.order_id : null;
-  if (!orderId && ctx.openOrders.length === 1) orderId = ctx.openOrders[0].id;
-  const ambiguousOrder = Boolean(parsed.ambiguous_order) || (ctx.openOrders.length >= 2 && !orderId);
-  const rawPayload = (parsed.payload && typeof parsed.payload === 'object' ? parsed.payload : {}) as Record<string, unknown>;
-
-  let proposedPayload: CopilotActionPayload | null = null;
-  const tomorrow = addDaysPht(1);
-
-  if (actionType === 'order_edit_items') {
-    const rawItems = Array.isArray(rawPayload.items) ? rawPayload.items : [];
-    const items: OrderEditItemChange[] = rawItems
-      .map((x): OrderEditItemChange | null => {
-        if (!x || typeof x !== 'object') return null;
-        const r = x as Record<string, unknown>;
-        const op = (['add', 'remove', 'set_qty', 'swap'].includes(String(r.op)) ? String(r.op) : 'add') as OrderEditItemChange['op'];
-        const pid = typeof r.productId === 'string' && variantMap.has(r.productId) ? r.productId : null;
-        const v = pid ? variantMap.get(pid) : undefined;
-        const repId = typeof r.replaceProductId === 'string' && variantMap.has(r.replaceProductId) ? r.replaceProductId : null;
-        return {
-          op,
-          productId: pid,
-          productName: v?.name || String(r.productName || 'Item'),
-          replaceProductId: repId,
-          replaceProductName: repId ? variantMap.get(repId)?.name || String(r.replaceProductName || '') : null,
-          quantity: Math.max(1, Math.round(Number(r.quantity || 1))),
-          unitPrice: v ? v.sellingPrice : Number(r.unitPrice || 0),
-          phraseUsed: typeof r.phraseUsed === 'string' ? r.phraseUsed.slice(0, 80) : null,
-        };
-      })
-      .filter((x): x is OrderEditItemChange => Boolean(x));
-
-    proposedPayload = {
-      kind: 'order_edit_items',
-      orderId,
-      createNewOrder: Boolean(rawPayload.createNewOrder) || !orderId,
-      newOrderPaymentType: rawPayload.newOrderPaymentType === 'Lay-away' || rawPayload.newOrderPaymentType === 'Full Payment' ? rawPayload.newOrderPaymentType : 'COD',
-      items,
-      note: typeof rawPayload.note === 'string' ? rawPayload.note : null,
-    };
-  } else if (actionType === 'order_hold_or_reschedule') {
-    const rawCheck = String(rawPayload.checkOn || '');
-    const checkOn = /^\d{4}-\d{2}-\d{2}$/.test(rawCheck) && rawCheck >= phtToday() ? rawCheck : addDaysPht(7);
-    const withOrderIds = (Array.isArray(rawPayload.withOrderIds) ? rawPayload.withOrderIds : [])
-      .map(String)
-      .filter((id) => openOrderIds.has(id));
-    proposedPayload = {
-      kind: 'order_hold_or_reschedule',
-      orderId,
-      holdKind: (['with_orders', 'payment', 'adding', 'date', 'other'].includes(String(rawPayload.holdKind)) ? String(rawPayload.holdKind) : 'date') as 'with_orders' | 'payment' | 'adding' | 'date' | 'other',
-      shipVia: rawPayload.shipVia === 'bus' ? 'bus' : 'courier',
-      checkOn,
-      withOrderIds,
-      note: String(rawPayload.note || ctx.burst.chatExcerpt).slice(0, 200),
-    };
-  } else if (actionType === 'order_cancel') {
-    proposedPayload = {
-      kind: 'order_cancel',
-      orderId,
-      reason: String(rawPayload.reason || 'Customer requested cancel on Messenger').slice(0, 200),
-    };
-  } else if (actionType === 'payment_proof') {
-    const totalAmount = Math.max(0, Number(rawPayload.totalAmount || 0));
-    const rawShares = Array.isArray(rawPayload.shares) ? rawPayload.shares : [];
-    const shares: PaymentSplitShare[] = rawShares
-      .map((s) => {
-        if (!s || typeof s !== 'object') return null;
-        const r = s as Record<string, unknown>;
-        const sid = String(r.orderId || '');
-        if (!openOrderIds.has(sid)) return null;
-        return { orderId: sid, amount: Math.max(0, Number(r.amount || 0)) };
-      })
-      .filter((x): x is PaymentSplitShare => x !== null && x.amount > 0);
-    if (shares.length === 0 && orderId && totalAmount > 0) shares.push({ orderId, amount: totalAmount });
-
-    const ocrText = `${String(rawPayload.ocrText || '')} ${ctx.burst.chatExcerpt}`;
-    const recv = inlineImg ? readReceiver(ocrText) : null;
-    const refMatch = String(rawPayload.referenceNumber || '').replace(/\D/g, '');
-    proposedPayload = {
-      kind: 'payment_proof',
-      orderId,
-      totalAmount,
-      paymentMethod: rawPayload.paymentMethod === 'Bank Transfer' || rawPayload.paymentMethod === 'Cash' || rawPayload.paymentMethod === 'Other' ? rawPayload.paymentMethod : 'GCash',
-      referenceNumber: refMatch.length >= 8 ? refMatch.slice(0, 16) : null,
-      receiverVerified: recv ? recv.ours : null,
-      receiverNote: recv && !recv.ours ? (recv.others.length ? `Shows ${recv.others.map((n) => `0${n}`).join(', ')} (not our GCash)` : 'Receiver number not visible') : null,
-      shares,
-      note: typeof rawPayload.note === 'string' ? rawPayload.note : null,
-    };
-  } else if (actionType === 'payment_promise') {
-    const rawDate = String(rawPayload.promisedDate || '');
-    const promisedDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) && rawDate >= phtToday() ? rawDate : tomorrow;
-    proposedPayload = {
-      kind: 'payment_promise',
-      orderId,
-      promisedDate,
-      promisedAmount: Number(rawPayload.promisedAmount || 0) > 0 ? Number(rawPayload.promisedAmount) : null,
-      note: String(rawPayload.note || ctx.burst.chatExcerpt).slice(0, 200),
-    };
-  }
+  const { orderId, ambiguousOrder, proposedPayload } = parseAnalyzedPayload({
+    actionType,
+    parsed,
+    ctx,
+    hasInlineImage: Boolean(inlineImg),
+    variantMap,
+    openOrderIds,
+    allOrderIds,
+  });
 
   const conf = Number(parsed.confidence);
   return {

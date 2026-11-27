@@ -1,8 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-const PROOF_BUCKET = 'proof_of_payment';
+export type CopilotAttachmentBucket = 'proof_of_payment' | 'customer-returns';
 const MAX_PROOF_BYTES = 5 * 1024 * 1024;
-const ARCHIVED_MARKER = `/storage/v1/object/public/${PROOF_BUCKET}/`;
 
 function extForContentType(contentType: string): string {
   const lower = contentType.toLowerCase();
@@ -13,35 +12,38 @@ function extForContentType(contentType: string): string {
 
 /**
  * Downloads a transient Messenger attachment URL and archives a permanent copy
- * in Supabase Storage (`proof_of_payment`). Falls back cleanly to `sourceUrl`
- * on network/storage error so approvals never block.
+ * in Supabase Storage (`proof_of_payment` or `customer-returns`). Falls back cleanly
+ * to `sourceUrl` on network/storage error so approvals never block.
  */
-export async function persistMessengerProofImage(
+export async function persistMessengerAttachment(
   supabase: SupabaseClient,
   sourceUrl: string | null,
-  psid: string
+  psid: string,
+  bucket: CopilotAttachmentBucket,
+  prefix = 'messenger-ai'
 ): Promise<string | null> {
   if (!sourceUrl || !/^https?:\/\//i.test(sourceUrl)) return sourceUrl;
-  if (sourceUrl.includes(ARCHIVED_MARKER)) return sourceUrl;
+  const archivedMarker = `/storage/v1/object/public/${bucket}/`;
+  if (sourceUrl.includes(archivedMarker)) return sourceUrl;
 
   const ctrl = new AbortController();
   const timeout = setTimeout(() => ctrl.abort(), 8000);
   try {
     const res = await fetch(sourceUrl, { signal: ctrl.signal });
     if (!res.ok) {
-      console.warn(`persistMessengerProofImage fetch HTTP ${res.status}`);
+      console.warn(`persistMessengerAttachment(${bucket}) fetch HTTP ${res.status}`);
       return sourceUrl;
     }
 
     const headerLen = Number(res.headers.get('content-length') || 0);
     if (headerLen > MAX_PROOF_BYTES) {
-      console.warn(`persistMessengerProofImage skipped: content-length ${headerLen} > 5MB`);
+      console.warn(`persistMessengerAttachment(${bucket}) skipped: content-length ${headerLen} > 5MB`);
       return sourceUrl;
     }
 
     const buf = Buffer.from(await res.arrayBuffer());
     if (buf.byteLength === 0 || buf.byteLength > MAX_PROOF_BYTES) {
-      console.warn(`persistMessengerProofImage skipped: buffer bytes=${buf.byteLength}`);
+      console.warn(`persistMessengerAttachment(${bucket}) skipped: buffer bytes=${buf.byteLength}`);
       return sourceUrl;
     }
 
@@ -49,23 +51,31 @@ export async function persistMessengerProofImage(
     const contentType = rawCt.startsWith('image/') ? rawCt : 'image/jpeg';
     const ext = extForContentType(contentType);
     const safePsid = (psid.replace(/[^a-zA-Z0-9_-]/g, '') || 'unknown').slice(0, 32);
-    const filePath = `messenger-ai/${safePsid}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const filePath = `${prefix}/${safePsid}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
     const { data, error } = await supabase.storage
-      .from(PROOF_BUCKET)
+      .from(bucket)
       .upload(filePath, buf, { contentType, upsert: false });
     if (error || !data?.path) {
-      console.warn('persistMessengerProofImage upload error:', error?.message);
+      console.warn(`persistMessengerAttachment(${bucket}) upload error:`, error?.message);
       return sourceUrl;
     }
 
-    return supabase.storage.from(PROOF_BUCKET).getPublicUrl(data.path).data.publicUrl;
+    return supabase.storage.from(bucket).getPublicUrl(data.path).data.publicUrl;
   } catch (err) {
-    console.warn('persistMessengerProofImage error:', err);
+    console.warn(`persistMessengerAttachment(${bucket}) error:`, err);
     return sourceUrl;
   } finally {
     clearTimeout(timeout);
   }
+}
+
+export async function persistMessengerProofImage(
+  supabase: SupabaseClient,
+  sourceUrl: string | null,
+  psid: string
+): Promise<string | null> {
+  return persistMessengerAttachment(supabase, sourceUrl, psid, 'proof_of_payment', 'messenger-ai');
 }
 
 /**

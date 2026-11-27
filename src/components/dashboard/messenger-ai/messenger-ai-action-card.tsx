@@ -11,6 +11,8 @@ import {
   type MessengerAiAction,
 } from '@/types';
 
+import { MessengerAiPhase2Preview } from './messenger-ai-phase2-preview';
+
 interface MessengerAiActionCardProps {
   action: MessengerAiAction;
   busy: boolean;
@@ -41,6 +43,8 @@ export function MessengerAiActionCard({
   const switchTargetOrder = (orderId: string | null, createNewOrder = false) => {
     if (payload.kind === 'order_edit_items') {
       setPayload({ ...payload, orderId, createNewOrder });
+    } else if (payload.kind === 'bus_shipping_request') {
+      setPayload({ ...payload, orderId, orderIds: orderId ? [orderId] : [] });
     } else if (payload.kind === 'payment_proof') {
       const amt = payload.totalAmount || 0;
       setPayload({
@@ -78,7 +82,7 @@ export function MessengerAiActionCard({
             </span>
             <span className="text-[10px] text-muted-foreground">({confPct}% conf.)</span>
             <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-              Approval First
+              {action.status === 'auto_applied_pending_check' ? 'Auto-Applied (Check / Undo)' : 'Approval First'}
             </span>
           </div>
           <div className="text-[11px] font-medium text-foreground/90">{action.summaryTaglish}</div>
@@ -229,6 +233,7 @@ export function MessengerAiActionCard({
             {payload.promisedAmount ? ` (₱${payload.promisedAmount.toLocaleString()})` : ''} — {payload.note}
           </div>
         )}
+        <MessengerAiPhase2Preview payload={payload} hasAttachment={Boolean(action.attachmentUrl)} />
         <div className="text-[10px] text-muted-foreground pt-0.5">AI note: {action.aiReasoning}</div>
       </div>
 
@@ -279,7 +284,7 @@ export function MessengerAiActionCard({
           className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/25 text-rose-700 dark:text-rose-300 text-xs font-semibold transition-all disabled:opacity-50"
         >
           <X className="w-3.5 h-3.5" />
-          <span>Mali</span>
+          <span>{action.status === 'auto_applied_pending_check' ? 'Undo / Mali' : 'Mali'}</span>
         </button>
       </div>
     </div>

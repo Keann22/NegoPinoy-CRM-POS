@@ -43,6 +43,26 @@ export function computePayloadDiff(
   } else if (proposed.kind === 'payment_promise' && final.kind === 'payment_promise') {
     if (proposed.promisedDate !== final.promisedDate) diffs.add('wrong_date');
     if ((proposed.promisedAmount || 0) !== (final.promisedAmount || 0)) diffs.add('wrong_amount');
+  } else if (proposed.kind === 'bus_shipping_request' && final.kind === 'bus_shipping_request') {
+    if (
+      proposed.busCompany.trim().toLowerCase() !== final.busCompany.trim().toLowerCase() ||
+      proposed.destination.trim().toLowerCase() !== final.destination.trim().toLowerCase()
+    ) {
+      diffs.add('wrong_variant');
+    }
+    if ([...proposed.orderIds].sort().join(',') !== [...final.orderIds].sort().join(',')) diffs.add('wrong_order');
+  } else if (proposed.kind === 'damage_or_complaint' && final.kind === 'damage_or_complaint') {
+    if (proposed.reason !== final.reason || proposed.source !== final.source) diffs.add('wrong_action_type');
+  } else if (proposed.kind === 'waiting_prompt_reply' && final.kind === 'waiting_prompt_reply') {
+    if (proposed.choice !== final.choice || proposed.promptType !== final.promptType) diffs.add('wrong_action_type');
+    if ((proposed.checkOn || null) !== (final.checkOn || null)) diffs.add('wrong_date');
+  } else if (proposed.kind === 'delivery_or_order_note' && final.kind === 'delivery_or_order_note') {
+    if (
+      proposed.deliveryNote.trim() !== final.deliveryNote.trim() ||
+      (proposed.receiverPhone || '') !== (final.receiverPhone || '')
+    ) {
+      diffs.add('other');
+    }
   }
 
   return Array.from(diffs);
@@ -173,7 +193,7 @@ export function buildAccuracySummary(
   }
 
   const accuracyByAction: MessengerAiAccuracyRow[] = rules
-    .filter((rule) => rule.phase === 1 || byType.has(rule.actionType))
+    .filter((rule) => rule.phase === 1 || rule.enabled || byType.has(rule.actionType))
     .map((rule) => {
       const c = byType.get(rule.actionType) || { correct: 0, edited: 0, rejected: 0 };
       const totalReviewed = c.correct + c.edited + c.rejected;

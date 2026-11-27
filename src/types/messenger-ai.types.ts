@@ -116,12 +116,71 @@ export interface PaymentPromisePayload {
   note: string;
 }
 
+export interface CopilotWaitingPrompt {
+  promptType: 'rts' | 'supplier_stock' | 'ship_hold';
+  promptId: string;
+  orderId: string;
+  shortOrderId: string;
+  summary: string;
+  allowedChoices: string[];
+}
+
+export interface BusShippingRequestPayload {
+  kind: 'bus_shipping_request';
+  orderId: string | null;
+  orderIds: string[];
+  busCompany: string;
+  destination: string;
+  note?: string | null;
+}
+
+export type DamageComplaintSource = 'damage_report' | 'shipped_back';
+export type DamageComplaintReason =
+  | 'Damaged in transit'
+  | 'Defective / not working'
+  | 'Wrong item'
+  | 'Missing item or part'
+  | 'Other';
+
+export interface DamageOrComplaintPayload {
+  kind: 'damage_or_complaint';
+  orderId: string | null;
+  source: DamageComplaintSource;
+  reason: DamageComplaintReason;
+  items: Array<{ productName: string; quantity: number }>;
+  notes: string;
+  attachPhoto: boolean;
+}
+
+export interface WaitingPromptReplyPayload {
+  kind: 'waiting_prompt_reply';
+  orderId: string | null;
+  promptType: 'rts' | 'supplier_stock' | 'ship_hold';
+  promptId: string | null;
+  choice: string;
+  checkOn?: string | null;
+  shippingPayer?: 'us' | 'customer' | null;
+  note?: string | null;
+}
+
+export interface DeliveryOrOrderNotePayload {
+  kind: 'delivery_or_order_note';
+  orderId: string | null;
+  deliveryNote: string;
+  receiverName?: string | null;
+  receiverPhone?: string | null;
+}
+
 export type CopilotActionPayload =
   | OrderEditItemsPayload
   | ShipHoldPayload
   | OrderCancelPayload
   | PaymentProofPayload
-  | PaymentPromisePayload;
+  | PaymentPromisePayload
+  | BusShippingRequestPayload
+  | DamageOrComplaintPayload
+  | WaitingPromptReplyPayload
+  | DeliveryOrOrderNotePayload;
 
 export interface MessengerAiRule {
   actionType: MessengerAiActionType;
@@ -259,25 +318,25 @@ export const ACTION_TYPE_META: Record<
     label: 'Bus Shipping',
     shortLabel: 'Bus Ship',
     badgeClass: 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/25',
-    description: 'Phase 2: Mark open orders for bus terminal delivery.',
+    description: 'Mark open orders for bus terminal delivery.',
   },
   damage_or_complaint: {
     label: 'Damage / Complaint',
     shortLabel: 'Complaint',
     badgeClass: 'bg-red-500/10 text-red-700 dark:text-red-300 border-red-500/25',
-    description: 'Phase 2: Pre-fill a Customer Return / Damage case.',
+    description: 'Pre-fill a Customer Return / Damage case.',
   },
   waiting_prompt_reply: {
     label: 'Waiting Prompt Reply',
     shortLabel: 'Reply',
     badgeClass: 'bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-500/25',
-    description: 'Phase 2: Pre-select customer answer on RTS / Supplier / Hold.',
+    description: 'Pre-select customer answer on RTS / Supplier / Hold.',
   },
   delivery_or_order_note: {
     label: 'Delivery / Order Note',
     shortLabel: 'Note',
     badgeClass: 'bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-500/25',
-    description: 'Phase 2: Append delivery or receiver note.',
+    description: 'Append delivery or receiver note.',
   },
 };
 

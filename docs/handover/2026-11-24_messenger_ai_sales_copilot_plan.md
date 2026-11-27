@@ -1,7 +1,7 @@
 # Messenger AI Sales Copilot — Plan & To-Do Note
 
-- **Date:** 2026-11-24 (Phase 1 built 2026-11-27)
-- **Status:** Phase 1 Built (Native Next.js + Supabase + Gemini, Zero n8n, Copy Reply for Meta Business Suite)
+- **Date:** 2026-11-24 (Phase 1 & Phase 2 built 2026-11-27)
+- **Status:** Phase 1 & Phase 2 Built (All 9 actions + safe auto_apply/Undo, Native Next.js + Supabase + Gemini, Zero n8n, Copy Reply for Meta Business Suite)
 - **Repo Note:** Public repository — examples below use generic placeholder names and order numbers only.
 
 ---

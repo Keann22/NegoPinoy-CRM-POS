@@ -10,6 +10,7 @@ import type {
   MessengerAiAction,
   VariantSearchResult,
 } from '@/types';
+import { MessengerAiPhase2EditFields } from './messenger-ai-phase2-edit-fields';
 
 interface MessengerAiEditDialogProps {
   action: MessengerAiAction | null;
@@ -341,6 +342,9 @@ export function MessengerAiEditDialog({
               </div>
             </div>
           )}
+
+          {/* Phase 2 Actions */}
+          <MessengerAiPhase2EditFields draft={draft} orders={orders} setDraft={setDraft} />
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>

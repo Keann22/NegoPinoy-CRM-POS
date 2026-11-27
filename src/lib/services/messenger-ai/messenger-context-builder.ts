@@ -6,11 +6,12 @@ import { OPEN_ORDER_STATUSES, shortOrderId } from '@/lib/shipping/ship-hold-rule
 import { getHoldDetails } from '@/lib/services/shipping/ship-hold-service';
 import type {
   CopilotOpenOrderOption,
+  CopilotWaitingPrompt,
   MessengerAiActionType,
   MessengerAiLesson,
-  MessengerProductAlias,
   VariantSearchResult,
 } from '@/types';
+import { loadCustomerPhase2Context } from './messenger-phase2-context';
 
 export class CopilotError extends Error {
   constructor(message: string, public status = 400) {
@@ -36,6 +37,8 @@ export interface BurstContext {
     storeCredit: number;
   };
   openOrders: CopilotOpenOrderOption[];
+  recentClosedOrders: CopilotOpenOrderOption[];
+  waitingPrompts: CopilotWaitingPrompt[];
   recentThread: Array<{ senderType: string; text: string; createdAt: string }>;
   candidateVariants: VariantSearchResult[];
   matchedAliases: Array<{ phrase: string; productId: string; productName: string }>;
@@ -234,6 +237,13 @@ export async function buildBurstContext(
     });
   }
 
+  const openOrderIds = openOrders.map((o) => o.id);
+  const { waitingPrompts, recentClosedOrders } = await loadCustomerPhase2Context(
+    supabase,
+    custRow?.id ? String(custRow.id) : null,
+    openOrderIds
+  );
+
   const lowerText = burst.chatExcerpt.toLowerCase();
   const matchedAliases = ((aliasRows ?? []) as Array<{ phrase_normalized: string; product_id: string; product_name: string }>)
     .filter((a) => lowerText.includes(a.phrase_normalized.toLowerCase()))
@@ -309,6 +319,8 @@ export async function buildBurstContext(
       storeCredit: Number(custRow?.store_credit || 0),
     },
     openOrders,
+    recentClosedOrders,
+    waitingPrompts,
     recentThread,
     candidateVariants,
     matchedAliases,
