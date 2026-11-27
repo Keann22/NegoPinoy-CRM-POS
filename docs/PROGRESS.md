@@ -27,23 +27,6 @@ Both must keep this file current. Dates and times are Philippine time (UTC+8).
 
 Format: `- **Task** (Agent, started YYYY-MM-DD). Files/area. Status.`
 
-
-- **Wala sa Supplier: prompts card on the Dashboard** (Antigravity, found
-  uncommitted 2026-11-25). `src/components/dashboard/supplier-stock/supplier-prompts-card.tsx`
-  (new), `src/hooks/useSupplierFlags.ts` (shared `useSupplierPrompts`),
-  `supplier-stock-popup.tsx`, `supplier-flag-dialog.tsx`, `supplier-stock/page.tsx`,
-  `src/app/dashboard/page.tsx`, `src/app/dashboard/layout.tsx` (Wala sa Supplier and
-  Pabilang as top-level menu items). Status: not committed; Antigravity to
-  confirm it is finished, run typecheck, commit.
-- **Bundle recipe self-loop guard + typo check on shelf counts** (Antigravity,
-  found uncommitted 2026-11-25). `src/lib/services/procurement-service.ts`,
-  `src/app/api/inventory/procurement-request/route.ts` (skip a recipe component that
-  points to itself), `InventoryGuardianAlertModal.tsx`, `alert-review-adjust-dialog.tsx`
-  (confirm counts of 500+, round to whole pieces). Status: not committed.
-- **Messenger backfill + comment access check** (Antigravity, found uncommitted
-  2026-11-25). `supabase/functions/facebook-webhook/index.ts`, `sync.ts`
-  (`backfill_conversations`, `comments_check`, auto-link / fill customer details).
-  Status: not committed; unknown whether the Edge Function was deployed.
 - **Messenger AI Sales Copilot: planning** (started 2026-11-24). Plan:
   `docs/handover/2026-11-24_messenger_ai_sales_copilot_plan.md` (not committed yet).
   Status: waiting on the open decisions in section 6 of the plan before step 1.
@@ -93,6 +76,20 @@ and new BUSINESS_WORKFLOW.md sections (Copilot, task actions).
 
 Newest first. Older history: `git log`. Feature rules: `docs/BUSINESS_WORKFLOW.md`.
 
+- **2026-11-27** Out at Supplier: Dashboard prompts card (`SupplierPromptsCard`,
+  shared `useSupplierPrompts` hook, cross-view sync) and top-level Out at Supplier
+  menu item (`layout.tsx`). (Antigravity, 31443a2)
+- **2026-11-27** Bundle recipe self-loop guard (`procurement-service.ts`,
+  `procurement-request/route.ts`) + shelf count 500+ typo confirmation and integer
+  rounding (`InventoryGuardianAlertModal.tsx`, `alert-review-adjust-dialog.tsx`).
+  (Antigravity, 54732bd)
+- **2026-11-27** Messenger backfill (`backfill_conversations`) + comment access
+  diagnostic (`comments_check`) in `facebook-webhook` (already deployed on Supabase
+  as version 32, matching repo byte-for-byte). (Antigravity, 4b082a2)
+- **2026-11-26** Picker shelf counts: removed the blocking owner-approval hold so
+  higher picker counts save immediately (with 50+ typo confirmation, existing 48h
+  Receiving warning, and non-blocking owner bell alert), removed from Owner To-Do,
+  and resolved the 5 open holds from Nov 26.
 - **2026-11-26** Priority List: Print list (the tab as filtered, tick box per order).
 - **2026-11-26** Priority List: green OK to ship tag on orders sales OK'd, plus an
   "OK to ship only" switch (from done tasks with an OK to ship answer).
@@ -100,6 +97,20 @@ Newest first. Older history: `git log`. Feature rules: `docs/BUSINESS_WORKFLOW.m
   with a green OK to ship tag, or a shared Inventory task when only sales had it
   (`ok-to-ship-service.ts`, columns `staff_tasks.ok_to_ship_at/by`). Backfilled 33
   answers from 2026-11-25/26.
+- **2026-11-25** Payments Log: unverified payments from before Jul 1, 2026 (testing
+  period) hidden from Pending, its count, statement matching and owner to-do
+  (`payment-review-cutoff.ts`). 60 pending payments verified by hand against the
+  0917/0923 statements; Cash payments that were really GCash/BDO relabeled.
+- **2026-11-25** Payments Log triage & 2-pass GCash statement matching: own-phone OCR
+  guard + notes ref fallback (`extract-ocr`), multi-line PDF parser & Date+Amount
+  bank/remittance matcher with reused-ref safety (`verify-pdf`), Pending bucket
+  filters/search/bulk actions/inline ref edit/re-run OCR (`/dashboard/accounting/payments`
+  + `/api/payments/manage`), and backlog cleanup (21 cancelled rejected, 19 refs
+  backfilled from notes, 15 phone-number refs fixed; backup in
+  `scripts/reports/2026-11-25-payments-cleanup-backup.json`); receipt date/time OCR
+  (`ocr_payment_date`, `ocr_payment_time`) + Vision backfill of 451 receipt dates /
+  427 times / 82 refs + time-based statement scoring. (Antigravity, 6263ad5, 79f5ca9, 2f23098)
+
 - **2026-11-26** Priority List: Ready to pack checks the shelf for unpicked orders
   (paid first, then oldest, same as Ready to Pick); short ones go to Waiting as
   "Not on the shelf" or Bought. Was 180 ready, 60 short. c0dca34 (Claude).
@@ -112,10 +123,6 @@ Newest first. Older history: `git log`. Feature rules: `docs/BUSINESS_WORKFLOW.m
   with strict role isolation and zero supplier/cost fields. Migration
   `2026-11-25_activity_history_indexes.sql` (applied). (Antigravity, 1f2a1b4)
 
-- **2026-11-25** Payments Log: unverified payments from before Jul 1, 2026 (testing
-  period) hidden from Pending, its count, statement matching and owner to-do
-  (`payment-review-cutoff.ts`). 60 pending payments verified by hand against the
-  0917/0923 statements; Cash payments that were really GCash/BDO relabeled.
 - **2026-11-25** Customer persona & profile, phase 2: DB triggers (`orders`, `payments`,
   `conversation_logs`) + on-view auto-refresh + daily cron refresh + paginated
   2,705-row listing + full order backfill (2,705/2,705 order customers profiled:
