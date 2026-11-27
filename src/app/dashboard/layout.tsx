@@ -39,6 +39,7 @@ import { SupplierStockPopup } from '@/components/dashboard/supplier-stock/suppli
 import { ShipHoldPopup } from '@/components/dashboard/ship-holds/ship-hold-popup';
 import { Bus, ClipboardCheck } from 'lucide-react';
 import { StaffTaskPopup } from '@/components/dashboard/tasks/staff-task-popup';
+import { MessengerAiCheckPopup } from '@/components/dashboard/messenger-ai/messenger-ai-check-popup';
 import { TasksNavBadge } from '@/components/dashboard/tasks/tasks-nav-badge';
 import { InventoryGuardianAlertModal } from '@/components/dashboard/inventory/InventoryGuardianAlertModal';
 import { InventoryGuardianTrigger } from '@/components/dashboard/inventory/InventoryGuardianTrigger';
@@ -177,7 +178,7 @@ export default function DashboardLayout({
       links.push({ href: '/dashboard/users', label: 'User Management', icon: Users });
       
       // New AI/Admin Features
-      links.push({ href: '/dashboard/approval-queue', label: 'AI Approval Queue', icon: ListChecks });
+      links.push({ href: '/dashboard/approval-queue', label: 'AI Copilot & Queue', icon: ListChecks });
       links.push({ href: '/dashboard/simulator', label: 'AI Simulator', icon: Bot });
       links.push({ href: '/dashboard/chat', label: 'Chat History', icon: MessageCircle });
     } else if (isSales) {
@@ -305,6 +306,7 @@ export default function DashboardLayout({
       <SupplierStockPopup />
       <ShipHoldPopup />
       <StaffTaskPopup />
+      <MessengerAiCheckPopup />
       <InventoryGuardianAlertModal />
       <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr] print:block">
         <div className="hidden border-r bg-sidebar md:block print:hidden">

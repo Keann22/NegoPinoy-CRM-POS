@@ -1,155 +1,216 @@
 'use client';
 
 import React, { useState } from 'react';
-import { RefreshCw, CheckCircle, Database, Trash2, User, Bot } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
-import { useEffect } from 'react';
+import { Bot, RefreshCw, Sparkles, CheckCircle2, Info } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { useMessengerAiDashboard } from '@/hooks/useMessengerAiActions';
+import type { CopilotActionPayload, MessengerAiAction, MessengerAiErrorCategory } from '@/types';
+import { MessengerAiAccuracyPanel } from '@/components/dashboard/messenger-ai/messenger-ai-accuracy-panel';
+import { MessengerAiActionCard } from '@/components/dashboard/messenger-ai/messenger-ai-action-card';
+import { MessengerAiEditDialog } from '@/components/dashboard/messenger-ai/messenger-ai-edit-dialog';
+import { MessengerAiRejectDialog } from '@/components/dashboard/messenger-ai/messenger-ai-reject-dialog';
+
+type TabKey = 'pending' | 'rules' | 'lessons';
 
 export default function ApprovalQueuePage() {
-  const [processingId, setProcessingId] = useState<string | null>(null);
-  
-  const supabase = createClient();
-  const [pendingFaqs, setPendingFaqs] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refetchTrigger, setRefetchTrigger] = useState(0);
+  const { toast } = useToast();
+  const {
+    data, loading, scanning, busyId, error, reload, scanNow,
+    reviewAction, updateRule, toggleLesson, deleteLesson, addAlias, deleteAlias,
+  } = useMessengerAiDashboard();
 
-  useEffect(() => {
-    const fetch = async () => {
-      setLoading(true);
-      try {
-        const { data, error } = await supabase.from('pending_faqs').select('*');
-        if (error) throw error;
-        setPendingFaqs(data || []);
-      } catch (err) { console.error('fetch error:', err); }
-      finally { setLoading(false); }
-    };
-    fetch();
-  }, [supabase, refetchTrigger]);
+  const [tab, setTab] = useState<TabKey>('pending');
+  const [editing, setEditing] = useState<{ action: MessengerAiAction; payload: CopilotActionPayload } | null>(null);
+  const [rejecting, setRejecting] = useState<MessengerAiAction | null>(null);
 
-  const handleVerify = async (question: string, answer: string, id: string) => {
-    setProcessingId(id);
+  const handleScan = async () => {
     try {
-      const webhookUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL || '';
-      const response = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, question, answer })
+      const res = await scanNow({ maxBursts: 6, quietSeconds: 0, lookbackHours: 72 });
+      if (res.creditError) {
+        toast({ variant: 'destructive', title: 'Gemini credits depleted', description: res.creditError });
+        return;
+      }
+      toast({
+        title: `Scanned ${res.scannedBursts} chat burst(s)`,
+        description: `Created ${res.actionsCreated} check(s), ${res.noActionCount} non-action, ${res.trivialSkipped} trivial skipped.`,
       });
-
-      if (!response.ok) throw new Error('Failed to verify FAQ');
-
-      // The backend should handle deletion, or we can optimistic delete here
-      setRefetchTrigger(n => n + 1);
-    } catch (error) {
-      console.error('Verification failed:', error);
-      alert('Action failed. Please try again.');
-    } finally {
-      setProcessingId(null);
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'Scan failed', description: err instanceof Error ? err.message : String(err) });
     }
   };
 
-  const handleDiscard = async (id: string) => {
-    if (!window.confirm('Are you sure you want to discard this suggestion?')) return;
-    setProcessingId(id);
+  const handleConfirm = async (action: MessengerAiAction, payload: CopilotActionPayload) => {
     try {
-      const { error } = await supabase.from('pending_faqs').delete().eq('id', id);
-      if (error) throw error;
-    } catch (error) {
-      console.error('Discard failed:', error);
-      alert('Failed to discard. Please try again.');
-    } finally {
-      setProcessingId(null);
+      const changed = JSON.stringify(payload) !== JSON.stringify(action.proposedPayload);
+      const res = await reviewAction({
+        actionId: action.id,
+        verdict: changed ? 'edited' : 'correct',
+        finalPayload: payload,
+      });
+      toast({ title: res.appliedSummary || 'Applied & verified' });
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'Could not apply', description: err instanceof Error ? err.message : String(err) });
     }
   };
 
-  const pending = pendingFaqs?.filter(f => f.status === 'pending') || [];
+  const totalReviewed = data?.accuracyByAction.reduce((s, r) => s + r.totalReviewed, 0) ?? 0;
+  const totalCorrect = data?.accuracyByAction.reduce((s, r) => s + r.correctCount, 0) ?? 0;
+  const overallPct = totalReviewed > 0 ? `${Math.round((totalCorrect / totalReviewed) * 100)}%` : '—';
 
   return (
-    <div className="max-w-6xl mx-auto py-8">
-      <div className="flex items-center justify-between mb-8">
+    <div className="max-w-6xl mx-auto py-6 space-y-5">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold mb-1">Knowledge Verification</h2>
-          <p className="text-muted-foreground text-sm">Review real customer conversations to expand the chatbot&apos;s brain.</p>
+          <h2 className="text-2xl font-bold flex items-center gap-2">
+            <Bot className="w-6 h-6 text-blue-600" />
+            Messenger AI Copilot &amp; Accuracy
+          </h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Native Gemini + Supabase Copilot (no n8n). Tests chat bursts in Approval First mode, tracks accuracy, and learns from every mistake.
+          </p>
         </div>
-        <button 
-          disabled={loading}
-          className="p-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl transition-all disabled:opacity-50"
-        >
-          <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-        </button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => void reload()} disabled={loading}>
+            <RefreshCw className={`w-4 h-4 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button size="sm" onClick={() => void handleScan()} disabled={scanning}>
+            <Sparkles className={`w-4 h-4 mr-1.5 ${scanning ? 'animate-spin' : ''}`} />
+            {scanning ? 'Scanning Chats...' : 'Scan Recent Chats'}
+          </Button>
+        </div>
       </div>
 
-      {loading && pending.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-24">
-          <div className="w-16 h-16 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin mb-4" />
-          <p className="text-muted-foreground font-medium animate-pulse">Scanning database for updates...</p>
-        </div>
-      ) : pending.length === 0 ? (
-        <div className="border-2 border-dashed border-slate-300 dark:border-slate-800 rounded-3xl p-16 text-center max-w-2xl mx-auto bg-slate-50 dark:bg-slate-900/50">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-emerald-500/10 mb-6">
-            <CheckCircle className="w-10 h-10 text-emerald-500" />
-          </div>
-          <h3 className="text-2xl font-bold mb-3">Knowledge Base is Healthy</h3>
-          <p className="text-muted-foreground">All recent interactions have been processed. The AI is fully up to date with its current training data.</p>
-        </div>
-      ) : (
-        <div className="grid gap-6">
-          {pending.map((faq) => (
-            <div key={faq.id} className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-md bg-card transition-all">
-              <div className="p-8">
-                <div className="flex items-start gap-4 mb-6">
-                  <div className="p-2 bg-blue-500/10 rounded-lg shrink-0 mt-1">
-                    <User className="w-5 h-5 text-blue-500" />
-                  </div>
-                  <div className="flex-1">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-blue-500 block mb-1">Customer Question</span>
-                    <h3 className="text-lg font-semibold leading-relaxed">{faq.suggested_question}</h3>
-                  </div>
-                </div>
-                
-                <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl p-6 border flex items-start gap-4">
-                  <div className="p-2 bg-emerald-500/10 rounded-lg shrink-0 mt-1">
-                    <Bot className="w-5 h-5 text-emerald-500" />
-                  </div>
-                  <div className="flex-1">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-500 block mb-1">AI Draft Answer</span>
-                    <p className="whitespace-pre-wrap leading-relaxed">{faq.suggested_answer}</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-slate-50 dark:bg-slate-900/50 px-8 py-5 border-t flex items-center justify-between">
-                <div className="flex items-center text-xs text-muted-foreground">
-                  <Database className="w-3.5 h-3.5 mr-2" />
-                  Captured {new Date(faq.created_at).toLocaleDateString()}
-                </div>
-                <div className="flex space-x-3">
-                  <button
-                    onClick={() => handleDiscard(faq.id)}
-                    disabled={processingId === faq.id}
-                    className="flex items-center px-4 py-2.5 text-rose-500 font-medium rounded-xl transition-all active:scale-95 hover:bg-rose-50 dark:hover:bg-rose-500/10 disabled:opacity-50"
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Discard
-                  </button>
-                  <button
-                    onClick={() => handleVerify(faq.suggested_question, faq.suggested_answer, faq.id)}
-                    disabled={processingId === faq.id}
-                    className="flex items-center px-6 py-2.5 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-500/20 active:scale-95 disabled:opacity-50"
-                  >
-                    {processingId === faq.id ? (
-                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                    )}
-                    Approve & Train AI
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
+      {/* Meta Permission Notice */}
+      <div className="flex items-start gap-2 rounded-xl border border-blue-500/25 bg-blue-500/5 px-3.5 py-2.5 text-xs text-blue-800 dark:text-blue-200">
+        <Info className="w-4 h-4 shrink-0 mt-0.5" />
+        <span>
+          <b>Meta Send permission pending:</b> No messages are sent automatically. Use <b>Copy Reply</b> on any card to paste into Meta Business Suite / Messenger, and turn on <b>Sales Pop-up</b> under Accuracy &amp; Rules once dry-run results look accurate.
+        </span>
+      </div>
+
+      {error && (
+        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3.5 py-2.5 text-xs text-rose-700 dark:text-rose-300">
+          {error}
         </div>
       )}
+
+      {/* KPI Strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="border border-border rounded-2xl p-3 bg-card">
+          <div className="text-[10px] font-bold uppercase text-muted-foreground">Pending Checks</div>
+          <div className="text-xl font-bold mt-0.5">{data?.pendingActions.length ?? 0}</div>
+        </div>
+        <div className="border border-border rounded-2xl p-3 bg-card">
+          <div className="text-[10px] font-bold uppercase text-muted-foreground">Overall Accuracy</div>
+          <div className="text-xl font-bold mt-0.5">{overallPct} <span className="text-xs font-normal text-muted-foreground">({totalReviewed} checked)</span></div>
+        </div>
+        <div className="border border-border rounded-2xl p-3 bg-card">
+          <div className="text-[10px] font-bold uppercase text-muted-foreground">Active Lessons</div>
+          <div className="text-xl font-bold mt-0.5">{data?.lessons.filter((l) => l.active).length ?? 0}</div>
+        </div>
+        <div className="border border-border rounded-2xl p-3 bg-card">
+          <div className="text-[10px] font-bold uppercase text-muted-foreground">Product Aliases</div>
+          <div className="text-xl font-bold mt-0.5">{data?.aliases.length ?? 0}</div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex flex-wrap gap-1.5 border-b border-border pb-2">
+        {[
+          { key: 'pending' as const, label: `Pending Checks (${data?.pendingActions.length ?? 0})` },
+          { key: 'rules' as const, label: 'Accuracy & Rollout Rules' },
+          { key: 'lessons' as const, label: `Mistake Log & Aliases (${(data?.lessons.length ?? 0) + (data?.aliases.length ?? 0)})` },
+        ].map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setTab(t.key)}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+              tab === t.key ? 'bg-primary text-primary-foreground' : 'bg-muted/50 hover:bg-muted text-muted-foreground'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {loading && !data ? (
+        <div className="py-16 text-center text-xs text-muted-foreground">Loading Copilot dashboard...</div>
+      ) : tab === 'pending' ? (
+        data && data.pendingActions.length === 0 ? (
+          <div className="border-2 border-dashed border-border rounded-2xl p-12 text-center space-y-2">
+            <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto opacity-80" />
+            <div className="font-bold text-sm">No pending Messenger AI checks</div>
+            <p className="text-xs text-muted-foreground max-w-md mx-auto">
+              Click <b>Scan Recent Chats</b> above to analyze recent unanalyzed Messenger bursts and review what the Copilot proposes.
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            {data?.pendingActions.map((a) => (
+              <MessengerAiActionCard
+                key={a.id}
+                action={a}
+                busy={busyId === a.id}
+                onConfirm={(p) => void handleConfirm(a, p)}
+                onEdit={(p) => setEditing({ action: a, payload: p })}
+                onReject={() => setRejecting(a)}
+              />
+            ))}
+          </div>
+        )
+      ) : data ? (
+        <MessengerAiAccuracyPanel
+          data={data}
+          section={tab === 'rules' ? 'rules' : 'lessons'}
+          onUpdateRule={updateRule}
+          onToggleLesson={toggleLesson}
+          onDeleteLesson={deleteLesson}
+          onAddAlias={addAlias}
+          onDeleteAlias={deleteAlias}
+        />
+      ) : null}
+
+      <MessengerAiEditDialog
+        action={editing?.action ?? null}
+        initialPayload={editing?.payload ?? null}
+        open={Boolean(editing)}
+        busy={Boolean(editing && busyId === editing.action.id)}
+        onOpenChange={(o) => { if (!o) setEditing(null); }}
+        onSave={async (editedPayload) => {
+          if (!editing) return;
+          try {
+            const res = await reviewAction({
+              actionId: editing.action.id,
+              verdict: 'edited',
+              finalPayload: editedPayload,
+            });
+            setEditing(null);
+            toast({ title: res.appliedSummary || 'Saved & applied correction' });
+          } catch (err) {
+            toast({ variant: 'destructive', title: 'Could not apply', description: err instanceof Error ? err.message : String(err) });
+          }
+        }}
+      />
+
+      <MessengerAiRejectDialog
+        open={Boolean(rejecting)}
+        busy={Boolean(rejecting && busyId === rejecting.id)}
+        onOpenChange={(o) => { if (!o) setRejecting(null); }}
+        onConfirmReject={async (cat: MessengerAiErrorCategory, note: string | null) => {
+          if (!rejecting) return;
+          try {
+            await reviewAction({ actionId: rejecting.id, verdict: 'rejected', errorCategory: cat, staffNote: note });
+            setRejecting(null);
+            toast({ title: 'Marked Mali — lesson saved' });
+          } catch (err) {
+            toast({ variant: 'destructive', title: 'Error', description: err instanceof Error ? err.message : String(err) });
+          }
+        }}
+      />
     </div>
   );
 }
